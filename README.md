@@ -31,4 +31,4 @@ query parameters through to this page (most tools have a "pass URL parameters on
 </script>
 ```
 
-Replace `PLACEHOLDER_TEST_SLUG` with the test's slug shown on its report page.
+Replace `PLACEHOLDER_TEST_SLUG` with the test's slug shown on its report page. Also replace `ir.seudominio.com` with the domain you configured for your Vercel redirect service (step 3 in Deploy).
