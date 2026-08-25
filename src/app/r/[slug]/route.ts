@@ -11,9 +11,10 @@ import {
 
 const COOKIE_MAX_AGE_DAYS = Number(process.env.COOKIE_MAX_AGE_DAYS ?? '30')
 
-export async function GET(request: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const db = createServiceRoleClient()
-  const test = await getTestBySlug(db, params.slug)
+  const test = await getTestBySlug(db, slug)
 
   if (!test || test.status !== 'active' || test.variants.length === 0) {
     if (test?.fallback_url) {
