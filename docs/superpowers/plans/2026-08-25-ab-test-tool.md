@@ -825,7 +825,7 @@ describe('GET /r/[slug]', () => {
     })
 
     const request = new NextRequest('https://ir.example.com/r/oferta-x')
-    const response = await GET(request, { params: { slug: 'oferta-x' } })
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
 
     expect(response.status).toBe(302)
     const location = new URL(response.headers.get('location')!)
@@ -837,7 +837,7 @@ describe('GET /r/[slug]', () => {
   it('returns 404 when the test is missing and there is no fallback', async () => {
     vi.mocked(getTestBySlug).mockResolvedValue(null)
     const request = new NextRequest('https://ir.example.com/r/missing')
-    const response = await GET(request, { params: { slug: 'missing' } })
+    const response = await GET(request, { params: Promise.resolve({ slug: 'missing' }) })
     expect(response.status).toBe(404)
   })
 
@@ -850,7 +850,7 @@ describe('GET /r/[slug]', () => {
       variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page' }],
     })
     const request = new NextRequest('https://ir.example.com/r/oferta-x')
-    const response = await GET(request, { params: { slug: 'oferta-x' } })
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     expect(response.status).toBe(302)
     expect(response.headers.get('location')).toBe('https://example.com/fallback')
   })
@@ -869,7 +869,7 @@ describe('GET /r/[slug]', () => {
     const request = new NextRequest('https://ir.example.com/r/oferta-x', {
       headers: { cookie: 'ir_t_oferta-x=v2' },
     })
-    const response = await GET(request, { params: { slug: 'oferta-x' } })
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     const location = new URL(response.headers.get('location')!)
     expect(location.origin + location.pathname).toBe('https://example.com/b')
   })
@@ -900,9 +900,10 @@ import {
 
 const COOKIE_MAX_AGE_DAYS = Number(process.env.COOKIE_MAX_AGE_DAYS ?? '30')
 
-export async function GET(request: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const db = createServiceRoleClient()
-  const test = await getTestBySlug(db, params.slug)
+  const test = await getTestBySlug(db, slug)
 
   if (!test || test.status !== 'active' || test.variants.length === 0) {
     if (test?.fallback_url) {
@@ -1426,7 +1427,7 @@ describe('GET /ty/[slug]', () => {
   it('records a conversion when tid matches a click event', async () => {
     vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1' })
     const request = new NextRequest('https://ir.example.com/ty/oferta-x?tid=trk_1')
-    const response = await GET(request, { params: { slug: 'oferta-x' } })
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     expect(response.headers.get('content-type')).toBe('image/gif')
     expect(insertConversionIfNew).toHaveBeenCalledWith(
       expect.anything(),
@@ -1436,7 +1437,7 @@ describe('GET /ty/[slug]', () => {
 
   it('still returns the pixel when tid is missing', async () => {
     const request = new NextRequest('https://ir.example.com/ty/oferta-x')
-    const response = await GET(request, { params: { slug: 'oferta-x' } })
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     expect(response.status).toBe(200)
     expect(insertConversionIfNew).not.toHaveBeenCalled()
   })
@@ -1444,7 +1445,7 @@ describe('GET /ty/[slug]', () => {
   it('still returns the pixel when tid matches no click event', async () => {
     vi.mocked(getClickEventByTrackingId).mockResolvedValue(null)
     const request = new NextRequest('https://ir.example.com/ty/oferta-x?tid=unknown')
-    const response = await GET(request, { params: { slug: 'oferta-x' } })
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     expect(response.status).toBe(200)
     expect(insertConversionIfNew).not.toHaveBeenCalled()
   })
@@ -1468,7 +1469,7 @@ import { getClickEventByTrackingId, insertConversionIfNew } from '@/lib/repo/con
 
 const TRANSPARENT_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7', 'base64')
 
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest, _context: { params: Promise<{ slug: string }> }) {
   const trackingId = request.nextUrl.searchParams.get('tid')
 
   if (trackingId) {
@@ -1880,12 +1881,13 @@ Create `src/app/dashboard/clients/[clientSlug]/page.tsx`:
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 
-export default async function ClientPage({ params }: { params: { clientSlug: string } }) {
+export default async function ClientPage({ params }: { params: Promise<{ clientSlug: string }> }) {
+  const { clientSlug } = await params
   const supabase = await createServerSupabaseClient()
   const { data: client } = await supabase
     .from('clients')
     .select('id, name, slug')
-    .eq('slug', params.clientSlug)
+    .eq('slug', clientSlug)
     .maybeSingle()
 
   if (!client) notFound()
@@ -2120,13 +2122,14 @@ import { notFound } from 'next/navigation'
 export default async function TestReportPage({
   params,
 }: {
-  params: { clientSlug: string; testSlug: string }
+  params: Promise<{ clientSlug: string; testSlug: string }>
 }) {
+  const { testSlug } = await params
   const supabase = await createServerSupabaseClient()
   const { data: test } = await supabase
     .from('tests')
     .select('id, name, slug, status')
-    .eq('slug', params.testSlug)
+    .eq('slug', testSlug)
     .maybeSingle()
 
   if (!test) notFound()
