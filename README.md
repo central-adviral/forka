@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AB Test Tool
 
-## Getting Started
+## Deploy
 
-First, run the development server:
+1. Create a Supabase project (production), run `npx supabase link` and `npx supabase db push` to apply migrations.
+2. Create a Vercel project pointed at this repo. Set env vars: `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HUBLA_WEBHOOK_TOKEN`, `COOKIE_MAX_AGE_DAYS`.
+3. In Vercel, add the custom domain used for redirects (e.g. `ir.seudominio.com`) and create the CNAME
+   record your DNS provider requests.
+4. In Hubla's webhook settings, register `https://ir.seudominio.com/api/webhooks/hubla` for the
+   "Pagamento da fatura realizado" (invoice.payment_succeeded) event, and set the webhook token to the
+   same value as `HUBLA_WEBHOOK_TOKEN`.
+5. Create your first login user via Supabase Studio (Authentication > Users > Add user).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Thank-you page pixel (capture tests)
+
+On any thank-you page whose test uses `conversion_method: thank_you_page`, add this snippet. It reads the
+tracking id from the page's own URL query string — your funnel/page-builder must forward the original
+query parameters through to this page (most tools have a "pass URL parameters on redirect" toggle):
+
+```html
+<script>
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var tid = params.get('utm_content') || params.get('tid');
+    if (tid) {
+      var img = new Image();
+      img.src = 'https://ir.seudominio.com/ty/PLACEHOLDER_TEST_SLUG?tid=' + encodeURIComponent(tid);
+    }
+  })();
+</script>
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Replace `PLACEHOLDER_TEST_SLUG` with the test's slug shown on its report page.
