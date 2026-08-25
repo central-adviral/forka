@@ -1511,7 +1511,7 @@ git commit -m "feat: add thank-you page pixel route handler"
 ### Task 11: Auth wiring and dashboard shell
 
 **Files:**
-- Create: `src/lib/supabase/middleware.ts`, `middleware.ts`, `src/lib/supabase/server.ts`, `src/lib/supabase/browser.ts`
+- Create: `src/lib/supabase/middleware.ts`, `src/middleware.ts`, `src/lib/supabase/server.ts`, `src/lib/supabase/browser.ts`
 - Create: `src/app/login/page.tsx`, `src/app/dashboard/layout.tsx`, `src/app/dashboard/page.tsx`
 
 **Interfaces:**
@@ -1555,7 +1555,7 @@ export async function updateSession(request: NextRequest) {
 }
 ```
 
-Create `middleware.ts` at the project root:
+Create `src/middleware.ts` (this project uses `--src-dir`, so Next.js requires middleware to live inside `src/`, not at the project root):
 
 ```ts
 import { type NextRequest } from 'next/server'
@@ -1723,7 +1723,7 @@ In the browser: visiting `http://localhost:3000/dashboard` while logged out redi
 - [ ] **Step 6: Commit**
 
 ```bash
-git add middleware.ts src/lib/supabase/middleware.ts src/lib/supabase/server.ts src/lib/supabase/browser.ts src/app/login src/app/dashboard
+git add src/middleware.ts src/lib/supabase/middleware.ts src/lib/supabase/server.ts src/lib/supabase/browser.ts src/app/login src/app/dashboard
 git commit -m "feat: add Supabase auth wiring and dashboard shell"
 ```
 
