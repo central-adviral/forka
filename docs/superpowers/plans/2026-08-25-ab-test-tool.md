@@ -664,16 +664,21 @@ beforeAll(async () => {
   clientId = client!.id
   testSlug = `slug-${Date.now()}`
 
-  const { data: testId } = await db.rpc('create_test_with_variants', {
-    p_client_id: clientId,
-    p_name: 'Repo Test',
-    p_slug: testSlug,
-    p_fallback_url: null,
-    p_conversion_method: 'thank_you_page',
-    p_variants: [{ name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' }],
-  })
-  const { data: variants } = await db.from('variants').select('id').eq('test_id', testId)
-  variantId = variants![0].id
+  // Seeded via direct service-role inserts, not the create_test_with_variants RPC:
+  // that RPC only grants EXECUTE to `authenticated` and checks owner_id = auth.uid(),
+  // which is null under a service-role client. service_role bypasses RLS and has
+  // the table-level GRANTs from Task 2, so direct inserts work with no auth context.
+  const { data: test } = await db
+    .from('tests')
+    .insert({ client_id: clientId, name: 'Repo Test', slug: testSlug, conversion_method: 'thank_you_page' })
+    .select()
+    .single()
+  const { data: variant } = await db
+    .from('variants')
+    .insert({ test_id: test!.id, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' })
+    .select()
+    .single()
+  variantId = variant!.id
 })
 
 describe('redirect-repo', () => {
@@ -1109,21 +1114,31 @@ beforeAll(async () => {
     .insert({ owner_id: user.user!.id, name: 'ConvRepo', slug: `conv-repo-${Date.now()}` })
     .select()
     .single()
-  const { data: testId } = await db.rpc('create_test_with_variants', {
-    p_client_id: client!.id,
-    p_name: 'Conv Test',
-    p_slug: `conv-slug-${Date.now()}`,
-    p_fallback_url: null,
-    p_conversion_method: 'hubla_webhook',
-    p_variants: [{ name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' }],
-  })
-  const { data: variants } = await db.from('variants').select('id').eq('test_id', testId)
+
+  // Seeded via direct service-role inserts, not the create_test_with_variants RPC —
+  // same reasoning as Task 5: that RPC requires an authenticated-user auth.uid(),
+  // which a service-role client does not have.
+  const { data: test } = await db
+    .from('tests')
+    .insert({
+      client_id: client!.id,
+      name: 'Conv Test',
+      slug: `conv-slug-${Date.now()}`,
+      conversion_method: 'hubla_webhook',
+    })
+    .select()
+    .single()
+  const { data: variant } = await db
+    .from('variants')
+    .insert({ test_id: test!.id, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' })
+    .select()
+    .single()
   trackingId = crypto.randomUUID()
   const { data: clickEvent } = await db
     .from('click_events')
     .insert({
-      test_id: testId,
-      variant_id: variants![0].id,
+      test_id: test!.id,
+      variant_id: variant!.id,
       visitor_id: 'visitor-x',
       tracking_id: trackingId,
       source_utms: {},
