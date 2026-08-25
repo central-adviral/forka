@@ -6,6 +6,7 @@ import { getClickEventByTrackingId, insertConversionIfNew } from '@/lib/repo/con
 export async function POST(request: NextRequest) {
   const receivedToken = request.headers.get('x-hubla-token')
   if (!verifyHublaToken(receivedToken, process.env.HUBLA_WEBHOOK_TOKEN!)) {
+    console.error('[hubla-webhook] rejected: invalid or missing x-hubla-token')
     return new NextResponse('Invalid token', { status: 401 })
   }
 
