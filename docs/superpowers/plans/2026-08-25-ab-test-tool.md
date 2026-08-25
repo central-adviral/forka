@@ -1161,10 +1161,15 @@ describe('conversion-repo', () => {
   })
 
   it('inserts a conversion and reports duplicate on retry', async () => {
+    // Unique per run: conversions.external_event_id has a DB-wide unique index
+    // (not scoped per click_event), so a fixed literal would falsely report
+    // 'duplicate' on a fresh first insert when this suite reruns against the
+    // same persistent local Supabase instance.
+    const externalEventId = `inv_dup_${Date.now()}`
     const first = await insertConversionIfNew(db, {
       clickEventId,
       source: 'hubla_webhook',
-      externalEventId: 'inv_dup_1',
+      externalEventId,
       valueCents: 5000,
     })
     expect(first).toBe('inserted')
@@ -1172,7 +1177,7 @@ describe('conversion-repo', () => {
     const second = await insertConversionIfNew(db, {
       clickEventId,
       source: 'hubla_webhook',
-      externalEventId: 'inv_dup_1',
+      externalEventId,
       valueCents: 5000,
     })
     expect(second).toBe('duplicate')
