@@ -1,0 +1,74 @@
+import { describe, it, expect, beforeAll } from 'vitest'
+import { createClient } from '@supabase/supabase-js'
+
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321'
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+const admin = createClient(URL, SERVICE_ROLE_KEY)
+
+async function createTestUser(email: string) {
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password: 'password123',
+    email_confirm: true,
+  })
+  if (error) throw error
+  return data.user!
+}
+
+async function signIn(email: string) {
+  const client = createClient(URL, ANON_KEY)
+  const { error } = await client.auth.signInWithPassword({ email, password: 'password123' })
+  if (error) throw error
+  return client
+}
+
+describe('schema RLS isolation', () => {
+  it('owner can see their client, another user cannot', async () => {
+    const ownerEmail = `owner-${Date.now()}@example.com`
+    const otherEmail = `other-${Date.now()}@example.com`
+    const owner = await createTestUser(ownerEmail)
+    await createTestUser(otherEmail)
+
+    const { data: client, error } = await admin
+      .from('clients')
+      .insert({ owner_id: owner.id, name: 'Cliente Teste', slug: `cliente-${Date.now()}` })
+      .select()
+      .single()
+    if (error) throw error
+
+    const ownerClient = await signIn(ownerEmail)
+    const { data: ownVisible } = await ownerClient.from('clients').select('id').eq('id', client.id)
+    expect(ownVisible).toHaveLength(1)
+
+    const otherClient = await signIn(otherEmail)
+    const { data: otherVisible } = await otherClient.from('clients').select('id').eq('id', client.id)
+    expect(otherVisible).toHaveLength(0)
+  })
+
+  it('create_test_with_variants rejects weights that do not sum to 100', async () => {
+    const email = `owner2-${Date.now()}@example.com`
+    const user = await createTestUser(email)
+    const { data: client } = await admin
+      .from('clients')
+      .insert({ owner_id: user.id, name: 'C2', slug: `c2-${Date.now()}` })
+      .select()
+      .single()
+
+    const asOwner = await signIn(email)
+    const { error } = await asOwner.rpc('create_test_with_variants', {
+      p_client_id: client!.id,
+      p_name: 'Teste X',
+      p_slug: `teste-x-${Date.now()}`,
+      p_fallback_url: null,
+      p_conversion_method: 'thank_you_page',
+      p_variants: [
+        { name: 'A', weight_pct: 50, destination_url: 'https://example.com/a' },
+        { name: 'B', weight_pct: 40, destination_url: 'https://example.com/b' },
+      ],
+    })
+    expect(error).not.toBeNull()
+    expect(error!.message).toContain('sum to 100')
+  })
+})
