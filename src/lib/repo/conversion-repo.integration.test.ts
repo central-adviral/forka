@@ -63,10 +63,11 @@ describe('conversion-repo', () => {
   })
 
   it('inserts a conversion and reports duplicate on retry', async () => {
+    const externalEventId = `inv_dup_${Date.now()}`
     const first = await insertConversionIfNew(db, {
       clickEventId,
       source: 'hubla_webhook',
-      externalEventId: 'inv_dup_1',
+      externalEventId,
       valueCents: 5000,
     })
     expect(first).toBe('inserted')
@@ -74,7 +75,7 @@ describe('conversion-repo', () => {
     const second = await insertConversionIfNew(db, {
       clickEventId,
       source: 'hubla_webhook',
-      externalEventId: 'inv_dup_1',
+      externalEventId,
       valueCents: 5000,
     })
     expect(second).toBe('duplicate')
