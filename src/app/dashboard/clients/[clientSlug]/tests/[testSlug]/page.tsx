@@ -28,11 +28,16 @@ export default async function TestReportPage({
   const supabase = await createServerSupabaseClient()
   const { data: test } = await supabase
     .from('tests')
-    .select('id, name, slug, status')
+    .select('id, name, slug, status, conversion_method')
     .eq('slug', testSlug)
     .maybeSingle()
 
   if (!test) notFound()
+
+  const { data: pixelVariants } =
+    test.conversion_method === 'thank_you_page'
+      ? await supabase.from('variants').select('id, name, thank_you_url').eq('test_id', test.id)
+      : { data: null }
 
   const { data: report } = await supabase.rpc('get_test_report', { p_test_id: test.id })
   const { data: sourceReport } = await supabase.rpc('get_test_report_by_source', { p_test_id: test.id })
@@ -138,6 +143,41 @@ export default async function TestReportPage({
           ))}
         </tbody>
       </table>
+      {pixelVariants && pixelVariants.length > 0 && (
+        <div className="mt-8">
+          <h2 className="mb-2 text-lg font-semibold">Pixel de conversão (thank-you page)</h2>
+          {pixelVariants.map((variant) => (
+            <div key={variant.id} className="mb-4 rounded border p-3">
+              <p className="mb-2 text-sm text-gray-600">
+                Variante {variant.name}
+                {variant.thank_you_url ? (
+                  <>
+                    {' '}
+                    — cole na página:{' '}
+                    <a className="text-blue-600 underline" href={variant.thank_you_url}>
+                      {variant.thank_you_url}
+                    </a>
+                  </>
+                ) : (
+                  <> — nenhuma URL de thank-you configurada para esta variante</>
+                )}
+              </p>
+              <pre className="overflow-x-auto rounded bg-gray-100 p-2 text-xs">
+                <code>{`<script>
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var tid = params.get('utm_content') || params.get('tid');
+    if (tid) {
+      var img = new Image();
+      img.src = 'https://${process.env.NEXT_PUBLIC_REDIRECT_DOMAIN}/ty/${test.slug}?tid=' + encodeURIComponent(tid);
+    }
+  })();
+</script>`}</code>
+              </pre>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
