@@ -146,22 +146,31 @@ export default async function TestReportPage({
       {pixelVariants && pixelVariants.length > 0 && (
         <div className="mt-8">
           <h2 className="mb-2 text-lg font-semibold">Pixel de conversão (thank-you page)</h2>
-          {pixelVariants.map((variant) => (
-            <div key={variant.id} className="mb-4 rounded border p-3">
-              <p className="mb-2 text-sm text-gray-600">
-                Variante {variant.name}
-                {variant.thank_you_url ? (
-                  <>
-                    {' '}
-                    — cole na página:{' '}
-                    <a className="text-blue-600 underline" href={variant.thank_you_url}>
-                      {variant.thank_you_url}
-                    </a>
-                  </>
-                ) : (
-                  <> — nenhuma URL de thank-you configurada para esta variante</>
-                )}
-              </p>
+          {pixelVariants.map((variant) => {
+            const isSafeUrl = variant.thank_you_url ? /^https?:\/\//i.test(variant.thank_you_url) : false
+            return (
+              <div key={variant.id} className="mb-4 rounded border p-3">
+                <p className="mb-2 text-sm text-gray-600">
+                  Variante {variant.name}
+                  {variant.thank_you_url && isSafeUrl ? (
+                    <>
+                      {' '}
+                      — cole na página:{' '}
+                      <a
+                        className="text-blue-600 underline"
+                        href={variant.thank_you_url}
+                        rel="noopener noreferrer"
+                        target="_blank"
+                      >
+                        {variant.thank_you_url}
+                      </a>
+                    </>
+                  ) : variant.thank_you_url ? (
+                    <> — URL de thank-you configurada tem um formato inválido: {variant.thank_you_url}</>
+                  ) : (
+                    <> — nenhuma URL de thank-you configurada para esta variante</>
+                  )}
+                </p>
               <pre className="overflow-x-auto rounded bg-gray-100 p-2 text-xs">
                 <code>{`<script>
   (function () {
@@ -175,7 +184,8 @@ export default async function TestReportPage({
 </script>`}</code>
               </pre>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
