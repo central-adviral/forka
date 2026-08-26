@@ -9,14 +9,14 @@ export default function NewClientPage() {
           name="name"
           required
           placeholder="Nome"
-          className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]"
+          className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
         />
         <input
           name="slug"
           required
           placeholder="slug (ex: nicho-fitness)"
           pattern="[a-z0-9-]+"
-          className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]"
+          className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
         />
         <button type="submit" className="rounded-[10px] bg-[#7C6FF0] px-4 py-2.5 text-sm font-semibold text-[#0B0E1A]">
           Criar

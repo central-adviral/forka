@@ -45,6 +45,17 @@ export default async function TestReportPage({
 
   const { data: report } = await supabase.rpc('get_test_report', { p_test_id: test.id })
   const { data: sourceReport } = await supabase.rpc('get_test_report_by_source', { p_test_id: test.id })
+
+  if (!report || report.length === 0) {
+    return (
+      <div className="p-8">
+        <p className="text-sm text-[#8A90A6]">
+          Não foi possível carregar os dados deste teste. Tente novamente em instantes.
+        </p>
+      </div>
+    )
+  }
+
   const redirectUrl = `https://${process.env.NEXT_PUBLIC_REDIRECT_DOMAIN}/r/${test.slug}`
 
   const baseRows = ((report as ReportRow[]) ?? []).map((row) => ({

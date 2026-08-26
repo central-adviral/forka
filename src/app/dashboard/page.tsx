@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 
 interface UsageStats {
   total_clients: number
@@ -22,9 +23,9 @@ export default async function DashboardPage() {
         </p>
       )}
       {(!clients || clients.length === 0) && (
-        <a href="/dashboard/clients/new" className="text-sm font-medium text-[#7C6FF0] hover:text-[#9C90F5]">
+        <Link href="/dashboard/clients/new" className="text-sm font-medium text-[#7C6FF0] hover:text-[#9C90F5]">
           + Criar seu primeiro cliente
-        </a>
+        </Link>
       )}
     </div>
   )

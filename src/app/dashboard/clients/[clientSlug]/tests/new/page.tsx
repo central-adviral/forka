@@ -14,7 +14,7 @@ interface VariantForm {
 }
 
 const inputClass =
-  'w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]'
+  'w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]'
 
 export default function NewTestPage() {
   const params = useParams<{ clientSlug: string }>()

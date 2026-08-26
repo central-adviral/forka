@@ -54,8 +54,10 @@ export function computeReportLayout(variants: ReportVariantInput[], fallbackConf
   }
 
   const totalVariantHeight = variants.length * VARIANT.h + (variants.length - 1) * VARIANT.gap
-  const variantStartY = (CANVAS_HEIGHT - totalVariantHeight) / 2
-  const entryNode: ReportNode = { x: ENTRY.x, y: (CANVAS_HEIGHT - ENTRY.h) / 2, w: ENTRY.w, h: ENTRY.h }
+  const PAD = 40 // vertical breathing room above/below the variant stack when it's the tallest column
+  const canvasHeight = Math.max(CANVAS_HEIGHT, totalVariantHeight + PAD * 2)
+  const variantStartY = (canvasHeight - totalVariantHeight) / 2
+  const entryNode: ReportNode = { x: ENTRY.x, y: (canvasHeight - ENTRY.h) / 2, w: ENTRY.w, h: ENTRY.h }
   const entryCenterY = entryNode.y + entryNode.h / 2
   const entryRightX = entryNode.x + entryNode.w
 
@@ -113,5 +115,5 @@ export function computeReportLayout(variants: ReportVariantInput[], fallbackConf
       }
     : null
 
-  return { canvasWidth: CANVAS_WIDTH, canvasHeight: CANVAS_HEIGHT, entryNode, variants: variantLayouts, fallback }
+  return { canvasWidth: CANVAS_WIDTH, canvasHeight, entryNode, variants: variantLayouts, fallback }
 }

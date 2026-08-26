@@ -56,4 +56,19 @@ describe('computeReportLayout', () => {
   it('throws on an empty variant list', () => {
     expect(() => computeReportLayout([], false)).toThrow()
   })
+
+  it('grows the canvas height to fit 5+ variants without clipping', () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({
+      id: `v${i}`,
+      name: `V${i}`,
+      weightPct: 100 / 6,
+      visits: 100,
+      conversions: 10,
+      destinationUrl: 'https://example.com',
+    }))
+    const layout = computeReportLayout(many, false)
+    const lastVariant = layout.variants[layout.variants.length - 1]
+    expect(lastVariant.node.y + lastVariant.node.h).toBeLessThanOrEqual(layout.canvasHeight)
+    expect(layout.variants[0].node.y).toBeGreaterThanOrEqual(0)
+  })
 })

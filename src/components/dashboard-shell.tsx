@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import Link from 'next/link'
 
 interface Client {
   id: string
@@ -43,7 +44,7 @@ export function DashboardShell({
           {clients.map((client) => {
             const active = pathname.startsWith(`/dashboard/clients/${client.slug}`)
             return (
-              <a
+              <Link
                 key={client.id}
                 href={`/dashboard/clients/${client.slug}`}
                 className={`flex items-center gap-2.5 rounded-lg px-2 py-2.5 ${active ? 'bg-[#7C6FF0]/[0.14]' : ''}`}
@@ -56,15 +57,15 @@ export function DashboardShell({
                   {initials(client.name)}
                 </span>
                 <span className={`text-[13.5px] ${active ? 'font-semibold' : 'text-[#8A90A6]'}`}>{client.name}</span>
-              </a>
+              </Link>
             )
           })}
         </nav>
 
         <div className="px-5 pt-2">
-          <a href="/dashboard/clients/new" className="text-[13px] font-medium text-[#7C6FF0] hover:text-[#9C90F5]">
+          <Link href="/dashboard/clients/new" className="text-[13px] font-medium text-[#7C6FF0] hover:text-[#9C90F5]">
             + Novo cliente
-          </a>
+          </Link>
         </div>
 
         <div className="mt-auto border-t border-white/[0.08] px-5 pt-4">
