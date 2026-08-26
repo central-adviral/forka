@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { probabilityToBeatControl } from '@/lib/domain/significance'
+import { toggleTestStatus } from './actions'
 
 interface ReportRow {
   variant_id: string
@@ -23,7 +24,7 @@ export default async function TestReportPage({
 }: {
   params: Promise<{ clientSlug: string; testSlug: string }>
 }) {
-  const { testSlug } = await params
+  const { clientSlug, testSlug } = await params
   const supabase = await createServerSupabaseClient()
   const { data: test } = await supabase
     .from('tests')
@@ -67,6 +68,22 @@ export default async function TestReportPage({
   return (
     <div>
       <h1 className="mb-2 text-lg font-semibold">{test.name}</h1>
+      <p className="mb-2 text-sm text-gray-600">
+        Status: <strong>{test.status === 'active' ? 'ativo' : 'pausado'}</strong>
+      </p>
+      <form
+        action={toggleTestStatus.bind(null, {
+          test_id: test.id,
+          next_status: test.status === 'active' ? 'paused' : 'active',
+          client_slug: clientSlug,
+          test_slug: test.slug,
+        })}
+        className="mb-4"
+      >
+        <button type="submit" className="rounded border px-3 py-1 text-sm">
+          {test.status === 'active' ? 'Pausar teste' : 'Ativar teste'}
+        </button>
+      </form>
       <p className="mb-4 text-sm text-gray-600">
         Link: <code className="rounded bg-gray-100 px-1">{redirectUrl}</code>
       </p>
