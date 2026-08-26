@@ -13,6 +13,9 @@ interface VariantForm {
   thank_you_url: string
 }
 
+const inputClass =
+  'w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]'
+
 export default function NewTestPage() {
   const params = useParams<{ clientSlug: string }>()
   const router = useRouter()
@@ -81,42 +84,80 @@ export default function NewTestPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-xl space-y-4">
-      <h1 className="text-lg font-semibold">Novo teste</h1>
-      <input required placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded border px-3 py-2" />
-      <input required placeholder="Slug (ex: oferta-x)" value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full rounded border px-3 py-2" />
-      <input placeholder="URL de fallback (opcional)" value={fallbackUrl} onChange={(e) => setFallbackUrl(e.target.value)} className="w-full rounded border px-3 py-2" />
-      <select value={conversionMethod} onChange={(e) => setConversionMethod(e.target.value as typeof conversionMethod)} className="w-full rounded border px-3 py-2">
-        <option value="hubla_webhook">Venda (webhook Hubla)</option>
-        <option value="thank_you_page">Captura (thank-you page)</option>
-      </select>
+    <div className="p-8">
+      <form onSubmit={handleSubmit} className="max-w-xl space-y-4">
+        <h1 className="font-['Space_Grotesk'] text-lg font-semibold">Novo teste</h1>
+        <input required placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+        <input
+          required
+          placeholder="Slug (ex: oferta-x)"
+          value={slug}
+          onChange={(e) => setSlug(e.target.value)}
+          className={inputClass}
+        />
+        <input
+          placeholder="URL de fallback (opcional)"
+          value={fallbackUrl}
+          onChange={(e) => setFallbackUrl(e.target.value)}
+          className={inputClass}
+        />
+        <select
+          value={conversionMethod}
+          onChange={(e) => setConversionMethod(e.target.value as typeof conversionMethod)}
+          className={inputClass}
+        >
+          <option value="hubla_webhook">Venda (webhook Hubla)</option>
+          <option value="thank_you_page">Captura (thank-you page)</option>
+        </select>
 
-      {variants.map((variant, index) => (
-        <fieldset key={index} className="space-y-2 rounded border p-3">
-          <legend className="text-sm font-medium">Variante {variant.name}</legend>
-          <input placeholder="Peso %" value={variant.weight_pct} onChange={(e) => updateVariant(index, 'weight_pct', e.target.value)} className="w-full rounded border px-3 py-2" />
-          <input placeholder="URL de destino" value={variant.destination_url} onChange={(e) => updateVariant(index, 'destination_url', e.target.value)} className="w-full rounded border px-3 py-2" />
-          {conversionMethod === 'thank_you_page' && (
-            <input placeholder="URL de thank-you" value={variant.thank_you_url} onChange={(e) => updateVariant(index, 'thank_you_url', e.target.value)} className="w-full rounded border px-3 py-2" />
-          )}
-        </fieldset>
-      ))}
+        {variants.map((variant, index) => (
+          <fieldset key={index} className="space-y-2 rounded-[10px] border border-white/[0.08] p-3">
+            <legend className="px-1 text-sm font-medium text-[#8A90A6]">Variante {variant.name}</legend>
+            <input
+              placeholder="Peso %"
+              value={variant.weight_pct}
+              onChange={(e) => updateVariant(index, 'weight_pct', e.target.value)}
+              className={inputClass}
+            />
+            <input
+              placeholder="URL de destino"
+              value={variant.destination_url}
+              onChange={(e) => updateVariant(index, 'destination_url', e.target.value)}
+              className={inputClass}
+            />
+            {conversionMethod === 'thank_you_page' && (
+              <input
+                placeholder="URL de thank-you"
+                value={variant.thank_you_url}
+                onChange={(e) => updateVariant(index, 'thank_you_url', e.target.value)}
+                className={inputClass}
+              />
+            )}
+          </fieldset>
+        ))}
 
-      <button
-        type="button"
-        onClick={() => setVariants((prev) => [...prev, { name: String.fromCharCode(65 + prev.length), weight_pct: '0', destination_url: '', thank_you_url: '' }])}
-        className="text-sm text-blue-600 underline"
-      >
-        + Adicionar variante
-      </button>
+        <button
+          type="button"
+          onClick={() =>
+            setVariants((prev) => [...prev, { name: String.fromCharCode(65 + prev.length), weight_pct: '0', destination_url: '', thank_you_url: '' }])
+          }
+          className="text-sm font-medium text-[#7C6FF0] hover:text-[#9C90F5]"
+        >
+          + Adicionar variante
+        </button>
 
-      {!weightsValid && <p className="text-sm text-amber-600">Os pesos devem somar 100%.</p>}
-      {clientLoading && <p className="text-sm text-gray-500">Carregando...</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+        {!weightsValid && <p className="text-sm text-[#F5B94D]">Os pesos devem somar 100%.</p>}
+        {clientLoading && <p className="text-sm text-[#8A90A6]">Carregando...</p>}
+        {error && <p className="text-sm text-[#F76C6C]">{error}</p>}
 
-      <button type="submit" disabled={!clientId} className="rounded bg-black px-3 py-2 text-white disabled:opacity-50">
-        Criar teste
-      </button>
-    </form>
+        <button
+          type="submit"
+          disabled={!clientId}
+          className="rounded-[10px] bg-[#7C6FF0] px-4 py-2.5 text-sm font-semibold text-[#0B0E1A] disabled:opacity-50"
+        >
+          Criar teste
+        </button>
+      </form>
+    </div>
   )
 }
