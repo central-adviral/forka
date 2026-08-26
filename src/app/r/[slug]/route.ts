@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { getTestBySlug, insertClickEvent } from '@/lib/repo/redirect-repo'
 import { pickVariant } from '@/lib/domain/pick-variant'
+import { isKnownBot } from '@/lib/domain/bot-filter'
 import {
   VISITOR_COOKIE,
   assignmentCookieName,
@@ -21,6 +22,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.redirect(test.fallback_url, 302)
     }
     return new NextResponse('Not found', { status: 404 })
+  }
+
+  if (isKnownBot(request.headers.get('user-agent'))) {
+    const destination = test.fallback_url ?? test.variants[0].destination_url
+    return NextResponse.redirect(destination, 302)
   }
 
   const cookieHeader = Object.fromEntries(request.cookies.getAll().map((c) => [c.name, c.value]))
