@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
+import { probabilityToBeatControl } from '@/lib/domain/significance'
 
 interface ReportRow {
   variant_id: string
@@ -27,14 +28,32 @@ export default async function TestReportPage({
   const { data: report } = await supabase.rpc('get_test_report', { p_test_id: test.id })
   const redirectUrl = `https://${process.env.NEXT_PUBLIC_REDIRECT_DOMAIN}/r/${test.slug}`
 
-  const rows = ((report as ReportRow[]) ?? []).map((row) => ({
+  const baseRows = ((report as ReportRow[]) ?? []).map((row) => ({
     ...row,
     rate: row.visits > 0 ? ((row.conversions / row.visits) * 100).toFixed(1) : '0.0',
   }))
-  const leaderId = rows.reduce(
-    (best: (typeof rows)[number] | undefined, row: (typeof rows)[number]) => (Number(row.rate) > Number(best?.rate ?? -1) ? row : best),
-    rows[0]
-  )?.variant_id
+  const control = baseRows[0]
+  const rows = baseRows.map((row) => ({
+    ...row,
+    confidencePct:
+      control && row.variant_id !== control.variant_id
+        ? Math.round(
+            probabilityToBeatControl(
+              { visits: control.visits, conversions: control.conversions },
+              { visits: row.visits, conversions: row.conversions }
+            ) * 100
+          )
+        : null,
+  }))
+  const totalVisits = rows.reduce((sum, row) => sum + row.visits, 0)
+  const leaderId =
+    totalVisits > 0
+      ? rows.reduce(
+          (best: (typeof rows)[number] | undefined, row: (typeof rows)[number]) =>
+            Number(row.rate) > Number(best?.rate ?? -1) ? row : best,
+          rows[0]
+        )?.variant_id
+      : undefined
 
   return (
     <div>
@@ -50,6 +69,7 @@ export default async function TestReportPage({
             <th>Visitas</th>
             <th>Conversões</th>
             <th>Taxa</th>
+            <th>Confiança</th>
           </tr>
         </thead>
         <tbody>
@@ -60,6 +80,11 @@ export default async function TestReportPage({
               <td>{row.visits}</td>
               <td>{row.conversions}</td>
               <td>{row.rate}%</td>
+              <td>
+                {row.confidencePct === null
+                  ? 'controle'
+                  : `${row.confidencePct}% de ser melhor que o controle`}
+              </td>
             </tr>
           ))}
         </tbody>

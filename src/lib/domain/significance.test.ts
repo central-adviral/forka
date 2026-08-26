@@ -1,0 +1,40 @@
+import { describe, it, expect } from 'vitest'
+import { probabilityToBeatControl } from './significance'
+
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+describe('probabilityToBeatControl', () => {
+  it('returns close to 0.5 when control and variant perform identically', () => {
+    const rand = mulberry32(1)
+    const p = probabilityToBeatControl({ visits: 500, conversions: 50 }, { visits: 500, conversions: 50 }, rand, 5000)
+    expect(p).toBeGreaterThan(0.3)
+    expect(p).toBeLessThan(0.7)
+  })
+
+  it('returns high confidence when the variant clearly outperforms', () => {
+    const rand = mulberry32(2)
+    const p = probabilityToBeatControl({ visits: 1000, conversions: 50 }, { visits: 1000, conversions: 150 }, rand, 5000)
+    expect(p).toBeGreaterThan(0.9)
+  })
+
+  it('returns low confidence when the variant clearly underperforms', () => {
+    const rand = mulberry32(3)
+    const p = probabilityToBeatControl({ visits: 1000, conversions: 150 }, { visits: 1000, conversions: 50 }, rand, 5000)
+    expect(p).toBeLessThan(0.1)
+  })
+
+  it('handles zero-visit variants without throwing', () => {
+    const rand = mulberry32(4)
+    const p = probabilityToBeatControl({ visits: 0, conversions: 0 }, { visits: 0, conversions: 0 }, rand, 1000)
+    expect(p).toBeGreaterThanOrEqual(0)
+    expect(p).toBeLessThanOrEqual(1)
+  })
+})
