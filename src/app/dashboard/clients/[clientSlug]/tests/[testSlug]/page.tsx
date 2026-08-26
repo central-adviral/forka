@@ -10,6 +10,14 @@ interface ReportRow {
   conversions: number
 }
 
+interface SourceReportRow {
+  variant_id: string
+  variant_name: string
+  utm_source: string
+  visits: number
+  conversions: number
+}
+
 export default async function TestReportPage({
   params,
 }: {
@@ -26,6 +34,7 @@ export default async function TestReportPage({
   if (!test) notFound()
 
   const { data: report } = await supabase.rpc('get_test_report', { p_test_id: test.id })
+  const { data: sourceReport } = await supabase.rpc('get_test_report_by_source', { p_test_id: test.id })
   const redirectUrl = `https://${process.env.NEXT_PUBLIC_REDIRECT_DOMAIN}/r/${test.slug}`
 
   const baseRows = ((report as ReportRow[]) ?? []).map((row) => ({
@@ -85,6 +94,29 @@ export default async function TestReportPage({
                   ? 'controle'
                   : `${row.confidencePct}% de ser melhor que o controle`}
               </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <h2 className="mb-2 mt-8 text-lg font-semibold">Por origem (UTM)</h2>
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b text-left">
+            <th className="py-2">Variante</th>
+            <th>Origem</th>
+            <th>Visitas</th>
+            <th>Conversões</th>
+            <th>Taxa</th>
+          </tr>
+        </thead>
+        <tbody>
+          {((sourceReport as SourceReportRow[]) ?? []).map((row) => (
+            <tr key={`${row.variant_id}-${row.utm_source}`}>
+              <td className="py-2">{row.variant_name}</td>
+              <td>{row.utm_source}</td>
+              <td>{row.visits}</td>
+              <td>{row.conversions}</td>
+              <td>{row.visits > 0 ? ((row.conversions / row.visits) * 100).toFixed(1) : '0.0'}%</td>
             </tr>
           ))}
         </tbody>
