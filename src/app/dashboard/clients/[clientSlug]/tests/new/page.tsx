@@ -25,6 +25,7 @@ export default function NewTestPage() {
     { name: 'B', weight_pct: '50', destination_url: '', thank_you_url: '' },
   ])
   const [error, setError] = useState<string | null>(null)
+  const [clientLoading, setClientLoading] = useState(true)
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient()
@@ -33,7 +34,14 @@ export default function NewTestPage() {
       .select('id')
       .eq('slug', params.clientSlug)
       .single()
-      .then(({ data }) => setClientId(data?.id ?? null))
+      .then(({ data, error }) => {
+        if (error) {
+          setError('Não foi possível carregar o cliente. Recarregue a página.')
+        } else {
+          setClientId(data?.id ?? null)
+        }
+        setClientLoading(false)
+      })
   }, [params.clientSlug])
 
   const weightsValid = weightsSumTo100(variants.map((v) => Number(v.weight_pct)))
@@ -101,9 +109,10 @@ export default function NewTestPage() {
       </button>
 
       {!weightsValid && <p className="text-sm text-amber-600">Os pesos devem somar 100%.</p>}
+      {clientLoading && <p className="text-sm text-gray-500">Carregando...</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <button type="submit" className="rounded bg-black px-3 py-2 text-white">
+      <button type="submit" disabled={!clientId} className="rounded bg-black px-3 py-2 text-white disabled:opacity-50">
         Criar teste
       </button>
     </form>

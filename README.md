@@ -4,7 +4,8 @@
 
 1. Create a Supabase project (production), run `npx supabase link` and `npx supabase db push` to apply migrations.
 2. Create a Vercel project pointed at this repo. Set env vars: `NEXT_PUBLIC_SUPABASE_URL`,
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HUBLA_WEBHOOK_TOKEN`, `COOKIE_MAX_AGE_DAYS`.
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HUBLA_WEBHOOK_TOKEN`, `COOKIE_MAX_AGE_DAYS`,
+   `NEXT_PUBLIC_REDIRECT_DOMAIN`.
 3. In Vercel, add the custom domain used for redirects (e.g. `ir.seudominio.com`) and create the CNAME
    record your DNS provider requests.
 4. In Hubla's webhook settings, register `https://ir.seudominio.com/api/webhooks/hubla` for the
