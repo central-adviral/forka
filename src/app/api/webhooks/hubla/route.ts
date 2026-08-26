@@ -10,8 +10,14 @@ export async function POST(request: NextRequest) {
     return new NextResponse('Invalid token', { status: 401 })
   }
 
-  const payload = await request.json()
-  const parsed = parseHublaPaymentSucceeded(payload)
+  let parsed
+  try {
+    const payload = await request.json()
+    parsed = parseHublaPaymentSucceeded(payload)
+  } catch (err) {
+    console.error('[hubla-webhook] failed to parse payload', err instanceof Error ? err.message : String(err))
+    return NextResponse.json({ ok: true, attributed: false })
+  }
 
   if (!parsed.trackingId) {
     return NextResponse.json({ ok: true, attributed: false })

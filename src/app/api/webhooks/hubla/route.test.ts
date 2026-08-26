@@ -34,6 +34,31 @@ describe('POST /api/webhooks/hubla', () => {
     expect(response.status).toBe(401)
   })
 
+  it('returns attributed:false instead of 500 when the body is not JSON', async () => {
+    vi.mocked(verifyHublaToken).mockReturnValue(true)
+    const request = new NextRequest('https://ir.example.com/api/webhooks/hubla', {
+      method: 'POST',
+      headers: { 'x-hubla-token': 'valid-token', 'content-type': 'application/json' },
+      body: 'not-json',
+    })
+    const response = await POST(request)
+    const json = await response.json()
+    expect(response.status).toBe(200)
+    expect(json).toEqual({ ok: true, attributed: false })
+  })
+
+  it('returns attributed:false instead of 500 when the payload is not a payment_succeeded event', async () => {
+    vi.mocked(verifyHublaToken).mockReturnValue(true)
+    vi.mocked(parseHublaPaymentSucceeded).mockImplementation(() => {
+      throw new Error('Hubla payload is not a payment_succeeded event: invoice.refunded')
+    })
+
+    const response = await POST(makeRequest({ type: 'invoice.refunded' }))
+    const json = await response.json()
+    expect(response.status).toBe(200)
+    expect(json).toEqual({ ok: true, attributed: false })
+  })
+
   it('returns attributed:false when tracking id is unknown', async () => {
     vi.mocked(verifyHublaToken).mockReturnValue(true)
     vi.mocked(parseHublaPaymentSucceeded).mockReturnValue({

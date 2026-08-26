@@ -15,6 +15,9 @@ export interface ParsedHublaEvent {
 }
 
 export function parseHublaPaymentSucceeded(payload: any): ParsedHublaEvent {
+  if (payload?.type !== 'invoice.payment_succeeded') {
+    throw new Error(`Hubla payload is not a payment_succeeded event: ${payload?.type}`)
+  }
   const invoice = payload?.event?.invoice
   if (!invoice?.id) {
     throw new Error('Hubla payload missing event.invoice.id')

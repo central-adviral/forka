@@ -19,6 +19,7 @@ describe('verifyHublaToken', () => {
 describe('parseHublaPaymentSucceeded', () => {
   it('extracts tracking id, external event id and value', () => {
     const payload = {
+      type: 'invoice.payment_succeeded',
       event: {
         invoice: {
           id: 'inv_123',
@@ -35,12 +36,28 @@ describe('parseHublaPaymentSucceeded', () => {
   })
 
   it('returns null tracking id when utm is missing', () => {
-    const payload = { event: { invoice: { id: 'inv_456', amount: { totalCents: 100 } } } }
+    const payload = {
+      type: 'invoice.payment_succeeded',
+      event: { invoice: { id: 'inv_456', amount: { totalCents: 100 } } },
+    }
     expect(parseHublaPaymentSucceeded(payload).trackingId).toBeNull()
   })
 
   it('throws when invoice id is missing', () => {
-    const payload = { event: { invoice: {} } }
+    const payload = { type: 'invoice.payment_succeeded', event: { invoice: {} } }
+    expect(() => parseHublaPaymentSucceeded(payload)).toThrow()
+  })
+
+  it('rejects a refund event instead of attributing it', () => {
+    const payload = {
+      type: 'invoice.refunded',
+      event: { invoice: { id: 'inv_1', firstPaymentSession: { utm: { content: 'trk_1' } } } },
+    }
+    expect(() => parseHublaPaymentSucceeded(payload)).toThrow()
+  })
+
+  it('rejects a payload with no event type at all', () => {
+    const payload = { event: { invoice: { id: 'inv_1' } } }
     expect(() => parseHublaPaymentSucceeded(payload)).toThrow()
   })
 })
