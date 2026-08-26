@@ -173,6 +173,11 @@ export default async function TestReportPage({
                     <> — nenhuma URL de thank-you configurada para esta variante</>
                   )}
                 </p>
+              <p className="mb-2 text-xs text-gray-500">
+                Importante: seu construtor de página/funil precisa estar configurado para repassar os
+                parâmetros da URL original no redirecionamento pra esta página, senão o pixel nunca recebe
+                o tracking id.
+              </p>
               <pre className="overflow-x-auto rounded bg-gray-100 p-2 text-xs">
                 <code>{`<script>
   (function () {

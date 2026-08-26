@@ -15,21 +15,8 @@
 
 ## Thank-you page pixel (capture tests)
 
-On any thank-you page whose test uses `conversion_method: thank_you_page`, add this snippet. It reads the
-tracking id from the page's own URL query string — your funnel/page-builder must forward the original
-query parameters through to this page (most tools have a "pass URL parameters on redirect" toggle):
-
-```html
-<script>
-  (function () {
-    var params = new URLSearchParams(window.location.search);
-    var tid = params.get('utm_content') || params.get('tid');
-    if (tid) {
-      var img = new Image();
-      img.src = 'https://ir.seudominio.com/ty/PLACEHOLDER_TEST_SLUG?tid=' + encodeURIComponent(tid);
-    }
-  })();
-</script>
-```
-
-Replace `PLACEHOLDER_TEST_SLUG` with the test's slug shown on its report page. Also replace `ir.seudominio.com` with the domain you configured for your Vercel redirect service (step 3 in Deploy).
+On any thank-you page whose test uses `conversion_method: thank_you_page`, this snippet is auto-generated
+per variant with your real domain and slug already filled in — go to the test's report page (Dashboard →
+client → test) and copy it from there. **Your funnel/page-builder must be configured to forward the
+original URL query parameters through to the thank-you page redirect, or the pixel will never receive a
+tracking id and will never fire.**
