@@ -51,7 +51,7 @@ export default async function TestReportPage({
   const rows = baseRows.map((row) => ({
     ...row,
     confidencePct:
-      control && row.variant_id !== control.variant_id
+      control && row.variant_id !== control.variant_id && control.visits > 0 && row.visits > 0
         ? Math.round(
             probabilityToBeatControl(
               { visits: control.visits, conversions: control.conversions },
@@ -112,9 +112,11 @@ export default async function TestReportPage({
               <td>{row.conversions}</td>
               <td>{row.rate}%</td>
               <td>
-                {row.confidencePct === null
-                  ? 'controle'
-                  : `${row.confidencePct}% de ser melhor que o controle`}
+                {row.confidencePct !== null
+                  ? `${row.confidencePct}% de ser melhor que o controle`
+                  : row.variant_id === control?.variant_id
+                    ? 'controle'
+                    : 'dados insuficientes'}
               </td>
             </tr>
           ))}
