@@ -1,7 +1,6 @@
 'use server'
 
 import { z } from 'zod'
-import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 const variantSchema = z.object({
@@ -13,7 +12,6 @@ const variantSchema = z.object({
 
 const createTestSchema = z.object({
   client_id: z.string().uuid(),
-  client_slug: z.string(),
   name: z.string().min(1),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
   fallback_url: z.string().url().optional().or(z.literal('')),
@@ -39,6 +37,4 @@ export async function createTest(input: z.infer<typeof createTestSchema>) {
     })),
   })
   if (error) throw error
-
-  redirect(`/dashboard/clients/${parsed.client_slug}`)
 }

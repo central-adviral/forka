@@ -89,10 +89,7 @@ create policy "conversions_select_via_client_owner" on conversions
     where ce.id = conversions.click_event_id and c.owner_id = auth.uid()
   ));
 
--- New tables in `public` are not reachable via the Data API by default on this
--- Postgres image: anon/authenticated/service_role only inherit truncate/
--- references/trigger/maintain, not select/insert/update/delete. Grants below
--- match the RLS policies above; RLS still governs which rows are visible.
+-- This Postgres image doesn't auto-expose new tables to the Data API; grants mirror the RLS policies above.
 grant select, insert, update, delete on clients, tests, variants to authenticated;
 grant select on click_events, conversions to authenticated;
 grant select, insert, update, delete on clients, tests, variants, click_events, conversions to service_role;

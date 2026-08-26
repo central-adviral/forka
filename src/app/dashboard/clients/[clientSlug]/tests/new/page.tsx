@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { createTest } from '../../actions'
 import { weightsSumTo100 } from '@/lib/domain/validate-weights'
 import { createBrowserSupabaseClient } from '@/lib/supabase/browser'
@@ -15,6 +15,7 @@ interface VariantForm {
 
 export default function NewTestPage() {
   const params = useParams<{ clientSlug: string }>()
+  const router = useRouter()
   const [clientId, setClientId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
@@ -57,7 +58,6 @@ export default function NewTestPage() {
     try {
       await createTest({
         client_id: clientId,
-        client_slug: params.clientSlug,
         name,
         slug,
         fallback_url: fallbackUrl,
@@ -71,7 +71,9 @@ export default function NewTestPage() {
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao criar teste')
+      return
     }
+    router.push(`/dashboard/clients/${params.clientSlug}`)
   }
 
   function updateVariant(index: number, field: keyof VariantForm, value: string) {
