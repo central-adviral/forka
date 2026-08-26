@@ -7,6 +7,7 @@ describe('isKnownBot', () => {
     expect(isKnownBot('facebookexternalhit/1.1')).toBe(true)
     expect(isKnownBot('Mozilla/5.0 (compatible; bingbot/2.0)')).toBe(true)
     expect(isKnownBot('Slackbot-LinkExpanding 1.0')).toBe(true)
+    expect(isKnownBot('SomeBot/1.0 (+http://example.com/bot)')).toBe(true)
   })
 
   it('flags common scripting/monitoring clients', () => {
@@ -22,6 +23,12 @@ describe('isKnownBot', () => {
       isKnownBot(
         'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
       )
+    ).toBe(false)
+  })
+
+  it('does not flag a real Android device whose name contains "bot"', () => {
+    expect(
+      isKnownBot('Mozilla/5.0 (Linux; Android 10; CUBOT_NOTE_S) AppleWebKit/537.36 (KHTML, like Gecko)')
     ).toBe(false)
   })
 
