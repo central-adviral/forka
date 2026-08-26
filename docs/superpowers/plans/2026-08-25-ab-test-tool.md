@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 15 (App Router), TypeScript, Supabase (`@supabase/supabase-js`, `@supabase/ssr`), Vitest, Tailwind CSS, Zod.
 
-**Spec:** [docs/superpowers/specs/2026-08-25-ab-test-tool-design.md](../specs/2026-08-25-ab-test-tool-design.md)
+**Spec:** [docs/superpowers/specs/2026-08-25-ab-test-tool-design.md](../specs/2026-08-25-ab-test-tool-design.md), amended by [2026-08-26-ab-test-tool-optimization-design.md](../specs/2026-08-26-ab-test-tool-optimization-design.md) (Tasks 16–21)
 
 ## Global Constraints
 
@@ -19,7 +19,11 @@
 - Tracking id travels to the destination URL as the `utm_content` query parameter (confirmed against Hubla's webhook payload at `event.invoice.firstPaymentSession.utm.content`).
 - Service-role Supabase key (`SUPABASE_SERVICE_ROLE_KEY`) is server-only, never sent to the browser, only used inside `/r`, `/ty`, and `/api/webhooks/hubla` route handlers.
 - The redirect domain shown in the dashboard (e.g. for copying the test link) comes from `NEXT_PUBLIC_REDIRECT_DOMAIN`, never hardcoded.
-- No statistical-significance/auto-winner logic, no non-Hubla checkout integration, no non-thank-you-page CRM webhook — out of scope per spec.
+- No automatic winner declaration, no non-Hubla checkout integration, no non-thank-you-page CRM webhook, no full test editing beyond a status toggle — out of scope per spec. (Tasks 16–21, added per the
+  [2026-08-26 optimization addendum](../specs/2026-08-26-ab-test-tool-optimization-design.md), add
+  bot filtering, a Bayesian confidence indicator, a source breakdown, a usage widget, a pause/activate
+  toggle, and an auto-generated thank-you pixel snippet — none of those change this constraint.)
+- Migration files are append-only and numbered sequentially: `0001_init.sql`, `0002_fix_report_conversion_method.sql` already exist; Task 18 adds `0003_report_by_source.sql`, Task 19 adds `0004_usage_stats.sql`. Never edit an already-applied migration file.
 
 ---
 
@@ -2262,4 +2266,921 @@ Replace `PLACEHOLDER_TEST_SLUG` with the test's slug shown on its report page.
 ```bash
 git add README.md
 git commit -m "docs: add deployment and thank-you pixel integration instructions"
+```
+
+---
+
+### Task 16: Domain — bot/crawler filtering on the redirect route
+
+**Files:**
+- Create: `src/lib/domain/bot-filter.ts`
+- Test: `src/lib/domain/bot-filter.test.ts`
+- Modify: `src/app/r/[slug]/route.ts` (Task 6), `src/app/r/[slug]/route.test.ts` (Task 6)
+
+**Interfaces:**
+- Produces: `isKnownBot(userAgent: string | null): boolean` — consumed by the modified `/r/[slug]`
+  route handler.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// src/lib/domain/bot-filter.test.ts
+import { describe, it, expect } from 'vitest'
+import { isKnownBot } from './bot-filter'
+
+describe('isKnownBot', () => {
+  it('flags common search/social crawlers', () => {
+    expect(isKnownBot('Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)')).toBe(true)
+    expect(isKnownBot('facebookexternalhit/1.1')).toBe(true)
+    expect(isKnownBot('Mozilla/5.0 (compatible; bingbot/2.0)')).toBe(true)
+    expect(isKnownBot('Slackbot-LinkExpanding 1.0')).toBe(true)
+  })
+
+  it('flags common scripting/monitoring clients', () => {
+    expect(isKnownBot('curl/8.4.0')).toBe(true)
+    expect(isKnownBot('python-requests/2.31.0')).toBe(true)
+    expect(isKnownBot('Mozilla/5.0 (Windows NT 10.0) HeadlessChrome/120.0.0.0')).toBe(true)
+    expect(isKnownBot('Pingdom.com_bot_version_1.4')).toBe(true)
+    expect(isKnownBot('UptimeRobot/2.0')).toBe(true)
+  })
+
+  it('does not flag a real browser', () => {
+    expect(
+      isKnownBot(
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
+      )
+    ).toBe(false)
+  })
+
+  it('treats a missing user-agent as not a known bot', () => {
+    expect(isKnownBot(null)).toBe(false)
+  })
+})
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+npx vitest run src/lib/domain/bot-filter.test.ts
+```
+Expected: FAIL — `bot-filter.ts` does not exist.
+
+- [ ] **Step 3: Implement**
+
+```ts
+// src/lib/domain/bot-filter.ts
+const BOT_UA_PATTERNS = [
+  'bot',
+  'crawler',
+  'spider',
+  'slurp',
+  'facebookexternalhit',
+  'bingpreview',
+  'curl/',
+  'python-requests',
+  'wget/',
+  'headlesschrome',
+  'pingdom',
+  'uptimerobot',
+]
+
+export function isKnownBot(userAgent: string | null): boolean {
+  if (!userAgent) return false
+  const ua = userAgent.toLowerCase()
+  return BOT_UA_PATTERNS.some((pattern) => ua.includes(pattern))
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+```bash
+npx vitest run src/lib/domain/bot-filter.test.ts
+```
+Expected: PASS (4 tests).
+
+- [ ] **Step 5: Add a route-level test for bot traffic**
+
+Add to `src/app/r/[slug]/route.test.ts` (inside the existing `describe('GET /r/[slug]')` block, same
+mocks already declared at the top of that file):
+
+```ts
+  it('redirects a known bot without recording a click event or setting cookies', async () => {
+    vi.mocked(getTestBySlug).mockResolvedValue({
+      id: 'test-1',
+      slug: 'oferta-x',
+      status: 'active',
+      fallback_url: null,
+      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page' }],
+    })
+    const request = new NextRequest('https://ir.example.com/r/oferta-x', {
+      headers: { 'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' },
+    })
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
+
+    expect(response.status).toBe(302)
+    const location = new URL(response.headers.get('location')!)
+    expect(location.origin + location.pathname).toBe('https://example.com/page')
+    expect(location.searchParams.get('utm_content')).toBeNull()
+    expect(insertClickEvent).not.toHaveBeenCalled()
+    expect(response.cookies.get('ir_vid')).toBeUndefined()
+  })
+
+  it('redirects a known bot to the fallback url when set', async () => {
+    vi.mocked(getTestBySlug).mockResolvedValue({
+      id: 'test-1',
+      slug: 'oferta-x',
+      status: 'active',
+      fallback_url: 'https://example.com/fallback',
+      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page' }],
+    })
+    const request = new NextRequest('https://ir.example.com/r/oferta-x', {
+      headers: { 'user-agent': 'curl/8.4.0' },
+    })
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
+    expect(response.headers.get('location')).toBe('https://example.com/fallback')
+    expect(insertClickEvent).not.toHaveBeenCalled()
+  })
+```
+
+- [ ] **Step 6: Run test to verify it fails**
+
+```bash
+npx vitest run "src/app/r/[slug]/route.test.ts"
+```
+Expected: FAIL — current handler always records a click event and sets cookies.
+
+- [ ] **Step 7: Modify the route handler**
+
+In `src/app/r/[slug]/route.ts`, add the import:
+
+```ts
+import { isKnownBot } from '@/lib/domain/bot-filter'
+```
+
+Insert this block right after the existing `if (!test || test.status !== 'active' ...)` block and
+before the `const cookieHeader = ...` line:
+
+```ts
+  if (isKnownBot(request.headers.get('user-agent'))) {
+    const destination = test.fallback_url ?? test.variants[0].destination_url
+    return NextResponse.redirect(destination, 302)
+  }
+```
+
+(Bots get a plain redirect: no `click_event`, no `tracking_id` appended, no cookies set.)
+
+- [ ] **Step 8: Run test to verify it passes**
+
+```bash
+npx vitest run "src/app/r/[slug]/route.test.ts"
+```
+Expected: PASS (6 tests).
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/lib/domain/bot-filter.ts src/lib/domain/bot-filter.test.ts "src/app/r/[slug]"
+git commit -m "feat: filter known bots out of redirect tracking"
+```
+
+---
+
+### Task 17: Domain — Bayesian confidence indicator
+
+**Files:**
+- Create: `src/lib/domain/significance.ts`
+- Test: `src/lib/domain/significance.test.ts`
+- Modify: `src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/page.tsx` (Task 14)
+
+**Interfaces:**
+- Produces: `probabilityToBeatControl(control: { visits: number; conversions: number }, variant: { visits: number; conversions: number }, rand?: () => number, samples?: number): number` — returns an estimate in `[0, 1]` of the probability the variant's true conversion rate exceeds the control's, via Monte Carlo sampling from `Beta(conversions + 1, visits - conversions + 1)` (Beta(1,1) uniform prior). Consumed by the report page (Task 14).
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// src/lib/domain/significance.test.ts
+import { describe, it, expect } from 'vitest'
+import { probabilityToBeatControl } from './significance'
+
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+describe('probabilityToBeatControl', () => {
+  it('returns close to 0.5 when control and variant perform identically', () => {
+    const rand = mulberry32(1)
+    const p = probabilityToBeatControl({ visits: 500, conversions: 50 }, { visits: 500, conversions: 50 }, rand, 5000)
+    expect(p).toBeGreaterThan(0.3)
+    expect(p).toBeLessThan(0.7)
+  })
+
+  it('returns high confidence when the variant clearly outperforms', () => {
+    const rand = mulberry32(2)
+    const p = probabilityToBeatControl({ visits: 1000, conversions: 50 }, { visits: 1000, conversions: 150 }, rand, 5000)
+    expect(p).toBeGreaterThan(0.9)
+  })
+
+  it('returns low confidence when the variant clearly underperforms', () => {
+    const rand = mulberry32(3)
+    const p = probabilityToBeatControl({ visits: 1000, conversions: 150 }, { visits: 1000, conversions: 50 }, rand, 5000)
+    expect(p).toBeLessThan(0.1)
+  })
+
+  it('handles zero-visit variants without throwing', () => {
+    const rand = mulberry32(4)
+    const p = probabilityToBeatControl({ visits: 0, conversions: 0 }, { visits: 0, conversions: 0 }, rand, 1000)
+    expect(p).toBeGreaterThanOrEqual(0)
+    expect(p).toBeLessThanOrEqual(1)
+  })
+})
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+npx vitest run src/lib/domain/significance.test.ts
+```
+Expected: FAIL — `significance.ts` does not exist.
+
+- [ ] **Step 3: Implement**
+
+```ts
+// src/lib/domain/significance.ts
+function sampleGamma(shape: number, rand: () => number, normal: () => number): number {
+  if (shape < 1) {
+    const u = rand()
+    return sampleGamma(shape + 1, rand, normal) * Math.pow(u, 1 / shape)
+  }
+  const d = shape - 1 / 3
+  const c = 1 / Math.sqrt(9 * d)
+  for (;;) {
+    let x: number
+    let v: number
+    do {
+      x = normal()
+      v = 1 + c * x
+    } while (v <= 0)
+    v = v * v * v
+    const u = rand()
+    if (u < 1 - 0.0331 * x * x * x * x) return d * v
+    if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v
+  }
+}
+
+function makeSeededNormal(rand: () => number): () => number {
+  return () => {
+    const u1 = Math.max(rand(), 1e-12)
+    const u2 = rand()
+    return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
+  }
+}
+
+function sampleBeta(alpha: number, beta: number, rand: () => number, normal: () => number): number {
+  const x = sampleGamma(alpha, rand, normal)
+  const y = sampleGamma(beta, rand, normal)
+  return x / (x + y)
+}
+
+export function probabilityToBeatControl(
+  control: { visits: number; conversions: number },
+  variant: { visits: number; conversions: number },
+  rand: () => number = Math.random,
+  samples = 10000
+): number {
+  const normal = makeSeededNormal(rand)
+  let wins = 0
+  for (let i = 0; i < samples; i++) {
+    const controlRate = sampleBeta(control.conversions + 1, control.visits - control.conversions + 1, rand, normal)
+    const variantRate = sampleBeta(variant.conversions + 1, variant.visits - variant.conversions + 1, rand, normal)
+    if (variantRate > controlRate) wins++
+  }
+  return wins / samples
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+```bash
+npx vitest run src/lib/domain/significance.test.ts
+```
+Expected: PASS (4 tests).
+
+- [ ] **Step 5: Show the confidence badge on the report page, and fix the all-zero-visits leader highlight**
+
+In `src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/page.tsx`, add the import:
+
+```ts
+import { probabilityToBeatControl } from '@/lib/domain/significance'
+```
+
+Replace this exact block (the `rows`/`leaderId` computation, right after the `report` RPC call):
+
+```tsx
+  const rows = ((report as ReportRow[]) ?? []).map((row) => ({
+    ...row,
+    rate: row.visits > 0 ? ((row.conversions / row.visits) * 100).toFixed(1) : '0.0',
+  }))
+  const leaderId = rows.reduce(
+    (best: (typeof rows)[number] | undefined, row: (typeof rows)[number]) => (Number(row.rate) > Number(best?.rate ?? -1) ? row : best),
+    rows[0]
+  )?.variant_id
+```
+
+with:
+
+```tsx
+  const baseRows = ((report as ReportRow[]) ?? []).map((row) => ({
+    ...row,
+    rate: row.visits > 0 ? ((row.conversions / row.visits) * 100).toFixed(1) : '0.0',
+  }))
+  const control = baseRows[0]
+  const rows = baseRows.map((row) => ({
+    ...row,
+    confidencePct:
+      control && row.variant_id !== control.variant_id
+        ? Math.round(
+            probabilityToBeatControl(
+              { visits: control.visits, conversions: control.conversions },
+              { visits: row.visits, conversions: row.conversions }
+            ) * 100
+          )
+        : null,
+  }))
+  const totalVisits = rows.reduce((sum, row) => sum + row.visits, 0)
+  const leaderId =
+    totalVisits > 0
+      ? rows.reduce(
+          (best: (typeof rows)[number] | undefined, row: (typeof rows)[number]) =>
+            Number(row.rate) > Number(best?.rate ?? -1) ? row : best,
+          rows[0]
+        )?.variant_id
+      : undefined
+```
+
+(The `totalVisits > 0` guard fixes a known minor issue from the final review: a brand-new test
+with zero visits everywhere no longer highlights the first variant in green.)
+
+Add a "Confiança" column to the table (header and body):
+
+```tsx
+            <th>Confiança</th>
+```
+
+```tsx
+              <td>
+                {row.confidencePct === null
+                  ? 'controle'
+                  : `${row.confidencePct}% de ser melhor que o controle`}
+              </td>
+```
+
+(`control` is the first row returned by `get_test_report`, which orders by `v.name` — this reads
+as "controle = primeira variante em ordem alfabética".)
+
+- [ ] **Step 6: Manual verification**
+
+```bash
+npm run dev
+```
+Open a test's report page with at least two variants that have visits; confirm the "Confiança"
+column shows "controle" on the first row and a percentage on the others. Open a brand-new test
+with zero visits and confirm no row is highlighted green.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/lib/domain/significance.ts src/lib/domain/significance.test.ts "src/app/dashboard/clients/[clientSlug]/tests/[testSlug]"
+git commit -m "feat: add Bayesian confidence indicator to the report"
+```
+
+---
+
+### Task 18: Report — conversion breakdown by traffic source
+
+**Files:**
+- Create: `supabase/migrations/0003_report_by_source.sql`
+- Modify: `src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/page.tsx` (Task 14 / Task 17)
+- Test: `supabase/tests/report-by-source.integration.test.ts`
+
+**Interfaces:**
+- Consumes: `variants`, `tests`, `click_events`, `conversions` tables (Task 2).
+- Produces RPC: `get_test_report_by_source(p_test_id uuid) returns table(variant_id uuid, variant_name text, utm_source text, visits bigint, conversions bigint)` — consumed by the report page.
+
+- [ ] **Step 1: Write the migration**
+
+Create `supabase/migrations/0003_report_by_source.sql`:
+
+```sql
+create or replace function get_test_report_by_source(p_test_id uuid)
+returns table (
+  variant_id uuid,
+  variant_name text,
+  utm_source text,
+  visits bigint,
+  conversions bigint
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from tests t join clients c on c.id = t.client_id
+    where t.id = p_test_id and c.owner_id = auth.uid()
+  ) then
+    raise exception 'not found or access denied';
+  end if;
+
+  return query
+  select
+    v.id,
+    v.name,
+    coalesce(nullif(ce.source_utms->>'utm_source', ''), '(direto)') as utm_source,
+    count(distinct ce.id)::bigint,
+    count(distinct cv.id)::bigint
+  from variants v
+  join tests t on t.id = v.test_id
+  join click_events ce on ce.variant_id = v.id
+  left join conversions cv on cv.click_event_id = ce.id and cv.source = t.conversion_method
+  where v.test_id = p_test_id
+  group by v.id, v.name, coalesce(nullif(ce.source_utms->>'utm_source', ''), '(direto)')
+  order by v.name, utm_source;
+end;
+$$;
+
+revoke all on function get_test_report_by_source(uuid) from public;
+grant execute on function get_test_report_by_source(uuid) to authenticated;
+```
+
+(The `cv.source = t.conversion_method` filter mirrors the fix already applied to `get_test_report`
+in `0002_fix_report_conversion_method.sql` — without it, a click holding conversions from more
+than one source would double-count here too.)
+
+- [ ] **Step 2: Apply the migration locally**
+
+```bash
+npx supabase db reset
+```
+Expected: applies `0001_init.sql`, `0002_fix_report_conversion_method.sql`, and
+`0003_report_by_source.sql` with no errors.
+
+- [ ] **Step 3: Write an integration test**
+
+Create `supabase/tests/report-by-source.integration.test.ts` (same setup pattern as
+`supabase/tests/schema.integration.test.ts` from Task 2 — a fresh user/client/test per test case):
+
+```ts
+import { describe, it, expect } from 'vitest'
+import { createClient } from '@supabase/supabase-js'
+
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321'
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+const admin = createClient(URL, SERVICE_ROLE_KEY)
+
+async function createSignedInOwner() {
+  const email = `source-report-${Date.now()}@example.com`
+  const { data } = await admin.auth.admin.createUser({ email, password: 'password123', email_confirm: true })
+  const asOwner = createClient(URL, ANON_KEY)
+  await asOwner.auth.signInWithPassword({ email, password: 'password123' })
+  return { userId: data.user!.id, asOwner }
+}
+
+describe('get_test_report_by_source', () => {
+  it('groups visits and conversions by utm_source, defaulting missing ones to (direto)', async () => {
+    const { userId, asOwner } = await createSignedInOwner()
+    const { data: client } = await admin
+      .from('clients')
+      .insert({ owner_id: userId, name: 'Source Test', slug: `source-test-${Date.now()}` })
+      .select()
+      .single()
+
+    const { data: test } = await admin
+      .from('tests')
+      .insert({
+        client_id: client!.id,
+        name: 'Teste Origem',
+        slug: `teste-origem-${Date.now()}`,
+        conversion_method: 'thank_you_page',
+      })
+      .select()
+      .single()
+    const { data: variant } = await admin
+      .from('variants')
+      .insert({ test_id: test!.id, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' })
+      .select()
+      .single()
+
+    const { data: metaClick } = await admin
+      .from('click_events')
+      .insert({
+        test_id: test!.id,
+        variant_id: variant!.id,
+        visitor_id: 'v1',
+        tracking_id: crypto.randomUUID(),
+        source_utms: { utm_source: 'meta' },
+      })
+      .select()
+      .single()
+    await admin.from('conversions').insert({ click_event_id: metaClick!.id, source: 'thank_you_page' })
+
+    await admin.from('click_events').insert({
+      test_id: test!.id,
+      variant_id: variant!.id,
+      visitor_id: 'v2',
+      tracking_id: crypto.randomUUID(),
+      source_utms: {},
+    })
+
+    const { data: report, error } = await asOwner.rpc('get_test_report_by_source', { p_test_id: test!.id })
+    expect(error).toBeNull()
+    const meta = report!.find((r: { utm_source: string }) => r.utm_source === 'meta')
+    const direto = report!.find((r: { utm_source: string }) => r.utm_source === '(direto)')
+    expect(meta).toMatchObject({ visits: 1, conversions: 1 })
+    expect(direto).toMatchObject({ visits: 1, conversions: 0 })
+  })
+})
+```
+
+(Fixtures are seeded via direct service-role table inserts, not the `create_test_with_variants`
+RPC, for the same reason established in Tasks 5/8: that RPC requires an authenticated user's
+`auth.uid()`, which a service-role client doesn't have.)
+
+- [ ] **Step 4: Run the integration test**
+
+```bash
+npx vitest run supabase/tests/report-by-source.integration.test.ts
+```
+Expected: PASS.
+
+- [ ] **Step 5: Add the source breakdown to the report page**
+
+In `src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/page.tsx`, add a second RPC call next
+to the existing `get_test_report` call:
+
+```ts
+  const { data: sourceReport } = await supabase.rpc('get_test_report_by_source', { p_test_id: test.id })
+```
+
+Render it as a second table below the existing one:
+
+```tsx
+      <h2 className="mb-2 mt-8 text-lg font-semibold">Por origem (UTM)</h2>
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b text-left">
+            <th className="py-2">Variante</th>
+            <th>Origem</th>
+            <th>Visitas</th>
+            <th>Conversões</th>
+            <th>Taxa</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(sourceReport ?? []).map((row) => (
+            <tr key={`${row.variant_id}-${row.utm_source}`}>
+              <td className="py-2">{row.variant_name}</td>
+              <td>{row.utm_source}</td>
+              <td>{row.visits}</td>
+              <td>{row.conversions}</td>
+              <td>{row.visits > 0 ? ((row.conversions / row.visits) * 100).toFixed(1) : '0.0'}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+```
+
+- [ ] **Step 6: Manual verification**
+
+```bash
+npm run dev
+```
+Hit `/r/<slug>?utm_source=meta` and `/r/<slug>` (no UTM) a few times, then open the report page and
+confirm the second table shows rows for `meta` and `(direto)`.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add supabase/migrations/0003_report_by_source.sql supabase/tests/report-by-source.integration.test.ts "src/app/dashboard/clients/[clientSlug]/tests/[testSlug]"
+git commit -m "feat: add conversion report breakdown by traffic source"
+```
+
+---
+
+### Task 19: Dashboard — usage awareness widget
+
+**Files:**
+- Create: `supabase/migrations/0004_usage_stats.sql`
+- Modify: `src/app/dashboard/page.tsx` (Task 11)
+- Test: `supabase/tests/usage-stats.integration.test.ts`
+
+**Interfaces:**
+- Produces RPC: `get_usage_stats() returns table(total_clients bigint, total_tests bigint, total_click_events bigint)` — consumed by the dashboard home page.
+
+- [ ] **Step 1: Write the migration**
+
+Create `supabase/migrations/0004_usage_stats.sql`:
+
+```sql
+create or replace function get_usage_stats()
+returns table (
+  total_clients bigint,
+  total_tests bigint,
+  total_click_events bigint
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return query
+  select
+    (select count(*) from clients where owner_id = auth.uid())::bigint,
+    (select count(*) from tests t join clients c on c.id = t.client_id where c.owner_id = auth.uid())::bigint,
+    (select count(*)
+       from click_events ce
+       join tests t on t.id = ce.test_id
+       join clients c on c.id = t.client_id
+       where c.owner_id = auth.uid())::bigint;
+end;
+$$;
+
+revoke all on function get_usage_stats() from public;
+grant execute on function get_usage_stats() to authenticated;
+```
+
+- [ ] **Step 2: Apply the migration locally**
+
+```bash
+npx supabase db reset
+```
+Expected: applies all four migrations with no errors.
+
+- [ ] **Step 3: Write an integration test**
+
+Create `supabase/tests/usage-stats.integration.test.ts`:
+
+```ts
+import { describe, it, expect } from 'vitest'
+import { createClient } from '@supabase/supabase-js'
+
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321'
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+const admin = createClient(URL, SERVICE_ROLE_KEY)
+
+describe('get_usage_stats', () => {
+  it('counts only rows owned by the calling user', async () => {
+    const email = `usage-stats-${Date.now()}@example.com`
+    const { data: user } = await admin.auth.admin.createUser({ email, password: 'password123', email_confirm: true })
+    const asOwner = createClient(URL, ANON_KEY)
+    await asOwner.auth.signInWithPassword({ email, password: 'password123' })
+
+    await admin.from('clients').insert({ owner_id: user!.user.id, name: 'Usage Test', slug: `usage-${Date.now()}` })
+
+    const { data, error } = await asOwner.rpc('get_usage_stats')
+    expect(error).toBeNull()
+    expect(data![0].total_clients).toBeGreaterThanOrEqual(1)
+  })
+})
+```
+
+- [ ] **Step 4: Run the integration test**
+
+```bash
+npx vitest run supabase/tests/usage-stats.integration.test.ts
+```
+Expected: PASS.
+
+- [ ] **Step 5: Show the widget on the dashboard home page**
+
+In `src/app/dashboard/page.tsx`, add the RPC call next to the existing `clients` query:
+
+```ts
+  const { data: usage } = await supabase.rpc('get_usage_stats').single()
+```
+
+Render it above the client list:
+
+```tsx
+      {usage && (
+        <p className="mb-4 text-xs text-gray-500">
+          {usage.total_clients} clientes · {usage.total_tests} testes · {usage.total_click_events} cliques
+          registrados (Supabase free tier: 500MB de banco — fique de olho se isso crescer muito rápido)
+        </p>
+      )}
+```
+
+- [ ] **Step 6: Manual verification**
+
+```bash
+npm run dev
+```
+Open `/dashboard` and confirm the counts line appears above the client list and matches what's in
+the database.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add supabase/migrations/0004_usage_stats.sql supabase/tests/usage-stats.integration.test.ts src/app/dashboard/page.tsx
+git commit -m "feat: add usage awareness widget to dashboard home"
+```
+
+---
+
+### Task 20: Dashboard — pause/activate a test
+
+**Files:**
+- Create: `src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/actions.ts`
+- Modify: `src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/page.tsx` (Task 14 / Task 17 / Task 18)
+
+**Interfaces:**
+- Produces: server action `toggleTestStatus(input: { test_id: string; next_status: 'active' | 'paused'; client_slug: string; test_slug: string })` — bound at render time from the report page.
+
+- [ ] **Step 1: Server action**
+
+Create `src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/actions.ts`:
+
+```ts
+'use server'
+
+import { z } from 'zod'
+import { revalidatePath } from 'next/cache'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+
+const toggleSchema = z.object({
+  test_id: z.string().uuid(),
+  next_status: z.enum(['active', 'paused']),
+  client_slug: z.string(),
+  test_slug: z.string(),
+})
+
+export async function toggleTestStatus(input: z.infer<typeof toggleSchema>) {
+  const parsed = toggleSchema.parse(input)
+  const supabase = await createServerSupabaseClient()
+
+  const { error } = await supabase.from('tests').update({ status: parsed.next_status }).eq('id', parsed.test_id)
+  if (error) throw error
+
+  revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests/${parsed.test_slug}`)
+}
+```
+
+(No extra ownership check needed: `tests_via_client_owner` is a `FOR ALL` RLS policy, so this
+`UPDATE` is already scoped to tests the authenticated user's clients own — a mismatched `test_id`
+simply matches zero rows, same protection pattern already approved for `createClient`/`createTest`
+in Tasks 12–13.)
+
+- [ ] **Step 2: Wire the toggle into the report page**
+
+In `src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/page.tsx`:
+
+Add the import:
+
+```ts
+import { toggleTestStatus } from './actions'
+```
+
+Change the params destructuring to also capture `clientSlug` (currently only `testSlug` is used):
+
+```tsx
+  const { clientSlug, testSlug } = await params
+```
+
+The existing `tests` select already includes `status` (`'id, name, slug, status'`) — no change
+needed to that query.
+
+Add this block right after the `<h1>` showing `test.name`:
+
+```tsx
+      <p className="mb-2 text-sm text-gray-600">
+        Status: <strong>{test.status === 'active' ? 'ativo' : 'pausado'}</strong>
+      </p>
+      <form
+        action={toggleTestStatus.bind(null, {
+          test_id: test.id,
+          next_status: test.status === 'active' ? 'paused' : 'active',
+          client_slug: clientSlug,
+          test_slug: test.slug,
+        })}
+        className="mb-4"
+      >
+        <button type="submit" className="rounded border px-3 py-1 text-sm">
+          {test.status === 'active' ? 'Pausar teste' : 'Ativar teste'}
+        </button>
+      </form>
+```
+
+- [ ] **Step 3: Manual verification**
+
+```bash
+npm run dev
+```
+Open a test's report page, click "Pausar teste", confirm the status label and button flip to
+"pausado" / "Ativar teste" and the page re-renders with the new state. Confirm `/r/<slug>` for that
+test now falls through to the paused/fallback branch from Task 6.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add "src/app/dashboard/clients/[clientSlug]/tests/[testSlug]"
+git commit -m "feat: add pause/activate toggle for a test"
+```
+
+---
+
+### Task 21: Dashboard — auto-generated thank-you pixel snippet
+
+**Files:**
+- Modify: `src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/page.tsx` (Task 14 / Task 17 / Task 18 / Task 20)
+
+**Interfaces:** none new exported — reads the already-stored `variants.thank_you_url` column and
+renders a ready-to-paste snippet using `NEXT_PUBLIC_REDIRECT_DOMAIN` and the test's own slug.
+
+- [ ] **Step 1: Fetch variants with their thank-you URL, only for thank-you-page tests**
+
+Add `conversion_method` to the existing `tests` select:
+
+```tsx
+    .select('id, name, slug, status, conversion_method')
+```
+
+Add this query right after the existing `test` lookup (before the `get_test_report` RPC call):
+
+```ts
+  const { data: pixelVariants } =
+    test.conversion_method === 'thank_you_page'
+      ? await supabase.from('variants').select('id, name, thank_you_url').eq('test_id', test.id)
+      : { data: null }
+```
+
+- [ ] **Step 2: Render the snippet per variant**
+
+Add this block at the end of the page, after the existing tables:
+
+```tsx
+      {pixelVariants && pixelVariants.length > 0 && (
+        <div className="mt-8">
+          <h2 className="mb-2 text-lg font-semibold">Pixel de conversão (thank-you page)</h2>
+          {pixelVariants.map((variant) => (
+            <div key={variant.id} className="mb-4 rounded border p-3">
+              <p className="mb-2 text-sm text-gray-600">
+                Variante {variant.name}
+                {variant.thank_you_url ? (
+                  <>
+                    {' '}
+                    — cole na página:{' '}
+                    <a className="text-blue-600 underline" href={variant.thank_you_url}>
+                      {variant.thank_you_url}
+                    </a>
+                  </>
+                ) : (
+                  <> — nenhuma URL de thank-you configurada para esta variante</>
+                )}
+              </p>
+              <pre className="overflow-x-auto rounded bg-gray-100 p-2 text-xs">
+                <code>{`<script>
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var tid = params.get('utm_content') || params.get('tid');
+    if (tid) {
+      var img = new Image();
+      img.src = 'https://${process.env.NEXT_PUBLIC_REDIRECT_DOMAIN}/ty/${test.slug}?tid=' + encodeURIComponent(tid);
+    }
+  })();
+</script>`}</code>
+              </pre>
+            </div>
+          ))}
+        </div>
+      )}
+```
+
+(The snippet is identical in mechanism to the README's manual version — same pixel, same `/ty/[slug]`
+endpoint from Task 10 — just pre-filled with this test's real domain and slug, so there is nothing
+left to substitute by hand.)
+
+- [ ] **Step 3: Manual verification**
+
+```bash
+npm run dev
+```
+Open the report page of a `thank_you_page`-conversion test with at least one variant that has a
+`thank_you_url` set; confirm the snippet section appears with the correct domain/slug baked in and
+the configured URL shown as a link. Open a `hubla_webhook`-conversion test and confirm the section
+does not appear at all.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add "src/app/dashboard/clients/[clientSlug]/tests/[testSlug]"
+git commit -m "feat: auto-generate thank-you pixel snippet from stored variant data"
 ```
