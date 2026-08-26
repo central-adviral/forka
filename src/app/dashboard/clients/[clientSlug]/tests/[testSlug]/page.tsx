@@ -286,7 +286,7 @@ export default async function TestReportPage({
           {pixelVariants.map((variant) => {
             const isSafeUrl = variant.thank_you_url ? /^https?:\/\//i.test(variant.thank_you_url) : false
             return (
-              <div key={variant.id} className="mb-4 rounded border p-3">
+              <div key={variant.id} className="mb-4 rounded-[10px] border border-white/[0.08] p-3">
                 <p className="mb-2 text-sm text-[#8A90A6]">
                   Variante {variant.name}
                   {variant.thank_you_url && isSafeUrl ? (
@@ -308,13 +308,13 @@ export default async function TestReportPage({
                     <> — nenhuma URL de thank-you configurada para esta variante</>
                   )}
                 </p>
-              <p className="mb-2 text-xs text-gray-500">
-                Importante: seu construtor de página/funil precisa estar configurado para repassar os
-                parâmetros da URL original no redirecionamento pra esta página, senão o pixel nunca recebe
-                o tracking id.
-              </p>
-              <pre className="overflow-x-auto rounded bg-[#1B2036] p-2 text-xs">
-                <code>{`<script>
+                <p className="mb-2 text-xs text-[#8A90A6]">
+                  Importante: seu construtor de página/funil precisa estar configurado para repassar os
+                  parâmetros da URL original no redirecionamento pra esta página, senão o pixel nunca recebe
+                  o tracking id.
+                </p>
+                <pre className="overflow-x-auto rounded bg-[#1B2036] p-2 text-xs">
+                  <code>{`<script>
   (function () {
     var params = new URLSearchParams(window.location.search);
     var tid = params.get('utm_content') || params.get('tid');
@@ -324,8 +324,8 @@ export default async function TestReportPage({
     }
   })();
 </script>`}</code>
-              </pre>
-            </div>
+                </pre>
+              </div>
             )
           })}
         </div>
