@@ -1,8 +1,18 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0e1a;
+  --foreground: #e8eaf2;
+  --surface: #141829;
+  --surface-2: #1b2036;
+  --border-token: rgba(255, 255, 255, 0.08);
+  --text-dim: #8a90a6;
+  --violet: #7c6ff0;
+  --blue: #4f8ef7;
+  --teal: #2dd4a8;
+  --amber: #f5b94d;
+  --rose: #f76c6c;
 }
 
 @theme inline {
@@ -12,15 +22,8 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
 }
