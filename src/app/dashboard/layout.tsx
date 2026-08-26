@@ -1,10 +1,16 @@
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { DashboardShell } from '@/components/dashboard-shell'
+
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const { data: clients } = await supabase.from('clients').select('id, name, slug').order('name')
+
   return (
-    <div className="mx-auto max-w-4xl p-6">
-      <nav className="mb-6 flex items-center justify-between border-b pb-4">
-        <a href="/dashboard" className="font-semibold">AB Test Tool</a>
-      </nav>
+    <DashboardShell clients={clients ?? []} userEmail={user?.email ?? ''}>
       {children}
-    </div>
+    </DashboardShell>
   )
 }

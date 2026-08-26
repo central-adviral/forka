@@ -12,26 +12,20 @@ export default async function DashboardPage() {
   const { data: usage } = (await supabase.rpc('get_usage_stats').single()) as { data: UsageStats | null }
 
   return (
-    <div>
-      <h1 className="mb-4 text-lg font-semibold">Clientes</h1>
+    <div className="p-8">
+      <h1 className="mb-1 font-['Space_Grotesk'] text-xl font-semibold">Clientes</h1>
+      <p className="mb-3 text-sm text-[#8A90A6]">Escolha um cliente na barra lateral para ver os testes.</p>
       {usage && (
-        <p className="mb-4 text-xs text-gray-500">
+        <p className="mb-6 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">
           {usage.total_clients} clientes · {usage.total_tests} testes · {usage.total_click_events} cliques
           registrados (Supabase free tier: 500MB de banco — fique de olho se isso crescer muito rápido)
         </p>
       )}
-      <ul className="space-y-2">
-        {clients?.map((client) => (
-          <li key={client.id}>
-            <a href={`/dashboard/clients/${client.slug}`} className="text-blue-600 underline">
-              {client.name}
-            </a>
-          </li>
-        ))}
-      </ul>
-      <a href="/dashboard/clients/new" className="mt-4 inline-block text-sm text-blue-600 underline">
-        + Novo cliente
-      </a>
+      {(!clients || clients.length === 0) && (
+        <a href="/dashboard/clients/new" className="text-sm font-medium text-[#7C6FF0] hover:text-[#9C90F5]">
+          + Criar seu primeiro cliente
+        </a>
+      )}
     </div>
   )
 }

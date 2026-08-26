@@ -23,30 +23,42 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto mt-24 max-w-sm">
-      <h1 className="mb-6 text-xl font-semibold">Entrar</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="email"
-          required
-          placeholder="E-mail"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded border px-3 py-2"
-        />
-        <input
-          type="password"
-          required
-          placeholder="Senha"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded border px-3 py-2"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button type="submit" className="w-full rounded bg-black px-3 py-2 text-white">
-          Entrar
-        </button>
-      </form>
+    <main className="flex min-h-screen items-center justify-center bg-[#0B0E1A]">
+      <div className="w-[400px] rounded-2xl border border-white/[0.08] bg-[#141829] p-10">
+        <h1 className="mb-2 font-['Space_Grotesk'] text-2xl font-semibold text-[#E8EAF2]">Entrar</h1>
+        <p className="mb-7 text-sm leading-relaxed text-[#8A90A6]">
+          Acesse seus clientes, testes e relatórios de conversão.
+        </p>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-[13px] font-medium text-[#8A90A6]">E-mail</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="h-11 rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-[13px] font-medium text-[#8A90A6]">Senha</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-11 rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]"
+            />
+          </div>
+          {error && <p className="text-sm text-[#F76C6C]">{error}</p>}
+          <button
+            type="submit"
+            className="mt-1.5 h-[46px] rounded-[10px] bg-[#7C6FF0] text-sm font-semibold text-[#0B0E1A]"
+          >
+            Entrar
+          </button>
+        </form>
+      </div>
     </main>
   )
 }
