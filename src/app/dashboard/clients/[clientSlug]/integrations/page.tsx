@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
 import { saveDomain, verifyDomain, saveHublaToken } from './actions'
+import { VerifyDomainButton } from './verify-domain-button'
 
 const STATUS_LABEL: Record<string, string> = {
   unconfigured: 'Não configurado',
@@ -92,14 +93,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
               domínio completo) — se o campo "Nome" recusar o valor completo, use apenas o prefixo.
             </p>
 
-            <form action={verifyDomain.bind(null, { client_id: client.id, client_slug: client.slug })}>
-              <button
-                type="submit"
-                className="rounded-[10px] border border-white/[0.08] px-4 py-2.5 text-sm font-medium text-[#8A90A6]"
-              >
-                Verificar
-              </button>
-            </form>
+            <VerifyDomainButton verifyAction={verifyDomain.bind(null, { client_id: client.id, client_slug: client.slug })} />
 
             <p className="text-xs text-[#8A90A6]">
               Depois que o DNS estiver verificado, avise o responsável técnico para finalizar o registro do

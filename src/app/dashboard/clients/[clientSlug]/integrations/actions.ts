@@ -37,14 +37,14 @@ export async function saveDomain(context: { client_id: string; client_slug: stri
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/integrations`)
 }
 
-export async function verifyDomain(context: { client_id: string; client_slug: string }) {
+export async function verifyDomain(context: { client_id: string; client_slug: string }): Promise<{ verified: boolean }> {
   const supabase = await createServerSupabaseClient()
 
   // Re-read the domain to verify from the DB (RLS-scoped to the caller's own clients) instead
   // of trusting a domain string passed in from the caller — otherwise this becomes an open DNS
   // lookup for any domain an authenticated user cares to type in.
   const { data: client } = await supabase.from('clients').select('custom_domain').eq('id', context.client_id).maybeSingle()
-  if (!client?.custom_domain) return
+  if (!client?.custom_domain) return { verified: false }
 
   let verified = false
   try {
@@ -62,6 +62,7 @@ export async function verifyDomain(context: { client_id: string; client_slug: st
     .eq('id', context.client_id)
   if (error) throw error
   revalidatePath(`/dashboard/clients/${context.client_slug}/integrations`)
+  return { verified }
 }
 
 const hublaTokenSchema = z.object({
