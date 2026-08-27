@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { probabilityToBeatControl } from '@/lib/domain/significance'
 import { computeReportLayout } from '@/lib/domain/report-layout'
+import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { toggleTestStatus } from './actions'
 
 interface ReportRow {
@@ -29,7 +30,7 @@ export default async function TestReportPage({
   const supabase = await createServerSupabaseClient()
   const { data: test } = await supabase
     .from('tests')
-    .select('id, name, slug, status, conversion_method, fallback_url')
+    .select('id, name, slug, status, conversion_method, fallback_url, client_id, clients(custom_domain, domain_status)')
     .eq('slug', testSlug)
     .maybeSingle()
 
@@ -60,7 +61,12 @@ export default async function TestReportPage({
     )
   }
 
-  const redirectUrl = `https://${process.env.NEXT_PUBLIC_REDIRECT_DOMAIN}/r/${test.slug}`
+  const clientDomain = test.clients as unknown as { custom_domain: string | null; domain_status: 'unconfigured' | 'pending' | 'verified' } | null
+  const activeDomain = resolveRedirectDomain(
+    { customDomain: clientDomain?.custom_domain ?? null, domainStatus: clientDomain?.domain_status ?? 'unconfigured' },
+    process.env.NEXT_PUBLIC_REDIRECT_DOMAIN ?? ''
+  )
+  const redirectUrl = `https://${activeDomain}/r/${test.slug}`
 
   const baseRows = ((report as ReportRow[]) ?? []).map((row) => ({
     ...row,
@@ -333,7 +339,7 @@ export default async function TestReportPage({
     var tid = params.get('utm_content') || params.get('tid');
     if (tid) {
       var img = new Image();
-      img.src = 'https://${process.env.NEXT_PUBLIC_REDIRECT_DOMAIN}/ty/${test.slug}?tid=' + encodeURIComponent(tid);
+      img.src = 'https://${activeDomain}/ty/${test.slug}?tid=' + encodeURIComponent(tid);
     }
   })();
 </script>`}</code>
