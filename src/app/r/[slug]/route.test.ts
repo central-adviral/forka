@@ -26,7 +26,9 @@ describe('GET /r/[slug]', () => {
       slug: 'oferta-x',
       status: 'active',
       fallback_url: null,
-      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page' }],
+      test_type: 'page',
+      sales_page_url: null,
+      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
     vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
 
@@ -53,7 +55,9 @@ describe('GET /r/[slug]', () => {
       slug: 'oferta-x',
       status: 'paused',
       fallback_url: 'https://example.com/fallback',
-      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page' }],
+      test_type: 'page',
+      sales_page_url: null,
+      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
     const request = new NextRequest('https://ir.example.com/r/oferta-x')
     const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
@@ -67,9 +71,11 @@ describe('GET /r/[slug]', () => {
       slug: 'oferta-x',
       status: 'active',
       fallback_url: null,
+      test_type: 'page',
+      sales_page_url: null,
       variants: [
-        { id: 'v1', name: 'A', weight_pct: 50, destination_url: 'https://example.com/a' },
-        { id: 'v2', name: 'B', weight_pct: 50, destination_url: 'https://example.com/b' },
+        { id: 'v1', name: 'A', weight_pct: 50, destination_url: 'https://example.com/a', is_control: false },
+        { id: 'v2', name: 'B', weight_pct: 50, destination_url: 'https://example.com/b', is_control: false },
       ],
     })
     const request = new NextRequest('https://ir.example.com/r/oferta-x', {
@@ -86,7 +92,9 @@ describe('GET /r/[slug]', () => {
       slug: 'oferta-x',
       status: 'active',
       fallback_url: null,
-      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page' }],
+      test_type: 'page',
+      sales_page_url: null,
+      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
     vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
     vi.mocked(countRecentClickEventsByIp).mockResolvedValue(999)
@@ -108,7 +116,9 @@ describe('GET /r/[slug]', () => {
       slug: 'oferta-x',
       status: 'active',
       fallback_url: null,
-      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page' }],
+      test_type: 'page',
+      sales_page_url: null,
+      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
     const request = new NextRequest('https://ir.example.com/r/oferta-x', {
       headers: { 'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' },
@@ -129,7 +139,9 @@ describe('GET /r/[slug]', () => {
       slug: 'oferta-x',
       status: 'active',
       fallback_url: 'https://example.com/fallback',
-      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page' }],
+      test_type: 'page',
+      sales_page_url: null,
+      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
     const request = new NextRequest('https://ir.example.com/r/oferta-x', {
       headers: { 'user-agent': 'curl/8.4.0' },

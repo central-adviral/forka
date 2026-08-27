@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { countRecentClickEventsByIp, getOrAssignVariant, getTestBySlug, insertClickEvent } from './redirect-repo'
+import {
+  countRecentClickEventsByIp,
+  getAssignedVariantId,
+  getLatestTrackingId,
+  getOrAssignVariant,
+  getTestBySlug,
+  insertClickEvent,
+} from './redirect-repo'
 
 const db = createServiceRoleClient()
 let clientId: string
@@ -127,5 +134,47 @@ describe('redirect-repo', () => {
     const first = await getOrAssignVariant(db, { testId, visitorId, candidateVariantId: variantId })
     const second = await getOrAssignVariant(db, { testId, visitorId, candidateVariantId: variantBId })
     expect(second).toBe(first)
+  })
+
+  it('returns null when the visitor has no assignment for this test', async () => {
+    expect(await getAssignedVariantId(db, { testId, visitorId: 'visitor-never-seen' })).toBeNull()
+  })
+
+  it('returns the assigned variant id for a known visitor', async () => {
+    await getOrAssignVariant(db, { testId, visitorId: 'visitor-assign-1', candidateVariantId: variantId })
+    expect(await getAssignedVariantId(db, { testId, visitorId: 'visitor-assign-1' })).toBe(variantId)
+  })
+
+  it('returns null when the visitor has no click event for this test', async () => {
+    expect(await getLatestTrackingId(db, { testId, visitorId: 'visitor-never-seen' })).toBeNull()
+  })
+
+  it('returns the most recent tracking id when the visitor clicked more than once', async () => {
+    const trackingIdOlder = `trk-older-${testId}`
+    const trackingIdNewer = `trk-newer-${testId}`
+    await insertClickEvent(db, {
+      testId,
+      variantId,
+      visitorId: 'visitor-multi',
+      trackingId: trackingIdOlder,
+      sourceUtms: {},
+      ip: null,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    await insertClickEvent(db, {
+      testId,
+      variantId,
+      visitorId: 'visitor-multi',
+      trackingId: trackingIdNewer,
+      sourceUtms: {},
+      ip: null,
+    })
+
+    expect(await getLatestTrackingId(db, { testId, visitorId: 'visitor-multi' })).toBe(trackingIdNewer)
+  })
+
+  it('refuses to change test_type after creation', async () => {
+    const { error } = await db.from('tests').update({ test_type: 'checkout' }).eq('id', testId)
+    expect(error?.message).toContain('test_type is immutable')
   })
 })

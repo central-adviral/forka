@@ -5,6 +5,7 @@ export interface VariantRow {
   name: string
   weight_pct: number
   destination_url: string
+  is_control: boolean
 }
 
 export interface TestWithVariants {
@@ -12,13 +13,17 @@ export interface TestWithVariants {
   slug: string
   status: 'active' | 'paused'
   fallback_url: string | null
+  test_type: 'page' | 'checkout'
+  sales_page_url: string | null
   variants: VariantRow[]
 }
 
 export async function getTestBySlug(db: SupabaseClient, slug: string): Promise<TestWithVariants | null> {
   const { data, error } = await db
     .from('tests')
-    .select('id, slug, status, fallback_url, variants(id, name, weight_pct, destination_url)')
+    .select(
+      'id, slug, status, fallback_url, test_type, sales_page_url, variants(id, name, weight_pct, destination_url, is_control)'
+    )
     .eq('slug', slug)
     .order('name', { referencedTable: 'variants' })
     .maybeSingle()
@@ -83,4 +88,34 @@ export async function getOrAssignVariant(
     .single()
   if (error) throw error
   return data.variant_id as string
+}
+
+export async function getAssignedVariantId(
+  db: SupabaseClient,
+  params: { testId: string; visitorId: string }
+): Promise<string | null> {
+  const { data, error } = await db
+    .from('variant_assignments')
+    .select('variant_id')
+    .eq('test_id', params.testId)
+    .eq('visitor_id', params.visitorId)
+    .maybeSingle()
+  if (error) throw error
+  return (data?.variant_id as string | undefined) ?? null
+}
+
+export async function getLatestTrackingId(
+  db: SupabaseClient,
+  params: { testId: string; visitorId: string }
+): Promise<string | null> {
+  const { data, error } = await db
+    .from('click_events')
+    .select('tracking_id')
+    .eq('test_id', params.testId)
+    .eq('visitor_id', params.visitorId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return (data?.tracking_id as string | undefined) ?? null
 }
