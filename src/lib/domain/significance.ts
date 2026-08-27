@@ -38,7 +38,8 @@ export function probabilityToBeatControl(
   variant: { visits: number; conversions: number },
   rand: () => number = Math.random,
   samples = 10000
-): number {
+): number | null {
+  if (control.visits === 0 || variant.visits === 0) return null
   const normal = makeSeededNormal(rand)
   let wins = 0
   for (let i = 0; i < samples; i++) {

@@ -31,10 +31,9 @@ describe('probabilityToBeatControl', () => {
     expect(p).toBeLessThan(0.1)
   })
 
-  it('handles zero-visit variants without throwing', () => {
+  it('returns null for zero-visit variants instead of a meaningless probability', () => {
     const rand = mulberry32(4)
     const p = probabilityToBeatControl({ visits: 0, conversions: 0 }, { visits: 0, conversions: 0 }, rand, 1000)
-    expect(p).toBeGreaterThanOrEqual(0)
-    expect(p).toBeLessThanOrEqual(1)
+    expect(p).toBeNull()
   })
 })

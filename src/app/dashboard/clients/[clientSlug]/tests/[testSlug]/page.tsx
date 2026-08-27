@@ -40,8 +40,12 @@ export default async function TestReportPage({
       ? await supabase.from('variants').select('id, name, thank_you_url').eq('test_id', test.id)
       : { data: null }
 
-  const { data: variantRows } = await supabase.from('variants').select('id, destination_url').eq('test_id', test.id)
+  const { data: variantRows } = await supabase
+    .from('variants')
+    .select('id, destination_url, is_control')
+    .eq('test_id', test.id)
   const destinationById = new Map((variantRows ?? []).map((v) => [v.id, v.destination_url as string]))
+  const controlVariantId = (variantRows ?? []).find((v) => v.is_control)?.id
 
   const { data: report } = await supabase.rpc('get_test_report', { p_test_id: test.id })
   const { data: sourceReport } = await supabase.rpc('get_test_report_by_source', { p_test_id: test.id })
@@ -62,19 +66,17 @@ export default async function TestReportPage({
     ...row,
     rate: row.visits > 0 ? ((row.conversions / row.visits) * 100).toFixed(1) : '0.0',
   }))
-  const control = baseRows[0]
-  const rows = baseRows.map((row) => ({
-    ...row,
-    confidencePct:
-      control && row.variant_id !== control.variant_id && control.visits > 0 && row.visits > 0
-        ? Math.round(
-            probabilityToBeatControl(
-              { visits: control.visits, conversions: control.conversions },
-              { visits: row.visits, conversions: row.conversions }
-            ) * 100
+  const control = baseRows.find((row) => row.variant_id === controlVariantId) ?? baseRows[0]
+  const rows = baseRows.map((row) => {
+    const p =
+      control && row.variant_id !== control.variant_id
+        ? probabilityToBeatControl(
+            { visits: control.visits, conversions: control.conversions },
+            { visits: row.visits, conversions: row.conversions }
           )
-        : null,
-  }))
+        : null
+    return { ...row, confidencePct: p !== null ? Math.round(p * 100) : null }
+  })
 
   const layout = computeReportLayout(
     rows.map((row) => ({
