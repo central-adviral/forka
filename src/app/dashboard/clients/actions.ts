@@ -34,3 +34,11 @@ export async function createClient(formData: FormData) {
   revalidatePath('/dashboard')
   redirect('/dashboard?created=1')
 }
+
+export async function deleteClient(clientId: string) {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('clients').delete().eq('id', clientId)
+  if (error) throw error
+  revalidatePath('/dashboard')
+  redirect('/dashboard')
+}

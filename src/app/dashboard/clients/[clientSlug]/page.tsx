@@ -2,6 +2,9 @@ import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { SuccessBanner } from '@/components/success-banner'
+import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
+import { deleteClient } from '../actions'
+import { deleteTest } from './actions'
 
 export default async function ClientPage({ params }: { params: Promise<{ clientSlug: string }> }) {
   const { clientSlug } = await params
@@ -27,7 +30,8 @@ export default async function ClientPage({ params }: { params: Promise<{ clientS
       </Suspense>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-['Space_Grotesk'] text-xl font-semibold">Testes — {client.name}</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          <ConfirmDeleteButton action={deleteClient.bind(null, client.id)} label="Excluir cliente" />
           <a
             href={`/dashboard/clients/${client.slug}/integrations`}
             className="rounded-[9px] border border-white/[0.08] px-4 py-2.5 text-[13.5px] font-medium text-[#8A90A6]"
@@ -45,26 +49,28 @@ export default async function ClientPage({ params }: { params: Promise<{ clientS
 
       <div className="overflow-hidden rounded-2xl border border-white/[0.08]">
         {(tests ?? []).map((test, index) => (
-          <a
+          <div
             key={test.id}
-            href={`/dashboard/clients/${client.slug}/tests/${test.slug}`}
             className={`flex items-center gap-5 bg-[#141829] px-6 py-5 hover:bg-[#1B2036] ${
               index < (tests?.length ?? 0) - 1 ? 'border-b border-white/[0.08]' : ''
             } ${test.status === 'paused' ? 'opacity-70' : ''}`}
           >
-            <div className="min-w-0 flex-1">
-              <div className="font-['Space_Grotesk'] text-[15px] font-semibold">{test.name}</div>
-              <div className="font-['JetBrains_Mono'] text-xs text-[#8A90A6]">/{test.slug}</div>
-            </div>
-            <span
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
-                test.status === 'active' ? 'border-[#2DD4A8]/35 text-[#2DD4A8]' : 'border-[#F76C6C]/35 text-[#F76C6C]'
-              }`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${test.status === 'active' ? 'bg-[#2DD4A8]' : 'bg-[#F76C6C]'}`} />
-              {test.status === 'active' ? 'Ativo' : 'Pausado'}
-            </span>
-          </a>
+            <a href={`/dashboard/clients/${client.slug}/tests/${test.slug}`} className="flex min-w-0 flex-1 items-center gap-5">
+              <div className="min-w-0 flex-1">
+                <div className="font-['Space_Grotesk'] text-[15px] font-semibold">{test.name}</div>
+                <div className="font-['JetBrains_Mono'] text-xs text-[#8A90A6]">/{test.slug}</div>
+              </div>
+              <span
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                  test.status === 'active' ? 'border-[#2DD4A8]/35 text-[#2DD4A8]' : 'border-[#F76C6C]/35 text-[#F76C6C]'
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${test.status === 'active' ? 'bg-[#2DD4A8]' : 'bg-[#F76C6C]'}`} />
+                {test.status === 'active' ? 'Ativo' : 'Pausado'}
+              </span>
+            </a>
+            <ConfirmDeleteButton action={deleteTest.bind(null, test.id, client.slug)} />
+          </div>
         ))}
         {(tests ?? []).length === 0 && <div className="px-6 py-8 text-sm text-[#8A90A6]">Nenhum teste ainda.</div>}
       </div>

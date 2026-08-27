@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 const httpUrl = z.string().url().regex(/^https?:\/\//i, 'A URL deve começar com http:// ou https://')
@@ -43,4 +44,11 @@ export async function createTest(input: z.infer<typeof createTestSchema>) {
     })),
   })
   if (error) throw error
+}
+
+export async function deleteTest(testId: string, clientSlug: string) {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('tests').delete().eq('id', testId)
+  if (error) throw error
+  revalidatePath(`/dashboard/clients/${clientSlug}`)
 }

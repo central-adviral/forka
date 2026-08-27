@@ -1,0 +1,49 @@
+'use client'
+
+import { useState } from 'react'
+
+export function ConfirmDeleteButton({
+  action,
+  label = 'Excluir',
+}: {
+  action: () => Promise<void>
+  label?: string
+}) {
+  const [confirming, setConfirming] = useState(false)
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          setConfirming(true)
+        }}
+        className="text-xs font-medium text-[#F76C6C] hover:text-[#ff8f8f]"
+      >
+        {label}
+      </button>
+    )
+  }
+
+  return (
+    <span className="flex items-center gap-2" onClick={(event) => event.preventDefault()}>
+      <span className="text-xs text-[#F76C6C]">Confirmar?</span>
+      <form action={action}>
+        <button type="submit" className="text-xs font-semibold text-[#F76C6C] underline">
+          Sim
+        </button>
+      </form>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.preventDefault()
+          setConfirming(false)
+        }}
+        className="text-xs text-[#8A90A6]"
+      >
+        Não
+      </button>
+    </span>
+  )
+}
