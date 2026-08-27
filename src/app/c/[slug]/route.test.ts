@@ -76,6 +76,22 @@ describe('GET /c/[slug]', () => {
     expect(response.headers.get('location')).toBe('https://pay.hub.la/aaa')
   })
 
+  it('sends an organic visitor to the first variant when no variant is marked as control', async () => {
+    vi.mocked(getTestBySlug).mockResolvedValue({
+      ...CHECKOUT_TEST,
+      variants: [
+        { id: 'v1', name: 'A', weight_pct: 50, destination_url: 'https://pay.hub.la/aaa', is_control: false },
+        { id: 'v2', name: 'B', weight_pct: 50, destination_url: 'https://pay.hub.la/bbb', is_control: false },
+      ],
+    })
+
+    const response = await GET(request(), params)
+
+    expect(response.status).toBe(302)
+    expect(response.headers.get('location')).toBe('https://pay.hub.la/aaa')
+    expect(getLatestTrackingId).not.toHaveBeenCalled()
+  })
+
   it('keeps redirecting when the test is paused', async () => {
     vi.mocked(getTestBySlug).mockResolvedValue({ ...CHECKOUT_TEST, status: 'paused' })
     vi.mocked(getLatestTrackingId).mockResolvedValue('trk_1')

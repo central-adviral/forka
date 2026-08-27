@@ -62,6 +62,8 @@ describe('schema RLS isolation', () => {
       p_name: 'Teste X',
       p_slug: `teste-x-${Date.now()}`,
       p_fallback_url: null,
+      p_test_type: 'page',
+      p_sales_page_url: null,
       p_conversion_method: 'thank_you_page',
       p_variants: [
         { name: 'A', weight_pct: 50, destination_url: 'https://example.com/a' },
@@ -87,6 +89,8 @@ describe('schema RLS isolation', () => {
       p_name: 'Teste Y',
       p_slug: `teste-y-${Date.now()}`,
       p_fallback_url: null,
+      p_test_type: 'page',
+      p_sales_page_url: null,
       p_conversion_method: 'thank_you_page',
       p_variants: [
         { name: 'Zebra Original', weight_pct: 50, destination_url: 'https://example.com/z' },
@@ -159,6 +163,8 @@ describe('schema RLS isolation', () => {
       p_name: 'Ad Report Test',
       p_slug: `ad-report-test-${Date.now()}`,
       p_fallback_url: null,
+      p_test_type: 'page',
+      p_sales_page_url: null,
       p_conversion_method: 'hubla_webhook',
       p_variants: [{ name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' }],
     })

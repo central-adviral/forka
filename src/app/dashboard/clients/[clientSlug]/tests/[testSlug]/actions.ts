@@ -58,20 +58,27 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
     throw new Error('Os pesos das variantes devem somar 100%')
   }
 
-  // Catch this here so the operator gets a Portuguese message instead of the raw
-  // tests_checkout_requires_sales_page constraint error from Postgres.
-  if (parsed.test_type === 'checkout' && !parsed.sales_page_url) {
-    throw new Error('Testes de checkout exigem a URL da página de vendas')
-  }
-
   const supabase = await createServerSupabaseClient()
 
   // Verify every submitted variant actually belongs to this test before writing anything,
   // so a stale/mismatched id fails the whole request up front instead of leaving some
   // variants updated and others not (these calls aren't wrapped in a DB transaction).
-  const { data: ownedVariants, error: ownedError } = await supabase.from('variants').select('id').eq('test_id', parsed.test_id)
-  if (ownedError) throw ownedError
-  const ownedIds = new Set((ownedVariants ?? []).map((v) => v.id))
+  const { data: test, error: testFetchError } = await supabase
+    .from('tests')
+    .select('test_type, variants(id)')
+    .eq('id', parsed.test_id)
+    .maybeSingle()
+  if (testFetchError) throw testFetchError
+  if (!test) throw new Error('Test not found or not authorized to update')
+
+  // Catch this here so the operator gets a Portuguese message instead of the raw
+  // tests_checkout_requires_sales_page constraint error from Postgres. Sourced from the
+  // database's own test_type, not parsed.test_type, since that value comes from the client.
+  if (test.test_type === 'checkout' && !parsed.sales_page_url) {
+    throw new Error('Testes de checkout exigem a URL da página de vendas')
+  }
+
+  const ownedIds = new Set((test.variants ?? []).map((v) => v.id))
   const foreignVariant = parsed.variants.find((v) => !ownedIds.has(v.id))
   if (foreignVariant) {
     throw new Error(`Variante ${foreignVariant.id} não pertence a este teste`)
