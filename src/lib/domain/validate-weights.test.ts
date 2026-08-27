@@ -14,4 +14,7 @@ describe('weightsSumTo100', () => {
   it('tolerates floating point rounding', () => {
     expect(weightsSumTo100([33.34, 33.33, 33.33])).toBe(true)
   })
+  it('rejects a total the server-side RPC would reject, so client and server agree', () => {
+    expect(weightsSumTo100([50.01, 50.01])).toBe(false)
+  })
 })
