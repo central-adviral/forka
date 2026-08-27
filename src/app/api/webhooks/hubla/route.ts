@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { verifyHublaToken, parseHublaPaymentSucceeded } from '@/lib/domain/hubla'
+import { HublaIrrelevantEventError, verifyHublaToken, parseHublaPaymentSucceeded } from '@/lib/domain/hubla'
 import { getClickEventByTrackingId, insertConversionIfNew } from '@/lib/repo/conversion-repo'
 
 export async function POST(request: NextRequest) {
   const receivedToken = request.headers.get('x-hubla-token')
-  if (!verifyHublaToken(receivedToken, process.env.HUBLA_WEBHOOK_TOKEN!)) {
+  if (!verifyHublaToken(receivedToken, process.env.HUBLA_WEBHOOK_TOKEN)) {
     console.error('[hubla-webhook] rejected: invalid or missing x-hubla-token')
     return new NextResponse('Invalid token', { status: 401 })
   }
@@ -15,8 +15,11 @@ export async function POST(request: NextRequest) {
     const payload = await request.json()
     parsed = parseHublaPaymentSucceeded(payload)
   } catch (err) {
-    console.error('[hubla-webhook] failed to parse payload', err instanceof Error ? err.message : String(err))
-    return NextResponse.json({ ok: true, attributed: false })
+    if (err instanceof HublaIrrelevantEventError) {
+      return NextResponse.json({ ok: true, attributed: false })
+    }
+    console.error('[hubla-webhook] rejected malformed payload', err instanceof Error ? err.message : String(err))
+    return NextResponse.json({ ok: false, attributed: false }, { status: 422 })
   }
 
   if (!parsed.trackingId) {

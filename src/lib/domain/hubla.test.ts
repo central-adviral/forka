@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { verifyHublaToken, parseHublaPaymentSucceeded } from './hubla'
+import { HublaIrrelevantEventError, HublaMalformedPayloadError, verifyHublaToken, parseHublaPaymentSucceeded } from './hubla'
 
 describe('verifyHublaToken', () => {
   it('returns true when tokens match', () => {
@@ -13,6 +13,9 @@ describe('verifyHublaToken', () => {
   })
   it('returns false when lengths differ', () => {
     expect(verifyHublaToken('short', 'a-much-longer-secret')).toBe(false)
+  })
+  it('returns false instead of throwing when the expected token is unset', () => {
+    expect(verifyHublaToken('anything', undefined)).toBe(false)
   })
 })
 
@@ -43,21 +46,21 @@ describe('parseHublaPaymentSucceeded', () => {
     expect(parseHublaPaymentSucceeded(payload).trackingId).toBeNull()
   })
 
-  it('throws when invoice id is missing', () => {
+  it('throws HublaMalformedPayloadError when invoice id is missing, distinct from an irrelevant event', () => {
     const payload = { type: 'invoice.payment_succeeded', event: { invoice: {} } }
-    expect(() => parseHublaPaymentSucceeded(payload)).toThrow()
+    expect(() => parseHublaPaymentSucceeded(payload)).toThrow(HublaMalformedPayloadError)
   })
 
-  it('rejects a refund event instead of attributing it', () => {
+  it('rejects a refund event with HublaIrrelevantEventError, not a malformed-payload error', () => {
     const payload = {
       type: 'invoice.refunded',
       event: { invoice: { id: 'inv_1', firstPaymentSession: { utm: { content: 'trk_1' } } } },
     }
-    expect(() => parseHublaPaymentSucceeded(payload)).toThrow()
+    expect(() => parseHublaPaymentSucceeded(payload)).toThrow(HublaIrrelevantEventError)
   })
 
-  it('rejects a payload with no event type at all', () => {
+  it('rejects a payload with no event type at all as an irrelevant event', () => {
     const payload = { event: { invoice: { id: 'inv_1' } } }
-    expect(() => parseHublaPaymentSucceeded(payload)).toThrow()
+    expect(() => parseHublaPaymentSucceeded(payload)).toThrow(HublaIrrelevantEventError)
   })
 })
