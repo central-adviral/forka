@@ -73,7 +73,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
               Valor: cname.vercel-dns.com
             </div>
 
-            <form action={verifyDomain.bind(null, { client_id: client.id, client_slug: client.slug, custom_domain: client.custom_domain })}>
+            <form action={verifyDomain.bind(null, { client_id: client.id, client_slug: client.slug })}>
               <button
                 type="submit"
                 className="rounded-[10px] border border-white/[0.08] px-4 py-2.5 text-sm font-medium text-[#8A90A6]"

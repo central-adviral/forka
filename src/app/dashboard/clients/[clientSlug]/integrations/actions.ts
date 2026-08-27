@@ -34,11 +34,18 @@ export async function saveDomain(context: { client_id: string; client_slug: stri
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/integrations`)
 }
 
-export async function verifyDomain(context: { client_id: string; client_slug: string; custom_domain: string }) {
+export async function verifyDomain(context: { client_id: string; client_slug: string }) {
   const supabase = await createServerSupabaseClient()
+
+  // Re-read the domain to verify from the DB (RLS-scoped to the caller's own clients) instead
+  // of trusting a domain string passed in from the caller — otherwise this becomes an open DNS
+  // lookup for any domain an authenticated user cares to type in.
+  const { data: client } = await supabase.from('clients').select('custom_domain').eq('id', context.client_id).maybeSingle()
+  if (!client?.custom_domain) return
+
   let verified = false
   try {
-    const records = await dns.resolveCname(context.custom_domain)
+    const records = await dns.resolveCname(client.custom_domain)
     verified = isCnameVerified(records)
   } catch {
     verified = false
