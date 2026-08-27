@@ -89,8 +89,8 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
               Valor: cname.vercel-dns.com
             </div>
             <p className="text-xs text-[#8A90A6]">
-              Alguns provedores de DNS pedem só a parte antes do seu domínio raiz (ex: só "ir" em vez do
-              domínio completo) — se o campo "Nome" recusar o valor completo, use apenas o prefixo.
+              Alguns provedores de DNS pedem só a parte antes do seu domínio raiz (ex: só &quot;ir&quot; em vez do
+              domínio completo) — se o campo &quot;Nome&quot; recusar o valor completo, use apenas o prefixo.
             </p>
 
             <VerifyDomainButton verifyAction={verifyDomain.bind(null, { client_id: client.id, client_slug: client.slug })} />

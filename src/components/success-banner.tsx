@@ -1,23 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 export function SuccessBanner({ param, message }: { param: string; message: string }) {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [visible, setVisible] = useState(false)
+  const visible = searchParams.get(param) === '1'
 
   useEffect(() => {
-    if (searchParams.get(param) === '1') {
-      setVisible(true)
-      const timeout = setTimeout(() => {
-        setVisible(false)
-        router.replace(window.location.pathname)
-      }, 3000)
-      return () => clearTimeout(timeout)
-    }
-  }, [searchParams, param, router])
+    if (!visible) return
+    const timeout = setTimeout(() => {
+      router.replace(window.location.pathname)
+    }, 3000)
+    return () => clearTimeout(timeout)
+  }, [visible, router])
 
   if (!visible) return null
 

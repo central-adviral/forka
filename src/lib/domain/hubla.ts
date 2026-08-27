@@ -17,7 +17,19 @@ export interface ParsedHublaEvent {
 export class HublaIrrelevantEventError extends Error {}
 export class HublaMalformedPayloadError extends Error {}
 
-export function parseHublaPaymentSucceeded(payload: any): ParsedHublaEvent {
+interface HublaPayload {
+  type?: string
+  event?: {
+    invoice?: {
+      id?: string
+      firstPaymentSession?: { utm?: { content?: string } }
+      amount?: { totalCents?: number }
+    }
+  }
+}
+
+export function parseHublaPaymentSucceeded(rawPayload: unknown): ParsedHublaEvent {
+  const payload = rawPayload as HublaPayload
   if (payload?.type !== 'invoice.payment_succeeded') {
     throw new HublaIrrelevantEventError(`Hubla payload is not a payment_succeeded event: ${payload?.type}`)
   }

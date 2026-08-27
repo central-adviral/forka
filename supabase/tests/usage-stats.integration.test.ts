@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type PostgrestError } from '@supabase/supabase-js'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321'
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -16,7 +16,10 @@ describe('get_usage_stats', () => {
 
     await admin.from('clients').insert({ owner_id: authUser!.user!.id, name: 'Usage Test', slug: `usage-${Date.now()}` })
 
-    const { data, error } = (await asOwner.rpc('get_usage_stats').single()) as { data: { total_clients: number } | null; error: any }
+    const { data, error } = (await asOwner.rpc('get_usage_stats').single()) as {
+      data: { total_clients: number } | null
+      error: PostgrestError | null
+    }
     expect(error).toBeNull()
     expect(data!.total_clients).toBeGreaterThanOrEqual(1)
   })
