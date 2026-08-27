@@ -100,6 +100,10 @@ export default function NewTestPage() {
     setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)))
   }
 
+  function removeVariant(index: number) {
+    setVariants((prev) => prev.filter((_, i) => i !== index))
+  }
+
   return (
     <div className="p-8">
       <form onSubmit={handleSubmit} className="max-w-xl space-y-4">
@@ -160,7 +164,18 @@ export default function NewTestPage() {
 
         {variants.map((variant, index) => (
           <fieldset key={index} className="space-y-2 rounded-[10px] border border-white/[0.08] p-3">
-            <legend className="px-1 text-sm font-medium text-[#8A90A6]">Variante {variant.name}</legend>
+            <legend className="flex items-center gap-2 px-1 text-sm font-medium text-[#8A90A6]">
+              Variante {variant.name}
+              {variants.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() => removeVariant(index)}
+                  className="text-xs font-medium text-[#F76C6C] hover:underline"
+                >
+                  Remover
+                </button>
+              )}
+            </legend>
             <input
               placeholder="Peso %"
               value={variant.weight_pct}
