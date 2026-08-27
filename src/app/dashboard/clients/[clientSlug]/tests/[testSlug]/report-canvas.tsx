@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ReportLayout } from '@/lib/domain/report-layout'
+import { clampZoom, computeFitZoom } from '@/lib/domain/canvas-zoom'
 
-const MIN_ZOOM = 0.2
-const MAX_ZOOM = 1
 const ZOOM_STEP = 0.1
 const CANVAS_PADDING = 40
 
@@ -34,8 +33,7 @@ export function ReportCanvas({
 
     function computeFit() {
       if (!container) return
-      const scale = Math.min(container.clientWidth / fullWidth, container.clientHeight / fullHeight, MAX_ZOOM)
-      setZoom(Math.max(MIN_ZOOM, scale))
+      setZoom(computeFitZoom(container.clientWidth, container.clientHeight, fullWidth, fullHeight))
     }
 
     computeFit()
@@ -46,7 +44,7 @@ export function ReportCanvas({
 
   function zoomBy(delta: number) {
     setAutoFit(false)
-    setZoom((current) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, current + delta)))
+    setZoom((current) => clampZoom(current + delta))
   }
 
   return (

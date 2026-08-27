@@ -140,4 +140,88 @@ describe('schema RLS isolation', () => {
     const { data: stillOwnerDomain } = await admin.from('clients').select('custom_domain').eq('id', client.id).single()
     expect(stillOwnerDomain?.custom_domain).toBe('ir.example.com')
   })
+
+  it('get_test_report_by_ad only counts confirmed sales, grouped by the click that led to each sale, and denies other owners', async () => {
+    const ownerEmail = `ad-report-owner-${Date.now()}@example.com`
+    const otherEmail = `ad-report-other-${Date.now()}@example.com`
+    const owner = await createTestUser(ownerEmail)
+    await createTestUser(otherEmail)
+
+    const { data: client } = await admin
+      .from('clients')
+      .insert({ owner_id: owner.id, name: 'Ad Report Client', slug: `ad-report-${Date.now()}` })
+      .select()
+      .single()
+
+    const asOwner = await signIn(ownerEmail)
+    const { data: testId, error: createError } = await asOwner.rpc('create_test_with_variants', {
+      p_client_id: client!.id,
+      p_name: 'Ad Report Test',
+      p_slug: `ad-report-test-${Date.now()}`,
+      p_fallback_url: null,
+      p_conversion_method: 'hubla_webhook',
+      p_variants: [{ name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' }],
+    })
+    if (createError) throw createError
+
+    const { data: variant } = await admin.from('variants').select('id').eq('test_id', testId).single()
+
+    const { data: convertedClick } = await admin
+      .from('click_events')
+      .insert({
+        test_id: testId,
+        variant_id: variant!.id,
+        visitor_id: 'visitor-1',
+        tracking_id: `trk-converted-${Date.now()}`,
+        source_utms: { utm_term: 'anuncio-1' },
+      })
+      .select()
+      .single()
+    await admin.from('conversions').insert({
+      click_event_id: convertedClick!.id,
+      source: 'hubla_webhook',
+      external_event_id: `inv-1-${Date.now()}`,
+    })
+
+    // A click with no conversion must not appear at all — this report only shows confirmed sales.
+    await admin.from('click_events').insert({
+      test_id: testId,
+      variant_id: variant!.id,
+      visitor_id: 'visitor-2',
+      tracking_id: `trk-no-sale-${Date.now()}`,
+      source_utms: { utm_term: 'anuncio-2' },
+    })
+
+    // A converted click with no utm_term falls back to the '(sem anúncio)' label.
+    const { data: noAdClick } = await admin
+      .from('click_events')
+      .insert({
+        test_id: testId,
+        variant_id: variant!.id,
+        visitor_id: 'visitor-3',
+        tracking_id: `trk-no-ad-${Date.now()}`,
+        source_utms: {},
+      })
+      .select()
+      .single()
+    await admin.from('conversions').insert({
+      click_event_id: noAdClick!.id,
+      source: 'hubla_webhook',
+      external_event_id: `inv-2-${Date.now()}`,
+    })
+
+    const { data: rows, error } = await asOwner.rpc('get_test_report_by_ad', { p_test_id: testId })
+    if (error) throw error
+
+    expect(rows).toHaveLength(2)
+    const conversionsByAd = new Map(rows!.map((row: { ad_name: string; conversions: number }) => [row.ad_name, row.conversions]))
+    expect(conversionsByAd.get('anuncio-1')).toBe(1)
+    expect(conversionsByAd.get('(sem anúncio)')).toBe(1)
+    expect(conversionsByAd.has('anuncio-2')).toBe(false)
+
+    const otherClient = await signIn(otherEmail)
+    const { error: deniedError } = await otherClient.rpc('get_test_report_by_ad', { p_test_id: testId })
+    expect(deniedError).not.toBeNull()
+    expect(deniedError!.message).toContain('access denied')
+  })
 })
