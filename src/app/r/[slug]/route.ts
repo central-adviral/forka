@@ -9,6 +9,7 @@ import {
   getOrCreateVisitorId,
   readAssignedVariantId,
 } from '@/lib/domain/cookie-assignment'
+import { resolveEntryDestination, withTrackingId } from '@/lib/domain/test-destination'
 
 const COOKIE_MAX_AGE_DAYS = Number(process.env.COOKIE_MAX_AGE_DAYS ?? '30')
 const MAX_CLICKS_PER_IP_PER_HOUR = 30
@@ -32,7 +33,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   if (isKnownBot(request.headers.get('user-agent'))) {
-    const destination = test.fallback_url ?? test.variants[0].destination_url
+    const destination =
+      test.fallback_url ??
+      resolveEntryDestination({
+        testType: test.test_type,
+        salesPageUrl: test.sales_page_url,
+        variantDestinationUrl: test.variants[0].destination_url,
+      })
     return NextResponse.redirect(destination, 302)
   }
 
@@ -73,15 +80,27 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     })
   }
 
-  const destination = new URL(variant.destination_url)
-  destination.searchParams.set('utm_content', trackingId)
+  const destination = withTrackingId(
+    resolveEntryDestination({
+      testType: test.test_type,
+      salesPageUrl: test.sales_page_url,
+      variantDestinationUrl: variant.destination_url,
+    }),
+    trackingId
+  )
 
   const response = NextResponse.redirect(destination, 302)
-  response.cookies.set(VISITOR_COOKIE, visitorId, { maxAge: 60 * 60 * 24 * 365, httpOnly: true, secure: true })
+  response.cookies.set(VISITOR_COOKIE, visitorId, {
+    maxAge: 60 * 60 * 24 * 365,
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+  })
   response.cookies.set(assignmentCookieName(test.slug), variant.id, {
     maxAge: 60 * 60 * 24 * COOKIE_MAX_AGE_DAYS,
     httpOnly: true,
     secure: true,
+    sameSite: 'lax',
   })
   return response
 }

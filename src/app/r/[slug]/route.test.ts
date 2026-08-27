@@ -150,4 +150,49 @@ describe('GET /r/[slug]', () => {
     expect(response.headers.get('location')).toBe('https://example.com/fallback')
     expect(insertClickEvent).not.toHaveBeenCalled()
   })
+
+  it('sends a checkout test to the shared sales page, not to the variant checkout link', async () => {
+    vi.mocked(getTestBySlug).mockResolvedValue({
+      id: 'test-1',
+      slug: 'oferta-x',
+      status: 'active',
+      fallback_url: null,
+      test_type: 'checkout',
+      sales_page_url: 'https://example.com/vendas',
+      variants: [
+        { id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://pay.hub.la/abc', is_control: true },
+      ],
+    })
+    vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
+
+    const request = new NextRequest('https://ir.example.com/r/oferta-x')
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
+
+    const location = new URL(response.headers.get('location')!)
+    expect(location.origin + location.pathname).toBe('https://example.com/vendas')
+    expect(location.searchParams.get('utm_content')).toBeTruthy()
+    expect(insertClickEvent).toHaveBeenCalledOnce()
+  })
+
+  it('sends a bot on a checkout test to the sales page, never to the checkout link', async () => {
+    vi.mocked(getTestBySlug).mockResolvedValue({
+      id: 'test-1',
+      slug: 'oferta-x',
+      status: 'active',
+      fallback_url: null,
+      test_type: 'checkout',
+      sales_page_url: 'https://example.com/vendas',
+      variants: [
+        { id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://pay.hub.la/abc', is_control: true },
+      ],
+    })
+
+    const request = new NextRequest('https://ir.example.com/r/oferta-x', {
+      headers: { 'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)' },
+    })
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
+
+    expect(response.headers.get('location')).toBe('https://example.com/vendas')
+    expect(insertClickEvent).not.toHaveBeenCalled()
+  })
 })
