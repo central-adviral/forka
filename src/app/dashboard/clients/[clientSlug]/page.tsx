@@ -22,12 +22,20 @@ export default async function ClientPage({ params }: { params: Promise<{ clientS
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-['Space_Grotesk'] text-xl font-semibold">Testes — {client.name}</h1>
-        <a
-          href={`/dashboard/clients/${client.slug}/tests/new`}
-          className="rounded-[9px] bg-[#7C6FF0] px-4 py-2.5 text-[13.5px] font-semibold text-[#0B0E1A]"
-        >
-          Novo teste
-        </a>
+        <div className="flex items-center gap-3">
+          <a
+            href={`/dashboard/clients/${client.slug}/integrations`}
+            className="rounded-[9px] border border-white/[0.08] px-4 py-2.5 text-[13.5px] font-medium text-[#8A90A6]"
+          >
+            Integrações
+          </a>
+          <a
+            href={`/dashboard/clients/${client.slug}/tests/new`}
+            className="rounded-[9px] bg-[#7C6FF0] px-4 py-2.5 text-[13.5px] font-semibold text-[#0B0E1A]"
+          >
+            Novo teste
+          </a>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-white/[0.08]">
