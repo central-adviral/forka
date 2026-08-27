@@ -16,7 +16,7 @@ describe('GET /ty/[slug]', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('records a conversion when tid matches a click event for this test', async () => {
-    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'oferta-x' })
+    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'oferta-x', clientId: 'client-1' })
     const request = new NextRequest('https://ir.example.com/ty/oferta-x?tid=trk_1')
     const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     expect(response.headers.get('content-type')).toBe('image/gif')
@@ -27,7 +27,7 @@ describe('GET /ty/[slug]', () => {
   })
 
   it('does not record a conversion when tid belongs to a different test', async () => {
-    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'outro-teste' })
+    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'outro-teste', clientId: 'client-1' })
     const request = new NextRequest('https://ir.example.com/ty/oferta-x?tid=trk_1')
     const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     expect(response.status).toBe(200)

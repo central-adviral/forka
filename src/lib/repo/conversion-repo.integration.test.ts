@@ -6,6 +6,7 @@ const db = createServiceRoleClient()
 let clickEventId: string
 let trackingId: string
 let testSlug: string
+let clientId: string
 
 beforeAll(async () => {
   const { data: user } = await db.auth.admin.createUser({
@@ -18,6 +19,7 @@ beforeAll(async () => {
     .insert({ owner_id: user.user!.id, name: 'ConvRepo', slug: `conv-repo-${Date.now()}` })
     .select()
     .single()
+  clientId = client!.id
 
   // Seeded via direct service-role inserts, not the create_test_with_variants RPC —
   // same reasoning as Task 5: that RPC requires an authenticated-user auth.uid(),
@@ -62,6 +64,11 @@ describe('conversion-repo', () => {
   it('includes the owning test slug, so callers can verify it matches the requested path', async () => {
     const result = await getClickEventByTrackingId(db, trackingId)
     expect(result?.testSlug).toBe(testSlug)
+  })
+
+  it('includes the owning client id, so per-client callers can verify ownership', async () => {
+    const result = await getClickEventByTrackingId(db, trackingId)
+    expect(result?.clientId).toBe(clientId)
   })
 
   it('returns null for an unknown tracking id', async () => {

@@ -5,16 +5,16 @@ export type ConversionSource = 'hubla_webhook' | 'thank_you_page'
 export async function getClickEventByTrackingId(
   db: SupabaseClient,
   trackingId: string
-): Promise<{ id: string; testSlug: string } | null> {
+): Promise<{ id: string; testSlug: string; clientId: string } | null> {
   const { data, error } = await db
     .from('click_events')
-    .select('id, tests(slug)')
+    .select('id, tests(slug, client_id)')
     .eq('tracking_id', trackingId)
     .maybeSingle()
   if (error) throw error
   if (!data) return null
-  const testSlug = (data.tests as unknown as { slug: string } | null)?.slug ?? ''
-  return { id: data.id, testSlug }
+  const test = data.tests as unknown as { slug: string; client_id: string } | null
+  return { id: data.id, testSlug: test?.slug ?? '', clientId: test?.client_id ?? '' }
 }
 
 export async function insertConversionIfNew(
