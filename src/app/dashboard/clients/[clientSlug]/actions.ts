@@ -3,18 +3,20 @@
 import { z } from 'zod'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
+const httpUrl = z.string().url().regex(/^https?:\/\//i, 'A URL deve começar com http:// ou https://')
+
 const variantSchema = z.object({
   name: z.string().min(1),
   weight_pct: z.coerce.number().gt(0).lte(100),
-  destination_url: z.string().url(),
-  thank_you_url: z.string().url().optional().or(z.literal('')),
+  destination_url: httpUrl,
+  thank_you_url: httpUrl.optional().or(z.literal('')),
 })
 
 const createTestSchema = z.object({
   client_id: z.string().uuid(),
   name: z.string().min(1),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
-  fallback_url: z.string().url().optional().or(z.literal('')),
+  fallback_url: httpUrl.optional().or(z.literal('')),
   conversion_method: z.enum(['hubla_webhook', 'thank_you_page']),
   variants: z.array(variantSchema).min(2),
 })
