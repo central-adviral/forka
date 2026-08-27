@@ -100,4 +100,44 @@ describe('schema RLS isolation', () => {
     expect(control?.name).toBe('Zebra Original')
     expect(variants!.filter((v) => v.is_control)).toHaveLength(1)
   })
+
+  it('owner can read/write their client integrations columns, another user cannot', async () => {
+    const ownerEmail = `domain-rls-owner-${Date.now()}@example.com`
+    const otherEmail = `domain-rls-other-${Date.now()}@example.com`
+    const owner = await createTestUser(ownerEmail)
+    await createTestUser(otherEmail)
+
+    const { data: client, error } = await admin
+      .from('clients')
+      .insert({ owner_id: owner.id, name: 'Domain RLS Test', slug: `domain-rls-${Date.now()}` })
+      .select()
+      .single()
+    if (error) throw error
+
+    const ownerClient = await signIn(ownerEmail)
+    const { error: updateError } = await ownerClient
+      .from('clients')
+      .update({ custom_domain: 'ir.example.com', hubla_webhook_token: 'owner-token' })
+      .eq('id', client.id)
+    expect(updateError).toBeNull()
+
+    const { data: ownVisible } = await ownerClient
+      .from('clients')
+      .select('custom_domain, hubla_webhook_token')
+      .eq('id', client.id)
+      .single()
+    expect(ownVisible?.custom_domain).toBe('ir.example.com')
+    expect(ownVisible?.hubla_webhook_token).toBe('owner-token')
+
+    const otherClient = await signIn(otherEmail)
+    const { data: otherUpdateResult } = await otherClient
+      .from('clients')
+      .update({ custom_domain: 'attacker.example.com' })
+      .eq('id', client.id)
+      .select()
+    expect(otherUpdateResult).toHaveLength(0)
+
+    const { data: stillOwnerDomain } = await admin.from('clients').select('custom_domain').eq('id', client.id).single()
+    expect(stillOwnerDomain?.custom_domain).toBe('ir.example.com')
+  })
 })

@@ -12,7 +12,10 @@ const domainSchema = z.object({
   custom_domain: z
     .string()
     .min(1, 'informe um domínio')
-    .regex(/^[a-z0-9.-]+$/i, 'domínio inválido — use apenas letras, números, pontos e hífen'),
+    .regex(
+      /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/i,
+      'domínio inválido — use o formato de um domínio real, ex: ir.seudominio.com'
+    ),
 })
 
 export async function saveDomain(context: { client_id: string; client_slug: string }, formData: FormData) {
