@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <style>
+    :root{
+      --bg:#0B0E1A; --surface:#141829; --surface-2:#1B2036;
+      --border:rgba(255,255,255,0.08); --text:#E8EAF2; --text-dim:#8A90A6;
+      --violet:#7C6FF0; --blue:#4F8EF7; --teal:#2DD4A8; --amber:#F5B94D; --rose:#F76C6C;
+    }
+    body{ margin:0; background:var(--bg); font-family:'Inter',system-ui,sans-serif; color:var(--text); }
+    a{ color:var(--violet); text-decoration:none; }
+    a:hover{ color:#9C90F5; }
+    .row:hover{ background:var(--surface-2); }
+  </style>
+</helmet>
+
+<div style="width:1440px; height:900px; display:flex; background:var(--bg); overflow:hidden;">
+
+  <!-- Sidebar -->
+  <div style="width:248px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; padding:24px 0;">
+
+    <div style="display:flex; align-items:center; gap:10px; padding:0 20px 24px 20px;">
+      <svg width="22" height="22" viewBox="0 0 34 34" fill="none">
+        <circle cx="17" cy="17" r="15.5" stroke="#7C6FF0" stroke-width="1.75"/>
+        <path d="M17 7 L17 17 L25 22" stroke="#4F8EF7" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M17 17 L9 22" stroke="#2DD4A8" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600;">Testes A/B</div>
+    </div>
+
+    <div style="padding:0 20px; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; color:var(--text-dim); text-transform:uppercase; margin-bottom:10px;">Clientes</div>
+
+    <div style="display:flex; flex-direction:column; gap:2px; padding:0 12px;">
+      <div style="display:flex; align-items:center; gap:10px; padding:9px 8px; border-radius:8px; background:rgba(124,111,240,0.14);">
+        <div style="width:26px; height:26px; border-radius:7px; background:var(--violet); color:#0B0E1A; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif;">TI</div>
+        <div style="font-size:13.5px; font-weight:600;">Tráfego IA</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; padding:9px 8px; border-radius:8px;">
+        <div style="width:26px; height:26px; border-radius:7px; background:var(--surface-2); color:var(--text-dim); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif;">CF</div>
+        <div style="font-size:13.5px; color:var(--text-dim);">Cliente Fitness</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; padding:9px 8px; border-radius:8px;">
+        <div style="width:26px; height:26px; border-radius:7px; background:var(--surface-2); color:var(--text-dim); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif;">CE</div>
+        <div style="font-size:13.5px; color:var(--text-dim);">Cliente Educação</div>
+      </div>
+    </div>
+
+    <div style="padding:9px 20px; margin-top:2px;">
+      <a href="#" style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500;">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M1 7H13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Novo cliente
+      </a>
+    </div>
+
+    <div style="margin-top:auto; padding:16px 20px 0 20px; border-top:1px solid var(--border);">
+      <div style="display:flex; align-items:center; gap:10px; padding-top:16px;">
+        <div style="width:28px; height:28px; border-radius:50%; background:var(--surface-2); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; color:var(--text-dim);">V</div>
+        <div style="display:flex; flex-direction:column;">
+          <div style="font-size:13px; font-weight:500;">Vitor</div>
+          <div style="font-size:11.5px; color:var(--text-dim); font-family:'JetBrains Mono',monospace;">vitor@trafegoia.com.br</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+
+    <div style="height:76px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding:0 32px; border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:12px; color:var(--text-dim);">Tráfego IA</div>
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:600;">Testes</div>
+      </div>
+      <button style="height:40px; padding:0 18px; border-radius:9px; border:none; background:var(--violet); color:#0B0E1A; font-family:'Inter',sans-serif; font-size:13.5px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px;">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M1 7H13" stroke="#0B0E1A" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Novo teste
+      </button>
+    </div>
+
+    <div style="flex:1; padding:28px 32px; overflow:auto;">
+      <div style="display:flex; flex-direction:column; border:1px solid var(--border); border-radius:14px; overflow:hidden;">
+
+        <!-- Test row 1 -->
+        <div class="row" style="display:flex; align-items:center; gap:20px; padding:20px 24px; background:var(--surface); border-bottom:1px solid var(--border);">
+          <div style="flex:1; min-width:0;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600; margin-bottom:4px;">Oferta Agosto — Landing vs Checkout Direto</div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-dim);">/oferta-agosto</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:7px; padding:5px 11px; border-radius:20px; border:1px solid rgba(45,212,168,0.35); color:var(--teal); font-size:12px; font-weight:500;">
+            <div style="width:6px; height:6px; border-radius:50%; background:var(--teal);"></div> Ativo
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--amber); width:96px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M8 21h8M12 17v4M6 3h12l-1 8a5 5 0 01-10 0L6 3zM4 6H2.5A1.5 1.5 0 001 7.5v0A3.5 3.5 0 004.5 11H6M20 6h1.5A1.5 1.5 0 0123 7.5v0A3.5 3.5 0 0119.5 11H18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            B lidera
+          </div>
+          <div style="width:100px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:13.5px;">3.412</div>
+          <div style="width:80px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:13.5px; color:var(--teal);">3,9%</div>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:var(--text-dim); flex-shrink:0;"><path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+
+        <!-- Test row 2 -->
+        <div class="row" style="display:flex; align-items:center; gap:20px; padding:20px 24px; background:var(--surface); border-bottom:1px solid var(--border);">
+          <div style="flex:1; min-width:0;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600; margin-bottom:4px;">Captura eBook — 3 headlines</div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-dim);">/captura-ebook-v2</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:7px; padding:5px 11px; border-radius:20px; border:1px solid rgba(45,212,168,0.35); color:var(--teal); font-size:12px; font-weight:500;">
+            <div style="width:6px; height:6px; border-radius:50%; background:var(--teal);"></div> Ativo
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--amber); width:96px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M8 21h8M12 17v4M6 3h12l-1 8a5 5 0 01-10 0L6 3zM4 6H2.5A1.5 1.5 0 001 7.5v0A3.5 3.5 0 004.5 11H6M20 6h1.5A1.5 1.5 0 0123 7.5v0A3.5 3.5 0 0119.5 11H18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            A lidera
+          </div>
+          <div style="width:100px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:13.5px;">1.204</div>
+          <div style="width:80px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:13.5px; color:var(--teal);">12,1%</div>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:var(--text-dim); flex-shrink:0;"><path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+
+        <!-- Test row 3 - paused -->
+        <div class="row" style="display:flex; align-items:center; gap:20px; padding:20px 24px; background:var(--surface); border-bottom:1px solid var(--border); opacity:0.7;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600; margin-bottom:4px;">Upsell Pós-Compra</div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-dim);">/upsell-pos</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:7px; padding:5px 11px; border-radius:20px; border:1px solid rgba(247,108,108,0.35); color:var(--rose); font-size:12px; font-weight:500;">
+            <div style="width:6px; height:6px; border-radius:50%; background:var(--rose);"></div> Pausado
+          </div>
+          <div style="width:96px; font-size:12.5px; color:var(--text-dim);">—</div>
+          <div style="width:100px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:13.5px; color:var(--text-dim);">540</div>
+          <div style="width:80px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:13.5px; color:var(--text-dim);">1,2%</div>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:var(--text-dim); flex-shrink:0;"><path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+
+        <!-- Test row 4 -->
+        <div class="row" style="display:flex; align-items:center; gap:20px; padding:20px 24px; background:var(--surface);">
+          <div style="flex:1; min-width:0;">
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600; margin-bottom:4px;">Webinar Setembro</div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-dim);">/webinar-set</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:7px; padding:5px 11px; border-radius:20px; border:1px solid rgba(45,212,168,0.35); color:var(--teal); font-size:12px; font-weight:500;">
+            <div style="width:6px; height:6px; border-radius:50%; background:var(--teal);"></div> Ativo
+          </div>
+          <div style="width:96px; font-size:12.5px; color:var(--text-dim);">Coletando</div>
+          <div style="width:100px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:13.5px;">89</div>
+          <div style="width:80px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:13.5px; color:var(--text-dim);">0,0%</div>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:var(--text-dim); flex-shrink:0;"><path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
