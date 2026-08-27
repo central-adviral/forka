@@ -12,14 +12,21 @@ const variantSchema = z.object({
   thank_you_url: httpUrl.optional().or(z.literal('')),
 })
 
-const createTestSchema = z.object({
-  client_id: z.string().uuid(),
-  name: z.string().min(1),
-  slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
-  fallback_url: httpUrl.optional().or(z.literal('')),
-  conversion_method: z.enum(['hubla_webhook', 'thank_you_page']),
-  variants: z.array(variantSchema).min(2),
-})
+const createTestSchema = z
+  .object({
+    client_id: z.string().uuid(),
+    name: z.string().min(1),
+    slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
+    fallback_url: httpUrl.optional().or(z.literal('')),
+    conversion_method: z.enum(['hubla_webhook', 'thank_you_page']),
+    test_type: z.enum(['page', 'checkout']),
+    sales_page_url: httpUrl.optional().or(z.literal('')),
+    variants: z.array(variantSchema).min(2),
+  })
+  .refine((data) => data.test_type !== 'checkout' || Boolean(data.sales_page_url), {
+    message: 'Testes de checkout exigem a URL da página de vendas',
+    path: ['sales_page_url'],
+  })
 
 export async function createTest(input: z.infer<typeof createTestSchema>) {
   const result = createTestSchema.safeParse(input)
@@ -35,6 +42,8 @@ export async function createTest(input: z.infer<typeof createTestSchema>) {
     p_slug: parsed.slug,
     p_fallback_url: parsed.fallback_url || null,
     p_conversion_method: parsed.conversion_method,
+    p_test_type: parsed.test_type,
+    p_sales_page_url: parsed.sales_page_url || null,
     p_variants: parsed.variants.map((v) => ({
       name: v.name,
       weight_pct: v.weight_pct,

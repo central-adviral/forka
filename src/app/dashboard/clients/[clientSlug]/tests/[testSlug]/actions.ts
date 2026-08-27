@@ -32,7 +32,9 @@ const updateTestSchema = z.object({
   test_id: z.string().uuid(),
   client_slug: z.string(),
   test_slug: z.string(),
+  test_type: z.enum(['page', 'checkout']),
   fallback_url: httpUrl.optional().or(z.literal('')),
+  sales_page_url: httpUrl.optional().or(z.literal('')),
   variants: z
     .array(
       z.object({
@@ -56,6 +58,12 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
     throw new Error('Os pesos das variantes devem somar 100%')
   }
 
+  // Catch this here so the operator gets a Portuguese message instead of the raw
+  // tests_checkout_requires_sales_page constraint error from Postgres.
+  if (parsed.test_type === 'checkout' && !parsed.sales_page_url) {
+    throw new Error('Testes de checkout exigem a URL da página de vendas')
+  }
+
   const supabase = await createServerSupabaseClient()
 
   // Verify every submitted variant actually belongs to this test before writing anything,
@@ -71,7 +79,10 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
 
   const { error: testError } = await supabase
     .from('tests')
-    .update({ fallback_url: parsed.fallback_url || null })
+    .update({
+      fallback_url: parsed.fallback_url || null,
+      sales_page_url: parsed.sales_page_url || null,
+    })
     .eq('id', parsed.test_id)
   if (testError) throw testError
 
