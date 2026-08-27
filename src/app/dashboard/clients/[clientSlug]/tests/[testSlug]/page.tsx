@@ -39,7 +39,7 @@ export default async function TestReportPage({
   const supabase = await createServerSupabaseClient()
   const { data: test } = await supabase
     .from('tests')
-    .select('id, name, slug, status, conversion_method, fallback_url, client_id, clients(custom_domain, domain_status)')
+    .select('id, name, slug, status, conversion_method, fallback_url, test_type, client_id, clients(custom_domain, domain_status)')
     .eq('slug', testSlug)
     .maybeSingle()
 
@@ -77,6 +77,7 @@ export default async function TestReportPage({
     process.env.NEXT_PUBLIC_REDIRECT_DOMAIN ?? ''
   )
   const redirectUrl = `https://${activeDomain}/r/${test.slug}`
+  const checkoutLinkUrl = `https://${activeDomain}/c/${test.slug}`
 
   const baseRows = ((report as ReportRow[]) ?? []).map((row) => ({
     ...row,
@@ -183,6 +184,22 @@ export default async function TestReportPage({
         fallbackUrl={test.fallback_url}
         confidenceLabelById={confidenceLabelById}
       />
+      {test.test_type === 'checkout' && (
+        <div className="mx-6 mb-6">
+          <h2 className="mb-2 font-['Space_Grotesk'] text-lg font-semibold">Link do botão de comprar</h2>
+          <div className="rounded-[10px] border border-white/[0.08] p-3">
+            <div className="mb-2 flex items-center gap-1.5">
+              <p className="break-all font-['JetBrains_Mono'] text-xs text-[#4F8EF7]">{checkoutLinkUrl}</p>
+              <CopyButton text={checkoutLinkUrl} />
+            </div>
+            <p className="text-xs text-[#8A90A6]">
+              Cole este endereço no botão de comprar da página de vendas. Se a página tiver vários botões de
+              compra, todos recebem o mesmo endereço. Trocar os checkouts ou os pesos depois não exige mexer na
+              página de novo.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="mx-6 mb-6">
         <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Por origem (UTM)</h2>
         <table className="w-full border-collapse text-sm">

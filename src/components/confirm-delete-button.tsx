@@ -5,9 +5,11 @@ import { useState } from 'react'
 export function ConfirmDeleteButton({
   action,
   label = 'Excluir',
+  warning,
 }: {
   action: () => Promise<void>
   label?: string
+  warning?: string
 }) {
   const [confirming, setConfirming] = useState(false)
 
@@ -25,7 +27,7 @@ export function ConfirmDeleteButton({
 
   return (
     <span className="flex items-center gap-2">
-      <span className="text-xs text-[#F76C6C]">Confirmar?</span>
+      <span className="text-xs text-[#F76C6C]">{warning ?? 'Confirmar?'}</span>
       <form action={action}>
         <button type="submit" className="text-xs font-semibold text-[#F76C6C] underline">
           Sim

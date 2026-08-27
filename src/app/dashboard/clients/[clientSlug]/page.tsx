@@ -19,7 +19,7 @@ export default async function ClientPage({ params }: { params: Promise<{ clientS
 
   const { data: tests } = await supabase
     .from('tests')
-    .select('id, name, slug, status')
+    .select('id, name, slug, status, test_type')
     .eq('client_id', client.id)
     .order('name')
 
@@ -68,8 +68,18 @@ export default async function ClientPage({ params }: { params: Promise<{ clientS
                 <span className={`h-1.5 w-1.5 rounded-full ${test.status === 'active' ? 'bg-[#2DD4A8]' : 'bg-[#F76C6C]'}`} />
                 {test.status === 'active' ? 'Ativo' : 'Pausado'}
               </span>
+              <span className="rounded-full border border-white/[0.08] px-2.5 py-1 text-xs font-medium text-[#8A90A6]">
+                {test.test_type === 'checkout' ? 'Checkout' : 'Página'}
+              </span>
             </a>
-            <ConfirmDeleteButton action={deleteTest.bind(null, test.id, client.slug)} />
+            <ConfirmDeleteButton
+              action={deleteTest.bind(null, test.id, client.slug)}
+              warning={
+                test.test_type === 'checkout'
+                  ? 'Isso vai quebrar o botão de comprar da página de vendas. Confirmar?'
+                  : undefined
+              }
+            />
           </div>
         ))}
         {(tests ?? []).length === 0 && <div className="px-6 py-8 text-sm text-[#8A90A6]">Nenhum teste ainda.</div>}
