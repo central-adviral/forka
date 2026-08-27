@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { probabilityToBeatControl } from '@/lib/domain/significance'
 import { computeReportLayout } from '@/lib/domain/report-layout'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
+import { CopyButton } from '@/components/copy-button'
 import { toggleTestStatus } from './actions'
 
 interface ReportRow {
@@ -113,6 +114,15 @@ export default async function TestReportPage({
     <div className="flex h-screen flex-col">
       <div className="flex h-[88px] flex-shrink-0 items-center justify-between border-b border-white/[0.08] px-8">
         <div>
+          <a
+            href={`/dashboard/clients/${clientSlug}`}
+            className="mb-1 flex items-center gap-1 text-xs text-[#8A90A6] hover:text-[#E8EAF2]"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Testes
+          </a>
           <div className="flex items-center gap-2.5">
             <h1 className="font-['Space_Grotesk'] text-[19px] font-semibold">{test.name}</h1>
             <span
@@ -123,13 +133,22 @@ export default async function TestReportPage({
               {test.status === 'active' ? 'Ativo' : 'Pausado'}
             </span>
           </div>
-          <p className="mt-1 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">{redirectUrl}</p>
+          <div className="mt-1 flex items-center gap-1.5">
+            <p className="font-['JetBrains_Mono'] text-xs text-[#8A90A6]">{redirectUrl}</p>
+            <CopyButton text={redirectUrl} />
+          </div>
         </div>
         <div className="flex items-center gap-5">
           <div className="flex flex-col items-end">
             <span className="font-['JetBrains_Mono'] text-[17px] font-medium">{totalVisits}</span>
             <span className="text-[11px] text-[#8A90A6]">acessos</span>
           </div>
+          <a
+            href={`/dashboard/clients/${clientSlug}/tests/${test.slug}/edit`}
+            className="flex h-9 items-center rounded-[9px] border border-white/[0.08] bg-transparent px-4 text-[13px] font-medium text-[#8A90A6]"
+          >
+            Editar
+          </a>
           <form
             action={toggleTestStatus.bind(null, {
               test_id: test.id,

@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
+import { CopyButton } from '@/components/copy-button'
 import { saveDomain, verifyDomain, saveHublaToken } from './actions'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -35,7 +36,18 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
 
   return (
     <div className="max-w-xl space-y-8 p-8">
-      <h1 className="font-['Space_Grotesk'] text-xl font-semibold">Integrações</h1>
+      <div>
+        <a
+          href={`/dashboard/clients/${client.slug}`}
+          className="mb-1 flex items-center gap-1 text-xs text-[#8A90A6] hover:text-[#E8EAF2]"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Testes
+        </a>
+        <h1 className="font-['Space_Grotesk'] text-xl font-semibold">Integrações</h1>
+      </div>
 
       <section className="space-y-4 rounded-2xl border border-white/[0.08] p-5">
         <div className="flex items-center justify-between">
@@ -110,9 +122,12 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
 
         <div>
           <p className="mb-1 text-xs text-[#8A90A6]">Cole esta URL no painel da Hubla:</p>
-          <p className="break-all rounded-[10px] border border-white/[0.08] bg-[#1B2036] p-3 font-['JetBrains_Mono'] text-xs text-[#4F8EF7]">
-            {webhookUrl}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="flex-1 break-all rounded-[10px] border border-white/[0.08] bg-[#1B2036] p-3 font-['JetBrains_Mono'] text-xs text-[#4F8EF7]">
+              {webhookUrl}
+            </p>
+            <CopyButton text={webhookUrl} />
+          </div>
         </div>
       </section>
     </div>
