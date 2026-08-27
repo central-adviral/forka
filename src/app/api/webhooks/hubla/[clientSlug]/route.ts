@@ -3,10 +3,23 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { HublaIrrelevantEventError, verifyHublaToken, parseHublaPaymentSucceeded } from '@/lib/domain/hubla'
 import { getClickEventByTrackingId, insertConversionIfNew } from '@/lib/repo/conversion-repo'
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ clientSlug: string }> }) {
+  const { clientSlug } = await params
+  const db = createServiceRoleClient()
+
+  const { data: client } = await db
+    .from('clients')
+    .select('id, hubla_webhook_token')
+    .eq('slug', clientSlug)
+    .maybeSingle()
+
+  if (!client || !client.hubla_webhook_token) {
+    return new NextResponse('Not found', { status: 404 })
+  }
+
   const receivedToken = request.headers.get('x-hubla-token')
-  if (!verifyHublaToken(receivedToken, process.env.HUBLA_WEBHOOK_TOKEN)) {
-    console.error('[hubla-webhook] rejected: invalid or missing x-hubla-token')
+  if (!verifyHublaToken(receivedToken, client.hubla_webhook_token)) {
+    console.error(`[hubla-webhook] rejected: invalid or missing x-hubla-token for client ${clientSlug}`)
     return new NextResponse('Invalid token', { status: 401 })
   }
 
@@ -26,9 +39,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, attributed: false })
   }
 
-  const db = createServiceRoleClient()
   const clickEvent = await getClickEventByTrackingId(db, parsed.trackingId)
-  if (!clickEvent) {
+  if (!clickEvent || clickEvent.clientId !== client.id) {
     return NextResponse.json({ ok: true, attributed: false })
   }
 
