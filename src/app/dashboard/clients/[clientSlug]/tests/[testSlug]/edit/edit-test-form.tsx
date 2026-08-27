@@ -22,11 +22,19 @@ export function EditTestForm({
   variants: initialVariants,
 }: {
   clientSlug: string
-  test: { id: string; name: string; slug: string; fallback_url: string | null }
+  test: {
+    id: string
+    name: string
+    slug: string
+    fallback_url: string | null
+    test_type: 'page' | 'checkout'
+    sales_page_url: string | null
+  }
   variants: { id: string; name: string; weight_pct: number; destination_url: string; thank_you_url: string | null }[]
 }) {
   const router = useRouter()
   const [fallbackUrl, setFallbackUrl] = useState(test.fallback_url ?? '')
+  const [salesPageUrl, setSalesPageUrl] = useState(test.sales_page_url ?? '')
   const [variants, setVariants] = useState<VariantForm[]>(
     initialVariants.map((v) => ({
       id: v.id,
@@ -59,6 +67,8 @@ export function EditTestForm({
         client_slug: clientSlug,
         test_slug: test.slug,
         fallback_url: fallbackUrl,
+        test_type: test.test_type,
+        sales_page_url: salesPageUrl,
         variants: variants.map((v) => ({
           id: v.id,
           weight_pct: Number(v.weight_pct),
@@ -99,6 +109,26 @@ export function EditTestForm({
           />
         </div>
 
+        <div>
+          <label className="mb-1.5 block text-[13px] font-medium text-[#8A90A6]">Tipo de teste</label>
+          <p className="rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#8A90A6]">
+            {test.test_type === 'checkout' ? 'Teste de checkout' : 'Teste de página'} — não pode ser alterado
+            depois de criado
+          </p>
+        </div>
+
+        {test.test_type === 'checkout' && (
+          <div>
+            <label className="mb-1.5 block text-[13px] font-medium text-[#8A90A6]">URL da página de vendas</label>
+            <input
+              placeholder="URL da página de vendas"
+              value={salesPageUrl}
+              onChange={(e) => setSalesPageUrl(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+        )}
+
         {variants.map((variant, index) => (
           <fieldset key={variant.id} className="space-y-2 rounded-[10px] border border-white/[0.08] p-3">
             <legend className="px-1 text-sm font-medium text-[#8A90A6]">Variante {variant.name}</legend>
@@ -109,7 +139,7 @@ export function EditTestForm({
               className={inputClass}
             />
             <input
-              placeholder="URL de destino"
+              placeholder={test.test_type === 'checkout' ? 'Link do checkout' : 'URL de destino'}
               value={variant.destination_url}
               onChange={(e) => updateVariant(index, 'destination_url', e.target.value)}
               className={inputClass}

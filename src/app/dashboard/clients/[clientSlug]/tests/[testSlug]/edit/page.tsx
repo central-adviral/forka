@@ -11,7 +11,7 @@ export default async function EditTestPage({
   const supabase = await createServerSupabaseClient()
   const { data: test } = await supabase
     .from('tests')
-    .select('id, name, slug, fallback_url, clients(slug)')
+    .select('id, name, slug, fallback_url, test_type, sales_page_url, clients(slug)')
     .eq('slug', testSlug)
     .maybeSingle()
 

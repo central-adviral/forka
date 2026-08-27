@@ -24,6 +24,8 @@ export default function NewTestPage() {
   const [slug, setSlug] = useState('')
   const [fallbackUrl, setFallbackUrl] = useState('')
   const [conversionMethod, setConversionMethod] = useState<'hubla_webhook' | 'thank_you_page'>('hubla_webhook')
+  const [testType, setTestType] = useState<'page' | 'checkout'>('page')
+  const [salesPageUrl, setSalesPageUrl] = useState('')
   const [variants, setVariants] = useState<VariantForm[]>([
     { name: 'A', weight_pct: '50', destination_url: '', thank_you_url: '' },
     { name: 'B', weight_pct: '50', destination_url: '', thank_you_url: '' },
@@ -58,9 +60,17 @@ export default function NewTestPage() {
       setError('Os pesos das variantes devem somar 100%')
       return
     }
+    if (testType === 'checkout' && !/^https?:\/\//i.test(salesPageUrl)) {
+      setError('A URL da página de vendas deve começar com http:// ou https://')
+      return
+    }
     const invalidUrlField = variants.find((v) => !/^https?:\/\//i.test(v.destination_url))
     if (invalidUrlField) {
-      setError(`A URL de destino da variante ${invalidUrlField.name} deve começar com http:// ou https://`)
+      setError(
+        testType === 'checkout'
+          ? `O link do checkout da variante ${invalidUrlField.name} deve começar com http:// ou https://`
+          : `A URL de destino da variante ${invalidUrlField.name} deve começar com http:// ou https://`
+      )
       return
     }
     try {
@@ -70,6 +80,8 @@ export default function NewTestPage() {
         slug,
         fallback_url: fallbackUrl,
         conversion_method: conversionMethod,
+        test_type: testType,
+        sales_page_url: testType === 'checkout' ? salesPageUrl : '',
         variants: variants.map((v) => ({
           name: v.name,
           weight_pct: Number(v.weight_pct),
@@ -107,6 +119,24 @@ export default function NewTestPage() {
           className={inputClass}
         />
         <select
+          value={testType}
+          onChange={(e) => setTestType(e.target.value as 'page' | 'checkout')}
+          className={inputClass}
+        >
+          <option value="page">Teste de página</option>
+          <option value="checkout">Teste de checkout</option>
+        </select>
+
+        {testType === 'checkout' && (
+          <input
+            placeholder="URL da página de vendas (única para todas as variantes)"
+            value={salesPageUrl}
+            onChange={(e) => setSalesPageUrl(e.target.value)}
+            className={inputClass}
+          />
+        )}
+
+        <select
           value={conversionMethod}
           onChange={(e) => setConversionMethod(e.target.value as typeof conversionMethod)}
           className={inputClass}
@@ -125,7 +155,7 @@ export default function NewTestPage() {
               className={inputClass}
             />
             <input
-              placeholder="URL de destino"
+              placeholder={testType === 'checkout' ? 'Link do checkout (https://pay.hub.la/...)' : 'URL de destino'}
               value={variant.destination_url}
               onChange={(e) => updateVariant(index, 'destination_url', e.target.value)}
               className={inputClass}
