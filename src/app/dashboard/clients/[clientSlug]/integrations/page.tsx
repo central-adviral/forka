@@ -80,10 +80,14 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
             <div className="rounded-[10px] border border-white/[0.08] bg-[#1B2036] p-3 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">
               Tipo: CNAME
               <br />
-              Nome: {client.custom_domain.split('.')[0]}
+              Nome: {client.custom_domain}
               <br />
               Valor: cname.vercel-dns.com
             </div>
+            <p className="text-xs text-[#8A90A6]">
+              Alguns provedores de DNS pedem só a parte antes do seu domínio raiz (ex: só "ir" em vez do
+              domínio completo) — se o campo "Nome" recusar o valor completo, use apenas o prefixo.
+            </p>
 
             <form action={verifyDomain.bind(null, { client_id: client.id, client_slug: client.slug })}>
               <button

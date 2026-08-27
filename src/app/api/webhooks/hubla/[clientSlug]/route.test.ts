@@ -98,6 +98,17 @@ describe('POST /api/webhooks/hubla/[clientSlug]', () => {
     expect(json).toEqual({ ok: false, attributed: false })
   })
 
+  it('returns attributed:false when the tracking id matches no click event at all', async () => {
+    vi.mocked(verifyHublaToken).mockReturnValue(true)
+    vi.mocked(parseHublaPaymentSucceeded).mockReturnValue({ trackingId: 'trk_unknown', externalEventId: 'inv_1', valueCents: 1000 })
+    vi.mocked(getClickEventByTrackingId).mockResolvedValue(null)
+
+    const response = await POST(makeRequest({}), { params: Promise.resolve({ clientSlug: 'gustavo-voe' }) })
+    const json = await response.json()
+    expect(json).toEqual({ ok: true, attributed: false })
+    expect(insertConversionIfNew).not.toHaveBeenCalled()
+  })
+
   it('does not attribute a click event belonging to a different client', async () => {
     vi.mocked(verifyHublaToken).mockReturnValue(true)
     vi.mocked(parseHublaPaymentSucceeded).mockReturnValue({ trackingId: 'trk_1', externalEventId: 'inv_1', valueCents: 1000 })

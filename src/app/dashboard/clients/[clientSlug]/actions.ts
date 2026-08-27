@@ -3,8 +3,7 @@
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
-const httpUrl = z.string().url().regex(/^https?:\/\//i, 'A URL deve começar com http:// ou https://')
+import { httpUrl } from '@/lib/domain/http-url-schema'
 
 const variantSchema = z.object({
   name: z.string().min(1),

@@ -48,7 +48,10 @@ export async function verifyDomain(context: { client_id: string; client_slug: st
 
   let verified = false
   try {
-    const records = await dns.resolveCname(client.custom_domain)
+    const records = await Promise.race([
+      dns.resolveCname(client.custom_domain),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('DNS lookup timed out')), 5000)),
+    ])
     verified = isCnameVerified(records)
   } catch {
     verified = false
@@ -64,7 +67,7 @@ export async function verifyDomain(context: { client_id: string; client_slug: st
 const hublaTokenSchema = z.object({
   client_id: z.string().uuid(),
   client_slug: z.string(),
-  hubla_webhook_token: z.string().min(1, 'informe um token'),
+  hubla_webhook_token: z.string().min(16, 'o token deve ter pelo menos 16 caracteres'),
 })
 
 export async function saveHublaToken(context: { client_id: string; client_slug: string }, formData: FormData) {

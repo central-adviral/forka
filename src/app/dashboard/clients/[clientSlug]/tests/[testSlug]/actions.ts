@@ -3,6 +3,8 @@
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { httpUrl } from '@/lib/domain/http-url-schema'
+import { weightsSumTo100 } from '@/lib/domain/validate-weights'
 
 const toggleSchema = z.object({
   test_id: z.string().uuid(),
@@ -25,8 +27,6 @@ export async function toggleTestStatus(input: z.infer<typeof toggleSchema>) {
 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests/${parsed.test_slug}`)
 }
-
-const httpUrl = z.string().url().regex(/^https?:\/\//i, 'A URL deve começar com http:// ou https://')
 
 const updateTestSchema = z.object({
   test_id: z.string().uuid(),
@@ -52,12 +52,22 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
   }
   const parsed = result.data
 
-  const totalWeight = parsed.variants.reduce((sum, v) => sum + v.weight_pct, 0)
-  if (Math.abs(totalWeight - 100) > 0.02) {
+  if (!weightsSumTo100(parsed.variants.map((v) => v.weight_pct))) {
     throw new Error('Os pesos das variantes devem somar 100%')
   }
 
   const supabase = await createServerSupabaseClient()
+
+  // Verify every submitted variant actually belongs to this test before writing anything,
+  // so a stale/mismatched id fails the whole request up front instead of leaving some
+  // variants updated and others not (these calls aren't wrapped in a DB transaction).
+  const { data: ownedVariants, error: ownedError } = await supabase.from('variants').select('id').eq('test_id', parsed.test_id)
+  if (ownedError) throw ownedError
+  const ownedIds = new Set((ownedVariants ?? []).map((v) => v.id))
+  const foreignVariant = parsed.variants.find((v) => !ownedIds.has(v.id))
+  if (foreignVariant) {
+    throw new Error(`Variante ${foreignVariant.id} não pertence a este teste`)
+  }
 
   const { error: testError } = await supabase
     .from('tests')
@@ -66,7 +76,7 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
   if (testError) throw testError
 
   for (const variant of parsed.variants) {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('variants')
       .update({
         weight_pct: variant.weight_pct,
@@ -74,10 +84,7 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
         thank_you_url: variant.thank_you_url || null,
       })
       .eq('id', variant.id)
-      .eq('test_id', parsed.test_id)
-      .select('id')
     if (error) throw error
-    if (!data || data.length === 0) throw new Error(`Variante ${variant.id} não pertence a este teste`)
   }
 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests/${parsed.test_slug}`)
