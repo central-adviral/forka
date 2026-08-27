@@ -66,7 +66,7 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
   if (testError) throw testError
 
   for (const variant of parsed.variants) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('variants')
       .update({
         weight_pct: variant.weight_pct,
@@ -74,7 +74,10 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
         thank_you_url: variant.thank_you_url || null,
       })
       .eq('id', variant.id)
+      .eq('test_id', parsed.test_id)
+      .select('id')
     if (error) throw error
+    if (!data || data.length === 0) throw new Error(`Variante ${variant.id} não pertence a este teste`)
   }
 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests/${parsed.test_slug}`)
