@@ -1,7 +1,11 @@
 const BOT_UA_PATTERNS = [
   'googlebot',
+  'adsbot-google',
+  'mediapartners-google',
   'bingbot',
   'slackbot',
+  'linkedinbot',
+  'whatsapp',
   'yandexbot',
   'duckduckbot',
   'applebot',
@@ -11,6 +15,12 @@ const BOT_UA_PATTERNS = [
   'petalbot',
   'ahrefsbot',
   'semrushbot',
+  'mj12bot',
+  'dotbot',
+  'bytespider',
+  'baiduspider',
+  'seznambot',
+  'ia_archiver',
   'slurp',
   'bot/',
   'crawler',
@@ -23,6 +33,9 @@ const BOT_UA_PATTERNS = [
   'headlesschrome',
   'pingdom',
   'uptimerobot',
+  'site24x7',
+  'newrelicpinger',
+  'statuscake',
 ]
 
 export function isKnownBot(userAgent: string | null): boolean {

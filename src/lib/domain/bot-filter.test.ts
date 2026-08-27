@@ -8,6 +8,8 @@ describe('isKnownBot', () => {
     expect(isKnownBot('Mozilla/5.0 (compatible; bingbot/2.0)')).toBe(true)
     expect(isKnownBot('Slackbot-LinkExpanding 1.0')).toBe(true)
     expect(isKnownBot('SomeBot/1.0 (+http://example.com/bot)')).toBe(true)
+    expect(isKnownBot('AdsBot-Google (+http://www.google.com/adsbot.html)')).toBe(true)
+    expect(isKnownBot('LinkedInBot/1.0 (compatible; Mozilla/5.0)')).toBe(true)
   })
 
   it('flags common scripting/monitoring clients', () => {
