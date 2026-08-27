@@ -4,16 +4,21 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/repo/redirect-repo', () => ({
   getTestBySlug: vi.fn(),
   insertClickEvent: vi.fn(),
+  getOrAssignVariant: vi.fn(),
+  countRecentClickEventsByIp: vi.fn(),
 }))
 vi.mock('@/lib/supabase/service-role', () => ({
   createServiceRoleClient: vi.fn(() => ({})),
 }))
 
 import { GET } from './route'
-import { getTestBySlug, insertClickEvent } from '@/lib/repo/redirect-repo'
+import { getTestBySlug, insertClickEvent, getOrAssignVariant, countRecentClickEventsByIp } from '@/lib/repo/redirect-repo'
 
 describe('GET /r/[slug]', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(countRecentClickEventsByIp).mockResolvedValue(0)
+  })
 
   it('redirects to a variant and appends the tracking id', async () => {
     vi.mocked(getTestBySlug).mockResolvedValue({
@@ -23,6 +28,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: null,
       variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page' }],
     })
+    vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
 
     const request = new NextRequest('https://ir.example.com/r/oferta-x')
     const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
@@ -72,6 +78,28 @@ describe('GET /r/[slug]', () => {
     const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     const location = new URL(response.headers.get('location')!)
     expect(location.origin + location.pathname).toBe('https://example.com/b')
+  })
+
+  it('still redirects but skips recording the click when the ip is over the rate limit', async () => {
+    vi.mocked(getTestBySlug).mockResolvedValue({
+      id: 'test-1',
+      slug: 'oferta-x',
+      status: 'active',
+      fallback_url: null,
+      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page' }],
+    })
+    vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
+    vi.mocked(countRecentClickEventsByIp).mockResolvedValue(999)
+
+    const request = new NextRequest('https://ir.example.com/r/oferta-x', {
+      headers: { 'x-forwarded-for': '203.0.113.9' },
+    })
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
+
+    expect(response.status).toBe(302)
+    const location = new URL(response.headers.get('location')!)
+    expect(location.origin + location.pathname).toBe('https://example.com/page')
+    expect(insertClickEvent).not.toHaveBeenCalled()
   })
 
   it('redirects a known bot without recording a click event or setting cookies', async () => {

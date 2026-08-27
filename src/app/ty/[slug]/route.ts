@@ -4,13 +4,14 @@ import { getClickEventByTrackingId, insertConversionIfNew } from '@/lib/repo/con
 
 const TRANSPARENT_GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7', 'base64')
 
-export async function GET(request: NextRequest, _context: { params: Promise<{ slug: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const trackingId = request.nextUrl.searchParams.get('tid')
 
   if (trackingId) {
     const db = createServiceRoleClient()
     const clickEvent = await getClickEventByTrackingId(db, trackingId)
-    if (clickEvent) {
+    if (clickEvent && clickEvent.testSlug === slug) {
       await insertConversionIfNew(db, { clickEventId: clickEvent.id, source: 'thank_you_page' })
     }
   }

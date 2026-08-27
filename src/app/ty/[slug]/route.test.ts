@@ -15,8 +15,8 @@ import { getClickEventByTrackingId, insertConversionIfNew } from '@/lib/repo/con
 describe('GET /ty/[slug]', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('records a conversion when tid matches a click event', async () => {
-    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1' })
+  it('records a conversion when tid matches a click event for this test', async () => {
+    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'oferta-x' })
     const request = new NextRequest('https://ir.example.com/ty/oferta-x?tid=trk_1')
     const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     expect(response.headers.get('content-type')).toBe('image/gif')
@@ -24,6 +24,14 @@ describe('GET /ty/[slug]', () => {
       expect.anything(),
       expect.objectContaining({ clickEventId: 'click_1', source: 'thank_you_page' })
     )
+  })
+
+  it('does not record a conversion when tid belongs to a different test', async () => {
+    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'outro-teste' })
+    const request = new NextRequest('https://ir.example.com/ty/oferta-x?tid=trk_1')
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
+    expect(response.status).toBe(200)
+    expect(insertConversionIfNew).not.toHaveBeenCalled()
   })
 
   it('still returns the pixel when tid is missing', async () => {

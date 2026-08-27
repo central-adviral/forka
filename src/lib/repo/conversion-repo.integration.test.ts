@@ -5,6 +5,7 @@ import { getClickEventByTrackingId, insertConversionIfNew } from './conversion-r
 const db = createServiceRoleClient()
 let clickEventId: string
 let trackingId: string
+let testSlug: string
 
 beforeAll(async () => {
   const { data: user } = await db.auth.admin.createUser({
@@ -31,6 +32,7 @@ beforeAll(async () => {
     })
     .select()
     .single()
+  testSlug = test!.slug
   const { data: variant } = await db
     .from('variants')
     .insert({ test_id: test!.id, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' })
@@ -55,6 +57,11 @@ describe('conversion-repo', () => {
   it('finds a click event by tracking id', async () => {
     const result = await getClickEventByTrackingId(db, trackingId)
     expect(result?.id).toBe(clickEventId)
+  })
+
+  it('includes the owning test slug, so callers can verify it matches the requested path', async () => {
+    const result = await getClickEventByTrackingId(db, trackingId)
+    expect(result?.testSlug).toBe(testSlug)
   })
 
   it('returns null for an unknown tracking id', async () => {
