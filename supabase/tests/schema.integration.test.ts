@@ -71,4 +71,33 @@ describe('schema RLS isolation', () => {
     expect(error).not.toBeNull()
     expect(error!.message).toContain('sum to 100')
   })
+
+  it('create_test_with_variants marks the first variant in the array as control, regardless of name order', async () => {
+    const email = `owner3-${Date.now()}@example.com`
+    const user = await createTestUser(email)
+    const { data: client } = await admin
+      .from('clients')
+      .insert({ owner_id: user.id, name: 'C3', slug: `c3-${Date.now()}` })
+      .select()
+      .single()
+
+    const asOwner = await signIn(email)
+    const { data: testId, error } = await asOwner.rpc('create_test_with_variants', {
+      p_client_id: client!.id,
+      p_name: 'Teste Y',
+      p_slug: `teste-y-${Date.now()}`,
+      p_fallback_url: null,
+      p_conversion_method: 'thank_you_page',
+      p_variants: [
+        { name: 'Zebra Original', weight_pct: 50, destination_url: 'https://example.com/z' },
+        { name: 'Alpha Nova Oferta', weight_pct: 50, destination_url: 'https://example.com/a' },
+      ],
+    })
+    if (error) throw error
+
+    const { data: variants } = await admin.from('variants').select('name, is_control').eq('test_id', testId)
+    const control = variants!.find((v) => v.is_control)
+    expect(control?.name).toBe('Zebra Original')
+    expect(variants!.filter((v) => v.is_control)).toHaveLength(1)
+  })
 })
