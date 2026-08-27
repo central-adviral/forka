@@ -3184,3 +3184,1136 @@ does not appear at all.
 git add "src/app/dashboard/clients/[clientSlug]/tests/[testSlug]"
 git commit -m "feat: auto-generate thank-you pixel snippet from stored variant data"
 ```
+
+---
+
+## Visual design addendum (2026-08-26)
+
+> Adds Tasks 22–26, per
+> [docs/superpowers/specs/2026-08-26-ab-test-tool-visual-design.md](../specs/2026-08-26-ab-test-tool-visual-design.md).
+> Do these now, on top of the fully implemented Tasks 1–21. Every task below is a **restyle**:
+> it must preserve 100% of the existing data-fetching, validation, and business logic in the
+> touched files (including the pause/activate toggle from Task 20, the auto-generated pixel
+> snippet with its URL-safety check from Task 21, and the three-way confidence label from
+> Task 17's bugfix) and change only markup/classNames/structure. A mockup of the approved
+> direction is at https://claude.ai/code/artifact/8b156469-0fe3-42ed-9d18-f80b7604b485
+> (source: `design/*.dc.html` — copy those files from the `main` branch of this repo into this
+> worktree if you want to view them locally; they are not required to implement this addendum,
+> the code below is self-contained).
+
+### Task 22: Design tokens — dark theme colors and fonts
+
+**Files:**
+- Modify: `src/app/globals.css`
+
+**Interfaces:**
+- Produces: CSS custom properties (`--surface`, `--surface-2`, `--border-token`, `--text-dim`,
+  `--violet`, `--blue`, `--teal`, `--amber`, `--rose`) plus a permanently-dark `--background`/
+  `--foreground`, consumed via Tailwind arbitrary-value classes (e.g. `bg-[#141829]`,
+  `font-['Space_Grotesk']`) by every task below.
+
+- [ ] **Step 1: Replace the full contents of `src/app/globals.css`**
+
+```css
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --background: #0b0e1a;
+  --foreground: #e8eaf2;
+  --surface: #141829;
+  --surface-2: #1b2036;
+  --border-token: rgba(255, 255, 255, 0.08);
+  --text-dim: #8a90a6;
+  --violet: #7c6ff0;
+  --blue: #4f8ef7;
+  --teal: #2dd4a8;
+  --amber: #f5b94d;
+  --rose: #f76c6c;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+```
+
+(This removes the old light/dark `prefers-color-scheme` split — the product is dark-only per
+the spec — and drops the unused Geist import reference from `layout.tsx` if present; leave
+`layout.tsx`'s font setup alone if it still compiles, this task only touches `globals.css`.)
+
+- [ ] **Step 2: Verify**
+
+```bash
+npx tsc --noEmit
+npm run build
+```
+Expected: both exit 0. Then `npm run dev` and open `/login` — background should be dark navy.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/app/globals.css
+git commit -m "feat: add dark theme tokens and font stack"
+```
+
+---
+
+### Task 23: Login, dashboard shell, and dashboard home restyle
+
+**Files:**
+- Modify: `src/app/login/page.tsx` (unchanged logic — restyle only)
+- Modify: `src/app/dashboard/layout.tsx`
+- Modify: `src/app/dashboard/page.tsx` (preserve the existing `UsageStats` fetch/display and
+  client list — restyle only)
+- Create: `src/components/dashboard-shell.tsx`
+
+- [ ] **Step 1: Restyle the login page**
+
+Replace the full contents of `src/app/login/page.tsx` (same `handleSubmit`/state logic as
+today, restyled):
+
+```tsx
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createBrowserSupabaseClient } from '@/lib/supabase/browser'
+
+export default function LoginPage() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    setError(null)
+    const supabase = createBrowserSupabaseClient()
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      setError(error.message)
+      return
+    }
+    router.push('/dashboard')
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#0B0E1A]">
+      <div className="w-[400px] rounded-2xl border border-white/[0.08] bg-[#141829] p-10">
+        <h1 className="mb-2 font-['Space_Grotesk'] text-2xl font-semibold text-[#E8EAF2]">Entrar</h1>
+        <p className="mb-7 text-sm leading-relaxed text-[#8A90A6]">
+          Acesse seus clientes, testes e relatórios de conversão.
+        </p>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-[13px] font-medium text-[#8A90A6]">E-mail</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="h-11 rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-[13px] font-medium text-[#8A90A6]">Senha</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-11 rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]"
+            />
+          </div>
+          {error && <p className="text-sm text-[#F76C6C]">{error}</p>}
+          <button
+            type="submit"
+            className="mt-1.5 h-[46px] rounded-[10px] bg-[#7C6FF0] text-sm font-semibold text-[#0B0E1A]"
+          >
+            Entrar
+          </button>
+        </form>
+      </div>
+    </main>
+  )
+}
+```
+
+- [ ] **Step 2: Create the dashboard shell (sidebar)**
+
+Create `src/components/dashboard-shell.tsx`:
+
+```tsx
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+interface Client {
+  id: string
+  name: string
+  slug: string
+}
+
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]!.toUpperCase())
+    .join('')
+}
+
+export function DashboardShell({
+  clients,
+  userEmail,
+  children,
+}: {
+  clients: Client[]
+  userEmail: string
+  children: React.ReactNode
+}) {
+  const pathname = usePathname()
+
+  return (
+    <div className="flex h-screen bg-[#0B0E1A] text-[#E8EAF2]">
+      <aside className="flex w-[248px] flex-shrink-0 flex-col border-r border-white/[0.08] bg-[#141829] py-6">
+        <div className="mb-6 flex items-center gap-2.5 px-5">
+          <span className="font-['Space_Grotesk'] text-[15px] font-semibold">Testes A/B</span>
+        </div>
+
+        <div className="mb-2.5 px-5 font-['JetBrains_Mono'] text-[11px] uppercase tracking-widest text-[#8A90A6]">
+          Clientes
+        </div>
+
+        <nav className="flex flex-col gap-0.5 px-3">
+          {clients.map((client) => {
+            const active = pathname.startsWith(`/dashboard/clients/${client.slug}`)
+            return (
+              <a
+                key={client.id}
+                href={`/dashboard/clients/${client.slug}`}
+                className={`flex items-center gap-2.5 rounded-lg px-2 py-2.5 ${active ? 'bg-[#7C6FF0]/[0.14]' : ''}`}
+              >
+                <span
+                  className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] font-['Space_Grotesk'] text-xs font-bold ${
+                    active ? 'bg-[#7C6FF0] text-[#0B0E1A]' : 'bg-[#1B2036] text-[#8A90A6]'
+                  }`}
+                >
+                  {initials(client.name)}
+                </span>
+                <span className={`text-[13.5px] ${active ? 'font-semibold' : 'text-[#8A90A6]'}`}>{client.name}</span>
+              </a>
+            )
+          })}
+        </nav>
+
+        <div className="px-5 pt-2">
+          <a href="/dashboard/clients/new" className="text-[13px] font-medium text-[#7C6FF0] hover:text-[#9C90F5]">
+            + Novo cliente
+          </a>
+        </div>
+
+        <div className="mt-auto border-t border-white/[0.08] px-5 pt-4">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1B2036] text-xs font-semibold text-[#8A90A6]">
+              {userEmail[0]?.toUpperCase() ?? '?'}
+            </span>
+            <span className="font-['JetBrains_Mono'] text-[11.5px] text-[#8A90A6]">{userEmail}</span>
+          </div>
+        </div>
+      </aside>
+
+      <main className="min-w-0 flex-1 overflow-auto">{children}</main>
+    </div>
+  )
+}
+```
+
+- [ ] **Step 3: Wire the shell into the dashboard layout**
+
+Replace the full contents of `src/app/dashboard/layout.tsx`:
+
+```tsx
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { DashboardShell } from '@/components/dashboard-shell'
+
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const { data: clients } = await supabase.from('clients').select('id, name, slug').order('name')
+
+  return (
+    <DashboardShell clients={clients ?? []} userEmail={user?.email ?? ''}>
+      {children}
+    </DashboardShell>
+  )
+}
+```
+
+- [ ] **Step 4: Restyle the dashboard home page, preserving the usage widget**
+
+Replace the full contents of `src/app/dashboard/page.tsx` — this keeps the exact same
+`UsageStats` fetch and free-tier caveat text that already ships, restyled:
+
+```tsx
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+
+interface UsageStats {
+  total_clients: number
+  total_tests: number
+  total_click_events: number
+}
+
+export default async function DashboardPage() {
+  const supabase = await createServerSupabaseClient()
+  const { data: clients } = await supabase.from('clients').select('id, name, slug').order('name')
+  const { data: usage } = (await supabase.rpc('get_usage_stats').single()) as { data: UsageStats | null }
+
+  return (
+    <div className="p-8">
+      <h1 className="mb-1 font-['Space_Grotesk'] text-xl font-semibold">Clientes</h1>
+      <p className="mb-3 text-sm text-[#8A90A6]">Escolha um cliente na barra lateral para ver os testes.</p>
+      {usage && (
+        <p className="mb-6 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">
+          {usage.total_clients} clientes · {usage.total_tests} testes · {usage.total_click_events} cliques
+          registrados (Supabase free tier: 500MB de banco — fique de olho se isso crescer muito rápido)
+        </p>
+      )}
+      {(!clients || clients.length === 0) && (
+        <a href="/dashboard/clients/new" className="text-sm font-medium text-[#7C6FF0] hover:text-[#9C90F5]">
+          + Criar seu primeiro cliente
+        </a>
+      )}
+    </div>
+  )
+}
+```
+
+- [ ] **Step 5: Manual verification**
+
+```bash
+npm run dev
+```
+`/login` renders the dark card. Logging in lands on `/dashboard` with a dark sidebar; the usage
+line still shows real counts; navigating into a client highlights it in the sidebar.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/app/login/page.tsx src/app/dashboard/layout.tsx src/app/dashboard/page.tsx src/components/dashboard-shell.tsx
+git commit -m "feat: restyle login, dashboard shell, and dashboard home"
+```
+
+---
+
+### Task 24: Restyle client and test creation forms
+
+**Files:**
+- Modify: `src/app/dashboard/clients/new/page.tsx`
+- Modify: `src/app/dashboard/clients/[clientSlug]/tests/new/page.tsx`
+
+This must preserve **every** existing behavior in the new-test form: the `useRouter` +
+`router.push` client-side navigation after `createTest` (not a server-side `redirect()`), the
+`clientLoading` state and its "Carregando..." message, the fetch-error message on the client
+lookup, and `disabled={!clientId}` on the submit button. Only classNames and wrapper structure
+change.
+
+- [ ] **Step 1: Restyle the new-client form**
+
+Replace the full contents of `src/app/dashboard/clients/new/page.tsx`:
+
+```tsx
+import { createClient } from '../actions'
+
+export default function NewClientPage() {
+  return (
+    <div className="p-8">
+      <form action={createClient} className="max-w-md space-y-4">
+        <h1 className="mb-2 font-['Space_Grotesk'] text-lg font-semibold">Novo cliente</h1>
+        <input
+          name="name"
+          required
+          placeholder="Nome"
+          className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]"
+        />
+        <input
+          name="slug"
+          required
+          placeholder="slug (ex: nicho-fitness)"
+          pattern="[a-z0-9-]+"
+          className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]"
+        />
+        <button type="submit" className="rounded-[10px] bg-[#7C6FF0] px-4 py-2.5 text-sm font-semibold text-[#0B0E1A]">
+          Criar
+        </button>
+      </form>
+    </div>
+  )
+}
+```
+
+- [ ] **Step 2: Restyle the new-test form**
+
+Replace the full contents of `src/app/dashboard/clients/[clientSlug]/tests/new/page.tsx`:
+
+```tsx
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { createTest } from '../../actions'
+import { weightsSumTo100 } from '@/lib/domain/validate-weights'
+import { createBrowserSupabaseClient } from '@/lib/supabase/browser'
+
+interface VariantForm {
+  name: string
+  weight_pct: string
+  destination_url: string
+  thank_you_url: string
+}
+
+const inputClass =
+  'w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]'
+
+export default function NewTestPage() {
+  const params = useParams<{ clientSlug: string }>()
+  const router = useRouter()
+  const [clientId, setClientId] = useState<string | null>(null)
+  const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
+  const [fallbackUrl, setFallbackUrl] = useState('')
+  const [conversionMethod, setConversionMethod] = useState<'hubla_webhook' | 'thank_you_page'>('hubla_webhook')
+  const [variants, setVariants] = useState<VariantForm[]>([
+    { name: 'A', weight_pct: '50', destination_url: '', thank_you_url: '' },
+    { name: 'B', weight_pct: '50', destination_url: '', thank_you_url: '' },
+  ])
+  const [error, setError] = useState<string | null>(null)
+  const [clientLoading, setClientLoading] = useState(true)
+
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient()
+    supabase
+      .from('clients')
+      .select('id')
+      .eq('slug', params.clientSlug)
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          setError('Não foi possível carregar o cliente. Recarregue a página.')
+        } else {
+          setClientId(data?.id ?? null)
+        }
+        setClientLoading(false)
+      })
+  }, [params.clientSlug])
+
+  const weightsValid = weightsSumTo100(variants.map((v) => Number(v.weight_pct)))
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    setError(null)
+    if (!clientId) return
+    if (!weightsValid) {
+      setError('Os pesos das variantes devem somar 100%')
+      return
+    }
+    try {
+      await createTest({
+        client_id: clientId,
+        name,
+        slug,
+        fallback_url: fallbackUrl,
+        conversion_method: conversionMethod,
+        variants: variants.map((v) => ({
+          name: v.name,
+          weight_pct: Number(v.weight_pct),
+          destination_url: v.destination_url,
+          thank_you_url: v.thank_you_url,
+        })),
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao criar teste')
+      return
+    }
+    router.push(`/dashboard/clients/${params.clientSlug}`)
+  }
+
+  function updateVariant(index: number, field: keyof VariantForm, value: string) {
+    setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, [field]: value } : v)))
+  }
+
+  return (
+    <div className="p-8">
+      <form onSubmit={handleSubmit} className="max-w-xl space-y-4">
+        <h1 className="font-['Space_Grotesk'] text-lg font-semibold">Novo teste</h1>
+        <input required placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+        <input
+          required
+          placeholder="Slug (ex: oferta-x)"
+          value={slug}
+          onChange={(e) => setSlug(e.target.value)}
+          className={inputClass}
+        />
+        <input
+          placeholder="URL de fallback (opcional)"
+          value={fallbackUrl}
+          onChange={(e) => setFallbackUrl(e.target.value)}
+          className={inputClass}
+        />
+        <select
+          value={conversionMethod}
+          onChange={(e) => setConversionMethod(e.target.value as typeof conversionMethod)}
+          className={inputClass}
+        >
+          <option value="hubla_webhook">Venda (webhook Hubla)</option>
+          <option value="thank_you_page">Captura (thank-you page)</option>
+        </select>
+
+        {variants.map((variant, index) => (
+          <fieldset key={index} className="space-y-2 rounded-[10px] border border-white/[0.08] p-3">
+            <legend className="px-1 text-sm font-medium text-[#8A90A6]">Variante {variant.name}</legend>
+            <input
+              placeholder="Peso %"
+              value={variant.weight_pct}
+              onChange={(e) => updateVariant(index, 'weight_pct', e.target.value)}
+              className={inputClass}
+            />
+            <input
+              placeholder="URL de destino"
+              value={variant.destination_url}
+              onChange={(e) => updateVariant(index, 'destination_url', e.target.value)}
+              className={inputClass}
+            />
+            {conversionMethod === 'thank_you_page' && (
+              <input
+                placeholder="URL de thank-you"
+                value={variant.thank_you_url}
+                onChange={(e) => updateVariant(index, 'thank_you_url', e.target.value)}
+                className={inputClass}
+              />
+            )}
+          </fieldset>
+        ))}
+
+        <button
+          type="button"
+          onClick={() =>
+            setVariants((prev) => [...prev, { name: String.fromCharCode(65 + prev.length), weight_pct: '0', destination_url: '', thank_you_url: '' }])
+          }
+          className="text-sm font-medium text-[#7C6FF0] hover:text-[#9C90F5]"
+        >
+          + Adicionar variante
+        </button>
+
+        {!weightsValid && <p className="text-sm text-[#F5B94D]">Os pesos devem somar 100%.</p>}
+        {clientLoading && <p className="text-sm text-[#8A90A6]">Carregando...</p>}
+        {error && <p className="text-sm text-[#F76C6C]">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={!clientId}
+          className="rounded-[10px] bg-[#7C6FF0] px-4 py-2.5 text-sm font-semibold text-[#0B0E1A] disabled:opacity-50"
+        >
+          Criar teste
+        </button>
+      </form>
+    </div>
+  )
+}
+```
+
+- [ ] **Step 3: Manual verification**
+
+```bash
+npm run dev
+```
+`/dashboard/clients/new` and `/dashboard/clients/<slug>/tests/new` render with the dark theme;
+the weight-sum warning, the "Carregando..." state, the disabled submit while `clientId` is
+loading, and the post-submit client-side navigation all still behave exactly as before.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/app/dashboard/clients/new/page.tsx "src/app/dashboard/clients/[clientSlug]/tests/new/page.tsx"
+git commit -m "feat: restyle client and test creation forms"
+```
+
+---
+
+### Task 25: Report page — node canvas
+
+**Files:**
+- Create: `src/lib/domain/report-layout.ts`
+- Test: `src/lib/domain/report-layout.test.ts`
+- Modify: `src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/page.tsx`
+
+**Interfaces:**
+- Consumes: `get_test_report` RPC, `get_test_report_by_source` RPC, `probabilityToBeatControl`,
+  `toggleTestStatus` (Task 20), `variants` table — all already wired in the current file.
+- Produces: `computeReportLayout(variants, fallbackConfigured): ReportLayout` — a pure function
+  from variant data to node/edge coordinates.
+
+This task **must preserve, unchanged**: the `params: Promise<{...}>` await pattern, the
+`toggleTestStatus.bind(...)` form wiring and its active/paused label swap, the conditional
+`pixelVariants` query and its `isSafeUrl` regex check and warning copy, and the three-way
+confidence label (`'controle'` for the control row / `'dados insuficientes'` when either side
+has zero visits / `` `${pct}% de ser melhor que o controle}` `` otherwise). Only the layout —
+how the per-variant report table becomes a node canvas — changes.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// src/lib/domain/report-layout.test.ts
+import { describe, it, expect } from 'vitest'
+import { computeReportLayout } from './report-layout'
+
+const variants = [
+  { id: 'a', name: 'A', weightPct: 50, visits: 1706, conversions: 58, destinationUrl: 'https://example.com/a' },
+  { id: 'b', name: 'B', weightPct: 30, visits: 1024, conversions: 61, destinationUrl: 'https://example.com/b' },
+  { id: 'c', name: 'C', weightPct: 20, visits: 682, conversions: 14, destinationUrl: 'https://example.com/c' },
+]
+
+describe('computeReportLayout', () => {
+  it('lays out one node column per variant, stacked without overlap', () => {
+    const layout = computeReportLayout(variants, false)
+    expect(layout.variants).toHaveLength(3)
+    for (let i = 1; i < layout.variants.length; i++) {
+      const prevBottom = layout.variants[i - 1].node.y + layout.variants[i - 1].node.h
+      expect(layout.variants[i].node.y).toBeGreaterThanOrEqual(prevBottom)
+    }
+  })
+
+  it('marks the variant with the highest conversion rate as leader', () => {
+    const layout = computeReportLayout(variants, false)
+    const leaders = layout.variants.filter((v) => v.isLeader)
+    expect(leaders).toHaveLength(1)
+    expect(leaders[0].id).toBe('b')
+  })
+
+  it('colors the leader conversion edge amber and others teal', () => {
+    const layout = computeReportLayout(variants, false)
+    const leader = layout.variants.find((v) => v.id === 'b')!
+    const other = layout.variants.find((v) => v.id === 'a')!
+    expect(leader.conversionEdge.color).toBe('#F5B94D')
+    expect(other.conversionEdge.color).toBe('#2DD4A8')
+  })
+
+  it('gives thicker traffic edges to variants with more visits', () => {
+    const layout = computeReportLayout(variants, false)
+    const a = layout.variants.find((v) => v.id === 'a')!
+    const c = layout.variants.find((v) => v.id === 'c')!
+    expect(a.trafficEdge.strokeWidth).toBeGreaterThan(c.trafficEdge.strokeWidth)
+  })
+
+  it('declares no leader when no variant has any visits', () => {
+    const noVisits = variants.map((v) => ({ ...v, visits: 0, conversions: 0 }))
+    const layout = computeReportLayout(noVisits, false)
+    expect(layout.variants.every((v) => !v.isLeader)).toBe(true)
+  })
+
+  it('omits the fallback node when not configured', () => {
+    expect(computeReportLayout(variants, false).fallback).toBeNull()
+  })
+
+  it('includes a fallback node when configured', () => {
+    expect(computeReportLayout(variants, true).fallback).not.toBeNull()
+  })
+
+  it('throws on an empty variant list', () => {
+    expect(() => computeReportLayout([], false)).toThrow()
+  })
+})
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+npx vitest run src/lib/domain/report-layout.test.ts
+```
+Expected: FAIL — module does not exist.
+
+- [ ] **Step 3: Implement**
+
+```ts
+// src/lib/domain/report-layout.ts
+export interface ReportVariantInput {
+  id: string
+  name: string
+  weightPct: number
+  visits: number
+  conversions: number
+  destinationUrl: string
+}
+
+export interface ReportNode {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface ReportVariantLayout {
+  id: string
+  name: string
+  weightPct: number
+  visits: number
+  conversions: number
+  ratePct: number
+  destinationUrl: string
+  isLeader: boolean
+  node: ReportNode
+  trafficEdge: { path: string; strokeWidth: number }
+  conversionNode: ReportNode
+  conversionEdge: { path: string; strokeWidth: number; color: string }
+}
+
+export interface ReportLayout {
+  canvasWidth: number
+  canvasHeight: number
+  entryNode: ReportNode
+  variants: ReportVariantLayout[]
+  fallback: { node: ReportNode; edge: { path: string } } | null
+}
+
+const CANVAS_WIDTH = 1360
+const CANVAS_HEIGHT = 732
+const ENTRY = { x: 40, w: 240, h: 150 }
+const VARIANT = { x: 360, w: 300, h: 170, gap: 26 }
+const CONVERSION = { x: 760, w: 220, h: 110 }
+
+function bezier(fromX: number, fromY: number, toX: number, toY: number): string {
+  const midX = (fromX + toX) / 2
+  return `M${fromX},${fromY} C${midX},${fromY} ${midX},${toY} ${toX},${toY}`
+}
+
+export function computeReportLayout(variants: ReportVariantInput[], fallbackConfigured: boolean): ReportLayout {
+  if (variants.length === 0) {
+    throw new Error('computeReportLayout requires at least one variant')
+  }
+
+  const totalVariantHeight = variants.length * VARIANT.h + (variants.length - 1) * VARIANT.gap
+  const variantStartY = (CANVAS_HEIGHT - totalVariantHeight) / 2
+  const entryNode: ReportNode = { x: ENTRY.x, y: (CANVAS_HEIGHT - ENTRY.h) / 2, w: ENTRY.w, h: ENTRY.h }
+  const entryCenterY = entryNode.y + entryNode.h / 2
+  const entryRightX = entryNode.x + entryNode.w
+
+  const maxVisits = Math.max(1, ...variants.map((v) => v.visits))
+  const rates = variants.map((v) => (v.visits > 0 ? v.conversions / v.visits : -1))
+  const bestRate = Math.max(...rates)
+  const leaderIndex = bestRate > 0 ? rates.indexOf(bestRate) : -1
+
+  const variantLayouts: ReportVariantLayout[] = variants.map((variant, index) => {
+    const node: ReportNode = {
+      x: VARIANT.x,
+      y: variantStartY + index * (VARIANT.h + VARIANT.gap),
+      w: VARIANT.w,
+      h: VARIANT.h,
+    }
+    const centerY = node.y + node.h / 2
+    const isLeader = index === leaderIndex
+
+    const conversionNode: ReportNode = {
+      x: CONVERSION.x,
+      y: centerY - CONVERSION.h / 2,
+      w: CONVERSION.w,
+      h: CONVERSION.h,
+    }
+
+    return {
+      id: variant.id,
+      name: variant.name,
+      weightPct: variant.weightPct,
+      visits: variant.visits,
+      conversions: variant.conversions,
+      ratePct: variant.visits > 0 ? (variant.conversions / variant.visits) * 100 : 0,
+      destinationUrl: variant.destinationUrl,
+      isLeader,
+      node,
+      trafficEdge: {
+        path: bezier(entryRightX, entryCenterY, node.x, centerY),
+        strokeWidth: 2.5 + (variant.visits / maxVisits) * 4.5,
+      },
+      conversionNode,
+      conversionEdge: {
+        path: bezier(node.x + node.w, centerY, conversionNode.x, centerY),
+        strokeWidth: isLeader ? 5 : 3.5,
+        color: isLeader ? '#F5B94D' : '#2DD4A8',
+      },
+    }
+  })
+
+  const fallback = fallbackConfigured
+    ? {
+        node: { x: entryNode.x + 160, y: entryNode.y + entryNode.h + 60, w: 230, h: 60 },
+        edge: {
+          path: `M${entryNode.x + 120},${entryNode.y + entryNode.h} L${entryNode.x + 120},${entryNode.y + entryNode.h + 90}`,
+        },
+      }
+    : null
+
+  return { canvasWidth: CANVAS_WIDTH, canvasHeight: CANVAS_HEIGHT, entryNode, variants: variantLayouts, fallback }
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+```bash
+npx vitest run src/lib/domain/report-layout.test.ts
+```
+Expected: PASS (8 tests).
+
+- [ ] **Step 5: Add `fallback_url` to the existing `tests` select and fetch variant destination URLs**
+
+In `src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/page.tsx`, change the existing
+`tests` select from:
+
+```ts
+    .select('id, name, slug, status, conversion_method')
+```
+
+to:
+
+```ts
+    .select('id, name, slug, status, conversion_method, fallback_url')
+```
+
+Add this query right after the existing `pixelVariants` query (which only fetches
+`thank_you_url` conditionally) — this new one is unconditional and only fetches
+`destination_url`, needed for every variant regardless of conversion method:
+
+```ts
+  const { data: variantRows } = await supabase.from('variants').select('id, destination_url').eq('test_id', test.id)
+  const destinationById = new Map((variantRows ?? []).map((v) => [v.id, v.destination_url as string]))
+```
+
+- [ ] **Step 6: Build the layout and the three-way confidence labels from the existing `rows`**
+
+Keep the existing `baseRows`/`control`/`rows` computation exactly as it is today (do not touch
+the confidence math). Immediately after the existing `rows` computation, add:
+
+```ts
+  const layout = computeReportLayout(
+    rows.map((row) => ({
+      id: row.variant_id,
+      name: row.variant_name,
+      weightPct: row.weight_pct,
+      visits: row.visits,
+      conversions: row.conversions,
+      destinationUrl: destinationById.get(row.variant_id) ?? '',
+    })),
+    Boolean(test.fallback_url)
+  )
+
+  const confidenceLabelById = new Map(
+    rows.map((row) => [
+      row.variant_id,
+      row.variant_id === control?.variant_id
+        ? 'controle'
+        : row.confidencePct !== null
+          ? `${row.confidencePct}% de ser melhor que o controle`
+          : 'dados insuficientes',
+    ])
+  )
+```
+
+- [ ] **Step 7: Replace the page's JSX**
+
+Replace everything from the opening `return (` through the closing `<table>` for the main
+report (i.e. everything up to, but not including, the `<h2>Por origem (UTM)</h2>` section) with:
+
+```tsx
+  return (
+    <div className="flex h-screen flex-col">
+      <div className="flex h-[88px] flex-shrink-0 items-center justify-between border-b border-white/[0.08] px-8">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="font-['Space_Grotesk'] text-[19px] font-semibold">{test.name}</h1>
+            <span
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-medium ${
+                test.status === 'active' ? 'border-[#2DD4A8]/35 text-[#2DD4A8]' : 'border-[#F76C6C]/35 text-[#F76C6C]'
+              }`}
+            >
+              {test.status === 'active' ? 'Ativo' : 'Pausado'}
+            </span>
+          </div>
+          <p className="mt-1 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">{redirectUrl}</p>
+        </div>
+        <div className="flex items-center gap-5">
+          <div className="flex flex-col items-end">
+            <span className="font-['JetBrains_Mono'] text-[17px] font-medium">{totalVisits}</span>
+            <span className="text-[11px] text-[#8A90A6]">acessos</span>
+          </div>
+          <form
+            action={toggleTestStatus.bind(null, {
+              test_id: test.id,
+              next_status: test.status === 'active' ? 'paused' : 'active',
+              client_slug: clientSlug,
+              test_slug: test.slug,
+            })}
+          >
+            <button
+              type="submit"
+              className="h-9 rounded-[9px] border border-white/[0.08] bg-transparent px-4 text-[13px] font-medium text-[#8A90A6]"
+            >
+              {test.status === 'active' ? 'Pausar teste' : 'Ativar teste'}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div className="relative m-6 flex-1 overflow-auto rounded-2xl border border-white/[0.08]">
+        <svg
+          width={layout.canvasWidth}
+          height={layout.canvasHeight}
+          viewBox={`0 0 ${layout.canvasWidth} ${layout.canvasHeight}`}
+          className="absolute left-5 top-5"
+          fill="none"
+        >
+          {layout.variants.map((variant) => (
+            <path
+              key={`traffic-${variant.id}`}
+              d={variant.trafficEdge.path}
+              stroke="#4F8EF7"
+              strokeWidth={variant.trafficEdge.strokeWidth}
+              strokeLinecap="round"
+              opacity={0.55}
+            />
+          ))}
+          {layout.variants.map((variant) => (
+            <path
+              key={`conversion-${variant.id}`}
+              d={variant.conversionEdge.path}
+              stroke={variant.conversionEdge.color}
+              strokeWidth={variant.conversionEdge.strokeWidth}
+              strokeLinecap="round"
+              opacity={0.8}
+            />
+          ))}
+          {layout.fallback && (
+            <path
+              d={layout.fallback.edge.path}
+              stroke="#F76C6C"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              strokeLinecap="round"
+              opacity={0.5}
+            />
+          )}
+        </svg>
+
+        <div
+          className="absolute rounded-xl border border-white/[0.08] bg-[#141829] p-[18px]"
+          style={{ left: layout.entryNode.x + 20, top: layout.entryNode.y + 20, width: layout.entryNode.w, height: layout.entryNode.h }}
+        >
+          <div className="mb-2.5 font-['JetBrains_Mono'] text-[10.5px] uppercase tracking-widest text-[#8A90A6]">
+            Link do teste
+          </div>
+          <div className="mb-4 break-all font-['JetBrains_Mono'] text-[12.5px] text-[#4F8EF7]">{redirectUrl}</div>
+          <div className="font-['Space_Grotesk'] text-[22px] font-semibold">{totalVisits}</div>
+          <div className="text-[11.5px] text-[#8A90A6]">acessos totais</div>
+        </div>
+
+        {layout.fallback && (
+          <div
+            className="absolute rounded-[10px] border border-[#F76C6C]/30 bg-[#141829] px-3.5 py-2.5 opacity-85"
+            style={{ left: layout.fallback.node.x + 20, top: layout.fallback.node.y + 20, width: layout.fallback.node.w }}
+          >
+            <div className="mb-0.5 text-[10.5px] uppercase tracking-wide text-[#F76C6C]">Fallback</div>
+            <div className="font-['JetBrains_Mono'] text-[11.5px] text-[#8A90A6]">{test.fallback_url}</div>
+          </div>
+        )}
+
+        {layout.variants.map((variant) => (
+          <div key={variant.id}>
+            <div
+              className={`absolute rounded-xl border bg-[#141829] p-[18px_20px] ${
+                variant.isLeader
+                  ? 'border-[#F5B94D] shadow-[0_0_0_3px_rgba(245,185,77,0.14),0_0_32px_rgba(245,185,77,0.18)]'
+                  : 'border-white/[0.08]'
+              }`}
+              style={{ left: variant.node.x + 20, top: variant.node.y + 20, width: variant.node.w, height: variant.node.h }}
+            >
+              <div className="mb-3.5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-[3px] bg-[#4F8EF7]" />
+                  <span className="font-['Space_Grotesk'] text-[15px] font-semibold">Variante {variant.name}</span>
+                  {variant.isLeader && (
+                    <span className="rounded-full bg-[#F5B94D]/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[#F5B94D]">
+                      Líder
+                    </span>
+                  )}
+                </div>
+                <span className="rounded-full bg-[#1B2036] px-2.5 py-0.5 font-['JetBrains_Mono'] text-[11.5px] text-[#8A90A6]">
+                  alvo {variant.weightPct}%
+                </span>
+              </div>
+              <div className="mb-3.5 flex gap-7">
+                <div>
+                  <div className="font-['JetBrains_Mono'] text-base font-medium">{variant.visits}</div>
+                  <div className="text-[11px] text-[#8A90A6]">acessos</div>
+                </div>
+                <div>
+                  <div className="font-['JetBrains_Mono'] text-base font-medium">{variant.conversions}</div>
+                  <div className="text-[11px] text-[#8A90A6]">conversões</div>
+                </div>
+              </div>
+              <div className="truncate border-t border-white/[0.08] pt-3 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">
+                {variant.destinationUrl}
+              </div>
+            </div>
+
+            <div
+              className={`absolute flex flex-col justify-center rounded-xl border bg-[#141829] p-4 ${
+                variant.isLeader ? 'border-[#F5B94D] shadow-[0_0_24px_rgba(245,185,77,0.14)]' : 'border-white/[0.08]'
+              }`}
+              style={{
+                left: variant.conversionNode.x + 20,
+                top: variant.conversionNode.y + 20,
+                width: variant.conversionNode.w,
+                height: variant.conversionNode.h,
+              }}
+            >
+              <div className="mb-2 text-[10.5px] uppercase tracking-wide text-[#8A90A6]">Conversão</div>
+              <div
+                className="font-['JetBrains_Mono'] text-[26px] font-semibold leading-none"
+                style={{ color: variant.isLeader ? '#F5B94D' : '#2DD4A8' }}
+              >
+                {variant.ratePct.toFixed(1)}%
+              </div>
+              <div className="mt-1 text-[11.5px] text-[#8A90A6]">
+                {variant.conversions} vendas · {confidenceLabelById.get(variant.id)}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+```
+
+(Leave the existing `<h2>Por origem (UTM)</h2>` table and the pixel-snippet section exactly
+where they were, right after this block — do not touch their JSX or logic. Only restyle their
+Tailwind classes to the dark tokens: `text-gray-600`→`text-[#8A90A6]`, `border-b`→
+`border-b border-white/[0.08]`, `bg-gray-100`→`bg-[#1B2036]`, `text-blue-600`→`text-[#4F8EF7]`,
+`text-lg font-semibold`→`font-['Space_Grotesk'] text-lg font-semibold`, wrapping both sections
+in `mx-6 mb-6` spacing to match the canvas's margins. Keep the `isSafeUrl` check and the
+"seu construtor de página/funil precisa..." warning text verbatim.)
+
+- [ ] **Step 8: Manual verification**
+
+```bash
+npm run dev
+```
+Open a test's report page with 2–3 variants and some traffic. Confirm: three columns connected
+by curved lines; the highest-converting variant has an amber border/glow, "Líder" badge, and
+amber conversion number/line; the confidence caption reads "controle" on the control variant,
+a percentage on the others (once both sides have visits), or "dados insuficientes" otherwise;
+clicking "Pausar teste"/"Ativar teste" still flips the status pill and button label; setting a
+`fallback_url` on the test shows the dashed rose line and Fallback chip; the UTM breakdown table
+and the pixel-snippet section (with its URL-safety warning) still render below the canvas
+exactly as before, just restyled.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/lib/domain/report-layout.ts src/lib/domain/report-layout.test.ts "src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/page.tsx"
+git commit -m "feat: rebuild the test report as a node canvas"
+```
+
+---
+
+### Task 26: Restyle the test list
+
+**Files:**
+- Modify: `src/app/dashboard/clients/[clientSlug]/page.tsx`
+
+- [ ] **Step 1: Restyle the test list**
+
+Replace the full contents of `src/app/dashboard/clients/[clientSlug]/page.tsx`:
+
+```tsx
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { notFound } from 'next/navigation'
+
+export default async function ClientPage({ params }: { params: Promise<{ clientSlug: string }> }) {
+  const { clientSlug } = await params
+  const supabase = await createServerSupabaseClient()
+  const { data: client } = await supabase
+    .from('clients')
+    .select('id, name, slug')
+    .eq('slug', clientSlug)
+    .maybeSingle()
+
+  if (!client) notFound()
+
+  const { data: tests } = await supabase
+    .from('tests')
+    .select('id, name, slug, status')
+    .eq('client_id', client.id)
+    .order('name')
+
+  return (
+    <div className="p-8">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="font-['Space_Grotesk'] text-xl font-semibold">Testes — {client.name}</h1>
+        <a
+          href={`/dashboard/clients/${client.slug}/tests/new`}
+          className="rounded-[9px] bg-[#7C6FF0] px-4 py-2.5 text-[13.5px] font-semibold text-[#0B0E1A]"
+        >
+          Novo teste
+        </a>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-white/[0.08]">
+        {(tests ?? []).map((test, index) => (
+          <a
+            key={test.id}
+            href={`/dashboard/clients/${client.slug}/tests/${test.slug}`}
+            className={`flex items-center gap-5 bg-[#141829] px-6 py-5 hover:bg-[#1B2036] ${
+              index < (tests?.length ?? 0) - 1 ? 'border-b border-white/[0.08]' : ''
+            } ${test.status === 'paused' ? 'opacity-70' : ''}`}
+          >
+            <div className="min-w-0 flex-1">
+              <div className="font-['Space_Grotesk'] text-[15px] font-semibold">{test.name}</div>
+              <div className="font-['JetBrains_Mono'] text-xs text-[#8A90A6]">/{test.slug}</div>
+            </div>
+            <span
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                test.status === 'active' ? 'border-[#2DD4A8]/35 text-[#2DD4A8]' : 'border-[#F76C6C]/35 text-[#F76C6C]'
+              }`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${test.status === 'active' ? 'bg-[#2DD4A8]' : 'bg-[#F76C6C]'}`} />
+              {test.status === 'active' ? 'Ativo' : 'Pausado'}
+            </span>
+          </a>
+        ))}
+        {(tests ?? []).length === 0 && <div className="px-6 py-8 text-sm text-[#8A90A6]">Nenhum teste ainda.</div>}
+      </div>
+    </div>
+  )
+}
+```
+
+- [ ] **Step 2: Manual verification**
+
+```bash
+npm run dev
+```
+`/dashboard/clients/<slug>` shows the test list as dark row-cards with status pills, matching
+the sidebar and report page's visual language.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add "src/app/dashboard/clients/[clientSlug]/page.tsx"
+git commit -m "feat: restyle test list"
+```
