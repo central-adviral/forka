@@ -4,6 +4,7 @@ import { probabilityToBeatControl } from '@/lib/domain/significance'
 import { computeReportLayout } from '@/lib/domain/report-layout'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
+import { ReportCanvas } from './report-canvas'
 import { toggleTestStatus } from './actions'
 
 interface ReportRow {
@@ -19,6 +20,13 @@ interface SourceReportRow {
   variant_name: string
   utm_source: string
   visits: number
+  conversions: number
+}
+
+interface AdReportRow {
+  variant_id: string
+  variant_name: string
+  ad_name: string
   conversions: number
 }
 
@@ -51,6 +59,7 @@ export default async function TestReportPage({
 
   const { data: report } = await supabase.rpc('get_test_report', { p_test_id: test.id })
   const { data: sourceReport } = await supabase.rpc('get_test_report_by_source', { p_test_id: test.id })
+  const { data: adReport } = await supabase.rpc('get_test_report_by_ad', { p_test_id: test.id })
 
   if (!report || report.length === 0) {
     return (
@@ -167,132 +176,13 @@ export default async function TestReportPage({
         </div>
       </div>
 
-      <div className="relative m-6 flex-1 overflow-auto rounded-2xl border border-white/[0.08]">
-        <svg
-          width={layout.canvasWidth}
-          height={layout.canvasHeight}
-          viewBox={`0 0 ${layout.canvasWidth} ${layout.canvasHeight}`}
-          className="absolute left-5 top-5"
-          fill="none"
-        >
-          {layout.variants.map((variant) => (
-            <path
-              key={`traffic-${variant.id}`}
-              d={variant.trafficEdge.path}
-              stroke="#4F8EF7"
-              strokeWidth={variant.trafficEdge.strokeWidth}
-              strokeLinecap="round"
-              opacity={0.55}
-            />
-          ))}
-          {layout.variants.map((variant) => (
-            <path
-              key={`conversion-${variant.id}`}
-              d={variant.conversionEdge.path}
-              stroke={variant.conversionEdge.color}
-              strokeWidth={variant.conversionEdge.strokeWidth}
-              strokeLinecap="round"
-              opacity={0.8}
-            />
-          ))}
-          {layout.fallback && (
-            <path
-              d={layout.fallback.edge.path}
-              stroke="#F76C6C"
-              strokeWidth={2}
-              strokeDasharray="5 5"
-              strokeLinecap="round"
-              opacity={0.5}
-            />
-          )}
-        </svg>
-
-        <div
-          className="absolute rounded-xl border border-white/[0.08] bg-[#141829] p-[18px]"
-          style={{ left: layout.entryNode.x + 20, top: layout.entryNode.y + 20, width: layout.entryNode.w, height: layout.entryNode.h }}
-        >
-          <div className="mb-2.5 font-['JetBrains_Mono'] text-[10.5px] uppercase tracking-widest text-[#8A90A6]">
-            Link do teste
-          </div>
-          <div className="mb-4 break-all font-['JetBrains_Mono'] text-[12.5px] text-[#4F8EF7]">{redirectUrl}</div>
-          <div className="font-['Space_Grotesk'] text-[22px] font-semibold">{totalVisits}</div>
-          <div className="text-[11.5px] text-[#8A90A6]">acessos totais</div>
-        </div>
-
-        {layout.fallback && (
-          <div
-            className="absolute rounded-[10px] border border-[#F76C6C]/30 bg-[#141829] px-3.5 py-2.5 opacity-85"
-            style={{ left: layout.fallback.node.x + 20, top: layout.fallback.node.y + 20, width: layout.fallback.node.w }}
-          >
-            <div className="mb-0.5 text-[10.5px] uppercase tracking-wide text-[#F76C6C]">Fallback</div>
-            <div className="font-['JetBrains_Mono'] text-[11.5px] text-[#8A90A6]">{test.fallback_url}</div>
-          </div>
-        )}
-
-        {layout.variants.map((variant) => (
-          <div key={variant.id}>
-            <div
-              className={`absolute rounded-xl border bg-[#141829] p-[18px_20px] ${
-                variant.isLeader
-                  ? 'border-[#F5B94D] shadow-[0_0_0_3px_rgba(245,185,77,0.14),0_0_32px_rgba(245,185,77,0.18)]'
-                  : 'border-white/[0.08]'
-              }`}
-              style={{ left: variant.node.x + 20, top: variant.node.y + 20, width: variant.node.w, height: variant.node.h }}
-            >
-              <div className="mb-3.5 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-[3px] bg-[#4F8EF7]" />
-                  <span className="font-['Space_Grotesk'] text-[15px] font-semibold">Variante {variant.name}</span>
-                  {variant.isLeader && (
-                    <span className="rounded-full bg-[#F5B94D]/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[#F5B94D]">
-                      Líder
-                    </span>
-                  )}
-                </div>
-                <span className="rounded-full bg-[#1B2036] px-2.5 py-0.5 font-['JetBrains_Mono'] text-[11.5px] text-[#8A90A6]">
-                  alvo {variant.weightPct}%
-                </span>
-              </div>
-              <div className="mb-3.5 flex gap-7">
-                <div>
-                  <div className="font-['JetBrains_Mono'] text-base font-medium">{variant.visits}</div>
-                  <div className="text-[11px] text-[#8A90A6]">acessos</div>
-                </div>
-                <div>
-                  <div className="font-['JetBrains_Mono'] text-base font-medium">{variant.conversions}</div>
-                  <div className="text-[11px] text-[#8A90A6]">conversões</div>
-                </div>
-              </div>
-              <div className="truncate border-t border-white/[0.08] pt-3 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">
-                {variant.destinationUrl}
-              </div>
-            </div>
-
-            <div
-              className={`absolute flex flex-col justify-center rounded-xl border bg-[#141829] p-4 ${
-                variant.isLeader ? 'border-[#F5B94D] shadow-[0_0_24px_rgba(245,185,77,0.14)]' : 'border-white/[0.08]'
-              }`}
-              style={{
-                left: variant.conversionNode.x + 20,
-                top: variant.conversionNode.y + 20,
-                width: variant.conversionNode.w,
-                height: variant.conversionNode.h,
-              }}
-            >
-              <div className="mb-2 text-[10.5px] uppercase tracking-wide text-[#8A90A6]">Conversão</div>
-              <div
-                className="font-['JetBrains_Mono'] text-[26px] font-semibold leading-none"
-                style={{ color: variant.isLeader ? '#F5B94D' : '#2DD4A8' }}
-              >
-                {variant.ratePct.toFixed(1)}%
-              </div>
-              <div className="mt-1 text-[11.5px] text-[#8A90A6]">
-                {variant.conversions} vendas · {confidenceLabelById.get(variant.id)}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <ReportCanvas
+        layout={layout}
+        redirectUrl={redirectUrl}
+        totalVisits={totalVisits}
+        fallbackUrl={test.fallback_url}
+        confidenceLabelById={confidenceLabelById}
+      />
       <div className="mx-6 mb-6">
         <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Por origem (UTM)</h2>
         <table className="w-full border-collapse text-sm">
@@ -315,6 +205,35 @@ export default async function TestReportPage({
                 <td>{row.visits > 0 ? ((row.conversions / row.visits) * 100).toFixed(1) : '0.0'}%</td>
               </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mx-6 mb-6">
+        <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Por anúncio</h2>
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-white/[0.08] text-left">
+              <th className="py-2">Variante</th>
+              <th>Anúncio</th>
+              <th>Vendas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {((adReport as AdReportRow[]) ?? []).length === 0 ? (
+              <tr>
+                <td className="py-2 text-[#8A90A6]" colSpan={3}>
+                  Nenhuma venda confirmada com anúncio identificado ainda.
+                </td>
+              </tr>
+            ) : (
+              ((adReport as AdReportRow[]) ?? []).map((row) => (
+                <tr key={`${row.variant_id}-${row.ad_name}`}>
+                  <td className="py-2">{row.variant_name}</td>
+                  <td>{row.ad_name}</td>
+                  <td>{row.conversions}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
