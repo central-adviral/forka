@@ -1,4 +1,6 @@
+import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { SuccessBanner } from '@/components/success-banner'
 import Link from 'next/link'
 
 interface UsageStats {
@@ -14,6 +16,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-8">
+      <Suspense fallback={null}>
+        <SuccessBanner param="created" message="Cliente criado com sucesso." />
+      </Suspense>
       <h1 className="mb-1 font-['Space_Grotesk'] text-xl font-semibold">Clientes</h1>
       <p className="mb-3 text-sm text-[#8A90A6]">Escolha um cliente na barra lateral para ver os testes.</p>
       {usage && (

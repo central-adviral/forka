@@ -1,5 +1,7 @@
+import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
+import { SuccessBanner } from '@/components/success-banner'
 
 export default async function ClientPage({ params }: { params: Promise<{ clientSlug: string }> }) {
   const { clientSlug } = await params
@@ -20,6 +22,9 @@ export default async function ClientPage({ params }: { params: Promise<{ clientS
 
   return (
     <div className="p-8">
+      <Suspense fallback={null}>
+        <SuccessBanner param="created" message="Teste criado com sucesso." />
+      </Suspense>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-['Space_Grotesk'] text-xl font-semibold">Testes — {client.name}</h1>
         <div className="flex items-center gap-3">

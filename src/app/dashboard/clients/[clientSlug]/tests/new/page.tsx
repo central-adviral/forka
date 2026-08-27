@@ -81,7 +81,7 @@ export default function NewTestPage() {
       setError(err instanceof Error ? err.message : 'Erro ao criar teste')
       return
     }
-    router.push(`/dashboard/clients/${params.clientSlug}`)
+    router.push(`/dashboard/clients/${params.clientSlug}?created=1`)
   }
 
   function updateVariant(index: number, field: keyof VariantForm, value: string) {

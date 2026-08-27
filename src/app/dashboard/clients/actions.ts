@@ -32,5 +32,5 @@ export async function createClient(formData: FormData) {
   if (error) throw error
 
   revalidatePath('/dashboard')
-  redirect('/dashboard')
+  redirect('/dashboard?created=1')
 }
