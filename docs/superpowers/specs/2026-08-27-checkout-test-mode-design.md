@@ -305,9 +305,13 @@ testável sem banco.
 ### `src/app/r/[slug]/route.ts`
 
 - Destino passa por `resolveEntryDestination` + `withTrackingId`.
+- **O ramo do bot filter também passa por `resolveEntryDestination`.** Hoje ele
+  usa `test.fallback_url ?? test.variants[0].destination_url`; num teste de
+  checkout isso mandaria bots direto pro `pay.hub.la`. Passa a cair na página de
+  vendas quando não houver `fallback_url`.
 - `sameSite: 'lax'` explícito nos dois cookies.
-- Nenhuma outra alteração: bot filter, rate limit, sorteio e atribuição
-  permanecem idênticos.
+- Nenhuma outra alteração: rate limit, sorteio e atribuição permanecem
+  idênticos.
 
 ### Server actions
 
