@@ -107,6 +107,7 @@ export function EditTestForm({
             onChange={(e) => setFallbackUrl(e.target.value)}
             className={inputClass}
           />
+          <p className="mt-1 text-xs text-[#8A90A6]">Pra onde mandar o visitante se o teste for pausado</p>
         </div>
 
         <div>
@@ -126,6 +127,7 @@ export function EditTestForm({
               onChange={(e) => setSalesPageUrl(e.target.value)}
               className={inputClass}
             />
+            <p className="mt-1 text-xs text-[#8A90A6]">A única página de vendas usada por todas as variantes</p>
           </div>
         )}
 
@@ -138,18 +140,29 @@ export function EditTestForm({
               onChange={(e) => updateVariant(index, 'weight_pct', e.target.value)}
               className={inputClass}
             />
+            <p className="-mt-1 text-xs text-[#8A90A6]">
+              Porcentagem do tráfego pra essa variante — a soma de todas precisa dar 100%
+            </p>
             <input
               placeholder={test.test_type === 'checkout' ? 'Link do checkout' : 'URL de destino'}
               value={variant.destination_url}
               onChange={(e) => updateVariant(index, 'destination_url', e.target.value)}
               className={inputClass}
             />
+            <p className="-mt-1 text-xs text-[#8A90A6]">
+              {test.test_type === 'checkout'
+                ? 'Link de pagamento da Hubla pra essa variante'
+                : 'Página de vendas dessa variante'}
+            </p>
             <input
               placeholder="URL de thank-you (opcional)"
               value={variant.thank_you_url}
               onChange={(e) => updateVariant(index, 'thank_you_url', e.target.value)}
               className={inputClass}
             />
+            <p className="-mt-1 text-xs text-[#8A90A6]">
+              Página que o cliente vê depois de comprar — cole o snippet do pixel nela
+            </p>
           </fieldset>
         ))}
 

@@ -74,6 +74,9 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
             Salvar
           </button>
         </form>
+        <p className="-mt-2 text-xs text-[#8A90A6]">
+          Aparece nos links dos seus testes no lugar do domínio padrão
+        </p>
 
         {client.custom_domain && (
           <>
@@ -123,6 +126,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
             Salvar
           </button>
         </form>
+        <p className="-mt-2 text-xs text-[#8A90A6]">Copie da aba Autenticação do webhook, no painel da Hubla</p>
 
         <div>
           <p className="mb-1 text-xs text-[#8A90A6]">Cole esta URL no painel da Hubla:</p>

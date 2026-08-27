@@ -112,12 +112,18 @@ export default function NewTestPage() {
           onChange={(e) => setSlug(e.target.value)}
           className={inputClass}
         />
+        <p className="-mt-2 text-xs text-[#8A90A6]">
+          Vira o link que você cola no anúncio: seudominio.com/r/slug — escolha algo curto e reconhecível
+        </p>
         <input
           placeholder="URL de fallback (opcional)"
           value={fallbackUrl}
           onChange={(e) => setFallbackUrl(e.target.value)}
           className={inputClass}
         />
+        <p className="-mt-2 text-xs text-[#8A90A6]">
+          Pra onde mandar o visitante se o teste for pausado (opcional)
+        </p>
         <select
           value={testType}
           onChange={(e) => setTestType(e.target.value as 'page' | 'checkout')}
@@ -126,14 +132,21 @@ export default function NewTestPage() {
           <option value="page">Teste de página</option>
           <option value="checkout">Teste de checkout</option>
         </select>
+        <p className="-mt-2 text-xs text-[#8A90A6]">
+          Página: cada variante é uma página de vendas diferente. Checkout: mesma página pra todos, cada
+          variante é um checkout diferente
+        </p>
 
         {testType === 'checkout' && (
-          <input
-            placeholder="URL da página de vendas (única para todas as variantes)"
-            value={salesPageUrl}
-            onChange={(e) => setSalesPageUrl(e.target.value)}
-            className={inputClass}
-          />
+          <>
+            <input
+              placeholder="URL da página de vendas (única para todas as variantes)"
+              value={salesPageUrl}
+              onChange={(e) => setSalesPageUrl(e.target.value)}
+              className={inputClass}
+            />
+            <p className="-mt-2 text-xs text-[#8A90A6]">A única página de vendas usada por todas as variantes</p>
+          </>
         )}
 
         <select
@@ -154,19 +167,32 @@ export default function NewTestPage() {
               onChange={(e) => updateVariant(index, 'weight_pct', e.target.value)}
               className={inputClass}
             />
+            <p className="-mt-1 text-xs text-[#8A90A6]">
+              Porcentagem do tráfego pra essa variante — a soma de todas precisa dar 100%
+            </p>
             <input
               placeholder={testType === 'checkout' ? 'Link do checkout (https://pay.hub.la/...)' : 'URL de destino'}
               value={variant.destination_url}
               onChange={(e) => updateVariant(index, 'destination_url', e.target.value)}
               className={inputClass}
             />
+            <p className="-mt-1 text-xs text-[#8A90A6]">
+              {testType === 'checkout'
+                ? 'Link de pagamento da Hubla pra essa variante'
+                : 'Página de vendas dessa variante'}
+            </p>
             {conversionMethod === 'thank_you_page' && (
-              <input
-                placeholder="URL de thank-you"
-                value={variant.thank_you_url}
-                onChange={(e) => updateVariant(index, 'thank_you_url', e.target.value)}
-                className={inputClass}
-              />
+              <>
+                <input
+                  placeholder="URL de thank-you"
+                  value={variant.thank_you_url}
+                  onChange={(e) => updateVariant(index, 'thank_you_url', e.target.value)}
+                  className={inputClass}
+                />
+                <p className="-mt-1 text-xs text-[#8A90A6]">
+                  Página que o cliente vê depois de comprar — cole o snippet do pixel nela
+                </p>
+              </>
             )}
           </fieldset>
         ))}
