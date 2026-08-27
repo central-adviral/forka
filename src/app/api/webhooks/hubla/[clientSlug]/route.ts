@@ -23,6 +23,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return new NextResponse('Invalid token', { status: 401 })
   }
 
+  if (request.headers.get('x-hubla-sandbox') === 'true') {
+    return NextResponse.json({ ok: true, attributed: false })
+  }
+
   let parsed
   try {
     const payload = await request.json()

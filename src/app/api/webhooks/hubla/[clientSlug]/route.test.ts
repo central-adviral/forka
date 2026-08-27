@@ -61,6 +61,21 @@ describe('POST /api/webhooks/hubla/[clientSlug]', () => {
     expect(response.status).toBe(401)
   })
 
+  it('ignores sandbox events without recording a conversion', async () => {
+    vi.mocked(verifyHublaToken).mockReturnValue(true)
+    const request = new NextRequest('https://ir.example.com/api/webhooks/hubla/gustavo-voe', {
+      method: 'POST',
+      headers: { 'x-hubla-token': 'valid-token', 'x-hubla-sandbox': 'true', 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'invoice.payment_succeeded' }),
+    })
+    const response = await POST(request, { params: Promise.resolve({ clientSlug: 'gustavo-voe' }) })
+    const json = await response.json()
+    expect(response.status).toBe(200)
+    expect(json).toEqual({ ok: true, attributed: false })
+    expect(parseHublaPaymentSucceeded).not.toHaveBeenCalled()
+    expect(insertConversionIfNew).not.toHaveBeenCalled()
+  })
+
   it('returns 422 instead of a silent 200 when the body is not JSON, so Hubla retries', async () => {
     vi.mocked(verifyHublaToken).mockReturnValue(true)
     const request = new NextRequest('https://ir.example.com/api/webhooks/hubla/gustavo-voe', {
