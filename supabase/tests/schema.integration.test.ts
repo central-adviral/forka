@@ -145,7 +145,7 @@ describe('schema RLS isolation', () => {
     expect(stillOwnerDomain?.custom_domain).toBe('ir.example.com')
   })
 
-  it('get_test_report_by_ad only counts confirmed sales, grouped by the click that led to each sale, and denies other owners', async () => {
+  it('get_test_report_by_ad reports clicks, confirmed sales and revenue per ad, and denies other owners', async () => {
     const ownerEmail = `ad-report-owner-${Date.now()}@example.com`
     const otherEmail = `ad-report-other-${Date.now()}@example.com`
     const owner = await createTestUser(ownerEmail)
@@ -187,9 +187,10 @@ describe('schema RLS isolation', () => {
       click_event_id: convertedClick!.id,
       source: 'hubla_webhook',
       external_event_id: `inv-1-${Date.now()}`,
+      value_cents: 1500,
     })
 
-    // A click with no conversion must not appear at all — this report only shows confirmed sales.
+    // A click with no conversion must still appear (clicks are now tracked), but with zero sales/revenue.
     await admin.from('click_events').insert({
       test_id: testId,
       variant_id: variant!.id,
@@ -219,11 +220,13 @@ describe('schema RLS isolation', () => {
     const { data: rows, error } = await asOwner.rpc('get_test_report_by_ad', { p_test_id: testId })
     if (error) throw error
 
-    expect(rows).toHaveLength(2)
-    const conversionsByAd = new Map(rows!.map((row: { ad_name: string; conversions: number }) => [row.ad_name, row.conversions]))
-    expect(conversionsByAd.get('anuncio-1')).toBe(1)
-    expect(conversionsByAd.get('(sem anúncio)')).toBe(1)
-    expect(conversionsByAd.has('anuncio-2')).toBe(false)
+    expect(rows).toHaveLength(3)
+    type AdRow = { ad_name: string; clicks: number; conversions: number; revenue_cents: number }
+    const byAdName = new Map((rows as AdRow[]).map((row) => [row.ad_name, row]))
+
+    expect(byAdName.get('anuncio-1')).toMatchObject({ clicks: 1, conversions: 1, revenue_cents: 1500 })
+    expect(byAdName.get('anuncio-2')).toMatchObject({ clicks: 1, conversions: 0, revenue_cents: 0 })
+    expect(byAdName.get('(sem anúncio)')).toMatchObject({ clicks: 1, conversions: 1 })
 
     const otherClient = await signIn(otherEmail)
     const { error: deniedError } = await otherClient.rpc('get_test_report_by_ad', { p_test_id: testId })

@@ -27,7 +27,9 @@ interface AdReportRow {
   variant_id: string
   variant_name: string
   ad_name: string
+  clicks: number
   conversions: number
+  revenue_cents: number
 }
 
 export default async function TestReportPage({
@@ -232,14 +234,16 @@ export default async function TestReportPage({
             <tr className="border-b border-white/[0.08] text-left">
               <th className="py-2">Variante</th>
               <th>Anúncio</th>
+              <th>Cliques</th>
               <th>Vendas</th>
+              <th>Faturamento</th>
             </tr>
           </thead>
           <tbody>
             {((adReport as AdReportRow[]) ?? []).length === 0 ? (
               <tr>
-                <td className="py-2 text-[#8A90A6]" colSpan={3}>
-                  Nenhuma venda confirmada com anúncio identificado ainda.
+                <td className="py-2 text-[#8A90A6]" colSpan={5}>
+                  Nenhum clique com anúncio identificado ainda.
                 </td>
               </tr>
             ) : (
@@ -247,7 +251,9 @@ export default async function TestReportPage({
                 <tr key={`${row.variant_id}-${row.ad_name}`}>
                   <td className="py-2">{row.variant_name}</td>
                   <td>{row.ad_name}</td>
+                  <td>{row.clicks}</td>
                   <td>{row.conversions}</td>
+                  <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
                 </tr>
               ))
             )}
