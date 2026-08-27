@@ -22,7 +22,11 @@ const createTestSchema = z.object({
 })
 
 export async function createTest(input: z.infer<typeof createTestSchema>) {
-  const parsed = createTestSchema.parse(input)
+  const result = createTestSchema.safeParse(input)
+  if (!result.success) {
+    throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
+  }
+  const parsed = result.data
   const supabase = await createServerSupabaseClient()
 
   const { error } = await supabase.rpc('create_test_with_variants', {

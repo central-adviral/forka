@@ -11,10 +11,14 @@ const createClientSchema = z.object({
 })
 
 export async function createClient(formData: FormData) {
-  const parsed = createClientSchema.parse({
+  const result = createClientSchema.safeParse({
     name: formData.get('name'),
     slug: formData.get('slug'),
   })
+  if (!result.success) {
+    throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
+  }
+  const parsed = result.data
 
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()

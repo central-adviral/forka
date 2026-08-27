@@ -58,6 +58,11 @@ export default function NewTestPage() {
       setError('Os pesos das variantes devem somar 100%')
       return
     }
+    const invalidUrlField = variants.find((v) => !/^https?:\/\//i.test(v.destination_url))
+    if (invalidUrlField) {
+      setError(`A URL de destino da variante ${invalidUrlField.name} deve começar com http:// ou https://`)
+      return
+    }
     try {
       await createTest({
         client_id: clientId,
