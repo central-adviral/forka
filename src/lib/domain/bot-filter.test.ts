@@ -5,6 +5,9 @@ describe('isKnownBot', () => {
   it('flags common search/social crawlers', () => {
     expect(isKnownBot('Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)')).toBe(true)
     expect(isKnownBot('facebookexternalhit/1.1')).toBe(true)
+    expect(isKnownBot('Facebot')).toBe(true)
+    expect(isKnownBot('meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)')).toBe(true)
+    expect(isKnownBot('meta-externalfetcher/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)')).toBe(true)
     expect(isKnownBot('Mozilla/5.0 (compatible; bingbot/2.0)')).toBe(true)
     expect(isKnownBot('Slackbot-LinkExpanding 1.0')).toBe(true)
     expect(isKnownBot('SomeBot/1.0 (+http://example.com/bot)')).toBe(true)
