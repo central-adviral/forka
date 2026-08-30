@@ -8,6 +8,7 @@ import { ReportCanvas } from './report-canvas'
 import { toggleTestStatus } from './actions'
 import { REPORT_PERIODS, resolvePeriodSince } from '@/lib/domain/report-period'
 import { RefreshButton } from './refresh-button'
+import { InsightPanel } from './insight-panel'
 
 interface ReportRow {
   variant_id: string
@@ -349,6 +350,7 @@ export default async function TestReportPage({
           </tbody>
         </table>
       </div>
+      <InsightPanel testId={test.id} sinceIso={sinceIso} />
       {pixelVariants && pixelVariants.length > 0 && (
         <div className="mx-6 mb-6">
           <h2 className="mb-2 font-['Space_Grotesk'] text-lg font-semibold">Pixel de conversão (thank-you page)</h2>

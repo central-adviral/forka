@@ -5,6 +5,9 @@ import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { httpUrl } from '@/lib/domain/http-url-schema'
 import { weightsSumTo100 } from '@/lib/domain/validate-weights'
+import { buildInsightPrompt, type InsightVariantStat } from '@/lib/domain/insight-prompt'
+import { probabilityToBeatControl } from '@/lib/domain/significance'
+import { createAnthropicClient } from '@/lib/anthropic/client'
 
 const toggleSchema = z.object({
   test_id: z.string().uuid(),
@@ -26,6 +29,84 @@ export async function toggleTestStatus(input: z.infer<typeof toggleSchema>) {
   if (!data || data.length === 0) throw new Error('Test not found or not authorized to update')
 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests/${parsed.test_slug}`)
+}
+
+const generateInsightSchema = z.object({
+  test_id: z.string().uuid(),
+  since_iso: z.string().datetime().nullable(),
+})
+
+interface InsightReportRow {
+  variant_id: string
+  variant_name: string
+  visits: number
+  conversions: number
+}
+
+interface InsightTotalsRow {
+  variant_id: string
+  revenue_cents: number
+}
+
+export async function generateInsight(input: z.infer<typeof generateInsightSchema>): Promise<string> {
+  const parsed = generateInsightSchema.parse(input)
+  const supabase = await createServerSupabaseClient()
+
+  const { data: variantRows, error: variantError } = await supabase
+    .from('variants')
+    .select('id, is_control')
+    .eq('test_id', parsed.test_id)
+  if (variantError) throw variantError
+  if (!variantRows || variantRows.length === 0) throw new Error('Test not found or not authorized')
+
+  const { data: report, error: reportError } = await supabase.rpc('get_test_report', {
+    p_test_id: parsed.test_id,
+    p_since: parsed.since_iso,
+  })
+  if (reportError) throw reportError
+  if (!report || report.length === 0) throw new Error('Sem dados suficientes para gerar insight')
+
+  const { data: totals, error: totalsError } = await supabase.rpc('get_test_report_totals', {
+    p_test_id: parsed.test_id,
+    p_since: parsed.since_iso,
+  })
+  if (totalsError) throw totalsError
+
+  const reportRows = report as InsightReportRow[]
+  const controlId = variantRows.find((v) => v.is_control)?.id
+  const controlRow = reportRows.find((row) => row.variant_id === controlId) ?? reportRows[0]
+  const revenueByVariant = new Map(
+    ((totals as InsightTotalsRow[]) ?? []).map((row) => [row.variant_id, row.revenue_cents])
+  )
+
+  const variants: InsightVariantStat[] = reportRows.map((row) => {
+    const isControl = row.variant_id === controlRow.variant_id
+    const confidence = !isControl
+      ? probabilityToBeatControl(
+          { visits: controlRow.visits, conversions: controlRow.conversions },
+          { visits: row.visits, conversions: row.conversions }
+        )
+      : null
+    return {
+      name: row.variant_name,
+      isControl,
+      visits: row.visits,
+      conversions: row.conversions,
+      revenueCents: revenueByVariant.get(row.variant_id) ?? 0,
+      confidencePct: confidence !== null ? Math.round(confidence * 100) : null,
+    }
+  })
+
+  const anthropic = createAnthropicClient()
+  const response = await anthropic.messages.create({
+    model: 'claude-haiku-4-5',
+    max_tokens: 400,
+    messages: [{ role: 'user', content: buildInsightPrompt(variants) }],
+  })
+
+  const textBlock = response.content.find((block) => block.type === 'text')
+  if (!textBlock) throw new Error('A IA não retornou texto')
+  return textBlock.text.trim()
 }
 
 const updateTestSchema = z.object({
