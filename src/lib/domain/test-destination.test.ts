@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveEntryDestination, withTrackingId } from './test-destination'
+import { resolveEntryDestination, withTrackingId, withUtms } from './test-destination'
 
 describe('resolveEntryDestination', () => {
   it('uses the variant destination in page mode', () => {
@@ -62,5 +62,38 @@ describe('withTrackingId', () => {
 
   it('returns the url untouched when there is no tracking id', () => {
     expect(withTrackingId('https://pay.hub.la/abc', null)).toBe('https://pay.hub.la/abc')
+  })
+})
+
+describe('withUtms', () => {
+  it('appends non-empty utm values', () => {
+    const result = new URL(
+      withUtms('https://example.com/vendas', {
+        utm_source: 'facebookads',
+        utm_medium: 'cpc',
+        utm_campaign: '1K_Latam',
+        utm_term: 'Anuncio 1',
+      })
+    )
+    expect(result.searchParams.get('utm_source')).toBe('facebookads')
+    expect(result.searchParams.get('utm_medium')).toBe('cpc')
+    expect(result.searchParams.get('utm_campaign')).toBe('1K_Latam')
+    expect(result.searchParams.get('utm_term')).toBe('Anuncio 1')
+  })
+
+  it('skips empty-string values instead of setting them as blank params', () => {
+    const result = new URL(withUtms('https://example.com/vendas', { utm_source: 'facebookads', utm_medium: '' }))
+    expect(result.searchParams.get('utm_source')).toBe('facebookads')
+    expect(result.searchParams.has('utm_medium')).toBe(false)
+  })
+
+  it('preserves query params already present on the url', () => {
+    const result = new URL(withUtms('https://example.com/vendas?offer=annual', { utm_source: 'facebookads' }))
+    expect(result.searchParams.get('offer')).toBe('annual')
+    expect(result.searchParams.get('utm_source')).toBe('facebookads')
+  })
+
+  it('returns the url unchanged when given no utms', () => {
+    expect(withUtms('https://example.com/vendas', {})).toBe('https://example.com/vendas')
   })
 })

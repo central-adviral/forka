@@ -104,18 +104,27 @@ export async function getAssignedVariantId(
   return (data?.variant_id as string | undefined) ?? null
 }
 
+export interface LatestClick {
+  trackingId: string
+  sourceUtms: Record<string, string>
+}
+
 export async function getLatestTrackingId(
   db: SupabaseClient,
   params: { testId: string; visitorId: string }
-): Promise<string | null> {
+): Promise<LatestClick | null> {
   const { data, error } = await db
     .from('click_events')
-    .select('tracking_id')
+    .select('tracking_id, source_utms')
     .eq('test_id', params.testId)
     .eq('visitor_id', params.visitorId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
   if (error) throw error
-  return (data?.tracking_id as string | undefined) ?? null
+  if (!data?.tracking_id) return null
+  return {
+    trackingId: data.tracking_id as string,
+    sourceUtms: (data.source_utms as Record<string, string> | null) ?? {},
+  }
 }

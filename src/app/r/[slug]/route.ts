@@ -9,7 +9,7 @@ import {
   getOrCreateVisitorId,
   readAssignedVariantId,
 } from '@/lib/domain/cookie-assignment'
-import { resolveEntryDestination, withTrackingId } from '@/lib/domain/test-destination'
+import { resolveEntryDestination, withTrackingId, withUtms } from '@/lib/domain/test-destination'
 
 const COOKIE_MAX_AGE_DAYS = Number(process.env.COOKIE_MAX_AGE_DAYS ?? '30')
 const MAX_CLICKS_PER_IP_PER_HOUR = 30
@@ -81,11 +81,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const destination = withTrackingId(
-    resolveEntryDestination({
-      testType: test.test_type,
-      salesPageUrl: test.sales_page_url,
-      variantDestinationUrl: variant.destination_url,
-    }),
+    withUtms(
+      resolveEntryDestination({
+        testType: test.test_type,
+        salesPageUrl: test.sales_page_url,
+        variantDestinationUrl: variant.destination_url,
+      }),
+      sourceUtms
+    ),
     trackingId
   )
 

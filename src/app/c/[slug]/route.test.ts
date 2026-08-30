@@ -41,7 +41,7 @@ describe('GET /c/[slug]', () => {
   })
 
   it('sends an assigned visitor to their own checkout with the tracking id', async () => {
-    vi.mocked(getLatestTrackingId).mockResolvedValue('trk_1')
+    vi.mocked(getLatestTrackingId).mockResolvedValue({ trackingId: 'trk_1', sourceUtms: {} })
 
     const response = await GET(request('ir_vid=visitor-1; ir_t_oferta-x=v2'), params)
 
@@ -53,12 +53,28 @@ describe('GET /c/[slug]', () => {
 
   it('falls back to the stored assignment when only the visitor cookie survives', async () => {
     vi.mocked(getAssignedVariantId).mockResolvedValue('v2')
-    vi.mocked(getLatestTrackingId).mockResolvedValue('trk_1')
+    vi.mocked(getLatestTrackingId).mockResolvedValue({ trackingId: 'trk_1', sourceUtms: {} })
 
     const response = await GET(request('ir_vid=visitor-1'), params)
 
     const location = new URL(response.headers.get('location')!)
     expect(location.origin + location.pathname).toBe('https://pay.hub.la/bbb')
+    expect(location.searchParams.get('utm_content')).toBe('trk_1')
+  })
+
+  it('forwards the original click utms onto the final checkout link', async () => {
+    vi.mocked(getLatestTrackingId).mockResolvedValue({
+      trackingId: 'trk_1',
+      sourceUtms: { utm_source: 'facebookads', utm_medium: 'cpc', utm_campaign: '1K_Latam', utm_term: 'Anuncio 1' },
+    })
+
+    const response = await GET(request('ir_vid=visitor-1; ir_t_oferta-x=v2'), params)
+
+    const location = new URL(response.headers.get('location')!)
+    expect(location.searchParams.get('utm_source')).toBe('facebookads')
+    expect(location.searchParams.get('utm_medium')).toBe('cpc')
+    expect(location.searchParams.get('utm_campaign')).toBe('1K_Latam')
+    expect(location.searchParams.get('utm_term')).toBe('Anuncio 1')
     expect(location.searchParams.get('utm_content')).toBe('trk_1')
   })
 
@@ -94,7 +110,7 @@ describe('GET /c/[slug]', () => {
 
   it('keeps redirecting when the test is paused', async () => {
     vi.mocked(getTestBySlug).mockResolvedValue({ ...CHECKOUT_TEST, status: 'paused' })
-    vi.mocked(getLatestTrackingId).mockResolvedValue('trk_1')
+    vi.mocked(getLatestTrackingId).mockResolvedValue({ trackingId: 'trk_1', sourceUtms: {} })
 
     const response = await GET(request('ir_vid=visitor-1; ir_t_oferta-x=v2'), params)
 

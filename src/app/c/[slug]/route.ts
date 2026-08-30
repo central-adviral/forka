@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { getAssignedVariantId, getLatestTrackingId, getTestBySlug } from '@/lib/repo/redirect-repo'
 import { VISITOR_COOKIE, readAssignedVariantId } from '@/lib/domain/cookie-assignment'
-import { withTrackingId } from '@/lib/domain/test-destination'
+import { withTrackingId, withUtms } from '@/lib/domain/test-destination'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -29,8 +29,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const isKnownVisitor = Boolean(variant)
   const resolved = variant ?? test.variants.find((v) => v.is_control) ?? test.variants[0]
 
-  const trackingId =
+  const latestClick =
     isKnownVisitor && visitorId ? await getLatestTrackingId(db, { testId: test.id, visitorId }) : null
 
-  return NextResponse.redirect(withTrackingId(resolved.destination_url, trackingId), 302)
+  const destination = withTrackingId(
+    withUtms(resolved.destination_url, latestClick?.sourceUtms ?? {}),
+    latestClick?.trackingId ?? null
+  )
+
+  return NextResponse.redirect(destination, 302)
 }

@@ -19,3 +19,11 @@ export function withTrackingId(url: string, trackingId: string | null): string {
   parsed.searchParams.set('utm_content', trackingId)
   return parsed.toString()
 }
+
+export function withUtms(url: string, utms: Record<string, string>): string {
+  const parsed = new URL(url)
+  for (const [key, value] of Object.entries(utms)) {
+    if (value) parsed.searchParams.set(key, value)
+  }
+  return parsed.toString()
+}

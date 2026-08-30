@@ -42,6 +42,31 @@ describe('GET /r/[slug]', () => {
     expect(insertClickEvent).toHaveBeenCalledOnce()
   })
 
+  it('forwards utm_source, utm_medium, utm_campaign and utm_term from the incoming ad click', async () => {
+    vi.mocked(getTestBySlug).mockResolvedValue({
+      id: 'test-1',
+      slug: 'oferta-x',
+      status: 'active',
+      fallback_url: null,
+      test_type: 'page',
+      sales_page_url: null,
+      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
+    })
+    vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
+
+    const request = new NextRequest(
+      'https://ir.example.com/r/oferta-x?utm_source=facebookads&utm_medium=cpc&utm_campaign=1K_Latam&utm_term=Anuncio%201'
+    )
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
+
+    const location = new URL(response.headers.get('location')!)
+    expect(location.searchParams.get('utm_source')).toBe('facebookads')
+    expect(location.searchParams.get('utm_medium')).toBe('cpc')
+    expect(location.searchParams.get('utm_campaign')).toBe('1K_Latam')
+    expect(location.searchParams.get('utm_term')).toBe('Anuncio 1')
+    expect(location.searchParams.get('utm_content')).toBeTruthy()
+  })
+
   it('returns 404 when the test is missing and there is no fallback', async () => {
     vi.mocked(getTestBySlug).mockResolvedValue(null)
     const request = new NextRequest('https://ir.example.com/r/missing')

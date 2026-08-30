@@ -149,7 +149,7 @@ describe('redirect-repo', () => {
     expect(await getLatestTrackingId(db, { testId, visitorId: 'visitor-never-seen' })).toBeNull()
   })
 
-  it('returns the most recent tracking id when the visitor clicked more than once', async () => {
+  it('returns the most recent tracking id and its source utms when the visitor clicked more than once', async () => {
     const trackingIdOlder = `trk-older-${testId}`
     const trackingIdNewer = `trk-newer-${testId}`
     await insertClickEvent(db, {
@@ -166,11 +166,14 @@ describe('redirect-repo', () => {
       variantId,
       visitorId: 'visitor-multi',
       trackingId: trackingIdNewer,
-      sourceUtms: {},
+      sourceUtms: { utm_source: 'facebookads', utm_medium: 'cpc' },
       ip: null,
     })
 
-    expect(await getLatestTrackingId(db, { testId, visitorId: 'visitor-multi' })).toBe(trackingIdNewer)
+    expect(await getLatestTrackingId(db, { testId, visitorId: 'visitor-multi' })).toEqual({
+      trackingId: trackingIdNewer,
+      sourceUtms: { utm_source: 'facebookads', utm_medium: 'cpc' },
+    })
   })
 
   it('refuses to change test_type after creation', async () => {
