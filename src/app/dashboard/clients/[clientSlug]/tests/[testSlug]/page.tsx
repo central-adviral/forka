@@ -6,6 +6,7 @@ import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
 import { ReportCanvas } from './report-canvas'
 import { toggleTestStatus } from './actions'
+import { REPORT_PERIODS, resolvePeriodSince } from '@/lib/domain/report-period'
 
 interface ReportRow {
   variant_id: string
@@ -44,10 +45,15 @@ interface AdReportRow {
 
 export default async function TestReportPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ clientSlug: string; testSlug: string }>
+  searchParams: Promise<{ periodo?: string }>
 }) {
   const { clientSlug, testSlug } = await params
+  const { periodo } = await searchParams
+  const since = resolvePeriodSince(periodo)
+  const sinceIso = since ? since.toISOString() : null
   const supabase = await createServerSupabaseClient()
   const { data: test } = await supabase
     .from('tests')
@@ -69,10 +75,16 @@ export default async function TestReportPage({
   const destinationById = new Map((variantRows ?? []).map((v) => [v.id, v.destination_url as string]))
   const controlVariantId = (variantRows ?? []).find((v) => v.is_control)?.id
 
-  const { data: report } = await supabase.rpc('get_test_report', { p_test_id: test.id })
-  const { data: sourceReport } = await supabase.rpc('get_test_report_by_source', { p_test_id: test.id })
-  const { data: adReport } = await supabase.rpc('get_test_report_by_ad', { p_test_id: test.id })
-  const { data: totalsReport } = await supabase.rpc('get_test_report_totals', { p_test_id: test.id })
+  const { data: report } = await supabase.rpc('get_test_report', { p_test_id: test.id, p_since: sinceIso })
+  const { data: sourceReport } = await supabase.rpc('get_test_report_by_source', {
+    p_test_id: test.id,
+    p_since: sinceIso,
+  })
+  const { data: adReport } = await supabase.rpc('get_test_report_by_ad', { p_test_id: test.id, p_since: sinceIso })
+  const { data: totalsReport } = await supabase.rpc('get_test_report_totals', {
+    p_test_id: test.id,
+    p_since: sinceIso,
+  })
 
   if (!report || report.length === 0) {
     return (
@@ -188,6 +200,25 @@ export default async function TestReportPage({
             </button>
           </form>
         </div>
+      </div>
+
+      <div className="mx-6 mt-4 flex gap-1.5">
+        {REPORT_PERIODS.map((option) => {
+          const isActive = (periodo ?? 'all') === option.value
+          return (
+            <a
+              key={option.value}
+              href={option.value === 'all' ? `?` : `?periodo=${option.value}`}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                isActive
+                  ? 'border-[#7C6FF0] bg-[#7C6FF0]/15 text-[#7C6FF0]'
+                  : 'border-white/[0.08] text-[#8A90A6] hover:text-[#E8EAF2]'
+              }`}
+            >
+              {option.label}
+            </a>
+          )
+        })}
       </div>
 
       <ReportCanvas
