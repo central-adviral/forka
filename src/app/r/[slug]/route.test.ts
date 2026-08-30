@@ -135,7 +135,7 @@ describe('GET /r/[slug]', () => {
     expect(insertClickEvent).not.toHaveBeenCalled()
   })
 
-  it('redirects a known bot without recording a click event or setting cookies', async () => {
+  it('redirects a known bot but records the click as a bot, without setting cookies', async () => {
     vi.mocked(getTestBySlug).mockResolvedValue({
       id: 'test-1',
       slug: 'oferta-x',
@@ -154,11 +154,12 @@ describe('GET /r/[slug]', () => {
     const location = new URL(response.headers.get('location')!)
     expect(location.origin + location.pathname).toBe('https://example.com/page')
     expect(location.searchParams.get('utm_content')).toBeNull()
-    expect(insertClickEvent).not.toHaveBeenCalled()
+    expect(insertClickEvent).toHaveBeenCalledOnce()
+    expect(insertClickEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ isBot: true }))
     expect(response.cookies.get('ir_vid')).toBeUndefined()
   })
 
-  it('redirects a known bot to the fallback url when set', async () => {
+  it('redirects a known bot to the fallback url when set, still recording the click as a bot', async () => {
     vi.mocked(getTestBySlug).mockResolvedValue({
       id: 'test-1',
       slug: 'oferta-x',
@@ -173,7 +174,8 @@ describe('GET /r/[slug]', () => {
     })
     const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     expect(response.headers.get('location')).toBe('https://example.com/fallback')
-    expect(insertClickEvent).not.toHaveBeenCalled()
+    expect(insertClickEvent).toHaveBeenCalledOnce()
+    expect(insertClickEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ isBot: true }))
   })
 
   it('sends a checkout test to the shared sales page, not to the variant checkout link', async () => {
@@ -218,6 +220,7 @@ describe('GET /r/[slug]', () => {
     const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
 
     expect(response.headers.get('location')).toBe('https://example.com/vendas')
-    expect(insertClickEvent).not.toHaveBeenCalled()
+    expect(insertClickEvent).toHaveBeenCalledOnce()
+    expect(insertClickEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ isBot: true }))
   })
 })

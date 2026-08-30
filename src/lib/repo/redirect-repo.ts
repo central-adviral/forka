@@ -41,6 +41,7 @@ export async function insertClickEvent(
     trackingId: string
     sourceUtms: Record<string, string>
     ip?: string | null
+    isBot?: boolean
   }
 ): Promise<void> {
   const { error } = await db.from('click_events').insert({
@@ -50,6 +51,7 @@ export async function insertClickEvent(
     tracking_id: params.trackingId,
     source_utms: params.sourceUtms,
     ip: params.ip ?? null,
+    is_bot: params.isBot ?? false,
   })
   if (error) throw error
 }

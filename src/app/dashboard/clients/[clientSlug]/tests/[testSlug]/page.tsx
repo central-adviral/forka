@@ -86,6 +86,10 @@ export default async function TestReportPage({
     p_test_id: test.id,
     p_since: sinceIso,
   })
+  const { data: botClickCount } = await supabase.rpc('get_test_bot_click_count', {
+    p_test_id: test.id,
+    p_since: sinceIso,
+  })
 
   if (!report || report.length === 0) {
     return (
@@ -247,7 +251,13 @@ export default async function TestReportPage({
         </div>
       )}
       <div className="mx-6 mb-6">
-        <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Total por variante</h2>
+        <div className="mb-2 mt-8 flex items-center gap-2">
+          <h2 className="font-['Space_Grotesk'] text-lg font-semibold">Total por variante</h2>
+          <span className="text-xs text-[#8A90A6]">
+            ({botClickCount ?? 0} {botClickCount === 1 ? 'clique de bot filtrado' : 'cliques de bot filtrados'}, não
+            contam no total)
+          </span>
+        </div>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-white/[0.08] text-left">

@@ -33,6 +33,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   if (isKnownBot(request.headers.get('user-agent'))) {
+    const botSourceUtms = Object.fromEntries(
+      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term'].map((key) => [
+        key,
+        request.nextUrl.searchParams.get(key) ?? '',
+      ])
+    )
+    await insertClickEvent(db, {
+      testId: test.id,
+      variantId: test.variants[0].id,
+      visitorId: crypto.randomUUID(),
+      trackingId: crypto.randomUUID(),
+      sourceUtms: botSourceUtms,
+      ip: getClientIp(request),
+      isBot: true,
+    })
     const destination =
       test.fallback_url ??
       resolveEntryDestination({
