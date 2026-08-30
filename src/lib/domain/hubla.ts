@@ -22,6 +22,11 @@ interface HublaPayload {
   event?: {
     invoice?: {
       id?: string
+      // Confirmed against a real production payload (delivery mode "compatibility") on
+      // 2026-08-30: the field is `paymentSession`, not `firstPaymentSession` as earlier
+      // documentation suggested. Keep the old name as a fallback in case another delivery
+      // mode ever uses it — cost of being wrong here is silent attribution loss.
+      paymentSession?: { utm?: { content?: string } }
       firstPaymentSession?: { utm?: { content?: string } }
       amount?: { totalCents?: number }
     }
@@ -38,7 +43,7 @@ export function parseHublaPaymentSucceeded(rawPayload: unknown): ParsedHublaEven
     throw new HublaMalformedPayloadError('Hubla payload missing event.invoice.id')
   }
   return {
-    trackingId: invoice.firstPaymentSession?.utm?.content ?? null,
+    trackingId: invoice.paymentSession?.utm?.content ?? invoice.firstPaymentSession?.utm?.content ?? null,
     externalEventId: invoice.id,
     valueCents: invoice.amount?.totalCents ?? null,
   }

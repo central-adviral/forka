@@ -20,7 +20,25 @@ describe('verifyHublaToken', () => {
 })
 
 describe('parseHublaPaymentSucceeded', () => {
-  it('extracts tracking id, external event id and value', () => {
+  it('extracts tracking id, external event id and value from a real payload shape', () => {
+    const payload = {
+      type: 'invoice.payment_succeeded',
+      event: {
+        invoice: {
+          id: 'inv_123',
+          amount: { totalCents: 9700 },
+          paymentSession: { utm: { content: 'trk_abc' } },
+        },
+      },
+    }
+    expect(parseHublaPaymentSucceeded(payload)).toEqual({
+      trackingId: 'trk_abc',
+      externalEventId: 'inv_123',
+      valueCents: 9700,
+    })
+  })
+
+  it('falls back to firstPaymentSession if paymentSession is absent', () => {
     const payload = {
       type: 'invoice.payment_succeeded',
       event: {
@@ -31,11 +49,7 @@ describe('parseHublaPaymentSucceeded', () => {
         },
       },
     }
-    expect(parseHublaPaymentSucceeded(payload)).toEqual({
-      trackingId: 'trk_abc',
-      externalEventId: 'inv_123',
-      valueCents: 9700,
-    })
+    expect(parseHublaPaymentSucceeded(payload).trackingId).toBe('trk_abc')
   })
 
   it('returns null tracking id when utm is missing', () => {
