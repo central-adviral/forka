@@ -7,6 +7,7 @@ import { CopyButton } from '@/components/copy-button'
 import { ReportCanvas } from './report-canvas'
 import { toggleTestStatus } from './actions'
 import { REPORT_PERIODS, resolvePeriodSince } from '@/lib/domain/report-period'
+import { RefreshButton } from './refresh-button'
 
 interface ReportRow {
   variant_id: string
@@ -178,6 +179,7 @@ export default async function TestReportPage({
             <span className="font-['JetBrains_Mono'] text-[17px] font-medium">{totalVisits}</span>
             <span className="text-[11px] text-[#8A90A6]">acessos</span>
           </div>
+          <RefreshButton />
           <a
             href={`/dashboard/clients/${clientSlug}/tests/${test.slug}/edit`}
             className="flex h-9 items-center rounded-[9px] border border-white/[0.08] bg-transparent px-4 text-[13px] font-medium text-[#8A90A6]"
