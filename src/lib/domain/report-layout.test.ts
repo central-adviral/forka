@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { computeReportLayout } from './report-layout'
 
 const variants = [
-  { id: 'a', name: 'A', weightPct: 50, visits: 1706, conversions: 58, destinationUrl: 'https://example.com/a' },
-  { id: 'b', name: 'B', weightPct: 30, visits: 1024, conversions: 61, destinationUrl: 'https://example.com/b' },
-  { id: 'c', name: 'C', weightPct: 20, visits: 682, conversions: 14, destinationUrl: 'https://example.com/c' },
+  { id: 'a', name: 'A', weightPct: 50, visits: 1706, conversions: 58, revenueCents: 435000, destinationUrl: 'https://example.com/a' },
+  { id: 'b', name: 'B', weightPct: 30, visits: 1024, conversions: 61, revenueCents: 457500, destinationUrl: 'https://example.com/b' },
+  { id: 'c', name: 'C', weightPct: 20, visits: 682, conversions: 14, revenueCents: 105000, destinationUrl: 'https://example.com/c' },
 ]
 
 describe('computeReportLayout', () => {
@@ -45,6 +45,11 @@ describe('computeReportLayout', () => {
     expect(layout.variants.every((v) => !v.isLeader)).toBe(true)
   })
 
+  it('passes revenueCents through unchanged', () => {
+    const layout = computeReportLayout(variants, false)
+    expect(layout.variants.find((v) => v.id === 'a')!.revenueCents).toBe(435000)
+  })
+
   it('omits the fallback node when not configured', () => {
     expect(computeReportLayout(variants, false).fallback).toBeNull()
   })
@@ -64,6 +69,7 @@ describe('computeReportLayout', () => {
       weightPct: 100 / 6,
       visits: 100,
       conversions: 10,
+      revenueCents: 5000,
       destinationUrl: 'https://example.com',
     }))
     const layout = computeReportLayout(many, false)

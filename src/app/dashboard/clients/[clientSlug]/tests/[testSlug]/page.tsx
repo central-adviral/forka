@@ -41,6 +41,7 @@ interface AdReportRow {
   variant_name: string
   ad_name: string
   clicks: number
+  visitors: number
   conversions: number
   revenue_cents: number
   bot_clicks: number
@@ -127,6 +128,10 @@ export default async function TestReportPage({
     return { ...row, confidencePct: p !== null ? Math.round(p * 100) : null }
   })
 
+  const revenueByVariant = new Map(
+    ((totalsReport as TotalsReportRow[]) ?? []).map((row) => [row.variant_id, row.revenue_cents])
+  )
+
   const layout = computeReportLayout(
     rows.map((row) => ({
       id: row.variant_id,
@@ -134,6 +139,7 @@ export default async function TestReportPage({
       weightPct: row.weight_pct,
       visits: row.visits,
       conversions: row.conversions,
+      revenueCents: revenueByVariant.get(row.variant_id) ?? 0,
       destinationUrl: destinationById.get(row.variant_id) ?? '',
     })),
     Boolean(test.fallback_url)
@@ -268,6 +274,7 @@ export default async function TestReportPage({
               <th>Visitas</th>
               <th>Vendas</th>
               <th>Faturamento</th>
+              <th>R$/clique</th>
               <th>Taxa</th>
             </tr>
           </thead>
@@ -279,6 +286,7 @@ export default async function TestReportPage({
                 <td>{row.visitors}</td>
                 <td>{row.conversions}</td>
                 <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
+                <td>R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}</td>
                 <td>{row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'}%</td>
               </tr>
             ))}
@@ -295,6 +303,7 @@ export default async function TestReportPage({
               <th>Visitas</th>
               <th>Conversões</th>
               <th>Faturamento</th>
+              <th>R$/clique</th>
               <th>Taxa</th>
               <th className="text-[#8A90A6]">Bots</th>
             </tr>
@@ -307,6 +316,7 @@ export default async function TestReportPage({
                 <td>{row.visits}</td>
                 <td>{row.conversions}</td>
                 <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
+                <td>R$ {(row.visits > 0 ? row.revenue_cents / row.visits / 100 : 0).toFixed(2)}</td>
                 <td>{row.visits > 0 ? ((row.conversions / row.visits) * 100).toFixed(1) : '0.0'}%</td>
                 <td className="text-[#8A90A6]">{row.bot_clicks}</td>
               </tr>
@@ -322,15 +332,17 @@ export default async function TestReportPage({
               <th className="py-2">Variante</th>
               <th>Anúncio</th>
               <th>Cliques</th>
+              <th>Visitas</th>
               <th>Vendas</th>
               <th>Faturamento</th>
+              <th>R$/clique</th>
               <th className="text-[#8A90A6]">Bots</th>
             </tr>
           </thead>
           <tbody>
             {((adReport as AdReportRow[]) ?? []).length === 0 ? (
               <tr>
-                <td className="py-2 text-[#8A90A6]" colSpan={6}>
+                <td className="py-2 text-[#8A90A6]" colSpan={8}>
                   Nenhum clique com anúncio identificado ainda.
                 </td>
               </tr>
@@ -340,8 +352,10 @@ export default async function TestReportPage({
                   <td className="py-2">{row.variant_name}</td>
                   <td>{row.ad_name}</td>
                   <td>{row.clicks}</td>
+                  <td>{row.visitors}</td>
                   <td>{row.conversions}</td>
                   <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
+                  <td>R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}</td>
                   <td className="text-[#8A90A6]">{row.bot_clicks}</td>
                 </tr>
               ))
