@@ -126,7 +126,7 @@ export default async function TestReportPage({
       row.variant_id === control?.variant_id
         ? 'controle'
         : row.confidencePct !== null
-          ? `${row.confidencePct}% de ser melhor que o controle`
+          ? `${row.confidencePct}% de ser melhor que a Variante ${control?.variant_name}`
           : 'dados insuficientes',
     ])
   )

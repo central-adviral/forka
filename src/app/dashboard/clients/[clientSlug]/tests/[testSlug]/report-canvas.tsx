@@ -48,7 +48,7 @@ export function ReportCanvas({
   }
 
   return (
-    <div ref={containerRef} className="relative m-6 h-[600px] flex-shrink-0 overflow-auto rounded-2xl border border-white/[0.08]">
+    <div ref={containerRef} className="relative m-6 h-[420px] flex-shrink-0 overflow-auto rounded-2xl border border-white/[0.08]">
       <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-[10px] border border-white/[0.08] bg-[#141829] px-1.5 py-1.5">
         <button
           type="button"
