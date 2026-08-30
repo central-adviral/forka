@@ -134,7 +134,7 @@ export default async function TestReportPage({
   const totalVisits = rows.reduce((sum, row) => sum + row.visits, 0)
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex min-h-screen flex-col">
       <div className="flex h-[88px] flex-shrink-0 items-center justify-between border-b border-white/[0.08] px-8">
         <div>
           <a
