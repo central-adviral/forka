@@ -21,6 +21,16 @@ interface SourceReportRow {
   utm_source: string
   visits: number
   conversions: number
+  revenue_cents: number
+}
+
+interface TotalsReportRow {
+  variant_id: string
+  variant_name: string
+  clicks: number
+  visitors: number
+  conversions: number
+  revenue_cents: number
 }
 
 interface AdReportRow {
@@ -62,6 +72,7 @@ export default async function TestReportPage({
   const { data: report } = await supabase.rpc('get_test_report', { p_test_id: test.id })
   const { data: sourceReport } = await supabase.rpc('get_test_report_by_source', { p_test_id: test.id })
   const { data: adReport } = await supabase.rpc('get_test_report_by_ad', { p_test_id: test.id })
+  const { data: totalsReport } = await supabase.rpc('get_test_report_totals', { p_test_id: test.id })
 
   if (!report || report.length === 0) {
     return (
@@ -203,6 +214,33 @@ export default async function TestReportPage({
         </div>
       )}
       <div className="mx-6 mb-6">
+        <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Total por variante</h2>
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-white/[0.08] text-left">
+              <th className="py-2">Variante</th>
+              <th>Cliques</th>
+              <th>Visitas</th>
+              <th>Vendas</th>
+              <th>Faturamento</th>
+              <th>Taxa</th>
+            </tr>
+          </thead>
+          <tbody>
+            {((totalsReport as TotalsReportRow[]) ?? []).map((row) => (
+              <tr key={row.variant_id}>
+                <td className="py-2">{row.variant_name}</td>
+                <td>{row.clicks}</td>
+                <td>{row.visitors}</td>
+                <td>{row.conversions}</td>
+                <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
+                <td>{row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mx-6 mb-6">
         <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Por origem (UTM)</h2>
         <table className="w-full border-collapse text-sm">
           <thead>
@@ -211,6 +249,7 @@ export default async function TestReportPage({
               <th>Origem</th>
               <th>Visitas</th>
               <th>Conversões</th>
+              <th>Faturamento</th>
               <th>Taxa</th>
             </tr>
           </thead>
@@ -221,6 +260,7 @@ export default async function TestReportPage({
                 <td>{row.utm_source}</td>
                 <td>{row.visits}</td>
                 <td>{row.conversions}</td>
+                <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
                 <td>{row.visits > 0 ? ((row.conversions / row.visits) * 100).toFixed(1) : '0.0'}%</td>
               </tr>
             ))}
