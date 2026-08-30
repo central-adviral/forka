@@ -222,21 +222,38 @@ describe('schema RLS isolation', () => {
       external_event_id: `inv-2-${Date.now()}`,
     })
 
+    // A bot click on anuncio-1 must not count as a click, but must show up as a bot_clicks count.
+    await admin.from('click_events').insert({
+      test_id: testId,
+      variant_id: variant!.id,
+      visitor_id: 'visitor-bot',
+      tracking_id: `trk-bot-${Date.now()}`,
+      source_utms: { utm_term: 'anuncio-1' },
+      is_bot: true,
+    })
+
     const { data: rows, error } = await asOwner.rpc('get_test_report_by_ad', { p_test_id: testId })
     if (error) throw error
 
     // 3 rows for variant A's ads, plus 1 zero row for variant B, which never received a click.
     expect(rows).toHaveLength(4)
-    type AdRow = { variant_id: string; ad_name: string; clicks: number; conversions: number; revenue_cents: number }
+    type AdRow = {
+      variant_id: string
+      ad_name: string
+      clicks: number
+      conversions: number
+      revenue_cents: number
+      bot_clicks: number
+    }
     const variantARows = (rows as AdRow[]).filter((row) => row.variant_id === variant!.id)
     const byAdName = new Map(variantARows.map((row) => [row.ad_name, row]))
 
-    expect(byAdName.get('anuncio-1')).toMatchObject({ clicks: 1, conversions: 1, revenue_cents: 1500 })
-    expect(byAdName.get('anuncio-2')).toMatchObject({ clicks: 1, conversions: 0, revenue_cents: 0 })
-    expect(byAdName.get('(sem anúncio)')).toMatchObject({ clicks: 1, conversions: 1 })
+    expect(byAdName.get('anuncio-1')).toMatchObject({ clicks: 1, conversions: 1, revenue_cents: 1500, bot_clicks: 1 })
+    expect(byAdName.get('anuncio-2')).toMatchObject({ clicks: 1, conversions: 0, revenue_cents: 0, bot_clicks: 0 })
+    expect(byAdName.get('(sem anúncio)')).toMatchObject({ clicks: 1, conversions: 1, bot_clicks: 0 })
 
     const variantBRow = (rows as AdRow[]).find((row) => row.variant_id === variantWithNoClicks!.id)
-    expect(variantBRow).toMatchObject({ clicks: 0, conversions: 0, revenue_cents: 0 })
+    expect(variantBRow).toMatchObject({ clicks: 0, conversions: 0, revenue_cents: 0, bot_clicks: 0 })
 
     const otherClient = await signIn(otherEmail)
     const { error: deniedError } = await otherClient.rpc('get_test_report_by_ad', { p_test_id: testId })

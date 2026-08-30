@@ -61,11 +61,20 @@ describe('get_test_report_by_source', () => {
       source_utms: {},
     })
 
+    await admin.from('click_events').insert({
+      test_id: test!.id,
+      variant_id: variant!.id,
+      visitor_id: 'v3-bot',
+      tracking_id: crypto.randomUUID(),
+      source_utms: { utm_source: 'meta' },
+      is_bot: true,
+    })
+
     const { data: report, error } = await asOwner.rpc('get_test_report_by_source', { p_test_id: test!.id })
     expect(error).toBeNull()
     const meta = report!.find((r: { utm_source: string }) => r.utm_source === 'meta')
     const direto = report!.find((r: { utm_source: string }) => r.utm_source === '(direto)')
-    expect(meta).toMatchObject({ visits: 1, conversions: 1 })
-    expect(direto).toMatchObject({ visits: 1, conversions: 0 })
+    expect(meta).toMatchObject({ visits: 1, conversions: 1, bot_clicks: 1 })
+    expect(direto).toMatchObject({ visits: 1, conversions: 0, bot_clicks: 0 })
   })
 })

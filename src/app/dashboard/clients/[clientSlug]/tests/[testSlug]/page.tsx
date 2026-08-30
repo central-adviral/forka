@@ -24,6 +24,7 @@ interface SourceReportRow {
   visits: number
   conversions: number
   revenue_cents: number
+  bot_clicks: number
 }
 
 interface TotalsReportRow {
@@ -42,6 +43,7 @@ interface AdReportRow {
   clicks: number
   conversions: number
   revenue_cents: number
+  bot_clicks: number
 }
 
 export default async function TestReportPage({
@@ -294,6 +296,7 @@ export default async function TestReportPage({
               <th>Conversões</th>
               <th>Faturamento</th>
               <th>Taxa</th>
+              <th className="text-[#8A90A6]">Bots</th>
             </tr>
           </thead>
           <tbody>
@@ -305,6 +308,7 @@ export default async function TestReportPage({
                 <td>{row.conversions}</td>
                 <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
                 <td>{row.visits > 0 ? ((row.conversions / row.visits) * 100).toFixed(1) : '0.0'}%</td>
+                <td className="text-[#8A90A6]">{row.bot_clicks}</td>
               </tr>
             ))}
           </tbody>
@@ -320,12 +324,13 @@ export default async function TestReportPage({
               <th>Cliques</th>
               <th>Vendas</th>
               <th>Faturamento</th>
+              <th className="text-[#8A90A6]">Bots</th>
             </tr>
           </thead>
           <tbody>
             {((adReport as AdReportRow[]) ?? []).length === 0 ? (
               <tr>
-                <td className="py-2 text-[#8A90A6]" colSpan={5}>
+                <td className="py-2 text-[#8A90A6]" colSpan={6}>
                   Nenhum clique com anúncio identificado ainda.
                 </td>
               </tr>
@@ -337,6 +342,7 @@ export default async function TestReportPage({
                   <td>{row.clicks}</td>
                   <td>{row.conversions}</td>
                   <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
+                  <td className="text-[#8A90A6]">{row.bot_clicks}</td>
                 </tr>
               ))
             )}
