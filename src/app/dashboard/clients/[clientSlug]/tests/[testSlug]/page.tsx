@@ -89,10 +89,6 @@ export default async function TestReportPage({
     p_test_id: test.id,
     p_since: sinceIso,
   })
-  const { data: botClickCount } = await supabase.rpc('get_test_bot_click_count', {
-    p_test_id: test.id,
-    p_since: sinceIso,
-  })
 
   if (!report || report.length === 0) {
     return (
@@ -259,13 +255,7 @@ export default async function TestReportPage({
         </div>
       )}
       <div className="mx-6 mb-6">
-        <div className="mb-2 mt-8 flex items-center gap-2">
-          <h2 className="font-['Space_Grotesk'] text-lg font-semibold">Total por variante</h2>
-          <span className="text-xs text-[#8A90A6]">
-            ({botClickCount ?? 0} {botClickCount === 1 ? 'clique de bot filtrado' : 'cliques de bot filtrados'}, não
-            contam no total)
-          </span>
-        </div>
+        <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Total por variante</h2>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-white/[0.08] text-left">
@@ -305,7 +295,6 @@ export default async function TestReportPage({
               <th>Faturamento</th>
               <th>R$/clique</th>
               <th>Taxa</th>
-              <th className="text-[#8A90A6]">Bots</th>
             </tr>
           </thead>
           <tbody>
@@ -318,7 +307,6 @@ export default async function TestReportPage({
                 <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
                 <td>R$ {(row.visits > 0 ? row.revenue_cents / row.visits / 100 : 0).toFixed(2)}</td>
                 <td>{row.visits > 0 ? ((row.conversions / row.visits) * 100).toFixed(1) : '0.0'}%</td>
-                <td className="text-[#8A90A6]">{row.bot_clicks}</td>
               </tr>
             ))}
           </tbody>
@@ -336,13 +324,12 @@ export default async function TestReportPage({
               <th>Vendas</th>
               <th>Faturamento</th>
               <th>R$/clique</th>
-              <th className="text-[#8A90A6]">Bots</th>
             </tr>
           </thead>
           <tbody>
             {((adReport as AdReportRow[]) ?? []).length === 0 ? (
               <tr>
-                <td className="py-2 text-[#8A90A6]" colSpan={8}>
+                <td className="py-2 text-[#8A90A6]" colSpan={7}>
                   Nenhum clique com anúncio identificado ainda.
                 </td>
               </tr>
@@ -356,7 +343,6 @@ export default async function TestReportPage({
                   <td>{row.conversions}</td>
                   <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
                   <td>R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}</td>
-                  <td className="text-[#8A90A6]">{row.bot_clicks}</td>
                 </tr>
               ))
             )}
