@@ -166,11 +166,16 @@ describe('schema RLS isolation', () => {
       p_test_type: 'page',
       p_sales_page_url: null,
       p_conversion_method: 'hubla_webhook',
-      p_variants: [{ name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' }],
+      p_variants: [
+        { name: 'A', weight_pct: 50, destination_url: 'https://example.com/a' },
+        { name: 'B', weight_pct: 50, destination_url: 'https://example.com/b' },
+      ],
     })
     if (createError) throw createError
 
-    const { data: variant } = await admin.from('variants').select('id').eq('test_id', testId).single()
+    const { data: variants } = await admin.from('variants').select('id, name').eq('test_id', testId)
+    const variant = variants!.find((v) => v.name === 'A')
+    const variantWithNoClicks = variants!.find((v) => v.name === 'B')
 
     const { data: convertedClick } = await admin
       .from('click_events')
@@ -220,13 +225,18 @@ describe('schema RLS isolation', () => {
     const { data: rows, error } = await asOwner.rpc('get_test_report_by_ad', { p_test_id: testId })
     if (error) throw error
 
-    expect(rows).toHaveLength(3)
-    type AdRow = { ad_name: string; clicks: number; conversions: number; revenue_cents: number }
-    const byAdName = new Map((rows as AdRow[]).map((row) => [row.ad_name, row]))
+    // 3 rows for variant A's ads, plus 1 zero row for variant B, which never received a click.
+    expect(rows).toHaveLength(4)
+    type AdRow = { variant_id: string; ad_name: string; clicks: number; conversions: number; revenue_cents: number }
+    const variantARows = (rows as AdRow[]).filter((row) => row.variant_id === variant!.id)
+    const byAdName = new Map(variantARows.map((row) => [row.ad_name, row]))
 
     expect(byAdName.get('anuncio-1')).toMatchObject({ clicks: 1, conversions: 1, revenue_cents: 1500 })
     expect(byAdName.get('anuncio-2')).toMatchObject({ clicks: 1, conversions: 0, revenue_cents: 0 })
     expect(byAdName.get('(sem anúncio)')).toMatchObject({ clicks: 1, conversions: 1 })
+
+    const variantBRow = (rows as AdRow[]).find((row) => row.variant_id === variantWithNoClicks!.id)
+    expect(variantBRow).toMatchObject({ clicks: 0, conversions: 0, revenue_cents: 0 })
 
     const otherClient = await signIn(otherEmail)
     const { error: deniedError } = await otherClient.rpc('get_test_report_by_ad', { p_test_id: testId })

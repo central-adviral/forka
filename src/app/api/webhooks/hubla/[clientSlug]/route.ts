@@ -83,6 +83,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ ok: false, attributed: false }, { status: 422 })
   }
 
+  if (parsed.valueCents === null) {
+    console.warn(
+      '[hubla-webhook] payment_succeeded event had no extractable amount, revenue will record as 0:',
+      JSON.stringify(redactPii(payload))
+    )
+  }
+
   if (!parsed.trackingId) {
     console.log('[hubla-webhook] no trackingId extracted from payload, raw payload:', JSON.stringify(redactPii(payload)))
     return NextResponse.json({ ok: true, attributed: false })
