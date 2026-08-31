@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { countRecentClickEventsByIp, getOrAssignVariant, getTestBySlug, insertClickEvent } from '@/lib/repo/redirect-repo'
 import { pickVariant } from '@/lib/domain/pick-variant'
@@ -39,15 +39,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         request.nextUrl.searchParams.get(key) ?? '',
       ])
     )
-    await insertClickEvent(db, {
-      testId: test.id,
-      variantId: test.variants[0].id,
-      visitorId: crypto.randomUUID(),
-      trackingId: crypto.randomUUID(),
-      sourceUtms: botSourceUtms,
-      ip: getClientIp(request),
-      isBot: true,
-    })
+    after(() =>
+      insertClickEvent(db, {
+        testId: test.id,
+        variantId: test.variants[0].id,
+        visitorId: crypto.randomUUID(),
+        trackingId: crypto.randomUUID(),
+        sourceUtms: botSourceUtms,
+        ip: getClientIp(request),
+        isBot: true,
+      })
+    )
     const destination =
       test.fallback_url ??
       resolveEntryDestination({
@@ -85,14 +87,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const ip = getClientIp(request)
   const recentClicksFromIp = ip ? await countRecentClickEventsByIp(db, { testId: test.id, ip, sinceMinutes: 60 }) : 0
   if (!ip || recentClicksFromIp < MAX_CLICKS_PER_IP_PER_HOUR) {
-    await insertClickEvent(db, {
-      testId: test.id,
-      variantId: variant.id,
-      visitorId,
-      trackingId,
-      sourceUtms,
-      ip,
-    })
+    after(() =>
+      insertClickEvent(db, {
+        testId: test.id,
+        variantId: variant.id,
+        visitorId,
+        trackingId,
+        sourceUtms,
+        ip,
+      })
+    )
   }
 
   const destination = withTrackingId(
