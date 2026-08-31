@@ -375,12 +375,12 @@ export default async function TestReportPage({
         </div>
         <div className="p-5">
           <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]">
-            Cliques por horário do dia
+            Vendas por horário do dia
           </h3>
           <MiniBarChart
             data={((hourReport as HourReportRow[]) ?? []).map((row) => ({
               label: row.hour % 3 === 0 ? String(row.hour) : '',
-              value: row.clicks,
+              value: row.conversions,
             }))}
             barColor="#4F8EF7"
           />
