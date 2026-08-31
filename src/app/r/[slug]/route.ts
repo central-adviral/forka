@@ -39,17 +39,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         request.nextUrl.searchParams.get(key) ?? '',
       ])
     )
-    after(() =>
-      insertClickEvent(db, {
-        testId: test.id,
-        variantId: test.variants[0].id,
-        visitorId: crypto.randomUUID(),
-        trackingId: crypto.randomUUID(),
-        sourceUtms: botSourceUtms,
-        ip: getClientIp(request),
-        isBot: true,
-      })
-    )
+    after(async () => {
+      try {
+        await insertClickEvent(db, {
+          testId: test.id,
+          variantId: test.variants[0].id,
+          visitorId: crypto.randomUUID(),
+          trackingId: crypto.randomUUID(),
+          sourceUtms: botSourceUtms,
+          ip: getClientIp(request),
+          isBot: true,
+        })
+      } catch (err) {
+        console.error('[click-insert-failed]', { testId: test.id, slug, isBot: true }, err)
+      }
+    })
     const destination =
       test.fallback_url ??
       resolveEntryDestination({
@@ -87,16 +91,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const ip = getClientIp(request)
   const recentClicksFromIp = ip ? await countRecentClickEventsByIp(db, { testId: test.id, ip, sinceMinutes: 60 }) : 0
   if (!ip || recentClicksFromIp < MAX_CLICKS_PER_IP_PER_HOUR) {
-    after(() =>
-      insertClickEvent(db, {
-        testId: test.id,
-        variantId: variant.id,
-        visitorId,
-        trackingId,
-        sourceUtms,
-        ip,
-      })
-    )
+    after(async () => {
+      try {
+        await insertClickEvent(db, {
+          testId: test.id,
+          variantId: variant.id,
+          visitorId,
+          trackingId,
+          sourceUtms,
+          ip,
+        })
+      } catch (err) {
+        console.error('[click-insert-failed]', { testId: test.id, slug, isBot: false }, err)
+      }
+    })
   }
 
   const destination = withTrackingId(

@@ -24,7 +24,12 @@ export default async function ClientPage({ params }: { params: Promise<{ clientS
     .eq('client_id', client.id)
     .order('name')
 
-  const { data: accessCounts } = await supabase.rpc('get_client_test_access_counts', { p_client_id: client.id })
+  const { data: accessCounts, error: accessCountsError } = await supabase.rpc('get_client_test_access_counts', {
+    p_client_id: client.id,
+  })
+  if (accessCountsError) {
+    console.error('[client-access-counts-failed]', { clientId: client.id }, accessCountsError)
+  }
   const accessesByTestId = new Map(
     ((accessCounts as { test_id: string; total_accesses: number }[]) ?? []).map((row) => [
       row.test_id,
@@ -71,7 +76,7 @@ export default async function ClientPage({ params }: { params: Promise<{ clientS
               </div>
               <div className="flex flex-col items-end">
                 <span className="font-['JetBrains_Mono'] text-[15px] font-medium">
-                  {accessesByTestId.get(test.id) ?? 0}
+                  {accessCountsError ? '—' : (accessesByTestId.get(test.id) ?? 0)}
                 </span>
                 <span className="text-[11px] text-[#8A90A6]">acessos totais</span>
               </div>
