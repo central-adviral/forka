@@ -11,7 +11,15 @@ function SparkleIcon({ className }: { className?: string }) {
   )
 }
 
-export function InsightPanel({ testId, sinceIso }: { testId: string; sinceIso: string | null }) {
+export function InsightPanel({
+  testId,
+  sinceIso,
+  untilIso,
+}: {
+  testId: string
+  sinceIso: string | null
+  untilIso: string | null
+}) {
   const [insight, setInsight] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -20,7 +28,7 @@ export function InsightPanel({ testId, sinceIso }: { testId: string; sinceIso: s
     setError(null)
     startTransition(async () => {
       try {
-        const text = await generateInsight({ test_id: testId, since_iso: sinceIso })
+        const text = await generateInsight({ test_id: testId, since_iso: sinceIso, until_iso: untilIso })
         setInsight(text)
       } catch {
         setError('Não foi possível gerar o insight agora. Tente novamente em instantes.')

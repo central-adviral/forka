@@ -34,6 +34,7 @@ export async function toggleTestStatus(input: z.infer<typeof toggleSchema>) {
 const generateInsightSchema = z.object({
   test_id: z.string().uuid(),
   since_iso: z.string().datetime().nullable(),
+  until_iso: z.string().datetime().nullable(),
 })
 
 interface InsightReportRow {
@@ -62,6 +63,7 @@ export async function generateInsight(input: z.infer<typeof generateInsightSchem
   const { data: report, error: reportError } = await supabase.rpc('get_test_report', {
     p_test_id: parsed.test_id,
     p_since: parsed.since_iso,
+    p_until: parsed.until_iso,
   })
   if (reportError) throw reportError
   if (!report || report.length === 0) throw new Error('Sem dados suficientes para gerar insight')
@@ -69,6 +71,7 @@ export async function generateInsight(input: z.infer<typeof generateInsightSchem
   const { data: totals, error: totalsError } = await supabase.rpc('get_test_report_totals', {
     p_test_id: parsed.test_id,
     p_since: parsed.since_iso,
+    p_until: parsed.until_iso,
   })
   if (totalsError) throw totalsError
 

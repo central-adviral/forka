@@ -6,7 +6,7 @@ import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
 import { ReportCanvas } from './report-canvas'
 import { toggleTestStatus } from './actions'
-import { REPORT_PERIODS, resolvePeriodSince } from '@/lib/domain/report-period'
+import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil } from '@/lib/domain/report-period'
 import { RefreshButton } from './refresh-button'
 import { InsightPanel } from './insight-panel'
 
@@ -60,6 +60,8 @@ export default async function TestReportPage({
   const { periodo } = await searchParams
   const since = resolvePeriodSince(periodo)
   const sinceIso = since ? since.toISOString() : null
+  const until = resolvePeriodUntil(periodo)
+  const untilIso = until ? until.toISOString() : null
   const supabase = await createServerSupabaseClient()
   const { data: test } = await supabase
     .from('tests')
@@ -81,15 +83,25 @@ export default async function TestReportPage({
   const destinationById = new Map((variantRows ?? []).map((v) => [v.id, v.destination_url as string]))
   const controlVariantId = (variantRows ?? []).find((v) => v.is_control)?.id
 
-  const { data: report } = await supabase.rpc('get_test_report', { p_test_id: test.id, p_since: sinceIso })
+  const { data: report } = await supabase.rpc('get_test_report', {
+    p_test_id: test.id,
+    p_since: sinceIso,
+    p_until: untilIso,
+  })
   const { data: sourceReport } = await supabase.rpc('get_test_report_by_source', {
     p_test_id: test.id,
     p_since: sinceIso,
+    p_until: untilIso,
   })
-  const { data: adReport } = await supabase.rpc('get_test_report_by_ad', { p_test_id: test.id, p_since: sinceIso })
+  const { data: adReport } = await supabase.rpc('get_test_report_by_ad', {
+    p_test_id: test.id,
+    p_since: sinceIso,
+    p_until: untilIso,
+  })
   const { data: totalsReport } = await supabase.rpc('get_test_report_totals', {
     p_test_id: test.id,
     p_since: sinceIso,
+    p_until: untilIso,
   })
 
   if (!report || report.length === 0) {
@@ -360,7 +372,7 @@ export default async function TestReportPage({
           </tbody>
         </table>
       </div>
-      <InsightPanel testId={test.id} sinceIso={sinceIso} />
+      <InsightPanel testId={test.id} sinceIso={sinceIso} untilIso={untilIso} />
       {pixelVariants && pixelVariants.length > 0 && (
         <div className="mx-6 mb-6">
           <h2 className="mb-2 font-['Space_Grotesk'] text-lg font-semibold">Pixel de conversão (thank-you page)</h2>
