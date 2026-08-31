@@ -348,6 +348,44 @@ export default async function TestReportPage({
         confidenceLabelById={confidenceLabelById}
         assetLabel={assetLabel}
       />
+      <div className="mx-6 mb-6 grid grid-cols-1 divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] md:grid-cols-3 md:divide-x md:divide-y-0">
+        <div className="p-5">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]">
+            Faturamento por {assetLabel.toLowerCase()}
+          </h3>
+          <MiniBarChart
+            data={((totalsReport as TotalsReportRow[]) ?? []).map((row) => ({
+              label: row.variant_name,
+              value: row.revenue_cents,
+            }))}
+            valueFormat={(v) => `R$ ${(v / 100).toFixed(0)}`}
+            barColor="#2DD4A8"
+          />
+        </div>
+        <div className="p-5">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]">
+            Cliques por dia da semana
+          </h3>
+          <MiniBarChart
+            data={((weekdayReport as WeekdayReportRow[]) ?? []).map((row) => ({
+              label: WEEKDAY_LABELS[row.weekday],
+              value: row.clicks,
+            }))}
+          />
+        </div>
+        <div className="p-5">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]">
+            Cliques por horário do dia
+          </h3>
+          <MiniBarChart
+            data={((hourReport as HourReportRow[]) ?? []).map((row) => ({
+              label: row.hour % 3 === 0 ? String(row.hour) : '',
+              value: row.clicks,
+            }))}
+            barColor="#4F8EF7"
+          />
+        </div>
+      </div>
       {test.test_type === 'checkout' && (
         <div className="mx-6 mb-6">
           <h2 className="mb-2 font-['Space_Grotesk'] text-lg font-semibold">Link do botão de comprar</h2>
@@ -513,38 +551,6 @@ export default async function TestReportPage({
             </div>
           )
         })()}
-      </div>
-      <div className="mx-6 mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-white/[0.08] p-4">
-          <h2 className="mb-3 font-['Space_Grotesk'] text-sm font-semibold">Faturamento por {assetLabel.toLowerCase()}</h2>
-          <MiniBarChart
-            data={((totalsReport as TotalsReportRow[]) ?? []).map((row) => ({
-              label: row.variant_name,
-              value: row.revenue_cents,
-            }))}
-            valueFormat={(v) => `R$ ${(v / 100).toFixed(0)}`}
-            barColor="#2DD4A8"
-          />
-        </div>
-        <div className="rounded-2xl border border-white/[0.08] p-4">
-          <h2 className="mb-3 font-['Space_Grotesk'] text-sm font-semibold">Cliques por dia da semana</h2>
-          <MiniBarChart
-            data={((weekdayReport as WeekdayReportRow[]) ?? []).map((row) => ({
-              label: WEEKDAY_LABELS[row.weekday],
-              value: row.clicks,
-            }))}
-          />
-        </div>
-        <div className="rounded-2xl border border-white/[0.08] p-4">
-          <h2 className="mb-3 font-['Space_Grotesk'] text-sm font-semibold">Cliques por horário do dia</h2>
-          <MiniBarChart
-            data={((hourReport as HourReportRow[]) ?? []).map((row) => ({
-              label: row.hour % 3 === 0 ? String(row.hour) : '',
-              value: row.clicks,
-            }))}
-            barColor="#4F8EF7"
-          />
-        </div>
       </div>
       <InsightPanel testId={test.id} sinceIso={sinceIso} untilIso={untilIso} />
       {pixelVariants && pixelVariants.length > 0 && (
