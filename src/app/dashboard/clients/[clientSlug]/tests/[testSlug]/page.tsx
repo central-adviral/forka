@@ -54,6 +54,24 @@ function formatBr(iso: string): string {
   return `${day}/${month}`
 }
 
+const TH_CLASS = 'px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]'
+const TD_CLASS = 'relative px-4 py-2.5'
+const TR_CLASS = 'border-b border-white/[0.04] last:border-0 even:bg-white/[0.015] hover:bg-white/[0.035]'
+
+function BarCell({ value, max, format }: { value: number; max: number; format: string }) {
+  const pct = max > 0 ? Math.max(value > 0 ? 6 : 0, (value / max) * 100) : 0
+  return (
+    <td className={TD_CLASS}>
+      <div className="absolute inset-y-1.5 left-0 rounded-r bg-[#7C6FF0]/[0.14]" style={{ width: `${pct}%` }} />
+      <span className="relative">{format}</span>
+    </td>
+  )
+}
+
+function RateCell({ rate }: { rate: string }) {
+  return <td className={`${TD_CLASS} ${Number(rate) > 0 ? 'text-[#2DD4A8]' : 'text-[#8A90A6]'}`}>{rate}%</td>
+}
+
 export default async function TestReportPage({
   params,
   searchParams,
@@ -321,102 +339,153 @@ export default async function TestReportPage({
       )}
       <div className="mx-6 mb-6">
         <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Total por {assetLabel.toLowerCase()}</h2>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-white/[0.08] text-left">
-              <th className="py-2">{assetLabel}</th>
-              <th>Cliques</th>
-              <th>Visitas únicas</th>
-              <th>Vendas</th>
-              <th>Faturamento</th>
-              <th>R$/clique</th>
-              <th>Taxa</th>
-            </tr>
-          </thead>
-          <tbody>
-            {((totalsReport as TotalsReportRow[]) ?? []).map((row) => (
-              <tr key={row.variant_id}>
-                <td className="py-2">{row.variant_name}</td>
-                <td>{row.clicks}</td>
-                <td>{row.visitors}</td>
-                <td>{row.conversions}</td>
-                <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
-                <td>R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}</td>
-                <td>{row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {(() => {
+          const totalsRows = (totalsReport as TotalsReportRow[]) ?? []
+          const maxClicks = Math.max(1, ...totalsRows.map((r) => r.clicks))
+          const maxRevenue = Math.max(1, ...totalsRows.map((r) => r.revenue_cents))
+          return (
+            <div className="overflow-hidden rounded-2xl border border-white/[0.08]">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.08] bg-white/[0.02] text-left">
+                    <th className={TH_CLASS}>{assetLabel}</th>
+                    <th className={TH_CLASS}>Cliques</th>
+                    <th className={TH_CLASS}>Visitas únicas</th>
+                    <th className={TH_CLASS}>Vendas</th>
+                    <th className={TH_CLASS}>Faturamento</th>
+                    <th className={TH_CLASS}>R$/clique</th>
+                    <th className={TH_CLASS}>Taxa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {totalsRows.map((row) => (
+                    <tr key={row.variant_id} className={`${TR_CLASS} ${row.clicks === 0 ? 'opacity-50' : ''}`}>
+                      <td className={TD_CLASS}>{row.variant_name}</td>
+                      <BarCell value={row.clicks} max={maxClicks} format={String(row.clicks)} />
+                      <td className={TD_CLASS}>{row.visitors}</td>
+                      <td className={TD_CLASS}>{row.conversions}</td>
+                      <BarCell
+                        value={row.revenue_cents}
+                        max={maxRevenue}
+                        format={`R$ ${(row.revenue_cents / 100).toFixed(2)}`}
+                      />
+                      <td className={TD_CLASS}>
+                        R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}
+                      </td>
+                      <RateCell rate={row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'} />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        })()}
       </div>
       <div className="mx-6 mb-6">
         <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Por origem (UTM)</h2>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-white/[0.08] text-left">
-              <th className="py-2">{assetLabel}</th>
-              <th>Origem</th>
-              <th>Cliques</th>
-              <th>Visitas únicas</th>
-              <th>Vendas</th>
-              <th>Faturamento</th>
-              <th>R$/clique</th>
-              <th>Taxa</th>
-            </tr>
-          </thead>
-          <tbody>
-            {((sourceReport as SourceReportRow[]) ?? []).map((row) => (
-              <tr key={`${row.variant_id}-${row.utm_source}`}>
-                <td className="py-2">{row.variant_name}</td>
-                <td>{row.utm_source}</td>
-                <td>{row.clicks}</td>
-                <td>{row.visitors}</td>
-                <td>{row.conversions}</td>
-                <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
-                <td>R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}</td>
-                <td>{row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {(() => {
+          const sourceRows = (sourceReport as SourceReportRow[]) ?? []
+          const maxClicks = Math.max(1, ...sourceRows.map((r) => r.clicks))
+          const maxRevenue = Math.max(1, ...sourceRows.map((r) => r.revenue_cents))
+          return (
+            <div className="overflow-hidden rounded-2xl border border-white/[0.08]">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.08] bg-white/[0.02] text-left">
+                    <th className={TH_CLASS}>{assetLabel}</th>
+                    <th className={TH_CLASS}>Origem</th>
+                    <th className={TH_CLASS}>Cliques</th>
+                    <th className={TH_CLASS}>Visitas únicas</th>
+                    <th className={TH_CLASS}>Vendas</th>
+                    <th className={TH_CLASS}>Faturamento</th>
+                    <th className={TH_CLASS}>R$/clique</th>
+                    <th className={TH_CLASS}>Taxa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sourceRows.map((row) => (
+                    <tr
+                      key={`${row.variant_id}-${row.utm_source}`}
+                      className={`${TR_CLASS} ${row.clicks === 0 ? 'opacity-50' : ''}`}
+                    >
+                      <td className={TD_CLASS}>{row.variant_name}</td>
+                      <td className={TD_CLASS}>{row.utm_source}</td>
+                      <BarCell value={row.clicks} max={maxClicks} format={String(row.clicks)} />
+                      <td className={TD_CLASS}>{row.visitors}</td>
+                      <td className={TD_CLASS}>{row.conversions}</td>
+                      <BarCell
+                        value={row.revenue_cents}
+                        max={maxRevenue}
+                        format={`R$ ${(row.revenue_cents / 100).toFixed(2)}`}
+                      />
+                      <td className={TD_CLASS}>
+                        R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}
+                      </td>
+                      <RateCell rate={row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'} />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        })()}
       </div>
       <div className="mx-6 mb-6">
         <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Por anúncio</h2>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-white/[0.08] text-left">
-              <th className="py-2">{assetLabel}</th>
-              <th>Anúncio</th>
-              <th>Cliques</th>
-              <th>Visitas únicas</th>
-              <th>Vendas</th>
-              <th>Faturamento</th>
-              <th>R$/clique</th>
-              <th>Taxa</th>
-            </tr>
-          </thead>
-          <tbody>
-            {((adReport as AdReportRow[]) ?? []).length === 0 ? (
-              <tr>
-                <td className="py-2 text-[#8A90A6]" colSpan={8}>
-                  Nenhum clique com anúncio identificado ainda.
-                </td>
-              </tr>
-            ) : (
-              ((adReport as AdReportRow[]) ?? []).map((row) => (
-                <tr key={`${row.variant_id}-${row.ad_name}`}>
-                  <td className="py-2">{row.variant_name}</td>
-                  <td>{row.ad_name}</td>
-                  <td>{row.clicks}</td>
-                  <td>{row.visitors}</td>
-                  <td>{row.conversions}</td>
-                  <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
-                  <td>R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}</td>
-                  <td>{row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'}%</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+        {(() => {
+          const adRows = (adReport as AdReportRow[]) ?? []
+          const maxClicks = Math.max(1, ...adRows.map((r) => r.clicks))
+          const maxRevenue = Math.max(1, ...adRows.map((r) => r.revenue_cents))
+          return (
+            <div className="overflow-hidden rounded-2xl border border-white/[0.08]">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.08] bg-white/[0.02] text-left">
+                    <th className={TH_CLASS}>{assetLabel}</th>
+                    <th className={TH_CLASS}>Anúncio</th>
+                    <th className={TH_CLASS}>Cliques</th>
+                    <th className={TH_CLASS}>Visitas únicas</th>
+                    <th className={TH_CLASS}>Vendas</th>
+                    <th className={TH_CLASS}>Faturamento</th>
+                    <th className={TH_CLASS}>R$/clique</th>
+                    <th className={TH_CLASS}>Taxa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adRows.length === 0 ? (
+                    <tr>
+                      <td className={`${TD_CLASS} text-[#8A90A6]`} colSpan={8}>
+                        Nenhum clique com anúncio identificado ainda.
+                      </td>
+                    </tr>
+                  ) : (
+                    adRows.map((row) => (
+                      <tr
+                        key={`${row.variant_id}-${row.ad_name}`}
+                        className={`${TR_CLASS} ${row.clicks === 0 ? 'opacity-50' : ''}`}
+                      >
+                        <td className={TD_CLASS}>{row.variant_name}</td>
+                        <td className={TD_CLASS}>{row.ad_name}</td>
+                        <BarCell value={row.clicks} max={maxClicks} format={String(row.clicks)} />
+                        <td className={TD_CLASS}>{row.visitors}</td>
+                        <td className={TD_CLASS}>{row.conversions}</td>
+                        <BarCell
+                          value={row.revenue_cents}
+                          max={maxRevenue}
+                          format={`R$ ${(row.revenue_cents / 100).toFixed(2)}`}
+                        />
+                        <td className={TD_CLASS}>
+                          R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}
+                        </td>
+                        <RateCell rate={row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'} />
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )
+        })()}
       </div>
       <InsightPanel testId={test.id} sinceIso={sinceIso} untilIso={untilIso} />
       {pixelVariants && pixelVariants.length > 0 && (
