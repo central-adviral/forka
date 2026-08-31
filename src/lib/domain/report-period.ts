@@ -37,3 +37,13 @@ export function resolvePeriodSince(period: string | undefined, now: Date = new D
 export function resolvePeriodUntil(period: string | undefined, now: Date = new Date()): Date | null {
   return period === 'yesterday' ? startOfDay(now) : null
 }
+
+export function resolveDateRange(desde: string | undefined, ate: string | undefined): { since: Date; until: Date } | null {
+  if (!desde || !ate) return null
+  const since = new Date(`${desde}T00:00:00`)
+  const ateStart = new Date(`${ate}T00:00:00`)
+  if (Number.isNaN(since.getTime()) || Number.isNaN(ateStart.getTime())) return null
+  const until = new Date(ateStart.getTime() + DAY_MS)
+  if (since.getTime() >= until.getTime()) return null
+  return { since, until }
+}

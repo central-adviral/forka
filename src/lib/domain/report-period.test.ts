@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolvePeriodSince, resolvePeriodUntil } from './report-period'
+import { resolvePeriodSince, resolvePeriodUntil, resolveDateRange } from './report-period'
 
 const NOW = new Date('2026-08-30T15:30:00.000Z')
 
@@ -64,5 +64,33 @@ describe('resolvePeriodUntil', () => {
     expect(resolvePeriodUntil('month', NOW)).toBeNull()
     expect(resolvePeriodUntil('all', NOW)).toBeNull()
     expect(resolvePeriodUntil(undefined, NOW)).toBeNull()
+  })
+})
+
+describe('resolveDateRange', () => {
+  it('spans midnight of "desde" to midnight of the day after "ate"', () => {
+    const range = resolveDateRange('2026-08-01', '2026-08-15')
+    expect(range?.since.toISOString()).toBe(new Date('2026-08-01T00:00:00').toISOString())
+    expect(range?.until.toISOString()).toBe(new Date('2026-08-16T00:00:00').toISOString())
+  })
+
+  it('returns null when either date is missing', () => {
+    expect(resolveDateRange(undefined, '2026-08-15')).toBeNull()
+    expect(resolveDateRange('2026-08-01', undefined)).toBeNull()
+    expect(resolveDateRange(undefined, undefined)).toBeNull()
+  })
+
+  it('returns null for an unparseable date', () => {
+    expect(resolveDateRange('not-a-date', '2026-08-15')).toBeNull()
+  })
+
+  it('returns null when "desde" is after "ate" (inverted range)', () => {
+    expect(resolveDateRange('2026-08-15', '2026-08-01')).toBeNull()
+  })
+
+  it('accepts a single-day range (desde equals ate)', () => {
+    const range = resolveDateRange('2026-08-10', '2026-08-10')
+    expect(range).not.toBeNull()
+    expect(range!.until.getTime() - range!.since.getTime()).toBe(24 * 60 * 60 * 1000)
   })
 })

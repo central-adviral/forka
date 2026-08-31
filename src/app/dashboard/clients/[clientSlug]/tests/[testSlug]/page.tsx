@@ -6,7 +6,7 @@ import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
 import { ReportCanvas } from './report-canvas'
 import { toggleTestStatus } from './actions'
-import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil } from '@/lib/domain/report-period'
+import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil, resolveDateRange } from '@/lib/domain/report-period'
 import { RefreshButton } from './refresh-button'
 import { InsightPanel } from './insight-panel'
 
@@ -49,18 +49,24 @@ interface AdReportRow {
   bot_clicks: number
 }
 
+function formatBr(iso: string): string {
+  const [, month, day] = iso.split('-')
+  return `${day}/${month}`
+}
+
 export default async function TestReportPage({
   params,
   searchParams,
 }: {
   params: Promise<{ clientSlug: string; testSlug: string }>
-  searchParams: Promise<{ periodo?: string }>
+  searchParams: Promise<{ periodo?: string; desde?: string; ate?: string }>
 }) {
   const { clientSlug, testSlug } = await params
-  const { periodo } = await searchParams
-  const since = resolvePeriodSince(periodo)
+  const { periodo, desde, ate } = await searchParams
+  const customRange = periodo === 'custom' ? resolveDateRange(desde, ate) : null
+  const since = periodo === 'custom' ? (customRange?.since ?? null) : resolvePeriodSince(periodo)
   const sinceIso = since ? since.toISOString() : null
-  const until = resolvePeriodUntil(periodo)
+  const until = periodo === 'custom' ? (customRange?.until ?? null) : resolvePeriodUntil(periodo)
   const untilIso = until ? until.toISOString() : null
   const supabase = await createServerSupabaseClient()
   const { data: test } = await supabase
@@ -247,6 +253,46 @@ export default async function TestReportPage({
             </a>
           )
         })}
+        <details className="relative" open={periodo === 'custom' || undefined}>
+          <summary
+            className={`cursor-pointer list-none rounded-full border px-3 py-1.5 text-xs font-medium ${
+              periodo === 'custom'
+                ? 'border-[#7C6FF0] bg-[#7C6FF0]/15 text-[#7C6FF0]'
+                : 'border-white/[0.08] text-[#8A90A6] hover:text-[#E8EAF2]'
+            }`}
+          >
+            {periodo === 'custom' && desde && ate ? `${formatBr(desde)} - ${formatBr(ate)}` : 'Personalizado'}
+          </summary>
+          <form
+            method="get"
+            className="absolute left-0 top-[calc(100%+6px)] z-10 flex flex-col gap-2 rounded-[10px] border border-white/[0.08] bg-[#141829] p-3 shadow-lg"
+          >
+            <input type="hidden" name="periodo" value="custom" />
+            <label className="flex flex-col gap-1 text-[11px] text-[#8A90A6]">
+              De
+              <input
+                type="date"
+                name="desde"
+                defaultValue={desde ?? ''}
+                required
+                className="rounded-[8px] border border-white/[0.08] bg-[#1B2036] px-2 py-1 text-xs text-[#E8EAF2]"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-[11px] text-[#8A90A6]">
+              Até
+              <input
+                type="date"
+                name="ate"
+                defaultValue={ate ?? ''}
+                required
+                className="rounded-[8px] border border-white/[0.08] bg-[#1B2036] px-2 py-1 text-xs text-[#E8EAF2]"
+              />
+            </label>
+            <button type="submit" className="rounded-[8px] bg-[#7C6FF0] px-3 py-1.5 text-xs font-semibold text-[#0B0E1A]">
+              Aplicar
+            </button>
+          </form>
+        </details>
       </div>
 
       <ReportCanvas
