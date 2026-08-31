@@ -13,12 +13,14 @@ export function ReportCanvas({
   totalVisits,
   fallbackUrl,
   confidenceLabelById,
+  assetLabel,
 }: {
   layout: ReportLayout
   redirectUrl: string
   totalVisits: number
   fallbackUrl: string | null
   confidenceLabelById: Map<string, string>
+  assetLabel: string
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
@@ -160,7 +162,9 @@ export function ReportCanvas({
               <div className="mb-3.5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-[3px] bg-[#4F8EF7]" />
-                  <span className="font-['Space_Grotesk'] text-[15px] font-semibold">Variante {variant.name}</span>
+                  <span className="font-['Space_Grotesk'] text-[15px] font-semibold">
+                    {assetLabel} {variant.name}
+                  </span>
                   {variant.isLeader && (
                     <span className="rounded-full bg-[#F5B94D]/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[#F5B94D]">
                       Líder

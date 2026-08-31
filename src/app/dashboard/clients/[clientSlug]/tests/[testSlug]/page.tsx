@@ -22,7 +22,8 @@ interface SourceReportRow {
   variant_id: string
   variant_name: string
   utm_source: string
-  visits: number
+  clicks: number
+  visitors: number
   conversions: number
   revenue_cents: number
   bot_clicks: number
@@ -142,13 +143,17 @@ export default async function TestReportPage({
     Boolean(test.fallback_url)
   )
 
+  const assetLabel = test.test_type === 'checkout' ? 'Checkout' : 'Página'
+  const assetArticle = test.test_type === 'checkout' ? 'o' : 'a'
+  const assetDemonstrative = test.test_type === 'checkout' ? 'este' : 'esta'
+
   const confidenceLabelById = new Map(
     rows.map((row) => [
       row.variant_id,
       row.variant_id === control?.variant_id
         ? 'controle'
         : row.confidencePct !== null
-          ? `${row.confidencePct}% de ser melhor que a Variante ${control?.variant_name}`
+          ? `${row.confidencePct}% de ser melhor que ${assetArticle} ${assetLabel} ${control?.variant_name}`
           : 'dados insuficientes',
     ])
   )
@@ -238,6 +243,7 @@ export default async function TestReportPage({
         totalVisits={totalVisits}
         fallbackUrl={test.fallback_url}
         confidenceLabelById={confidenceLabelById}
+        assetLabel={assetLabel}
       />
       {test.test_type === 'checkout' && (
         <div className="mx-6 mb-6">
@@ -256,13 +262,13 @@ export default async function TestReportPage({
         </div>
       )}
       <div className="mx-6 mb-6">
-        <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Total por variante</h2>
+        <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Total por {assetLabel.toLowerCase()}</h2>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-white/[0.08] text-left">
-              <th className="py-2">Variante</th>
+              <th className="py-2">{assetLabel}</th>
               <th>Cliques</th>
-              <th>Visitas</th>
+              <th>Visitas únicas</th>
               <th>Vendas</th>
               <th>Faturamento</th>
               <th>R$/clique</th>
@@ -289,9 +295,10 @@ export default async function TestReportPage({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-white/[0.08] text-left">
-              <th className="py-2">Variante</th>
+              <th className="py-2">{assetLabel}</th>
               <th>Origem</th>
-              <th>Visitas</th>
+              <th>Cliques</th>
+              <th>Visitas únicas</th>
               <th>Conversões</th>
               <th>Faturamento</th>
               <th>R$/clique</th>
@@ -303,11 +310,12 @@ export default async function TestReportPage({
               <tr key={`${row.variant_id}-${row.utm_source}`}>
                 <td className="py-2">{row.variant_name}</td>
                 <td>{row.utm_source}</td>
-                <td>{row.visits}</td>
+                <td>{row.clicks}</td>
+                <td>{row.visitors}</td>
                 <td>{row.conversions}</td>
                 <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
-                <td>R$ {(row.visits > 0 ? row.revenue_cents / row.visits / 100 : 0).toFixed(2)}</td>
-                <td>{row.visits > 0 ? ((row.conversions / row.visits) * 100).toFixed(1) : '0.0'}%</td>
+                <td>R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}</td>
+                <td>{row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'}%</td>
               </tr>
             ))}
           </tbody>
@@ -318,10 +326,10 @@ export default async function TestReportPage({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-white/[0.08] text-left">
-              <th className="py-2">Variante</th>
+              <th className="py-2">{assetLabel}</th>
               <th>Anúncio</th>
               <th>Cliques</th>
-              <th>Visitas</th>
+              <th>Visitas únicas</th>
               <th>Vendas</th>
               <th>Faturamento</th>
               <th>R$/clique</th>
@@ -359,7 +367,7 @@ export default async function TestReportPage({
             return (
               <div key={variant.id} className="mb-4 rounded-[10px] border border-white/[0.08] p-3">
                 <p className="mb-2 text-sm text-[#8A90A6]">
-                  Variante {variant.name}
+                  {assetLabel} {variant.name}
                   {variant.thank_you_url && isSafeUrl ? (
                     <>
                       {' '}
@@ -376,7 +384,7 @@ export default async function TestReportPage({
                   ) : variant.thank_you_url ? (
                     <> — URL de thank-you configurada tem um formato inválido: {variant.thank_you_url}</>
                   ) : (
-                    <> — nenhuma URL de thank-you configurada para esta variante</>
+                    <> — nenhuma URL de thank-you configurada para {assetDemonstrative} {assetLabel.toLowerCase()}</>
                   )}
                 </p>
                 <p className="mb-2 text-xs text-[#8A90A6]">

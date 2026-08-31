@@ -53,6 +53,15 @@ describe('get_test_report_by_source', () => {
       .single()
     await admin.from('conversions').insert({ click_event_id: metaClick!.id, source: 'thank_you_page' })
 
+    // Same visitor clicking the meta ad again: counts as another click, not another visitor.
+    await admin.from('click_events').insert({
+      test_id: test!.id,
+      variant_id: variant!.id,
+      visitor_id: 'v1',
+      tracking_id: crypto.randomUUID(),
+      source_utms: { utm_source: 'meta' },
+    })
+
     await admin.from('click_events').insert({
       test_id: test!.id,
       variant_id: variant!.id,
@@ -74,7 +83,7 @@ describe('get_test_report_by_source', () => {
     expect(error).toBeNull()
     const meta = report!.find((r: { utm_source: string }) => r.utm_source === 'meta')
     const direto = report!.find((r: { utm_source: string }) => r.utm_source === '(direto)')
-    expect(meta).toMatchObject({ visits: 1, conversions: 1, bot_clicks: 1 })
-    expect(direto).toMatchObject({ visits: 1, conversions: 0, bot_clicks: 0 })
+    expect(meta).toMatchObject({ clicks: 2, visitors: 1, conversions: 1, bot_clicks: 1 })
+    expect(direto).toMatchObject({ clicks: 1, visitors: 1, conversions: 0, bot_clicks: 0 })
   })
 })
