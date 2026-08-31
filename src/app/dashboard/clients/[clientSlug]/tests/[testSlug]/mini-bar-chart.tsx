@@ -14,7 +14,9 @@ export function MiniBarChart({
         const heightPct = d.value > 0 ? Math.max(4, (d.value / max) * 100) : 2
         return (
           <div key={`${d.label}-${index}`} className="flex h-full flex-1 flex-col items-center gap-1.5">
-            <span className="font-['JetBrains_Mono'] text-[10.5px] text-[#8A90A6]">{valueFormat(d.value)}</span>
+            <span className="font-['JetBrains_Mono'] text-[10.5px] text-[#8A90A6]">
+              {d.value > 0 ? valueFormat(d.value) : ' '}
+            </span>
             <div className="flex w-full flex-1 items-end">
               <div
                 className="w-full rounded-t transition-all"
