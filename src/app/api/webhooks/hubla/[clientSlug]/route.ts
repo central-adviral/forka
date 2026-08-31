@@ -3,35 +3,30 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { HublaIrrelevantEventError, verifyHublaToken, parseHublaPaymentSucceeded } from '@/lib/domain/hubla'
 import { getClickEventByTrackingId, insertConversionIfNew } from '@/lib/repo/conversion-repo'
 
-// Hubla's payload can carry customer PII (name/email/phone) alongside the invoice/UTM data we
-// actually need to debug attribution. Redact known PII field names before this ever reaches logs.
-const PII_KEYS = new Set([
-  'email',
-  'phone',
-  'phoneNumber',
-  'name',
-  'firstName',
-  'lastName',
-  'document',
-  'cpf',
-  'cnpj',
-  'address',
-  'payer',
-  'user',
-  'customer',
-  'billingAddress',
-])
-
-function redactPii(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(redactPii)
-  if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {}
-    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-      out[key] = PII_KEYS.has(key) ? '[redacted]' : redactPii(val)
+// Hubla's payload can carry customer PII (name/email/phone/document/address) alongside the
+// invoice/UTM data we actually need to debug attribution. Rather than deny-listing known PII
+// field names (which misses any field we haven't seen yet), only ever log this fixed allow-list
+// of fields -- everything else in the raw payload is never included in a log line at all.
+function extractSafeDebugFields(rawPayload: unknown): unknown {
+  const payload = rawPayload as {
+    type?: string
+    event?: {
+      invoice?: {
+        id?: string
+        amount?: unknown
+        paymentSession?: { utm?: unknown }
+        firstPaymentSession?: { utm?: unknown }
+      }
     }
-    return out
   }
-  return value
+  const invoice = payload?.event?.invoice
+  return {
+    type: payload?.type,
+    invoiceId: invoice?.id,
+    amount: invoice?.amount,
+    paymentSessionUtm: invoice?.paymentSession?.utm,
+    firstPaymentSessionUtm: invoice?.firstPaymentSession?.utm,
+  }
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ clientSlug: string }> }) {
@@ -71,14 +66,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     parsed = parseHublaPaymentSucceeded(payload)
   } catch (err) {
     if (err instanceof HublaIrrelevantEventError) {
-      console.log('[hubla-webhook] irrelevant event, raw payload:', JSON.stringify(redactPii(payload)))
+      console.log('[hubla-webhook] irrelevant event, raw payload:', JSON.stringify(extractSafeDebugFields(payload)))
       return NextResponse.json({ ok: true, attributed: false })
     }
     console.error(
       '[hubla-webhook] rejected malformed payload',
       err instanceof Error ? err.message : String(err),
       'raw payload:',
-      JSON.stringify(redactPii(payload))
+      JSON.stringify(extractSafeDebugFields(payload))
     )
     return NextResponse.json({ ok: false, attributed: false }, { status: 422 })
   }
@@ -86,12 +81,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (parsed.valueCents === null) {
     console.warn(
       '[hubla-webhook] payment_succeeded event had no extractable amount, revenue will record as 0:',
-      JSON.stringify(redactPii(payload))
+      JSON.stringify(extractSafeDebugFields(payload))
     )
   }
 
   if (!parsed.trackingId) {
-    console.log('[hubla-webhook] no trackingId extracted from payload, raw payload:', JSON.stringify(redactPii(payload)))
+    console.log('[hubla-webhook] no trackingId extracted from payload, raw payload:', JSON.stringify(extractSafeDebugFields(payload)))
     return NextResponse.json({ ok: true, attributed: false })
   }
 

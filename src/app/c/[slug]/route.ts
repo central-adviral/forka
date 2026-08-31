@@ -32,6 +32,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const latestClick =
     isKnownVisitor && visitorId ? await getLatestTrackingId(db, { testId: test.id, visitorId }) : null
 
+  if (isKnownVisitor && !latestClick) {
+    console.log('[checkout-golink-no-click]', { testId: test.id, slug, variantId: resolved.id, visitorId })
+  }
+
   const destination = withTrackingId(
     withUtms(resolved.destination_url, latestClick?.sourceUtms ?? {}),
     latestClick?.trackingId ?? null

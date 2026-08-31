@@ -105,6 +105,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         console.error('[click-insert-failed]', { testId: test.id, slug, isBot: false }, err)
       }
     })
+  } else {
+    console.log('[click-rate-limited]', { testId: test.id, slug, ip, visitorId, recentClicksFromIp })
   }
 
   const destination = withTrackingId(

@@ -166,6 +166,11 @@ export default function NewTestPage() {
           <fieldset key={index} className="space-y-2 rounded-[10px] border border-white/[0.08] p-3">
             <legend className="flex items-center gap-2 px-1 text-sm font-medium text-[#8A90A6]">
               Variante {variant.name}
+              {index === 0 && (
+                <span className="rounded-full bg-[#7C6FF0]/15 px-2 py-0.5 text-[10.5px] font-medium text-[#7C6FF0]">
+                  controle
+                </span>
+              )}
               {variants.length > 2 && (
                 <button
                   type="button"
