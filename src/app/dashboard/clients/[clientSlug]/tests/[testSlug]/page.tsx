@@ -9,6 +9,23 @@ import { toggleTestStatus } from './actions'
 import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil, resolveDateRange } from '@/lib/domain/report-period'
 import { RefreshButton } from './refresh-button'
 import { InsightPanel } from './insight-panel'
+import { MiniBarChart } from './mini-bar-chart'
+
+const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+
+interface WeekdayReportRow {
+  weekday: number
+  clicks: number
+  conversions: number
+  revenue_cents: number
+}
+
+interface HourReportRow {
+  hour: number
+  clicks: number
+  conversions: number
+  revenue_cents: number
+}
 
 interface ReportRow {
   variant_id: string
@@ -123,6 +140,16 @@ export default async function TestReportPage({
     p_until: untilIso,
   })
   const { data: totalsReport } = await supabase.rpc('get_test_report_totals', {
+    p_test_id: test.id,
+    p_since: sinceIso,
+    p_until: untilIso,
+  })
+  const { data: weekdayReport } = await supabase.rpc('get_test_report_by_weekday', {
+    p_test_id: test.id,
+    p_since: sinceIso,
+    p_until: untilIso,
+  })
+  const { data: hourReport } = await supabase.rpc('get_test_report_by_hour', {
     p_test_id: test.id,
     p_since: sinceIso,
     p_until: untilIso,
@@ -486,6 +513,38 @@ export default async function TestReportPage({
             </div>
           )
         })()}
+      </div>
+      <div className="mx-6 mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-white/[0.08] p-4">
+          <h2 className="mb-3 font-['Space_Grotesk'] text-sm font-semibold">Faturamento por {assetLabel.toLowerCase()}</h2>
+          <MiniBarChart
+            data={((totalsReport as TotalsReportRow[]) ?? []).map((row) => ({
+              label: row.variant_name,
+              value: row.revenue_cents,
+            }))}
+            valueFormat={(v) => `R$ ${(v / 100).toFixed(0)}`}
+            barColor="#2DD4A8"
+          />
+        </div>
+        <div className="rounded-2xl border border-white/[0.08] p-4">
+          <h2 className="mb-3 font-['Space_Grotesk'] text-sm font-semibold">Cliques por dia da semana</h2>
+          <MiniBarChart
+            data={((weekdayReport as WeekdayReportRow[]) ?? []).map((row) => ({
+              label: WEEKDAY_LABELS[row.weekday],
+              value: row.clicks,
+            }))}
+          />
+        </div>
+        <div className="rounded-2xl border border-white/[0.08] p-4">
+          <h2 className="mb-3 font-['Space_Grotesk'] text-sm font-semibold">Cliques por horário do dia</h2>
+          <MiniBarChart
+            data={((hourReport as HourReportRow[]) ?? []).map((row) => ({
+              label: row.hour % 3 === 0 ? String(row.hour) : '',
+              value: row.clicks,
+            }))}
+            barColor="#4F8EF7"
+          />
+        </div>
       </div>
       <InsightPanel testId={test.id} sinceIso={sinceIso} untilIso={untilIso} />
       {pixelVariants && pixelVariants.length > 0 && (
