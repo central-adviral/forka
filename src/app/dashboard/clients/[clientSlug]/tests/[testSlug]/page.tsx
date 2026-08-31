@@ -299,7 +299,7 @@ export default async function TestReportPage({
               <th>Origem</th>
               <th>Cliques</th>
               <th>Visitas únicas</th>
-              <th>Conversões</th>
+              <th>Vendas</th>
               <th>Faturamento</th>
               <th>R$/clique</th>
               <th>Taxa</th>
@@ -333,12 +333,13 @@ export default async function TestReportPage({
               <th>Vendas</th>
               <th>Faturamento</th>
               <th>R$/clique</th>
+              <th>Taxa</th>
             </tr>
           </thead>
           <tbody>
             {((adReport as AdReportRow[]) ?? []).length === 0 ? (
               <tr>
-                <td className="py-2 text-[#8A90A6]" colSpan={7}>
+                <td className="py-2 text-[#8A90A6]" colSpan={8}>
                   Nenhum clique com anúncio identificado ainda.
                 </td>
               </tr>
@@ -352,6 +353,7 @@ export default async function TestReportPage({
                   <td>{row.conversions}</td>
                   <td>R$ {(row.revenue_cents / 100).toFixed(2)}</td>
                   <td>R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}</td>
+                  <td>{row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'}%</td>
                 </tr>
               ))
             )}
