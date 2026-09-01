@@ -44,7 +44,7 @@ export interface ReportLayout {
 const CANVAS_WIDTH = 1360
 const CANVAS_HEIGHT = 732
 const ENTRY = { x: 40, w: 240, h: 150 }
-const VARIANT = { x: 360, w: 300, h: 170, gap: 26 }
+const VARIANT = { x: 360, w: 300, h: 210, gap: 26 }
 const CONVERSION = { x: 760, w: 220, h: 110 }
 
 function bezier(fromX: number, fromY: number, toX: number, toY: number): string {

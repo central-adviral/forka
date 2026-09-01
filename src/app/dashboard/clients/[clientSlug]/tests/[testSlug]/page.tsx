@@ -91,7 +91,7 @@ function InfoTooltip({ text }: { text: string }) {
       <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white/20 text-[9px] font-bold normal-case text-[#8A90A6]">
         !
       </span>
-      <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 w-48 -translate-x-1/2 rounded-md border border-white/[0.08] bg-[#1B2036] p-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-[#E8EAF2] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 w-48 -translate-x-1/2 rounded-md border border-white/[0.08] bg-[#1B2036] p-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-[#E8EAF2] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
         {text}
       </span>
     </span>

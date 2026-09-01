@@ -175,7 +175,7 @@ export function ReportCanvas({
                   alvo {variant.weightPct}%
                 </span>
               </div>
-              <div className="mb-3.5 flex gap-7">
+              <div className="mb-3.5 grid grid-cols-2 gap-x-7 gap-y-2.5">
                 <div>
                   <div className="font-['JetBrains_Mono'] text-base font-medium">{variant.visits}</div>
                   <div className="text-[11px] text-[#8A90A6]">acessos</div>
