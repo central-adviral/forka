@@ -75,6 +75,40 @@ const TH_CLASS = 'px-4 py-3 text-[11px] font-semibold uppercase tracking-wide te
 const TD_CLASS = 'relative px-4 py-2.5'
 const TR_CLASS = 'border-b border-white/[0.04] last:border-0 even:bg-white/[0.015] hover:bg-white/[0.035]'
 
+const METRIC_INFO = {
+  cliques: 'Total de vezes que o link foi clicado, incluindo cliques repetidos da mesma pessoa.',
+  visitas: 'Número de pessoas diferentes que clicaram, contando cada uma só uma vez mesmo se ela clicar várias vezes.',
+  vendas: 'Número de vendas confirmadas atribuídas a essa linha.',
+  faturamento: 'Soma do valor de todas as vendas confirmadas dessa linha.',
+  rsPorClique: 'Faturamento dividido pelo número de cliques — quanto cada clique rendeu em média.',
+  rsPorAcesso: 'Faturamento dividido pelo número de visitas únicas — quanto cada visitante rendeu em média.',
+  taxa: 'Porcentagem de cliques que viraram venda.',
+}
+
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <span className="group relative ml-1 inline-flex cursor-help align-middle">
+      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white/20 text-[9px] font-bold normal-case text-[#8A90A6]">
+        !
+      </span>
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 w-48 -translate-x-1/2 rounded-md border border-white/[0.08] bg-[#1B2036] p-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-[#E8EAF2] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+        {text}
+      </span>
+    </span>
+  )
+}
+
+function ThWithInfo({ label, info }: { label: string; info: string }) {
+  return (
+    <th className={TH_CLASS}>
+      <span className="inline-flex items-center">
+        {label}
+        <InfoTooltip text={info} />
+      </span>
+    </th>
+  )
+}
+
 function BarCell({ value, max, format }: { value: number; max: number; format: string }) {
   const pct = max > 0 ? Math.max(value > 0 ? 6 : 0, (value / max) * 100) : 0
   return (
@@ -192,6 +226,9 @@ export default async function TestReportPage({
   const revenueByVariant = new Map(
     ((totalsReport as TotalsReportRow[]) ?? []).map((row) => [row.variant_id, row.revenue_cents])
   )
+  const uniqueVisitorsByVariant = new Map(
+    ((totalsReport as TotalsReportRow[]) ?? []).map((row) => [row.variant_id, row.visitors])
+  )
 
   const layout = computeReportLayout(
     rows.map((row) => ({
@@ -199,6 +236,7 @@ export default async function TestReportPage({
       name: row.variant_name,
       weightPct: row.weight_pct,
       visits: row.visits,
+      uniqueVisitors: uniqueVisitorsByVariant.get(row.variant_id) ?? 0,
       conversions: row.conversions,
       revenueCents: revenueByVariant.get(row.variant_id) ?? 0,
       destinationUrl: destinationById.get(row.variant_id) ?? '',
@@ -414,12 +452,13 @@ export default async function TestReportPage({
                 <thead>
                   <tr className="border-b border-white/[0.08] bg-white/[0.02] text-left">
                     <th className={TH_CLASS}>{assetLabel}</th>
-                    <th className={TH_CLASS}>Cliques</th>
-                    <th className={TH_CLASS}>Visitas únicas</th>
-                    <th className={TH_CLASS}>Vendas</th>
-                    <th className={TH_CLASS}>Faturamento</th>
-                    <th className={TH_CLASS}>R$/clique</th>
-                    <th className={TH_CLASS}>Taxa</th>
+                    <ThWithInfo label="Cliques" info={METRIC_INFO.cliques} />
+                    <ThWithInfo label="Visitas únicas" info={METRIC_INFO.visitas} />
+                    <ThWithInfo label="Vendas" info={METRIC_INFO.vendas} />
+                    <ThWithInfo label="Faturamento" info={METRIC_INFO.faturamento} />
+                    <ThWithInfo label="R$/clique" info={METRIC_INFO.rsPorClique} />
+                    <ThWithInfo label="R$/acesso" info={METRIC_INFO.rsPorAcesso} />
+                    <ThWithInfo label="Taxa" info={METRIC_INFO.taxa} />
                   </tr>
                 </thead>
                 <tbody>
@@ -436,6 +475,9 @@ export default async function TestReportPage({
                       />
                       <td className={TD_CLASS}>
                         R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}
+                      </td>
+                      <td className={TD_CLASS}>
+                        R$ {(row.visitors > 0 ? row.revenue_cents / row.visitors / 100 : 0).toFixed(2)}
                       </td>
                       <RateCell rate={row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'} />
                     </tr>
@@ -459,12 +501,13 @@ export default async function TestReportPage({
                   <tr className="border-b border-white/[0.08] bg-white/[0.02] text-left">
                     <th className={TH_CLASS}>{assetLabel}</th>
                     <th className={TH_CLASS}>Origem</th>
-                    <th className={TH_CLASS}>Cliques</th>
-                    <th className={TH_CLASS}>Visitas únicas</th>
-                    <th className={TH_CLASS}>Vendas</th>
-                    <th className={TH_CLASS}>Faturamento</th>
-                    <th className={TH_CLASS}>R$/clique</th>
-                    <th className={TH_CLASS}>Taxa</th>
+                    <ThWithInfo label="Cliques" info={METRIC_INFO.cliques} />
+                    <ThWithInfo label="Visitas únicas" info={METRIC_INFO.visitas} />
+                    <ThWithInfo label="Vendas" info={METRIC_INFO.vendas} />
+                    <ThWithInfo label="Faturamento" info={METRIC_INFO.faturamento} />
+                    <ThWithInfo label="R$/clique" info={METRIC_INFO.rsPorClique} />
+                    <ThWithInfo label="R$/acesso" info={METRIC_INFO.rsPorAcesso} />
+                    <ThWithInfo label="Taxa" info={METRIC_INFO.taxa} />
                   </tr>
                 </thead>
                 <tbody>
@@ -485,6 +528,9 @@ export default async function TestReportPage({
                       />
                       <td className={TD_CLASS}>
                         R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}
+                      </td>
+                      <td className={TD_CLASS}>
+                        R$ {(row.visitors > 0 ? row.revenue_cents / row.visitors / 100 : 0).toFixed(2)}
                       </td>
                       <RateCell rate={row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'} />
                     </tr>
@@ -508,18 +554,19 @@ export default async function TestReportPage({
                   <tr className="border-b border-white/[0.08] bg-white/[0.02] text-left">
                     <th className={TH_CLASS}>{assetLabel}</th>
                     <th className={TH_CLASS}>Anúncio</th>
-                    <th className={TH_CLASS}>Cliques</th>
-                    <th className={TH_CLASS}>Visitas únicas</th>
-                    <th className={TH_CLASS}>Vendas</th>
-                    <th className={TH_CLASS}>Faturamento</th>
-                    <th className={TH_CLASS}>R$/clique</th>
-                    <th className={TH_CLASS}>Taxa</th>
+                    <ThWithInfo label="Cliques" info={METRIC_INFO.cliques} />
+                    <ThWithInfo label="Visitas únicas" info={METRIC_INFO.visitas} />
+                    <ThWithInfo label="Vendas" info={METRIC_INFO.vendas} />
+                    <ThWithInfo label="Faturamento" info={METRIC_INFO.faturamento} />
+                    <ThWithInfo label="R$/clique" info={METRIC_INFO.rsPorClique} />
+                    <ThWithInfo label="R$/acesso" info={METRIC_INFO.rsPorAcesso} />
+                    <ThWithInfo label="Taxa" info={METRIC_INFO.taxa} />
                   </tr>
                 </thead>
                 <tbody>
                   {adRows.length === 0 ? (
                     <tr>
-                      <td className={`${TD_CLASS} text-[#8A90A6]`} colSpan={8}>
+                      <td className={`${TD_CLASS} text-[#8A90A6]`} colSpan={9}>
                         Nenhum clique com anúncio identificado ainda.
                       </td>
                     </tr>
@@ -541,6 +588,9 @@ export default async function TestReportPage({
                         />
                         <td className={TD_CLASS}>
                           R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}
+                        </td>
+                        <td className={TD_CLASS}>
+                          R$ {(row.visitors > 0 ? row.revenue_cents / row.visitors / 100 : 0).toFixed(2)}
                         </td>
                         <RateCell rate={row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'} />
                       </tr>

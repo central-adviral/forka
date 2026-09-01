@@ -190,6 +190,16 @@ export function ReportCanvas({
                   </div>
                   <div className="text-[11px] text-[#8A90A6]">R$/clique</div>
                 </div>
+                <div>
+                  <div className="font-['JetBrains_Mono'] text-base font-medium">
+                    R${' '}
+                    {(variant.uniqueVisitors > 0
+                      ? variant.revenueCents / variant.uniqueVisitors / 100
+                      : 0
+                    ).toFixed(2)}
+                  </div>
+                  <div className="text-[11px] text-[#8A90A6]">R$/acesso</div>
+                </div>
               </div>
               <div className="truncate border-t border-white/[0.08] pt-3 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">
                 {variant.destinationUrl}
