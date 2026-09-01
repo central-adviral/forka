@@ -123,6 +123,19 @@ function RateCell({ rate }: { rate: string }) {
   return <td className={`${TD_CLASS} ${Number(rate) > 0 ? 'text-[#2DD4A8]' : 'text-[#8A90A6]'}`}>{rate}%</td>
 }
 
+function BotTag({ clicks, botClicks }: { clicks: number; botClicks: number }) {
+  if (botClicks === 0) return null
+  const pct = Math.round((botClicks / (clicks + botClicks)) * 100)
+  return (
+    <span
+      title="Cliques adicionais identificados como bot/crawler (ex.: pré-visualização de link da Meta) — não contam em visitas, vendas ou faturamento."
+      className="ml-2 inline-flex cursor-help items-center rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium normal-case text-[#8A90A6]"
+    >
+      {pct}% bot
+    </span>
+  )
+}
+
 export default async function TestReportPage({
   params,
   searchParams,
@@ -517,7 +530,10 @@ export default async function TestReportPage({
                       className={`${TR_CLASS} ${row.clicks === 0 ? 'opacity-50' : ''}`}
                     >
                       <td className={TD_CLASS}>{row.variant_name}</td>
-                      <td className={TD_CLASS}>{row.utm_source}</td>
+                      <td className={TD_CLASS}>
+                        {row.utm_source}
+                        <BotTag clicks={row.clicks} botClicks={row.bot_clicks} />
+                      </td>
                       <BarCell value={row.clicks} max={maxClicks} format={String(row.clicks)} />
                       <td className={TD_CLASS}>{row.visitors}</td>
                       <td className={TD_CLASS}>{row.conversions}</td>
@@ -577,7 +593,10 @@ export default async function TestReportPage({
                         className={`${TR_CLASS} ${row.clicks === 0 ? 'opacity-50' : ''}`}
                       >
                         <td className={TD_CLASS}>{row.variant_name}</td>
-                        <td className={TD_CLASS}>{row.ad_name}</td>
+                        <td className={TD_CLASS}>
+                          {row.ad_name}
+                          <BotTag clicks={row.clicks} botClicks={row.bot_clicks} />
+                        </td>
                         <BarCell value={row.clicks} max={maxClicks} format={String(row.clicks)} />
                         <td className={TD_CLASS}>{row.visitors}</td>
                         <td className={TD_CLASS}>{row.conversions}</td>
