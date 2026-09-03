@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/internal/sync-funnel", "schedule": "0 * * * *" }
+  ]
+}
