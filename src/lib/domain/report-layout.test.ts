@@ -50,6 +50,11 @@ describe('computeReportLayout', () => {
     expect(layout.variants.find((v) => v.id === 'a')!.revenueCents).toBe(435000)
   })
 
+  it('passes uniqueVisitors through unchanged', () => {
+    const layout = computeReportLayout(variants, false)
+    expect(layout.variants.find((v) => v.id === 'a')!.uniqueVisitors).toBe(1500)
+  })
+
   it('omits the fallback node when not configured', () => {
     expect(computeReportLayout(variants, false).fallback).toBeNull()
   })

@@ -151,58 +151,61 @@ export default async function TestReportPage({
   const until = periodo === 'custom' ? (customRange?.until ?? null) : resolvePeriodUntil(periodo)
   const untilIso = until ? until.toISOString() : null
   const supabase = await createServerSupabaseClient()
-  const { data: test } = await supabase
+  const { data: test, error: testError } = await supabase
     .from('tests')
     .select('id, name, slug, status, conversion_method, fallback_url, test_type, client_id, clients(custom_domain, domain_status)')
     .eq('slug', testSlug)
     .maybeSingle()
 
+  if (testError) {
+    console.error('[test-report-fetch-failed]', { testSlug }, testError)
+    return (
+      <div className="p-8">
+        <p className="text-sm text-[#8A90A6]">Não foi possível carregar este teste agora. Tente novamente em instantes.</p>
+      </div>
+    )
+  }
   if (!test) notFound()
 
-  const { data: pixelVariants } =
+  const [
+    { data: pixelVariants, error: pixelVariantsError },
+    { data: variantRows, error: variantRowsError },
+    { data: report, error: reportError },
+    { data: sourceReport, error: sourceReportError },
+    { data: adReport, error: adReportError },
+    { data: totalsReport, error: totalsReportError },
+    { data: weekdayReport, error: weekdayReportError },
+    { data: hourReport, error: hourReportError },
+  ] = await Promise.all([
     test.conversion_method === 'thank_you_page'
-      ? await supabase.from('variants').select('id, name, thank_you_url').eq('test_id', test.id)
-      : { data: null }
+      ? supabase.from('variants').select('id, name, thank_you_url').eq('test_id', test.id)
+      : Promise.resolve({ data: null, error: null }),
+    supabase.from('variants').select('id, destination_url, is_control').eq('test_id', test.id),
+    supabase.rpc('get_test_report', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
+    supabase.rpc('get_test_report_by_source', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
+    supabase.rpc('get_test_report_by_ad', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
+    supabase.rpc('get_test_report_totals', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
+    supabase.rpc('get_test_report_by_weekday', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
+    supabase.rpc('get_test_report_by_hour', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
+  ])
 
-  const { data: variantRows } = await supabase
-    .from('variants')
-    .select('id, destination_url, is_control')
-    .eq('test_id', test.id)
+  if (pixelVariantsError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'pixelVariants' }, pixelVariantsError)
+  if (variantRowsError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'variantRows' }, variantRowsError)
+  if (reportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report' }, reportError)
+  if (sourceReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_source' }, sourceReportError)
+  if (adReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_ad' }, adReportError)
+  if (totalsReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_totals' }, totalsReportError)
+  if (weekdayReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_weekday' }, weekdayReportError)
+  if (hourReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_hour' }, hourReportError)
+
+  const hasPartialDataError = Boolean(
+    variantRowsError || sourceReportError || adReportError || totalsReportError || weekdayReportError || hourReportError
+  )
+
   const destinationById = new Map((variantRows ?? []).map((v) => [v.id, v.destination_url as string]))
   const controlVariantId = (variantRows ?? []).find((v) => v.is_control)?.id
 
-  const { data: report } = await supabase.rpc('get_test_report', {
-    p_test_id: test.id,
-    p_since: sinceIso,
-    p_until: untilIso,
-  })
-  const { data: sourceReport } = await supabase.rpc('get_test_report_by_source', {
-    p_test_id: test.id,
-    p_since: sinceIso,
-    p_until: untilIso,
-  })
-  const { data: adReport } = await supabase.rpc('get_test_report_by_ad', {
-    p_test_id: test.id,
-    p_since: sinceIso,
-    p_until: untilIso,
-  })
-  const { data: totalsReport } = await supabase.rpc('get_test_report_totals', {
-    p_test_id: test.id,
-    p_since: sinceIso,
-    p_until: untilIso,
-  })
-  const { data: weekdayReport } = await supabase.rpc('get_test_report_by_weekday', {
-    p_test_id: test.id,
-    p_since: sinceIso,
-    p_until: untilIso,
-  })
-  const { data: hourReport } = await supabase.rpc('get_test_report_by_hour', {
-    p_test_id: test.id,
-    p_since: sinceIso,
-    p_until: untilIso,
-  })
-
-  if (!report || report.length === 0) {
+  if (reportError || !report || report.length === 0) {
     return (
       <div className="p-8">
         <p className="text-sm text-[#8A90A6]">
@@ -390,6 +393,13 @@ export default async function TestReportPage({
           </form>
         </details>
       </div>
+
+      {hasPartialDataError && (
+        <div className="mx-6 mt-4 rounded-[10px] border border-[#F5B94D]/35 bg-[#F5B94D]/10 px-4 py-2.5 text-xs text-[#F5B94D]">
+          Alguns dados desta página podem estar incompletos — houve uma falha ao carregar parte do relatório. Tente
+          atualizar a página em instantes.
+        </div>
+      )}
 
       <ReportCanvas
         layout={layout}

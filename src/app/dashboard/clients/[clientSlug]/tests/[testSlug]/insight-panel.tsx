@@ -30,7 +30,8 @@ export function InsightPanel({
       try {
         const text = await generateInsight({ test_id: testId, since_iso: sinceIso, until_iso: untilIso })
         setInsight(text)
-      } catch {
+      } catch (err) {
+        console.error('[insight-generate-failed]', { testId }, err)
         setError('Não foi possível gerar o insight agora. Tente novamente em instantes.')
       }
     })

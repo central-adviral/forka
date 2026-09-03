@@ -34,6 +34,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   if (isKnownVisitor && !latestClick) {
     console.log('[checkout-golink-no-click]', { testId: test.id, slug, variantId: resolved.id, visitorId })
+  } else if (!isKnownVisitor) {
+    console.log('[checkout-golink-unknown-visitor]', {
+      testId: test.id,
+      slug,
+      variantId: resolved.id,
+      visitorId: visitorId ?? null,
+    })
   }
 
   const destination = withTrackingId(

@@ -75,21 +75,13 @@ export async function getOrAssignVariant(
   db: SupabaseClient,
   params: { testId: string; visitorId: string; candidateVariantId: string }
 ): Promise<string> {
-  await db
-    .from('variant_assignments')
-    .upsert(
-      { test_id: params.testId, visitor_id: params.visitorId, variant_id: params.candidateVariantId },
-      { onConflict: 'test_id,visitor_id', ignoreDuplicates: true }
-    )
-
-  const { data, error } = await db
-    .from('variant_assignments')
-    .select('variant_id')
-    .eq('test_id', params.testId)
-    .eq('visitor_id', params.visitorId)
-    .single()
+  const { data, error } = await db.rpc('get_or_assign_variant', {
+    p_test_id: params.testId,
+    p_visitor_id: params.visitorId,
+    p_candidate_variant_id: params.candidateVariantId,
+  })
   if (error) throw error
-  return data.variant_id as string
+  return data as string
 }
 
 export async function getAssignedVariantId(

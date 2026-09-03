@@ -89,10 +89,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   )
 
   const ip = getClientIp(request)
-  const recentClicksFromIp = ip ? await countRecentClickEventsByIp(db, { testId: test.id, ip, sinceMinutes: 60 }) : 0
-  if (!ip || recentClicksFromIp < MAX_CLICKS_PER_IP_PER_HOUR) {
-    after(async () => {
-      try {
+  after(async () => {
+    try {
+      const recentClicksFromIp = ip ? await countRecentClickEventsByIp(db, { testId: test.id, ip, sinceMinutes: 60 }) : 0
+      if (!ip || recentClicksFromIp < MAX_CLICKS_PER_IP_PER_HOUR) {
         await insertClickEvent(db, {
           testId: test.id,
           variantId: variant.id,
@@ -101,13 +101,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           sourceUtms,
           ip,
         })
-      } catch (err) {
-        console.error('[click-insert-failed]', { testId: test.id, slug, isBot: false }, err)
+      } else {
+        console.log('[click-rate-limited]', { testId: test.id, slug, ip, visitorId, recentClicksFromIp })
       }
-    })
-  } else {
-    console.log('[click-rate-limited]', { testId: test.id, slug, ip, visitorId, recentClicksFromIp })
-  }
+    } catch (err) {
+      console.error('[click-insert-failed]', { testId: test.id, slug, isBot: false }, err)
+    }
+  })
 
   const destination = withTrackingId(
     withUtms(
