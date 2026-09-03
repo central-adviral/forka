@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 
 const serviceDb = createServiceRoleClient()
 const ownerPassword = 'password123'
 let clientId: string
-let authedDb: ReturnType<typeof createClient>
+let authedDb: SupabaseClient
 
 beforeAll(async () => {
   const ownerEmail = `funnel-owner-${Date.now()}@example.com`
