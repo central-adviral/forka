@@ -54,7 +54,11 @@ async function syncSalesEntity(appDb: SupabaseClient, launchopsDb: SupabaseClien
     await recordSyncResult(appDb, { clientId: client.id, entity: 'sales', result: 'ok', newCursor: latestUpdatedAt ?? undefined })
   } catch (err) {
     console.error('[sync-funnel-sales-failed]', { clientId: client.id }, err)
-    await recordSyncResult(appDb, { clientId: client.id, entity: 'sales', result: 'error', message: String(err) })
+    try {
+      await recordSyncResult(appDb, { clientId: client.id, entity: 'sales', result: 'error', message: err instanceof Error ? err.message : String(err) })
+    } catch (recordErr) {
+      console.error('[sync-funnel-sales-record-failed]', { clientId: client.id }, recordErr)
+    }
   }
 }
 
@@ -69,7 +73,11 @@ async function syncAdSpendEntity(appDb: SupabaseClient, launchopsDb: SupabaseCli
     await recordSyncResult(appDb, { clientId: client.id, entity: 'ad_spend_daily', result: 'ok', newCursor: latestUpdatedAt })
   } catch (err) {
     console.error('[sync-funnel-ad-spend-failed]', { clientId: client.id }, err)
-    await recordSyncResult(appDb, { clientId: client.id, entity: 'ad_spend_daily', result: 'error', message: String(err) })
+    try {
+      await recordSyncResult(appDb, { clientId: client.id, entity: 'ad_spend_daily', result: 'error', message: err instanceof Error ? err.message : String(err) })
+    } catch (recordErr) {
+      console.error('[sync-funnel-ad-spend-record-failed]', { clientId: client.id }, recordErr)
+    }
   }
 }
 
@@ -85,6 +93,10 @@ async function syncAdCreativeSpendEntity(appDb: SupabaseClient, launchopsDb: Sup
     await recordSyncResult(appDb, { clientId: client.id, entity: 'ad_creative_spend_daily', result: 'ok', newCursor: latestUpdatedAt })
   } catch (err) {
     console.error('[sync-funnel-ad-creative-spend-failed]', { clientId: client.id }, err)
-    await recordSyncResult(appDb, { clientId: client.id, entity: 'ad_creative_spend_daily', result: 'error', message: String(err) })
+    try {
+      await recordSyncResult(appDb, { clientId: client.id, entity: 'ad_creative_spend_daily', result: 'error', message: err instanceof Error ? err.message : String(err) })
+    } catch (recordErr) {
+      console.error('[sync-funnel-ad-creative-spend-record-failed]', { clientId: client.id }, recordErr)
+    }
   }
 }
