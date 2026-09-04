@@ -62,19 +62,34 @@ create policy "sales_funnels_via_client_owner" on sales_funnels
 grant select, insert, update, delete on sales_funnels to authenticated;
 
 -- sales: client_id -> sales_funnel_id
+-- 0029 created an RLS policy referencing sales.client_id directly -- must drop it
+-- before the column can be dropped, then recreate it (same name) through sales_funnels.
+drop policy "sales_via_client_owner" on sales;
 alter table sales drop constraint sales_client_id_source_external_id_key;
 alter table sales drop column client_id;
 alter table sales add column sales_funnel_id uuid not null references sales_funnels(id) on delete cascade;
 alter table sales add constraint sales_funnel_source_external_id_key unique (sales_funnel_id, source, external_id);
+create policy "sales_via_client_owner" on sales
+  for select using (exists (
+    select 1 from sales_funnels sf join clients c on c.id = sf.client_id
+    where sf.id = sales.sales_funnel_id and c.owner_id = auth.uid()
+  ));
 
--- ad_spend_daily: client_id -> sales_funnel_id
+-- ad_spend_daily: client_id -> sales_funnel_id (same RLS caveat as sales above)
+drop policy "ad_spend_daily_via_client_owner" on ad_spend_daily;
 alter table ad_spend_daily drop constraint ad_spend_daily_client_id_source_operacao_id_data_key;
 alter table ad_spend_daily drop column client_id;
 alter table ad_spend_daily add column sales_funnel_id uuid not null references sales_funnels(id) on delete cascade;
 alter table ad_spend_daily add constraint ad_spend_daily_funnel_source_operacao_data_key
   unique (sales_funnel_id, source, operacao_id, data);
+create policy "ad_spend_daily_via_client_owner" on ad_spend_daily
+  for select using (exists (
+    select 1 from sales_funnels sf join clients c on c.id = sf.client_id
+    where sf.id = ad_spend_daily.sales_funnel_id and c.owner_id = auth.uid()
+  ));
 
--- ad_creative_spend_daily: client_id -> sales_funnel_id
+-- ad_creative_spend_daily: client_id -> sales_funnel_id (same RLS caveat as sales above)
+drop policy "ad_creative_spend_daily_via_client_owner" on ad_creative_spend_daily;
 alter table ad_creative_spend_daily drop constraint ad_creative_spend_daily_client_id_source_data_ad_id_ad_name_key;
 alter table ad_creative_spend_daily drop column client_id;
 alter table ad_creative_spend_daily add column sales_funnel_id uuid not null references sales_funnels(id) on delete cascade;
@@ -83,12 +98,23 @@ alter table ad_creative_spend_daily add constraint ad_creative_spend_daily_funne
 drop index if exists ad_creative_spend_daily_report_idx;
 create index ad_creative_spend_daily_report_idx
   on ad_creative_spend_daily(sales_funnel_id, ad_id, ad_name, data);
+create policy "ad_creative_spend_daily_via_client_owner" on ad_creative_spend_daily
+  for select using (exists (
+    select 1 from sales_funnels sf join clients c on c.id = sf.client_id
+    where sf.id = ad_creative_spend_daily.sales_funnel_id and c.owner_id = auth.uid()
+  ));
 
--- funnel_sync_state: client_id -> sales_funnel_id (new composite PK)
+-- funnel_sync_state: client_id -> sales_funnel_id (new composite PK; same RLS caveat as sales above)
+drop policy "funnel_sync_state_via_client_owner" on funnel_sync_state;
 alter table funnel_sync_state drop constraint funnel_sync_state_pkey;
 alter table funnel_sync_state drop column client_id;
 alter table funnel_sync_state add column sales_funnel_id uuid not null references sales_funnels(id) on delete cascade;
 alter table funnel_sync_state add primary key (sales_funnel_id, entity);
+create policy "funnel_sync_state_via_client_owner" on funnel_sync_state
+  for select using (exists (
+    select 1 from sales_funnels sf join clients c on c.id = sf.client_id
+    where sf.id = funnel_sync_state.sales_funnel_id and c.owner_id = auth.uid()
+  ));
 
 -- Campos antigos no client nunca foram preenchidos (confirmado 2026-09-04) -- remove sem backfill.
 alter table clients drop column launchops_operacao_ids;
