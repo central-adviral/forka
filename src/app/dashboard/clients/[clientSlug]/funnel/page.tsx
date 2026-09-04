@@ -3,7 +3,9 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getDailyFunnel, getFunnelSyncHealth } from '@/lib/repo/funnel-repo'
 
 function defaultDateRange() {
-  const until = new Date().toISOString().slice(0, 10)
+  // `until` is an exclusive upper bound in funnel-repo's query, so it must be tomorrow
+  // to include all of today's data.
+  const until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   return { since, until }
 }

@@ -33,7 +33,9 @@ export async function getDailyFunnel(
   if (spendError) throw spendError
 
   const byDay = new Map<string, { vendas: number; receitaBruta: number; receitaLiquida: number; spend: number }>()
-  const dayKey = (iso: string) => iso.slice(0, 10)
+  // Sales timestamps are UTC; ad_spend_daily.data already arrives in the ad account's
+  // local timezone (America/Sao_Paulo), so bucket sales by the same BRT calendar day.
+  const dayKey = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(iso))
 
   for (const row of (salesRows ?? []) as { data_venda: string; valor_bruto: number | null; valor_liquido: number | null }[]) {
     const key = dayKey(row.data_venda)

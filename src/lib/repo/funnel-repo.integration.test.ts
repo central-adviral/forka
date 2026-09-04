@@ -23,6 +23,8 @@ beforeAll(async () => {
   await db.from('sales').insert([
     { client_id: clientId, external_id: 's1', data_venda: '2026-09-01T10:00:00Z', status: 'aprovada', valor_bruto: 10, valor_liquido: 9 },
     { client_id: clientId, external_id: 's2', data_venda: '2026-09-01T11:00:00Z', status: 'aprovada', valor_bruto: 20, valor_liquido: 18 },
+    // 23:30 BRT on 09-01 is 02:30 UTC on 09-02 — must bucket under the BRT day, not the UTC day.
+    { client_id: clientId, external_id: 's3', data_venda: '2026-09-01T23:30:00-03:00', status: 'aprovada', valor_bruto: 40, valor_liquido: 36 },
   ])
   await db.from('ad_spend_daily').insert([
     { client_id: clientId, operacao_id: operacaoIdA, data: '2026-09-01', spend: 5 },
@@ -53,5 +55,14 @@ describe('funnel-repo', () => {
     const health = await getFunnelSyncHealth(db, clientId)
     const sales = health.find((h) => h.entity === 'sales')
     expect(sales?.lastResult).toBe('ok')
+  })
+
+  it('buckets a late-evening BRT sale under the BRT day, not the UTC day', async () => {
+    const rows = await getDailyFunnel(db, clientId, '2026-09-01', '2026-09-03')
+    const day1 = rows.find((r) => r.data === '2026-09-01')
+    const day2 = rows.find((r) => r.data === '2026-09-02')
+    expect(day1?.vendas).toBe(3)
+    expect(day1?.receitaBruta).toBe(70)
+    expect(day2).toBeUndefined()
   })
 })
