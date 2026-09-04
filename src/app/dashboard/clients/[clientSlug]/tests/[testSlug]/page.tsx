@@ -64,6 +64,9 @@ interface AdReportRow {
   conversions: number
   revenue_cents: number
   bot_clicks: number
+  ad_spend: number | null
+  ad_impressions: number | null
+  ad_link_clicks: number | null
 }
 
 function formatBr(iso: string): string {
@@ -83,6 +86,9 @@ const METRIC_INFO = {
   rsPorClique: 'Faturamento dividido pelo número de cliques — quanto cada clique rendeu em média.',
   rsPorAcesso: 'Faturamento dividido pelo número de visitas únicas — quanto cada visitante rendeu em média.',
   taxa: 'Porcentagem de cliques que viraram venda.',
+  gasto: 'Total investido em mídia paga nesse anúncio, vindo do Meta Ads.',
+  cpm: 'Custo por mil impressões do anúncio no Meta Ads.',
+  ctr: 'Porcentagem de impressões do anúncio que viraram clique no link, direto no Meta Ads.',
 }
 
 function InfoTooltip({ text }: { text: string }) {
@@ -587,12 +593,15 @@ export default async function TestReportPage({
                     <ThWithInfo label="R$/clique" info={METRIC_INFO.rsPorClique} />
                     <ThWithInfo label="R$/acesso" info={METRIC_INFO.rsPorAcesso} />
                     <ThWithInfo label="Taxa" info={METRIC_INFO.taxa} />
+                    <ThWithInfo label="Gasto" info={METRIC_INFO.gasto} />
+                    <ThWithInfo label="CPM" info={METRIC_INFO.cpm} />
+                    <ThWithInfo label="CTR" info={METRIC_INFO.ctr} />
                   </tr>
                 </thead>
                 <tbody>
                   {adRows.length === 0 ? (
                     <tr>
-                      <td className={`${TD_CLASS} text-[#8A90A6]`} colSpan={9}>
+                      <td className={`${TD_CLASS} text-[#8A90A6]`} colSpan={12}>
                         Nenhum clique com anúncio identificado ainda.
                       </td>
                     </tr>
@@ -622,6 +631,13 @@ export default async function TestReportPage({
                           R$ {(row.visitors > 0 ? row.revenue_cents / row.visitors / 100 : 0).toFixed(2)}
                         </td>
                         <RateCell rate={row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'} />
+                        <td className={TD_CLASS}>R$ {((row.ad_spend ?? 0) / 1).toFixed(2)}</td>
+                        <td className={TD_CLASS}>
+                          {row.ad_impressions ? `R$ ${(((row.ad_spend ?? 0) / row.ad_impressions) * 1000).toFixed(2)}` : '—'}
+                        </td>
+                        <td className={TD_CLASS}>
+                          {row.ad_impressions ? `${(((row.ad_link_clicks ?? 0) / row.ad_impressions) * 100).toFixed(1)}%` : '—'}
+                        </td>
                       </tr>
                     ))
                   )}
