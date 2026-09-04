@@ -4,7 +4,12 @@ import { createLaunchOpsClient } from '@/lib/launchops/client'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { getSyncCursor, recordSyncResult } from '@/lib/repo/funnel-sync-state-repo'
 import { fetchLaunchOpsSalesRows, syncSalesForClient } from '@/lib/launchops/sync-sales'
-import { fetchLaunchOpsAdSpendRows, aggregateAdSpendByOperacaoDay, syncAdSpendForClient } from '@/lib/launchops/sync-ad-spend'
+import {
+  fetchLaunchOpsAdSpendRows,
+  fetchLaunchOpsAdSpendRowsForDays,
+  aggregateAdSpendByOperacaoDay,
+  syncAdSpendForClient,
+} from '@/lib/launchops/sync-ad-spend'
 import {
   fetchLaunchOpsAdCreatives,
   fetchLaunchOpsAdCreativeSpendRows,
@@ -19,6 +24,9 @@ interface FunnelClient {
 }
 
 export async function GET(request: NextRequest) {
+  if (!process.env.CRON_SECRET) {
+    return new NextResponse('Server misconfigured', { status: 500 })
+  }
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new NextResponse('Unauthorized', { status: 401 })
@@ -67,8 +75,15 @@ async function syncAdSpendEntity(appDb: SupabaseClient, launchopsDb: SupabaseCli
   try {
     const cursor = await getSyncCursor(appDb, client.id, 'ad_spend_daily')
     const rawRows = await fetchLaunchOpsAdSpendRows(launchopsDb, { operacaoIds: client.launchops_operacao_ids, since: cursor })
-    const aggregated = aggregateAdSpendByOperacaoDay(rawRows)
-    await syncAdSpendForClient(appDb, client.id, aggregated)
+    if (rawRows.length > 0) {
+      const days = [...new Set(rawRows.map((row) => row.data_referencia))]
+      const fullDayRows = await fetchLaunchOpsAdSpendRowsForDays(launchopsDb, {
+        operacaoIds: client.launchops_operacao_ids,
+        days,
+      })
+      const aggregated = aggregateAdSpendByOperacaoDay(fullDayRows)
+      await syncAdSpendForClient(appDb, client.id, aggregated)
+    }
     const latestUpdatedAt = rawRows.length > 0 ? rawRows[rawRows.length - 1].updated_at : undefined
     await recordSyncResult(appDb, { clientId: client.id, entity: 'ad_spend_daily', result: 'ok', newCursor: latestUpdatedAt })
   } catch (err) {

@@ -34,6 +34,20 @@ export async function fetchLaunchOpsAdSpendRows(
   return (data ?? []) as LaunchOpsAdSpendRow[]
 }
 
+export async function fetchLaunchOpsAdSpendRowsForDays(
+  launchopsDb: SupabaseClient,
+  params: { operacaoIds: string[]; days: string[] }
+): Promise<LaunchOpsAdSpendRow[]> {
+  if (params.days.length === 0) return []
+  const { data, error } = await launchopsDb
+    .from('meta_ads_daily')
+    .select('operacao_id, data_referencia, spend, impressions, clicks, leads_periodo, updated_at')
+    .in('operacao_id', params.operacaoIds)
+    .in('data_referencia', params.days)
+  if (error) throw error
+  return (data ?? []) as LaunchOpsAdSpendRow[]
+}
+
 export function aggregateAdSpendByOperacaoDay(rows: LaunchOpsAdSpendRow[]): AggregatedAdSpendRow[] {
   const byKey = new Map<string, AggregatedAdSpendRow>()
   for (const row of rows) {
