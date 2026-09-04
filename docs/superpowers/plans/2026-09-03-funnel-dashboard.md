@@ -1787,6 +1787,88 @@ git commit -m "feat(funnel): add client mapping settings and Funil de Vendas das
 
 ---
 
+## Task 11: Display ad spend/CPM/CTR on the existing test report page
+
+**Added after the final whole-branch review** (finding I4): the spec's UI section said the enriched `get_test_report_by_ad` columns should appear on the existing test report page as extra columns in the "Por anúncio" table, but the original 10-task plan never included that UI wiring — Tasks 8/9 built the data path but nothing displayed it. Confirmed via grep: no file under `src/` reads `ad_spend`/`ad_impressions`/`ad_link_clicks`.
+
+**Files:**
+- Modify: `src/app/dashboard/clients/[clientSlug]/tests/[testSlug]/page.tsx`
+
+**Interfaces:**
+- Consumes: `get_test_report_by_ad`'s existing `ad_spend numeric`, `ad_impressions bigint`, `ad_link_clicks bigint` columns (Task 8/final-review-fix — already returned by the RPC, just not read by this page yet).
+
+- [ ] **Step 1: Update the `AdReportRow` interface**
+
+```typescript
+interface AdReportRow {
+  variant_id: string
+  variant_name: string
+  ad_name: string
+  clicks: number
+  visitors: number
+  conversions: number
+  revenue_cents: number
+  bot_clicks: number
+  ad_spend: number | null
+  ad_impressions: number | null
+  ad_link_clicks: number | null
+}
+```
+
+- [ ] **Step 2: Add tooltip copy to `METRIC_INFO`**
+
+```typescript
+  gasto: 'Total investido em mídia paga nesse anúncio, vindo do Meta Ads.',
+  cpm: 'Custo por mil impressões do anúncio no Meta Ads.',
+  ctr: 'Porcentagem de impressões do anúncio que viraram clique no link, direto no Meta Ads.',
+```
+
+- [ ] **Step 3: Add 3 header cells to the "Por anúncio" table**
+
+In the `<thead>` of the "Por anúncio" section (the one with `<th className={TH_CLASS}>Anúncio</th>`), after the existing `ThWithInfo` headers and before the closing `</tr>`:
+
+```tsx
+                    <ThWithInfo label="Gasto" info={METRIC_INFO.gasto} />
+                    <ThWithInfo label="CPM" info={METRIC_INFO.cpm} />
+                    <ThWithInfo label="CTR" info={METRIC_INFO.ctr} />
+```
+
+- [ ] **Step 4: Add 3 data cells to each ad row**
+
+In the `adRows.map((row) => (...))` body, after the existing `<RateCell rate={...} />` and before the closing `</tr>`:
+
+```tsx
+                        <td className={TD_CLASS}>R$ {((row.ad_spend ?? 0) / 1).toFixed(2)}</td>
+                        <td className={TD_CLASS}>
+                          {row.ad_impressions ? `R$ ${(((row.ad_spend ?? 0) / row.ad_impressions) * 1000).toFixed(2)}` : '—'}
+                        </td>
+                        <td className={TD_CLASS}>
+                          {row.ad_impressions ? `${(((row.ad_link_clicks ?? 0) / row.ad_impressions) * 100).toFixed(1)}%` : '—'}
+                        </td>
+```
+
+(`ad_spend` is already in reais as a `numeric`, not cents like `revenue_cents` — don't divide by 100.)
+
+- [ ] **Step 5: Update the empty-state `colSpan`**
+
+The "Nenhum clique com anúncio identificado ainda." row currently has `colSpan={9}` — change it to `colSpan={12}` (9 existing columns + 3 new ones).
+
+- [ ] **Step 6: Verify**
+
+Run: `npx tsc --noEmit && npm run lint && npm run build`
+Expected: all clean. This file has no dedicated unit test (server component, no existing `page.test.tsx`) — every other derived metric in this same table (R$/clique, R$/acesso, Taxa) already follows this untested-inline-arithmetic pattern, so CPM/CTR are consistent with existing convention, not a new gap.
+
+Manually verify in a browser if practical: load a test report page for a test with `get_test_report_by_ad` rows that have non-null `ad_spend`, confirm Gasto/CPM/CTR render sensibly (no `NaN`, no crash on `ad_impressions = 0`).
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/app/dashboard/clients/\[clientSlug\]/tests/\[testSlug\]/page.tsx
+git commit -m "feat(reports): display ad spend, CPM and CTR on the per-ad test report table"
+```
+
+---
+
 ## Final check
 
 - [ ] Run `npm run lint && npm run build && npm run test && npm run test:integration`
