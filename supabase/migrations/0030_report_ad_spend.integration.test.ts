@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321'
@@ -8,7 +9,7 @@ const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const db = createServiceRoleClient()
 let testId: string
 let clientId: string
-let asOwner: ReturnType<typeof createClient>
+let asOwner: SupabaseClient
 
 beforeAll(async () => {
   const email = `report-ad-spend-${Date.now()}@example.com`
