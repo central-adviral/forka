@@ -9,22 +9,36 @@ funcionalidade misturados na mesma navegação:
 - **Funil de Vendas** (LaunchOps: vendas + gasto de mídia) — hoje é **singular
   por cliente**: os campos `clients.launchops_operacao_ids` e
   `clients.launchops_produto_nomes` guardam um único mapeamento, e a página
-  `/dashboard/clients/[clientSlug]/funnel` mostra um único dashboard.
+  `/dashboard/clients/[clientSlug]/funnel` mostra um único dashboard. A
+  credencial de acesso ao LaunchOps (`LAUNCHOPS_SUPABASE_URL`/
+  `LAUNCHOPS_SUPABASE_SERVICE_ROLE_KEY`) é hoje uma variável de ambiente
+  **global** da Vercel — um segredo só, compartilhado por todos os clientes.
 
-O usuário quer que **Funil de Venda também seja plural**, do mesmo jeito que
-teste já é — um cliente pode ter vários funis de venda (ex: "1K LATAM",
-"Alunos 1K Por Dia"), cada um rastreando uma operação/produto diferente do
-LaunchOps. Isso pede uma tela de entrada nova por cliente, separando os dois
-tipos de funil antes de listar qualquer um dos dois.
+O usuário quer três coisas nesta mesma leva de trabalho:
+
+1. **Funil de Venda plural** — um cliente pode ter vários funis de venda
+   (ex: "1K LATAM", "Alunos 1K Por Dia"), do mesmo jeito que já tem vários
+   testes A/B.
+2. **Credencial por cliente, não global** — em vez de uma variável de
+   ambiente única compartilhada, a URL e a chave de acesso à fonte de dados
+   do funil (hoje sempre o LaunchOps) viram campos na aba **Integrações**
+   de cada cliente, do mesmo jeito que o token da Hubla já é por cliente.
+   No caso real de hoje (só "Gustavo VOE"), o usuário mesmo vai colar a
+   URL/chave do seu LaunchOps ali — mas a estrutura já nasce pronta pra um
+   cliente futuro ter uma fonte diferente, sem precisar mexer em variável
+   de ambiente da Vercel.
+3. **Vínculo teste ↔ funil, sem afetar teste ativo** — cada teste ganha um
+   campo opcional apontando pra qual funil de venda ele pertence, pra o
+   relatório "Por anúncio" conseguir mostrar gasto/CPM/CTR de verdade. Tem
+   que ser opcional e não quebrar nenhum teste já existente.
 
 **Estado real do banco (verificado em 2026-09-04, antes de escrever esta
 spec):** nenhum client tem `launchops_operacao_ids`/`launchops_produto_nomes`
 preenchido ainda, e as 4 tabelas do funil (`sales`, `ad_spend_daily`,
 `ad_creative_spend_daily`, `funnel_sync_state`) estão todas vazias — a
-sincronização com o LaunchOps ainda não rodou de verdade (variáveis de
-ambiente pendentes). **Isso significa que não existe nenhum dado real para
-migrar ou re-mapear** — a mudança de modelo de dado é só criar a estrutura
-nova, sem backfill.
+sincronização com o LaunchOps ainda não rodou de verdade. **Isso significa
+que não existe nenhum dado real para migrar ou re-mapear** — a mudança de
+modelo de dado é só criar a estrutura nova, sem backfill.
 
 ## Escopo
 
@@ -37,31 +51,47 @@ nova, sem backfill.
    de testes: nome, resumo do mapeamento, receita/ROAS recentes, status de
    sincronização, toggle ativo/pausado, "+ Novo funil").
 4. Formulário "Novo funil de venda" / "Editar funil" — nome + mapeamento
-   LaunchOps (`operacao_ids`/`produto_nomes`), o que **substitui** os campos
-   que a spec anterior (`2026-09-03-funnel-dashboard-design.md`) tinha
-   colocado na aba Integrações do cliente.
-5. O dashboard de funil que já existe (cone, KPIs, pizza de pagamento) passa
+   (`launchops_operacao_ids`/`launchops_produto_nomes`).
+5. Aba **Integrações** do cliente ganha uma seção nova, **"Fonte de dados do
+   Funil de Vendas"** (URL + chave de acesso) — client-wide, compartilhada
+   por todos os funis daquele cliente. Continua com Domínio e Hubla como já
+   é hoje.
+6. O dashboard de funil que já existe (cone, KPIs, pizza de pagamento) passa
    a ser **por funil**, não por cliente — a mesma tela, só trocando a chave
    de filtro.
-6. Job de sincronização (`/api/internal/sync-funnel`) passa a iterar
-   `sales_funnels` em vez de `clients`.
-7. Aba **Integrações** do cliente perde a seção de mapeamento LaunchOps —
-   volta a conter só o que é de fato client-wide: Domínio e token da Hubla.
+7. Job de sincronização (`/api/internal/sync-funnel`) passa a iterar
+   `sales_funnels`, resolvendo a credencial de acesso pelo `client_id` de
+   cada funil (não mais uma única credencial global).
+8. Formulário de criar/editar teste A/B ganha um campo opcional "Funil de
+   venda associado" (dropdown com os funis daquele cliente, ou em branco).
+9. `get_test_report_by_ad`/`get_test_report_by_source` passam a cruzar
+   gasto usando o `sales_funnel_id` do **teste**, não mais tentando inferir
+   pelo cliente.
 
-## Fora de escopo (mantido igual à spec anterior)
+## Fora de escopo
 
-- Ingestão direta por cliente (cliente colando o próprio token do Meta
-  Ads/Hubla) — já registrado como ideia futura na memória do projeto,
-  não muda com esta spec.
+- Ingestão direta batendo na API do Meta Ads/Hubla usando o token do
+  próprio cliente final (sem nenhum banco tipo LaunchOps no meio) — isso
+  continua diferente do item 2 do escopo acima: aqui a fonte ainda é "um
+  banco Postgres/Supabase no formato do LaunchOps", só a credencial de
+  acesso a ele que vira por cliente. Ingestão direta de verdade (schema
+  arbitrário, sem ser LaunchOps) continua fora, registrada na memória do
+  projeto como ideia futura.
 - Multi-usuário / RBAC.
-- Qualquer alteração no rastreamento de teste A/B (`click_events`,
-  `conversions`, RPCs de relatório) — este trabalho não toca nisso.
+- Qualquer alteração no rastreamento de clique/conversão do teste A/B em si
+  (`click_events`, `conversions`) — este trabalho não toca nisso, só no que
+  cruza com gasto de mídia.
 
 ## Modelo de dados
 
 Migration nova `0032_sales_funnels.sql` (sequência após `0031`):
 
 ```sql
+-- Credencial de acesso à fonte de dados do funil, por cliente (substitui as
+-- variáveis de ambiente globais LAUNCHOPS_SUPABASE_URL/LAUNCHOPS_SUPABASE_SERVICE_ROLE_KEY).
+alter table clients add column funnel_source_url text;
+alter table clients add column funnel_source_service_role_key text;
+
 create table sales_funnels (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null references clients(id) on delete cascade,
@@ -82,6 +112,11 @@ create policy "sales_funnels_via_client_owner" on sales_funnels
 
 grant select, insert, update, delete on sales_funnels to authenticated;
 
+-- Vínculo opcional teste -> funil. Nullable, on delete set null: nenhum teste
+-- existente muda de comportamento (todos ficam null automaticamente), e apagar
+-- um funil nunca apaga ou quebra um teste, só desvincula.
+alter table tests add column sales_funnel_id uuid references sales_funnels(id) on delete set null;
+
 -- As 4 tabelas do funil passam a ser escopadas por funil, não por cliente.
 -- Sem dado existente pra migrar (todas as 4 estão vazias hoje) -- troca direta,
 -- sem coluna de transição.
@@ -90,7 +125,6 @@ alter table sales add column sales_funnel_id uuid not null references sales_funn
 
 alter table ad_spend_daily drop column client_id;
 alter table ad_spend_daily add column sales_funnel_id uuid not null references sales_funnels(id) on delete cascade;
--- unique (client_id, source, operacao_id, data) vira:
 alter table ad_spend_daily drop constraint ad_spend_daily_client_id_source_operacao_id_data_key;
 alter table ad_spend_daily add constraint ad_spend_daily_funnel_source_operacao_data_key
   unique (sales_funnel_id, source, operacao_id, data);
@@ -120,28 +154,19 @@ sincronizado (que continuam SELECT-only pra `authenticated`, escrita só por
 `service_role`), `sales_funnels` recebe policy `for all` — porque é o
 usuário, pela UI, quem cria/edita/pausa/apaga um funil (não o job de sync).
 
-**`get_test_report_by_ad`/`get_test_report_by_source`:** o join com
-`ad_creative_spend_daily` (adicionado na spec anterior) precisa trocar de
-`acsd.client_id = v_client_id` para `acsd.sales_funnel_id = ...` — mas como
-**hoje não existe nenhum jeito de saber qual funil de venda corresponde a
-qual teste A/B** (são conceitos irmãos, não pai/filho), esse join fica
-**sem match nenhum até o usuário mapear um teste a um funil explicitamente**.
-Isso não é regressão: hoje mesmo, sem nenhum funil configurado, esse join já
-não bate nada (as tabelas estão vazias). Fica registrado como um ponto em
-aberto — ver "Não resolvido nesta spec" abaixo.
+**Cruzamento de gasto resolvido:** `get_test_report_by_ad`/
+`get_test_report_by_source` passam a fazer `join sales_funnels sf on sf.id =
+t.sales_funnel_id` antes de agregar `ad_creative_spend_daily` por
+`sf.id`. Quando `t.sales_funnel_id is null` (todo teste de hoje, e qualquer
+teste novo que o usuário não vincular), o join simplesmente não traz nada —
+mesmo comportamento gracioso que já existe hoje (colunas de gasto vazias),
+sem exceção nem erro.
 
-## Não resolvido nesta spec (decisão do usuário, não bloqueia o resto)
-
-Cruzar "Por anúncio" do relatório de teste A/B com o gasto de um funil de
-venda específico exige saber **qual funil pertence a qual teste** — hoje
-não existe esse vínculo (client tem N testes e N funis, sem ligação
-declarada entre um teste e um funil). Duas opções, para decidir depois:
-(a) o teste A/B ganha um campo opcional "funil de venda associado"; (b) o
-match continua sendo feito só por `client_id` (voltando a ser client-wide
-só para esse join específico, mesmo com múltiplos funis). Não implementado
-agora — o relatório por anúncio simplesmente não mostra gasto até isso ser
-decidido, sem quebrar nada do que já funciona (clique/conversão continuam
-normais).
+**Sobre guardar a chave de acesso em texto puro:** segue exatamente o mesmo
+padrão já usado pro token de webhook da Hubla (`clients.hubla_webhook_token`)
+— sem criptografia adicional nesta v1, protegido pelas mesmas garantias de
+RLS/acesso que já protegem o resto da tabela `clients`. Não é uma mudança de
+postura de segurança, é consistência com o que já existe.
 
 ## Rotas novas
 
@@ -157,8 +182,8 @@ normais).
   sync via `getFunnelSyncHealth`, toggle `is_active`, "+ Novo funil").
 - `src/app/dashboard/clients/[clientSlug]/funis-venda/new/page.tsx` —
   **nova**: formulário nome + `launchops_operacao_ids` +
-  `launchops_produto_nomes` (mesmos campos que estavam em Integrações,
-  agora aqui).
+  `launchops_produto_nomes` (a credencial de acesso NÃO fica aqui — fica em
+  Integrações, client-wide).
 - `src/app/dashboard/clients/[clientSlug]/funis-venda/[funnelSlug]/page.tsx`
   — **substitui** a atual `.../funnel/page.tsx`: mesmo conteúdo (cone, KPIs,
   pizza), trocando o filtro de `client_id` para `sales_funnel_id` resolvido
@@ -169,19 +194,44 @@ normais).
 
 ## Mudanças em código existente
 
-- `src/app/dashboard/clients/[clientSlug]/integrations/page.tsx` — remove a
-  seção de mapeamento LaunchOps adicionada pela spec anterior (Domínio e
-  Hubla continuam).
-- `src/app/api/internal/sync-funnel/route.ts` — troca a query de `clients`
-  (`where launchops_operacao_ids is not null`) para `sales_funnels`
-  (`where is_active = true and (launchops_operacao_ids is not null or
-  launchops_produto_nomes is not null)`), e todo `client.id` usado como
-  chave de escrita vira `funnel.id`.
+- `src/app/dashboard/clients/[clientSlug]/integrations/page.tsx` — troca a
+  seção de mapeamento LaunchOps (da spec anterior) por uma seção genérica
+  "Fonte de dados do Funil de Vendas" (2 campos: URL, chave de acesso).
+  Domínio e Hubla continuam como estão.
+- `src/lib/launchops/client.ts` (`createLaunchOpsClient`) — deixa de ler
+  `process.env.LAUNCHOPS_SUPABASE_URL`/`LAUNCHOPS_SUPABASE_SERVICE_ROLE_KEY`
+  e passa a receber `url`/`serviceRoleKey` como parâmetros, buscados do
+  `client` dono do funil sendo sincronizado.
+- `src/app/api/internal/sync-funnel/route.ts` — a query passa a ser em
+  `sales_funnels` (join `clients` pra pegar a credencial), filtrando
+  `is_active = true`; para cada funil, cria um `LaunchOpsClient` com a
+  credencial do client dono daquele funil (clientes diferentes podem ter
+  fontes diferentes; funis do mesmo cliente reaproveitam a mesma conexão).
+  Todo `client.id` usado como chave de escrita nas 3 tabelas de sync vira
+  `funnel.id`.
 - `src/lib/repo/funnel-repo.ts` — `getDailyFunnel`/`getPaymentMethodBreakdown`/
   `getFunnelSyncHealth` trocam o parâmetro `clientId` por `salesFunnelId`.
+- `src/app/dashboard/clients/[clientSlug]/tests/new/page.tsx` e
+  `tests/[testSlug]/edit/page.tsx` — ganham um campo opcional "Funil de
+  venda associado", populado com os `sales_funnels` daquele client.
 - Cabeçalho do cliente (hoje com botões "Integrações" / "Funil de Vendas" /
   "Novo teste" soltos lado a lado) — o botão solto "Funil de Vendas" some
   daqui, porque agora só se chega em Funis de Venda pelo hub.
+
+## Tratamento de erros e casos de borda
+
+- **Cliente sem `funnel_source_url`/`funnel_source_service_role_key`
+  configurado, mas com um `sales_funnel` já criado:** o job de sync pula
+  esse funil (mesmo tratamento silencioso e sem derrubar o cron que já
+  existe pra client sem mapeamento, só que agora a checagem é na
+  credencial do client, não no mapeamento do funil).
+- **Teste vinculado a um funil que depois é apagado:** `on delete set
+  null` — o teste continua existindo normalmente, só perde a referência
+  (relatório por anúncio volta a não mostrar gasto, sem erro).
+- **Dois clientes diferentes com a mesma URL/chave de fonte de dados**
+  (ex: dois clientes seus seguindo apontando pro mesmo LaunchOps): sem
+  problema — cada `sales_funnel` ainda filtra por `operacao_ids`/
+  `produto_nomes` próprios, então não há vazamento de dado entre eles.
 
 ## Estratégia de testes
 
@@ -192,8 +242,15 @@ normais).
 - Integração: `funnel_sync_state` com a nova PK composta
   `(sales_funnel_id, entity)` — duas entidades do mesmo funil não colidem;
   o mesmo `entity` em dois funis diferentes do mesmo client não colide.
-- Integração: sync route com 2 funis ativos do mesmo client mapeando
-  `operacao_ids` diferentes — dado de um nunca aparece no outro.
+- Integração: sync route com 2 clients com `funnel_source_url`/chave
+  **diferentes** — dado de um nunca aparece no outro (prova que a
+  credencial por cliente funciona de verdade, não só a variável global).
+- Integração: `get_test_report_by_ad` com `tests.sales_funnel_id` nulo
+  (comportamento de hoje) continua sem quebrar nem mudar clique/conversão;
+  com `sales_funnel_id` preenchido, `ad_spend` aparece corretamente.
+- Integração: apagar um `sales_funnel` que está vinculado a um teste ativo
+  — o teste continua existindo e seu relatório de clique/conversão
+  continua idêntico (só o gasto some).
 - Unitário: `getDailyFunnel`/`getPaymentMethodBreakdown` recebendo
   `salesFunnelId` em vez de `clientId` — mesmos testes já existentes,
   só troca o parâmetro.
