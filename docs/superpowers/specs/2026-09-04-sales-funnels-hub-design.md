@@ -27,10 +27,16 @@ O usuário quer três coisas nesta mesma leva de trabalho:
    URL/chave do seu LaunchOps ali — mas a estrutura já nasce pronta pra um
    cliente futuro ter uma fonte diferente, sem precisar mexer em variável
    de ambiente da Vercel.
-3. **Vínculo teste ↔ funil, sem afetar teste ativo** — cada teste ganha um
-   campo opcional apontando pra qual funil de venda ele pertence, pra o
-   relatório "Por anúncio" conseguir mostrar gasto/CPM/CTR de verdade. Tem
-   que ser opcional e não quebrar nenhum teste já existente.
+3. **Atribuição de gasto continua automática, sem vínculo manual** — o
+   relatório "Por anúncio" já casa gasto com clique pela identidade do
+   próprio anúncio (`fb_ad_id`/`utm_term`), nunca por uma relação declarada
+   entre teste e funil. Com múltiplos funis por cliente, isso só muda no
+   "de onde" a soma de gasto é buscada: em vez de olhar o gasto de um único
+   funil, o relatório soma o gasto de **todos os funis daquele cliente**,
+   e casa por ID/nome do anúncio como sempre fez. Decisão explícita do
+   usuário: não quer escolher manualmente "esse teste é desse funil" — quer
+   que a atribuição continue vindo só do que a Meta já manda no clique e na
+   venda.
 
 **Estado real do banco (verificado em 2026-09-04, antes de escrever esta
 spec):** nenhum client tem `launchops_operacao_ids`/`launchops_produto_nomes`
@@ -62,11 +68,12 @@ modelo de dado é só criar a estrutura nova, sem backfill.
 7. Job de sincronização (`/api/internal/sync-funnel`) passa a iterar
    `sales_funnels`, resolvendo a credencial de acesso pelo `client_id` de
    cada funil (não mais uma única credencial global).
-8. Formulário de criar/editar teste A/B ganha um campo opcional "Funil de
-   venda associado" (dropdown com os funis daquele cliente, ou em branco).
-9. `get_test_report_by_ad`/`get_test_report_by_source` passam a cruzar
-   gasto usando o `sales_funnel_id` do **teste**, não mais tentando inferir
-   pelo cliente.
+8. `get_test_report_by_ad`/`get_test_report_by_source` passam a agregar
+   `ad_creative_spend_daily` de **todos os `sales_funnels` do cliente** do
+   teste (via `join sales_funnels ... where client_id = v_client_id`, no
+   lugar do antigo `acsd.client_id = v_client_id` direto), continuando a
+   casar por `fb_ad_id`/`utm_term` exatamente como já fazia com um funil
+   só. Nenhum campo novo no teste, nenhuma escolha manual do usuário.
 
 ## Fora de escopo
 
@@ -112,11 +119,6 @@ create policy "sales_funnels_via_client_owner" on sales_funnels
 
 grant select, insert, update, delete on sales_funnels to authenticated;
 
--- Vínculo opcional teste -> funil. Nullable, on delete set null: nenhum teste
--- existente muda de comportamento (todos ficam null automaticamente), e apagar
--- um funil nunca apaga ou quebra um teste, só desvincula.
-alter table tests add column sales_funnel_id uuid references sales_funnels(id) on delete set null;
-
 -- As 4 tabelas do funil passam a ser escopadas por funil, não por cliente.
 -- Sem dado existente pra migrar (todas as 4 estão vazias hoje) -- troca direta,
 -- sem coluna de transição.
@@ -154,13 +156,26 @@ sincronizado (que continuam SELECT-only pra `authenticated`, escrita só por
 `service_role`), `sales_funnels` recebe policy `for all` — porque é o
 usuário, pela UI, quem cria/edita/pausa/apaga um funil (não o job de sync).
 
-**Cruzamento de gasto resolvido:** `get_test_report_by_ad`/
-`get_test_report_by_source` passam a fazer `join sales_funnels sf on sf.id =
-t.sales_funnel_id` antes de agregar `ad_creative_spend_daily` por
-`sf.id`. Quando `t.sales_funnel_id is null` (todo teste de hoje, e qualquer
-teste novo que o usuário não vincular), o join simplesmente não traz nada —
-mesmo comportamento gracioso que já existe hoje (colunas de gasto vazias),
-sem exceção nem erro.
+**Cruzamento de gasto — automático, sem vínculo manual:** a CTE
+`ad_spend_agg` de `get_test_report_by_ad`/`get_test_report_by_source` troca
+`from ad_creative_spend_daily acsd where acsd.client_id = v_client_id` por:
+
+```sql
+from ad_creative_spend_daily acsd
+join sales_funnels sf on sf.id = acsd.sales_funnel_id
+where sf.client_id = v_client_id
+```
+
+Isso soma o gasto de **todos os funis daquele cliente** numa única bolsa, e
+o resto da query continua igual: casa com o clique por
+`coalesce(nullif(fb_ad_id,''), nullif(utm_term,''))`. Se o cliente não tiver
+nenhum funil configurado (caso de hoje), a soma vem vazia e as colunas de
+gasto ficam em branco — mesmo comportamento gracioso de sempre, sem
+exceção. Não existe cenário onde o usuário precise "escolher" de qual funil
+vem o gasto: se dois funis do mesmo cliente acidentalmente mapearem a
+mesma operação do LaunchOps, o gasto dela pode ser somado em dobro — isso é
+um cuidado de configuração do usuário (mapear operações sem sobrepor), não
+algo que o código precise validar.
 
 **Sobre guardar a chave de acesso em texto puro:** segue exatamente o mesmo
 padrão já usado pro token de webhook da Hubla (`clients.hubla_webhook_token`)
@@ -211,9 +226,9 @@ postura de segurança, é consistência com o que já existe.
   `funnel.id`.
 - `src/lib/repo/funnel-repo.ts` — `getDailyFunnel`/`getPaymentMethodBreakdown`/
   `getFunnelSyncHealth` trocam o parâmetro `clientId` por `salesFunnelId`.
-- `src/app/dashboard/clients/[clientSlug]/tests/new/page.tsx` e
-  `tests/[testSlug]/edit/page.tsx` — ganham um campo opcional "Funil de
-  venda associado", populado com os `sales_funnels` daquele client.
+- Formulário de teste A/B (criar/editar) — **sem mudança nenhuma**. A
+  atribuição de gasto continua 100% automática, pela identidade do
+  anúncio.
 - Cabeçalho do cliente (hoje com botões "Integrações" / "Funil de Vendas" /
   "Novo teste" soltos lado a lado) — o botão solto "Funil de Vendas" some
   daqui, porque agora só se chega em Funis de Venda pelo hub.
@@ -225,9 +240,10 @@ postura de segurança, é consistência com o que já existe.
   esse funil (mesmo tratamento silencioso e sem derrubar o cron que já
   existe pra client sem mapeamento, só que agora a checagem é na
   credencial do client, não no mapeamento do funil).
-- **Teste vinculado a um funil que depois é apagado:** `on delete set
-  null` — o teste continua existindo normalmente, só perde a referência
-  (relatório por anúncio volta a não mostrar gasto, sem erro).
+- **Um `sales_funnel` é apagado:** os testes daquele cliente continuam
+  existindo normalmente — a soma de gasto (que já vem de "todos os funis do
+  cliente", nunca de um funil específico "dono" do teste) simplesmente
+  passa a somar um funil a menos, sem erro.
 - **Dois clientes diferentes com a mesma URL/chave de fonte de dados**
   (ex: dois clientes seus seguindo apontando pro mesmo LaunchOps): sem
   problema — cada `sales_funnel` ainda filtra por `operacao_ids`/
@@ -245,12 +261,14 @@ postura de segurança, é consistência com o que já existe.
 - Integração: sync route com 2 clients com `funnel_source_url`/chave
   **diferentes** — dado de um nunca aparece no outro (prova que a
   credencial por cliente funciona de verdade, não só a variável global).
-- Integração: `get_test_report_by_ad` com `tests.sales_funnel_id` nulo
-  (comportamento de hoje) continua sem quebrar nem mudar clique/conversão;
-  com `sales_funnel_id` preenchido, `ad_spend` aparece corretamente.
-- Integração: apagar um `sales_funnel` que está vinculado a um teste ativo
-  — o teste continua existindo e seu relatório de clique/conversão
-  continua idêntico (só o gasto some).
+- Integração: `get_test_report_by_ad` com um cliente que tem **dois**
+  `sales_funnels` cada um com gasto de anúncios diferentes — o relatório
+  soma o gasto dos dois corretamente, casando por `fb_ad_id`/`utm_term`
+  como sempre. Cliente sem nenhum funil continua com as colunas de gasto
+  em branco, sem quebrar clique/conversão.
+- Integração: apagar um `sales_funnel` — os testes daquele cliente
+  continuam existindo e seu relatório de clique/conversão continua
+  idêntico (só o gasto somado fica menor, sem erro).
 - Unitário: `getDailyFunnel`/`getPaymentMethodBreakdown` recebendo
   `salesFunnelId` em vez de `clientId` — mesmos testes já existentes,
   só troca o parâmetro.
