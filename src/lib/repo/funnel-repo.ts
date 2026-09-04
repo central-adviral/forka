@@ -1,11 +1,23 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+// Brazil has had no DST since 2019, so BRT is a fixed UTC-3 offset — a BRT calendar day
+// boundary ("YYYY-MM-DDT00:00:00" local) is always this same UTC instant. `since`/`until` are
+// plain date strings (e.g. "2026-08-04"); querying `data_venda` against them directly compares
+// against UTC midnight, not BRT midnight — dayKey() below buckets by BRT day, so the query
+// bound has to line up with the same boundary or a sale near midnight BRT can fall outside the
+// requested range even though its BRT day is inside it.
+function brtDayBoundaryUtc(dateOnly: string): string {
+  return `${dateOnly}T03:00:00.000Z`
+}
+
 export interface DailyFunnelRow {
   data: string
   vendas: number
   receitaBruta: number
   receitaLiquida: number
   spend: number
+  impressions: number
+  clicks: number
   roas: number | null
   cac: number | null
 }
@@ -20,35 +32,41 @@ export async function getDailyFunnel(
     .from('sales')
     .select('data_venda, valor_bruto, valor_liquido')
     .eq('client_id', clientId)
-    .gte('data_venda', since)
-    .lt('data_venda', until)
+    .gte('data_venda', brtDayBoundaryUtc(since))
+    .lt('data_venda', brtDayBoundaryUtc(until))
   if (salesError) throw salesError
 
   const { data: spendRows, error: spendError } = await db
     .from('ad_spend_daily')
-    .select('data, spend')
+    .select('data, spend, impressions, clicks')
     .eq('client_id', clientId)
     .gte('data', since)
     .lt('data', until)
   if (spendError) throw spendError
 
-  const byDay = new Map<string, { vendas: number; receitaBruta: number; receitaLiquida: number; spend: number }>()
+  const byDay = new Map<
+    string,
+    { vendas: number; receitaBruta: number; receitaLiquida: number; spend: number; impressions: number; clicks: number }
+  >()
   // Sales timestamps are UTC; ad_spend_daily.data already arrives in the ad account's
   // local timezone (America/Sao_Paulo), so bucket sales by the same BRT calendar day.
   const dayKey = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(iso))
+  const emptyEntry = () => ({ vendas: 0, receitaBruta: 0, receitaLiquida: 0, spend: 0, impressions: 0, clicks: 0 })
 
   for (const row of (salesRows ?? []) as { data_venda: string; valor_bruto: number | null; valor_liquido: number | null }[]) {
     const key = dayKey(row.data_venda)
-    const entry = byDay.get(key) ?? { vendas: 0, receitaBruta: 0, receitaLiquida: 0, spend: 0 }
+    const entry = byDay.get(key) ?? emptyEntry()
     entry.vendas += 1
     entry.receitaBruta += row.valor_bruto ?? 0
     entry.receitaLiquida += row.valor_liquido ?? 0
     byDay.set(key, entry)
   }
 
-  for (const row of (spendRows ?? []) as { data: string; spend: number }[]) {
-    const entry = byDay.get(row.data) ?? { vendas: 0, receitaBruta: 0, receitaLiquida: 0, spend: 0 }
+  for (const row of (spendRows ?? []) as { data: string; spend: number; impressions: number; clicks: number }[]) {
+    const entry = byDay.get(row.data) ?? emptyEntry()
     entry.spend += row.spend
+    entry.impressions += row.impressions
+    entry.clicks += row.clicks
     byDay.set(row.data, entry)
   }
 
@@ -60,6 +78,36 @@ export async function getDailyFunnel(
       cac: entry.vendas > 0 ? entry.spend / entry.vendas : null,
     }))
     .sort((a, b) => a.data.localeCompare(b.data))
+}
+
+export interface PaymentMethodBreakdown {
+  metodo: string
+  receita: number
+}
+
+export async function getPaymentMethodBreakdown(
+  db: SupabaseClient,
+  clientId: string,
+  since: string,
+  until: string
+): Promise<PaymentMethodBreakdown[]> {
+  const { data, error } = await db
+    .from('sales')
+    .select('metodo_pagamento, valor_bruto')
+    .eq('client_id', clientId)
+    .gte('data_venda', brtDayBoundaryUtc(since))
+    .lt('data_venda', brtDayBoundaryUtc(until))
+  if (error) throw error
+
+  const byMethod = new Map<string, number>()
+  for (const row of (data ?? []) as { metodo_pagamento: string | null; valor_bruto: number | null }[]) {
+    const key = row.metodo_pagamento ?? 'desconhecido'
+    byMethod.set(key, (byMethod.get(key) ?? 0) + (row.valor_bruto ?? 0))
+  }
+
+  return [...byMethod.entries()]
+    .map(([metodo, receita]) => ({ metodo, receita }))
+    .sort((a, b) => b.receita - a.receita)
 }
 
 export interface SyncHealth {
