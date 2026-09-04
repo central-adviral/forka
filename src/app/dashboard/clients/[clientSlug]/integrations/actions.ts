@@ -90,31 +90,31 @@ export async function saveHublaToken(context: { client_id: string; client_slug: 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/integrations`)
 }
 
-const launchopsMappingSchema = z.object({
+const funnelDataSourceSchema = z.object({
   client_id: z.string().uuid(),
   client_slug: z.string(),
-  launchops_operacao_ids: z.string(),
-  launchops_produto_nomes: z.string(),
+  funnel_source_url: z.string().url('informe uma URL válida').optional().or(z.literal('')),
+  funnel_source_service_role_key: z.string().optional().or(z.literal('')),
 })
 
-export async function saveLaunchOpsMapping(context: { client_id: string; client_slug: string }, formData: FormData) {
-  const result = launchopsMappingSchema.safeParse({
+export async function saveFunnelDataSource(context: { client_id: string; client_slug: string }, formData: FormData) {
+  const result = funnelDataSourceSchema.safeParse({
     client_id: context.client_id,
     client_slug: context.client_slug,
-    launchops_operacao_ids: formData.get('launchops_operacao_ids'),
-    launchops_produto_nomes: formData.get('launchops_produto_nomes'),
+    funnel_source_url: formData.get('funnel_source_url'),
+    funnel_source_service_role_key: formData.get('funnel_source_service_role_key'),
   })
   if (!result.success) {
     throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
   }
   const parsed = result.data
-  const operacaoIds = parsed.launchops_operacao_ids.split(',').map((s) => s.trim()).filter(Boolean)
-  const produtoNomes = parsed.launchops_produto_nomes.split(',').map((s) => s.trim()).filter(Boolean)
-
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase
     .from('clients')
-    .update({ launchops_operacao_ids: operacaoIds, launchops_produto_nomes: produtoNomes })
+    .update({
+      funnel_source_url: parsed.funnel_source_url || null,
+      funnel_source_service_role_key: parsed.funnel_source_service_role_key || null,
+    })
     .eq('id', parsed.client_id)
   if (error) throw error
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/integrations`)
