@@ -89,3 +89,33 @@ export async function saveHublaToken(context: { client_id: string; client_slug: 
   if (error) throw error
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/integrations`)
 }
+
+const launchopsMappingSchema = z.object({
+  client_id: z.string().uuid(),
+  client_slug: z.string(),
+  launchops_operacao_ids: z.string(),
+  launchops_produto_nomes: z.string(),
+})
+
+export async function saveLaunchOpsMapping(context: { client_id: string; client_slug: string }, formData: FormData) {
+  const result = launchopsMappingSchema.safeParse({
+    client_id: context.client_id,
+    client_slug: context.client_slug,
+    launchops_operacao_ids: formData.get('launchops_operacao_ids'),
+    launchops_produto_nomes: formData.get('launchops_produto_nomes'),
+  })
+  if (!result.success) {
+    throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
+  }
+  const parsed = result.data
+  const operacaoIds = parsed.launchops_operacao_ids.split(',').map((s) => s.trim()).filter(Boolean)
+  const produtoNomes = parsed.launchops_produto_nomes.split(',').map((s) => s.trim()).filter(Boolean)
+
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase
+    .from('clients')
+    .update({ launchops_operacao_ids: operacaoIds, launchops_produto_nomes: produtoNomes })
+    .eq('id', parsed.client_id)
+  if (error) throw error
+  revalidatePath(`/dashboard/clients/${parsed.client_slug}/integrations`)
+}

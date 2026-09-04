@@ -2,7 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
-import { saveDomain, verifyDomain, saveHublaToken } from './actions'
+import { saveDomain, verifyDomain, saveHublaToken, saveLaunchOpsMapping } from './actions'
 import { VerifyDomainButton } from './verify-domain-button'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -22,7 +22,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
   const supabase = await createServerSupabaseClient()
   const { data: client } = await supabase
     .from('clients')
-    .select('id, slug, custom_domain, domain_status, hubla_webhook_token')
+    .select('id, slug, custom_domain, domain_status, hubla_webhook_token, launchops_operacao_ids, launchops_produto_nomes')
     .eq('slug', clientSlug)
     .maybeSingle()
 
@@ -131,6 +131,40 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
             <CopyButton text={webhookUrl} />
           </div>
         </div>
+      </section>
+
+      <section className="space-y-4 rounded-2xl border border-white/[0.08] p-5">
+        <h2 className="font-['Space_Grotesk'] text-base font-semibold">LaunchOps</h2>
+
+        <form action={saveLaunchOpsMapping.bind(null, { client_id: client.id, client_slug: client.slug })} className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs text-[#8A90A6]">IDs de operação (separados por vírgula)</label>
+            <input
+              name="launchops_operacao_ids"
+              placeholder="09066a9d-419c-..., 15e25205-230b-..."
+              defaultValue={(client.launchops_operacao_ids ?? []).join(', ')}
+              className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-[#8A90A6]">Nomes de produto na Hubla (separados por vírgula)</label>
+            <input
+              name="launchops_produto_nomes"
+              placeholder="1K Por Dia Latam"
+              defaultValue={(client.launchops_produto_nomes ?? []).join(', ')}
+              className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
+            />
+          </div>
+          <button
+            type="submit"
+            className="rounded-[10px] bg-[#7C6FF0] px-4 py-2.5 text-sm font-semibold text-[#0B0E1A]"
+          >
+            Salvar
+          </button>
+        </form>
+        <p className="-mt-2 text-xs text-[#8A90A6]">
+          Mapeia este cliente às operações/produtos correspondentes no LaunchOps, usados pelo sync automático de vendas e gasto de mídia.
+        </p>
       </section>
     </div>
   )
