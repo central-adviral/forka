@@ -447,6 +447,12 @@ git commit -m "feat(db): add sales_funnels table, per-client funnel credentials,
 - Modify: `src/lib/repo/funnel-repo.integration.test.ts`
 - Modify: `src/lib/repo/funnel-sync-state-repo.integration.test.ts`
 - Modify: `src/lib/launchops/sync-sales.test.ts`
+- Modify: `src/lib/launchops/sync-sales.integration.test.ts`
+- Modify: `src/lib/launchops/sync-ad-spend.integration.test.ts`
+- Modify: `src/lib/launchops/sync-ad-creative-spend.integration.test.ts`
+- Modify: `supabase/migrations/0029_funnel_dashboard.integration.test.ts`
+- Modify: `supabase/migrations/0030_report_ad_spend.integration.test.ts`
+- Modify: `supabase/migrations/0031_report_ad_spend_fallback_fix.integration.test.ts`
 
 **Interfaces:**
 - Consumes: `sales_funnels`, and the re-keyed `sales`/`ad_spend_daily`/`ad_creative_spend_daily`/`funnel_sync_state` tables from Task 1.
@@ -717,17 +723,441 @@ describe('syncSalesForFunnel', () => {
 })
 ```
 
-`sync-ad-spend.test.ts` and `sync-ad-creative-spend.test.ts` need no changes — they only test the pure functions (`aggregateAdSpendByOperacaoDay`, `fetchAllPages`, `joinAdCreativeSpend`), none of which touch `clientId`/`salesFunnelId`.
+`sync-ad-spend.test.ts` and `sync-ad-creative-spend.test.ts` (the plain unit test files, not the `.integration.test.ts` ones below) need no changes — they only test the pure functions (`aggregateAdSpendByOperacaoDay`, `fetchAllPages`, `joinAdCreativeSpend`), none of which touch `clientId`/`salesFunnelId`.
 
-- [ ] **Step 10: Run the tests**
+- [ ] **Step 10: Update `src/lib/launchops/sync-sales.integration.test.ts`**
+
+This file integration-tests `syncSalesForClient` directly against a real local Postgres — same rename as Step 9's unit test, but exercising the real upsert/dedup behavior against the `sales` table.
+
+```typescript
+import { describe, it, expect, beforeAll } from 'vitest'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
+import { syncSalesForFunnel, type LaunchOpsSaleRow } from './sync-sales'
+
+const db = createServiceRoleClient()
+let salesFunnelId: string
+
+beforeAll(async () => {
+  const { data: user } = await db.auth.admin.createUser({
+    email: `sync-sales-${Date.now()}@example.com`,
+    password: 'password123',
+    email_confirm: true,
+  })
+  const { data: client } = await db
+    .from('clients')
+    .insert({ owner_id: user!.user!.id, name: 'SyncSales', slug: `sync-sales-${Date.now()}` })
+    .select()
+    .single()
+  const { data: funnel } = await db
+    .from('sales_funnels')
+    .insert({ client_id: client!.id, name: 'SyncSales Funnel', slug: 'sync-sales-funnel' })
+    .select()
+    .single()
+  salesFunnelId = funnel!.id
+})
+
+function row(overrides: Partial<LaunchOpsSaleRow> = {}): LaunchOpsSaleRow {
+  return {
+    id: crypto.randomUUID(),
+    data_venda: '2026-09-01T12:00:00Z',
+    produto_nome: '1K Por Dia Latam',
+    status: 'aprovada',
+    valor_bruto: 7.7,
+    valor_liquido: 6.9,
+    metodo_pagamento: 'pix',
+    updated_at: '2026-09-01T12:00:00Z',
+    ...overrides,
+  }
+}
+
+describe('syncSalesForFunnel (integration)', () => {
+  it('inserts a new sale and re-running with the same row does not duplicate it', async () => {
+    const saleRow = row()
+    await syncSalesForFunnel(db, salesFunnelId, [saleRow])
+    await syncSalesForFunnel(db, salesFunnelId, [saleRow])
+
+    const { data } = await db.from('sales').select('id').eq('sales_funnel_id', salesFunnelId).eq('external_id', saleRow.id)
+    expect(data!.length).toBe(1)
+  })
+
+  it('updates an existing sale in place when the row is re-synced with new values', async () => {
+    const saleRow = row({ valor_bruto: 10 })
+    await syncSalesForFunnel(db, salesFunnelId, [saleRow])
+    await syncSalesForFunnel(db, salesFunnelId, [{ ...saleRow, valor_bruto: 12 }])
+
+    const { data } = await db
+      .from('sales')
+      .select('valor_bruto')
+      .eq('sales_funnel_id', salesFunnelId)
+      .eq('external_id', saleRow.id)
+      .single()
+    expect(data!.valor_bruto).toBe(12)
+  })
+})
+```
+
+- [ ] **Step 11: Update `src/lib/launchops/sync-ad-spend.integration.test.ts`**
+
+```typescript
+import { describe, it, expect, beforeAll } from 'vitest'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
+import { syncAdSpendForFunnel, type AggregatedAdSpendRow } from './sync-ad-spend'
+
+const db = createServiceRoleClient()
+let salesFunnelId: string
+const operacaoIdA = crypto.randomUUID()
+const operacaoIdB = crypto.randomUUID()
+
+beforeAll(async () => {
+  const { data: user } = await db.auth.admin.createUser({
+    email: `sync-adspend-${Date.now()}@example.com`,
+    password: 'password123',
+    email_confirm: true,
+  })
+  const { data: client } = await db
+    .from('clients')
+    .insert({ owner_id: user!.user!.id, name: 'SyncAdSpend', slug: `sync-adspend-${Date.now()}` })
+    .select()
+    .single()
+  const { data: funnel } = await db
+    .from('sales_funnels')
+    .insert({ client_id: client!.id, name: 'SyncAdSpend Funnel', slug: 'sync-adspend-funnel' })
+    .select()
+    .single()
+  salesFunnelId = funnel!.id
+})
+
+describe('syncAdSpendForFunnel (integration)', () => {
+  it('keeps operation A untouched when only operation B is re-synced for the same day', async () => {
+    const rowA: AggregatedAdSpendRow = { operacao_id: operacaoIdA, data: '2026-09-01', spend: 100, impressions: 1000, clicks: 10, leads: 2 }
+    const rowB: AggregatedAdSpendRow = { operacao_id: operacaoIdB, data: '2026-09-01', spend: 40, impressions: 400, clicks: 4, leads: 1 }
+    await syncAdSpendForFunnel(db, salesFunnelId, [rowA, rowB])
+
+    await syncAdSpendForFunnel(db, salesFunnelId, [{ ...rowB, spend: 55 }])
+
+    const { data } = await db
+      .from('ad_spend_daily')
+      .select('operacao_id, spend')
+      .eq('sales_funnel_id', salesFunnelId)
+      .eq('data', '2026-09-01')
+      .order('operacao_id')
+
+    const byOp = new Map(data!.map((r) => [r.operacao_id, r.spend]))
+    expect(byOp.get(operacaoIdA)).toBe(100)
+    expect(byOp.get(operacaoIdB)).toBe(55)
+  })
+})
+```
+
+- [ ] **Step 12: Update `src/lib/launchops/sync-ad-creative-spend.integration.test.ts`**
+
+```typescript
+import { describe, it, expect, beforeAll } from 'vitest'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
+import { syncAdCreativeSpendForFunnel, type JoinedAdCreativeSpendRow } from './sync-ad-creative-spend'
+
+const db = createServiceRoleClient()
+let salesFunnelId: string
+
+beforeAll(async () => {
+  const { data: user } = await db.auth.admin.createUser({
+    email: `sync-adcreative-${Date.now()}@example.com`,
+    password: 'password123',
+    email_confirm: true,
+  })
+  const { data: client } = await db
+    .from('clients')
+    .insert({ owner_id: user!.user!.id, name: 'SyncAdCreative', slug: `sync-adcreative-${Date.now()}` })
+    .select()
+    .single()
+  const { data: funnel } = await db
+    .from('sales_funnels')
+    .insert({ client_id: client!.id, name: 'SyncAdCreative Funnel', slug: 'sync-adcreative-funnel' })
+    .select()
+    .single()
+  salesFunnelId = funnel!.id
+})
+
+describe('syncAdCreativeSpendForFunnel (integration)', () => {
+  it('does not duplicate a row when ad_id is null and the same batch is synced twice', async () => {
+    const row: JoinedAdCreativeSpendRow = { ad_id: null, ad_name: 'Criativo Sem ID', data: '2026-09-01', spend: 10, impressions: 100, link_clicks: 2 }
+    await syncAdCreativeSpendForFunnel(db, salesFunnelId, [row])
+    await syncAdCreativeSpendForFunnel(db, salesFunnelId, [row])
+
+    const { data } = await db
+      .from('ad_creative_spend_daily')
+      .select('id')
+      .eq('sales_funnel_id', salesFunnelId)
+      .eq('data', '2026-09-01')
+      .is('ad_id', null)
+      .eq('ad_name', 'Criativo Sem ID')
+    expect(data!.length).toBe(1)
+  })
+})
+```
+
+- [ ] **Step 13: Update `supabase/migrations/0029_funnel_dashboard.integration.test.ts`**
+
+This file predates `sales_funnels` and tested RLS on `sales` directly via `client_id`. Update it to create a `sales_funnels` row and use `sales_funnel_id`, keeping the same 3 assertions (service role can select, authenticated owner can select via RLS, authenticated role is blocked from inserting).
+
+```typescript
+import { describe, it, expect, beforeAll } from 'vitest'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
+
+const serviceDb = createServiceRoleClient()
+const ownerPassword = 'password123'
+let salesFunnelId: string
+let authedDb: SupabaseClient
+
+beforeAll(async () => {
+  const ownerEmail = `funnel-owner-${Date.now()}@example.com`
+  const { data: user } = await serviceDb.auth.admin.createUser({
+    email: ownerEmail,
+    password: ownerPassword,
+    email_confirm: true,
+  })
+  const { data: client } = await serviceDb
+    .from('clients')
+    .insert({ owner_id: user!.user!.id, name: 'Funnel RLS', slug: `funnel-rls-${Date.now()}` })
+    .select()
+    .single()
+  const { data: funnel } = await serviceDb
+    .from('sales_funnels')
+    .insert({ client_id: client!.id, name: 'Funnel RLS Funnel', slug: 'funnel-rls-funnel' })
+    .select()
+    .single()
+  salesFunnelId = funnel!.id
+
+  await serviceDb.from('sales').insert({
+    sales_funnel_id: salesFunnelId,
+    external_id: `sale-${Date.now()}`,
+    data_venda: new Date().toISOString(),
+    status: 'aprovada',
+    valor_bruto: 10,
+  })
+
+  const anonDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    auth: { persistSession: false },
+  })
+  const { data: signIn, error: signInError } = await anonDb.auth.signInWithPassword({
+    email: ownerEmail,
+    password: ownerPassword,
+  })
+  if (signInError) throw signInError
+  authedDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: `Bearer ${signIn.session!.access_token}` } },
+  })
+})
+
+describe('funnel tables RLS', () => {
+  it('lets the service role select the seeded sale', async () => {
+    const { data, error } = await serviceDb.from('sales').select('id').eq('sales_funnel_id', salesFunnelId)
+    expect(error).toBeNull()
+    expect(data!.length).toBe(1)
+  })
+
+  it('lets the authenticated owner select their own sale via RLS', async () => {
+    const { data, error } = await authedDb.from('sales').select('id').eq('sales_funnel_id', salesFunnelId)
+    expect(error).toBeNull()
+    expect(data!.length).toBe(1)
+  })
+
+  it('rejects insert from the authenticated role — grants are select-only', async () => {
+    const { error } = await authedDb.from('sales').insert({
+      sales_funnel_id: salesFunnelId,
+      external_id: `blocked-${Date.now()}`,
+      data_venda: new Date().toISOString(),
+      status: 'aprovada',
+    })
+    expect(error).not.toBeNull()
+  })
+})
+```
+
+- [ ] **Step 14: Update `supabase/migrations/0030_report_ad_spend.integration.test.ts`**
+
+Regression test for a real historical bug (a non-pre-aggregated join multiplying spend by click count) — must keep testing that exact scenario, just sourced from a `sales_funnel` instead of `client_id` directly.
+
+```typescript
+import { describe, it, expect, beforeAll } from 'vitest'
+import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
+
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321'
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+const db = createServiceRoleClient()
+let testId: string
+let asOwner: SupabaseClient
+
+beforeAll(async () => {
+  const email = `report-ad-spend-${Date.now()}@example.com`
+  const password = 'password123'
+  const { data: user } = await db.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
+  asOwner = createClient(URL, ANON_KEY)
+  await asOwner.auth.signInWithPassword({ email, password })
+  const { data: client } = await db
+    .from('clients')
+    .insert({ owner_id: user!.user!.id, name: 'ReportAdSpend', slug: `report-ad-spend-${Date.now()}` })
+    .select()
+    .single()
+  const clientId = client!.id
+  const { data: funnel } = await db
+    .from('sales_funnels')
+    .insert({ client_id: clientId, name: 'ReportAdSpend Funnel', slug: 'report-ad-spend-funnel' })
+    .select()
+    .single()
+  const salesFunnelId = funnel!.id
+  const { data: test } = await db
+    .from('tests')
+    .insert({ client_id: clientId, name: 'T', slug: `report-ad-spend-t-${Date.now()}`, conversion_method: 'hubla_webhook' })
+    .select()
+    .single()
+  testId = test!.id
+  const { data: variant } = await db
+    .from('variants')
+    .insert({ test_id: testId, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' })
+    .select()
+    .single()
+  const variantId = variant!.id
+
+  // 3 clicks for the same ad, plus 5 days of R$10 spend for that ad — a broken
+  // (non-pre-aggregated) join would multiply spend by click count (15x R$10 instead of R$50 total).
+  for (let i = 0; i < 3; i++) {
+    await db.from('click_events').insert({
+      test_id: testId,
+      variant_id: variantId,
+      visitor_id: `visitor-${i}`,
+      tracking_id: crypto.randomUUID(),
+      source_utms: { fb_ad_id: 'ad-123' },
+    })
+  }
+  const spendRows = Array.from({ length: 5 }, (_, i) => ({
+    sales_funnel_id: salesFunnelId,
+    source: 'launchops_sync',
+    data: `2026-09-0${i + 1}`,
+    ad_id: 'ad-123',
+    ad_name: 'Criativo X',
+    spend: 10,
+    impressions: 100,
+    link_clicks: 2,
+  }))
+  await db.from('ad_creative_spend_daily').insert(spendRows)
+})
+
+describe('get_test_report_by_ad — spend enrichment', () => {
+  it('returns total spend for the period, not spend multiplied by click count', async () => {
+    const { data, error } = await asOwner.rpc('get_test_report_by_ad', { p_test_id: testId, p_since: null, p_until: null })
+    expect(error).toBeNull()
+    const row = (data as { ad_name: string; clicks: number; ad_spend: number }[]).find((r) => r.ad_name === 'ad-123')
+    expect(row?.clicks).toBe(3)
+    expect(row?.ad_spend).toBe(50)
+  })
+})
+```
+
+- [ ] **Step 15: Update `supabase/migrations/0031_report_ad_spend_fallback_fix.integration.test.ts`**
+
+Regression test for the `utm_term` fallback when `fb_ad_id` is an empty string rather than null — same schema swap as Step 14.
+
+```typescript
+import { describe, it, expect, beforeAll } from 'vitest'
+import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
+
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321'
+const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+const db = createServiceRoleClient()
+let testId: string
+let asOwner: SupabaseClient
+
+beforeAll(async () => {
+  const email = `report-fallback-fix-${Date.now()}@example.com`
+  const password = 'password123'
+  const { data: user } = await db.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
+  asOwner = createClient(URL, ANON_KEY)
+  await asOwner.auth.signInWithPassword({ email, password })
+  const { data: client } = await db
+    .from('clients')
+    .insert({ owner_id: user!.user!.id, name: 'ReportFallbackFix', slug: `report-fallback-fix-${Date.now()}` })
+    .select()
+    .single()
+  const clientId = client!.id
+  const { data: funnel } = await db
+    .from('sales_funnels')
+    .insert({ client_id: clientId, name: 'ReportFallbackFix Funnel', slug: 'report-fallback-fix-funnel' })
+    .select()
+    .single()
+  const salesFunnelId = funnel!.id
+  const { data: test } = await db
+    .from('tests')
+    .insert({ client_id: clientId, name: 'T', slug: `report-fallback-fix-t-${Date.now()}`, conversion_method: 'hubla_webhook' })
+    .select()
+    .single()
+  testId = test!.id
+  const { data: variant } = await db
+    .from('variants')
+    .insert({ test_id: testId, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' })
+    .select()
+    .single()
+  const variantId = variant!.id
+
+  // click has no fb_ad_id (the redirect route writes '' for it, not null) but a real utm_term.
+  // LaunchOps only reports ad_name for this ad (ad_id is null), matching the realistic case where
+  // the CTE key correctly falls through to ad_name — but a broken join predicate on the click side
+  // (coalesce('', utm_term) never falls through to utm_term) would still leave ad_spend null.
+  await db.from('click_events').insert({
+    test_id: testId,
+    variant_id: variantId,
+    visitor_id: 'visitor-1',
+    tracking_id: crypto.randomUUID(),
+    source_utms: { fb_ad_id: '', utm_term: 'Criativo Y' },
+  })
+  await db.from('ad_creative_spend_daily').insert({
+    sales_funnel_id: salesFunnelId,
+    source: 'launchops_sync',
+    data: '2026-09-01',
+    ad_id: null,
+    ad_name: 'Criativo Y',
+    spend: 25,
+    impressions: 200,
+    link_clicks: 4,
+  })
+})
+
+describe('get_test_report_by_ad — utm_term fallback with empty-string fb_ad_id', () => {
+  it('matches spend via utm_term when fb_ad_id is an empty string, not null', async () => {
+    const { data, error } = await asOwner.rpc('get_test_report_by_ad', { p_test_id: testId, p_since: null, p_until: null })
+    expect(error).toBeNull()
+    const row = (data as { ad_name: string; clicks: number; ad_spend: number | null }[]).find((r) => r.ad_name === 'Criativo Y')
+    expect(row?.clicks).toBe(1)
+    expect(row?.ad_spend).toBe(25)
+  })
+})
+```
+
+- [ ] **Step 16: Run the tests**
 
 Run: `npx tsc --noEmit && npm run test`
-Expected: TypeScript clean, all unit tests PASS (these are unit tests; the `.integration.test.ts` files require `npm run test:integration` with `supabase start` running locally — run that too if available, expect PASS).
+Expected: TypeScript clean, all unit tests PASS (these are unit tests; the `.integration.test.ts` files require `npm run test:integration` with `supabase start` running locally — run that too, expect the full suite PASS now that Steps 10-15 fixed every file broken by Task 1's re-key).
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 17: Commit**
 
 ```bash
-git add src/lib/launchops/client.ts src/lib/repo/funnel-repo.ts src/lib/repo/funnel-sync-state-repo.ts src/lib/launchops/sync-sales.ts src/lib/launchops/sync-ad-spend.ts src/lib/launchops/sync-ad-creative-spend.ts src/lib/repo/funnel-repo.integration.test.ts src/lib/repo/funnel-sync-state-repo.integration.test.ts src/lib/launchops/sync-sales.test.ts
+git add src/lib/launchops/client.ts src/lib/repo/funnel-repo.ts src/lib/repo/funnel-sync-state-repo.ts src/lib/launchops/sync-sales.ts src/lib/launchops/sync-ad-spend.ts src/lib/launchops/sync-ad-creative-spend.ts src/lib/repo/funnel-repo.integration.test.ts src/lib/repo/funnel-sync-state-repo.integration.test.ts src/lib/launchops/sync-sales.test.ts src/lib/launchops/sync-sales.integration.test.ts src/lib/launchops/sync-ad-spend.integration.test.ts src/lib/launchops/sync-ad-creative-spend.integration.test.ts supabase/migrations/0029_funnel_dashboard.integration.test.ts supabase/migrations/0030_report_ad_spend.integration.test.ts supabase/migrations/0031_report_ad_spend_fallback_fix.integration.test.ts
 git commit -m "refactor(funnel): rename client-scoped repo/sync functions to be funnel-scoped"
 ```
 
