@@ -10,7 +10,10 @@ const createSalesFunnelSchema = z.object({
   client_slug: z.string(),
   name: z.string().min(1),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
-  launchops_operacao_ids: z.string(),
+  launchops_operacao_ids: z
+    .string()
+    .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean))
+    .pipe(z.array(z.string().uuid('IDs de operação devem ser UUIDs válidos'))),
   launchops_produto_nomes: z.string(),
 })
 
@@ -27,7 +30,6 @@ export async function createSalesFunnel(context: { client_id: string; client_slu
     throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
   }
   const parsed = result.data
-  const operacaoIds = parsed.launchops_operacao_ids.split(',').map((s) => s.trim()).filter(Boolean)
   const produtoNomes = parsed.launchops_produto_nomes.split(',').map((s) => s.trim()).filter(Boolean)
 
   const supabase = await createServerSupabaseClient()
@@ -35,10 +37,15 @@ export async function createSalesFunnel(context: { client_id: string; client_slu
     client_id: parsed.client_id,
     name: parsed.name,
     slug: parsed.slug,
-    launchops_operacao_ids: operacaoIds,
+    launchops_operacao_ids: parsed.launchops_operacao_ids,
     launchops_produto_nomes: produtoNomes,
   })
-  if (error) throw error
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('Já existe um funil com esse slug neste cliente')
+    }
+    throw error
+  }
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/funis-venda`)
   redirect(`/dashboard/clients/${parsed.client_slug}/funis-venda`)
 }
@@ -76,7 +83,10 @@ const editSalesFunnelSchema = z.object({
   client_slug: z.string(),
   funnel_slug: z.string(),
   name: z.string().min(1),
-  launchops_operacao_ids: z.string(),
+  launchops_operacao_ids: z
+    .string()
+    .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean))
+    .pipe(z.array(z.string().uuid('IDs de operação devem ser UUIDs válidos'))),
   launchops_produto_nomes: z.string(),
 })
 
@@ -96,15 +106,20 @@ export async function editSalesFunnel(
     throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
   }
   const parsed = result.data
-  const operacaoIds = parsed.launchops_operacao_ids.split(',').map((s) => s.trim()).filter(Boolean)
   const produtoNomes = parsed.launchops_produto_nomes.split(',').map((s) => s.trim()).filter(Boolean)
 
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase
     .from('sales_funnels')
-    .update({ name: parsed.name, launchops_operacao_ids: operacaoIds, launchops_produto_nomes: produtoNomes })
+    .update({
+      name: parsed.name,
+      launchops_operacao_ids: parsed.launchops_operacao_ids,
+      launchops_produto_nomes: produtoNomes,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', parsed.sales_funnel_id)
   if (error) throw error
+  revalidatePath(`/dashboard/clients/${parsed.client_slug}/funis-venda`)
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/funis-venda/${parsed.funnel_slug}`)
   redirect(`/dashboard/clients/${parsed.client_slug}/funis-venda/${parsed.funnel_slug}`)
 }

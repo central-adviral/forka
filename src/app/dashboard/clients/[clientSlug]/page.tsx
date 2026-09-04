@@ -50,7 +50,7 @@ export default async function ClientHubPage({ params }: { params: Promise<{ clie
           <p className="text-[13px] leading-relaxed text-[#8A90A6]">
             Testes A/B de página e checkout — clique, variante, conversão.
           </p>
-          <div className="mt-4 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">{testsCount} funis ativos</div>
+          <div className="mt-4 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">{testsCount} funis de teste</div>
         </a>
 
         <a
