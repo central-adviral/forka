@@ -1,4 +1,4 @@
-# Ampliar o Sync do LaunchOps (identidade + reconciliação + hierarquia) — Design
+# Ampliar o Sync do LaunchOps (reconciliação + hierarquia de campanha) — Design
 
 ## Contexto e motivação
 
@@ -10,11 +10,15 @@ dois lugares que nunca se cruzam por chave de verdade: `conversions`
 
 1. **Sem reconciliação** entre `conversions` e `sales` — a mesma compra pode,
    em tese, gerar um registro de receita em cada tabela sem nenhum vínculo.
-2. **Sem identidade de comprador** — nem `sales` nem `conversions` guardam
-   e-mail/telefone, então não dá pra medir recompra ou reconhecer o mesmo
-   lead em anúncios diferentes.
-3. **Gasto de anúncio sem hierarquia de campanha** — `ad_creative_spend_daily`
+2. **Gasto de anúncio sem hierarquia de campanha** — `ad_creative_spend_daily`
    só guarda `ad_id`/`ad_name`, sem `campaign_id`/`adset_id`.
+
+(Uma terceira lacuna do rascunho original — identidade de comprador, pra
+LTV/recompra — foi discutida e **adiada por decisão consciente do Vitor**
+em 2026-09-04: guardar e-mail/telefone/nome no ab-test-tool, mesmo copiando
+de um campo que a Hubla já manda pro LaunchOps, é a primeira vez que dado
+pessoal de comprador entraria nesse banco, e isso merece mais tempo de
+decisão sobre retenção/LGPD do que cabe nesta etapa. Ver "Fora de escopo".)
 
 **Achado que muda o escopo original:** inspecionando o schema real do banco
 do LaunchOps (`vgxivkxkbsspekmkaqhw`, verificado em 2026-09-04), as três
@@ -24,9 +28,7 @@ lidas pelo sync de hoje:
 - `vendas.transaction_id_plataforma` — o id da transação na Hubla, o mesmo
   valor que o ab-test-tool já grava em `conversions.external_event_id`
   (`invoice.id`, ver `src/lib/domain/hubla.ts`). É a chave de reconciliação
-  que faltava.
-- `vendas.comprador_email_normalizado`, `comprador_telefone_normalizado`,
-  `comprador_nome` — identidade do comprador já normalizada pelo LaunchOps.
+  que faltava. Não é dado pessoal — é só um identificador de transação.
 - `anuncio.campaign_id`, `campaign_name`, `adset_id`, `adset_name` — já
   presentes na mesma tabela que `sync-ad-creative-spend.ts` já lê hoje
   (`fetchLaunchOpsAdCreatives` só seleciona `id, ad_id, ad_name`).
@@ -36,24 +38,26 @@ LaunchOps, não exigem nenhuma tabela nova nem infraestrutura nova — só
 ampliar o `select` de duas funções de sync que já existem e adicionar
 colunas nas tabelas que já existem.
 
-**Não verificado com dado real de produção:** o projeto Supabase de
-produção do ab-test-tool (`supabase-cerise-forest`, ver nota de acesso na
-memória do projeto) não estava acessível via MCP nesta sessão — as duas
-contas Supabase disponíveis apontam para projetos diferentes (um projeto
-antigo travado na migration `0009`, sem relação com produção). Não foi
-possível confirmar empiricamente que `transaction_id_plataforma` bate
-caractere-por-caractere com `conversions.external_event_id` em um par
-real. O design abaixo assume que bate (mesma origem: id de transação da
-Hubla) mas trata o casamento como best-effort — ver "Tratamento de erros e
-casos de borda".
+**Verificado com dado real de produção (2026-09-04, após a primeira versão
+desta spec):** a hipótese central não pôde ser confirmada nesta sessão (sem
+acesso ao projeto Supabase de produção real via MCP — só a duas contas que
+apontavam para projetos sem relação com produção), mas foi confirmada
+depois, com acesso direto aos dois bancos reais: o id
+`05a61998-5922-441a-a1ff-a27efc71ff7e` (cliente Gustavo VOE) aparece em
+`vendas.transaction_id_plataforma` (LaunchOps) e em
+`conversions.external_event_id` (ab-test-tool), batendo
+caractere-por-caractere. A chave de reconciliação funciona como desenhado.
+O casamento continua sendo tratado como best-effort no código (ver
+"Tratamento de erros e casos de borda") — a confirmação remove a incerteza
+sobre o *formato* do dado, não elimina os casos em que uma venda
+simplesmente não tem uma conversão correspondente (a maioria não tem).
 
 ## Escopo
 
-1. **`sales` ganha 5 colunas**: `transaction_id_plataforma`,
-   `comprador_email_normalizado`, `comprador_telefone_normalizado`,
-   `comprador_nome`, `conversion_id` (FK opcional para `conversions.id`).
-2. **`sync-sales.ts`** amplia a leitura do LaunchOps para trazer os 4 campos
-   novos de `vendas`, e tenta casar `transaction_id_plataforma` com
+1. **`sales` ganha 2 colunas**: `transaction_id_plataforma`, `conversion_id`
+   (FK opcional para `conversions.id`).
+2. **`sync-sales.ts`** amplia a leitura do LaunchOps para trazer
+   `transaction_id_plataforma` de `vendas`, e tenta casar esse valor com
    `conversions.external_event_id` antes de gravar — se achar, preenche
    `conversion_id`; se não achar, grava a venda normalmente com
    `conversion_id = null`.
@@ -65,14 +69,19 @@ casos de borda".
 
 ## Fora de escopo
 
+- **Identidade de comprador (e-mail/telefone/nome), pra qualquer cliente,
+  LaunchOps ou não.** Decisão consciente do Vitor em 2026-09-04: mesmo
+  vindo de um campo que a Hubla já manda pro LaunchOps, seria a primeira
+  vez que dado pessoal de comprador entra no ab-test-tool — merece uma
+  decisão própria sobre retenção/LGPD antes de implementar, não uma
+  aprovação de carona dentro desta spec. Fica registrado como próximo
+  passo possível, não descartado.
 - Nenhuma tabela nova (`customers`, `dim_ad`, `fact_sale`). Esta etapa
   enriquece as tabelas que já existem — a decisão de promover pra uma
   tabela dedicada fica para quando surgir uma necessidade concreta (ex: uma
   tela de perfil de comprador).
 - Nenhuma mudança de relatório ou de UI. Os campos novos ficam disponíveis
   no banco; usá-los num relatório é um passo separado, depois.
-- Identidade de comprador para clientes **sem** LaunchOps (via webhook
-  direto da Hubla) — sub-projeto separado, ainda não especificado.
 - Reconciliação retroativa por job/varredura — ver "Tratamento de erros e
   casos de borda" sobre por que o casamento é só no momento do sync.
 - Tratamento de venda que muda de status (`aprovada` → `reembolsada`) depois
@@ -84,14 +93,13 @@ casos de borda".
 
 ## Modelo de dados
 
-Migration nova `supabase/migrations/0033_launchops_sync_enrichment.sql`
-(sequência após `0032`):
+Migration nova `supabase/migrations/0034_launchops_sync_enrichment.sql`
+(sequência após `0033_funnel_traffic_metrics.sql`, que foi aplicada em
+produção durante o mesmo dia em que esta spec foi escrita — `0033` já está
+ocupado):
 
 ```sql
 alter table sales add column transaction_id_plataforma text;
-alter table sales add column comprador_email_normalizado text;
-alter table sales add column comprador_telefone_normalizado text;
-alter table sales add column comprador_nome text;
 alter table sales add column conversion_id uuid references conversions(id) on delete set null;
 
 alter table ad_creative_spend_daily add column campaign_id text;
@@ -112,18 +120,23 @@ desfazer o vínculo.
 
 ## Mudanças em código existente
 
-- **`src/lib/launchops/sync-sales.ts`**
-  - `LaunchOpsSaleRow` ganha `transaction_id_plataforma`,
-    `comprador_email_normalizado`, `comprador_telefone_normalizado`,
-    `comprador_nome` (todos `string | null`).
+- **`src/lib/launchops/sync-sales.ts`** (nota: esta função já mudou uma vez
+  hoje, ver `880ec2f fix: batch LaunchOps sync upserts` — passou a gravar
+  em lotes de `UPSERT_BATCH_SIZE = 500` em vez de um upsert único; a
+  descrição abaixo já é sobre a versão atual, não a original)
+  - `LaunchOpsSaleRow` ganha `transaction_id_plataforma` (`string | null`).
   - `fetchLaunchOpsSalesRows` amplia o `.select(...)` da query em `vendas`
-    para incluir os 4 campos novos.
-  - `syncSalesForFunnel`: antes de montar o payload de upsert, coleta os
-    `transaction_id_plataforma` não-nulos do lote, busca em `conversions`
+    para incluir esse campo.
+  - `syncSalesForFunnel`: antes do `.map()` que monta o payload (a mesma
+    passagem única que já existe, antes de ser fatiada nos lotes de 500
+    pra gravação), coleta os `transaction_id_plataforma` não-nulos de
+    **todo** `rows` (não por lote), busca em `conversions`
     (`select id, external_event_id where external_event_id = any(...)`) e
     monta um mapa `external_event_id → conversion_id`. Cada linha do
     payload ganha `conversion_id: map.get(transaction_id_plataforma) ??
-    null`. Uma única consulta extra por lote de sync, não uma por venda.
+    null`. Uma única consulta extra por chamada de sync, antes de entrar
+    no loop de gravação em lotes — não uma consulta por lote nem por
+    venda.
 
 - **`src/lib/launchops/sync-ad-creative-spend.ts`**
   - `LaunchOpsAdCreative` e `JoinedAdCreativeSpendRow` ganham `campaign_id`,
@@ -167,13 +180,21 @@ desfazer o vínculo.
   zero. Se a conversão ainda existir com o mesmo `external_event_id`, o
   vínculo se mantém; não há como esse recálculo *perder* um vínculo já
   certo, só ganhar um que faltava.
+- **Mesmo `transaction_id_plataforma` em vendas de dois funis/clientes
+  diferentes** (não deveria acontecer — cada transação da Hubla é única —
+  mas é estruturalmente possível se o LaunchOps duplicar um registro):
+  ambas as linhas de `sales` apontariam pro mesmo `conversion_id`, já que
+  não há constraint de unicidade impedindo isso. Risco muito baixo,
+  registrado como decisão consciente de não adicionar uma constraint agora
+  — mesmo padrão de outras regras "garantidas só na aplicação, não no
+  banco" já usado no projeto (ex: soma de peso das variantes).
 
 ## Estratégia de testes
 
 Segue o padrão já usado no projeto (migration com teste de integração
 irmão, ex: `0029_funnel_dashboard.integration.test.ts`):
 
-- **Integração** (`0033_launchops_sync_enrichment.integration.test.ts`):
+- **Integração** (`0034_launchops_sync_enrichment.integration.test.ts`):
   colunas novas existem com os tipos certos em `sales` e
   `ad_creative_spend_daily`; apagar uma `conversion` com uma `sales`
   vinculada não apaga a `sales`, só zera `conversion_id`.
