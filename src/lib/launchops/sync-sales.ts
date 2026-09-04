@@ -37,18 +37,26 @@ export async function fetchLaunchOpsSalesRows(
 }
 
 const UPSERT_BATCH_SIZE = 500
+const LOOKUP_CHUNK_SIZE = 200
 
-async function findConversionIdsByExternalEventId(
+// PostgREST/Kong's GET query-string budget caps an `.in()` filter around 200-650 ids —
+// well below a first full-history sync's volume. Chunk the lookup the same way the
+// write path below is already batched, merging results into one Map.
+export async function findConversionIdsByExternalEventId(
   appDb: SupabaseClient,
-  externalEventIds: string[]
+  externalEventIds: string[],
+  chunkSize = LOOKUP_CHUNK_SIZE
 ): Promise<Map<string, string>> {
   const conversionIdByExternalEventId = new Map<string, string>()
   if (externalEventIds.length === 0) return conversionIdByExternalEventId
 
-  const { data, error } = await appDb.from('conversions').select('id, external_event_id').in('external_event_id', externalEventIds)
-  if (error) throw error
-  for (const conversion of data ?? []) {
-    if (conversion.external_event_id) conversionIdByExternalEventId.set(conversion.external_event_id, conversion.id)
+  for (let i = 0; i < externalEventIds.length; i += chunkSize) {
+    const chunk = externalEventIds.slice(i, i + chunkSize)
+    const { data, error } = await appDb.from('conversions').select('id, external_event_id').in('external_event_id', chunk)
+    if (error) throw error
+    for (const conversion of data ?? []) {
+      if (conversion.external_event_id) conversionIdByExternalEventId.set(conversion.external_event_id, conversion.id)
+    }
   }
   return conversionIdByExternalEventId
 }

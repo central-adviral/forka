@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { syncSalesForFunnel, type LaunchOpsSaleRow } from './sync-sales'
+import { syncSalesForFunnel, findConversionIdsByExternalEventId, type LaunchOpsSaleRow } from './sync-sales'
 
 const db = createServiceRoleClient()
 let salesFunnelId: string
 let matchedExternalEventId: string
 let matchedConversionId: string
+let testId: string
+let variantId: string
 
 beforeAll(async () => {
   const { data: user } = await db.auth.admin.createUser({
@@ -35,6 +37,8 @@ beforeAll(async () => {
     .insert({ test_id: test!.id, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' })
     .select()
     .single()
+  testId = test!.id
+  variantId = variant!.id
   const { data: clickEvent } = await db
     .from('click_events')
     .insert({ test_id: test!.id, variant_id: variant!.id, visitor_id: 'visitor-sync-sales', tracking_id: crypto.randomUUID(), source_utms: {} })
@@ -125,5 +129,34 @@ describe('syncSalesForFunnel (integration)', () => {
       .eq('external_id', saleRow.id)
       .single()
     expect(data!.conversion_id).toBeNull()
+  })
+})
+
+describe('findConversionIdsByExternalEventId (integration)', () => {
+  it('merges results across multiple chunk boundaries without dropping entries', async () => {
+    const externalEventIds = Array.from({ length: 5 }, (_, i) => `chunk_${Date.now()}_${i}`)
+    const conversionIdByExternalEventId = new Map<string, string>()
+
+    for (const externalEventId of externalEventIds) {
+      const { data: clickEvent } = await db
+        .from('click_events')
+        .insert({ test_id: testId, variant_id: variantId, visitor_id: 'visitor-chunk-test', tracking_id: crypto.randomUUID(), source_utms: {} })
+        .select()
+        .single()
+      const { data: conversion } = await db
+        .from('conversions')
+        .insert({ click_event_id: clickEvent!.id, source: 'hubla_webhook', external_event_id: externalEventId, value_cents: 100 })
+        .select()
+        .single()
+      conversionIdByExternalEventId.set(externalEventId, conversion!.id)
+    }
+
+    // chunkSize=2 forces 3 round trips across 5 ids (2 + 2 + 1), exercising the merge logic.
+    const result = await findConversionIdsByExternalEventId(db, externalEventIds, 2)
+
+    expect(result.size).toBe(5)
+    for (const externalEventId of externalEventIds) {
+      expect(result.get(externalEventId)).toBe(conversionIdByExternalEventId.get(externalEventId))
+    }
   })
 })
