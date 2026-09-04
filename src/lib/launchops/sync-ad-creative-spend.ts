@@ -5,6 +5,10 @@ export interface LaunchOpsAdCreative {
   id: string
   ad_id: string | null
   ad_name: string | null
+  campaign_id: string | null
+  campaign_name: string | null
+  adset_id: string | null
+  adset_name: string | null
 }
 
 export interface LaunchOpsAdCreativeSpendRow {
@@ -19,6 +23,10 @@ export interface LaunchOpsAdCreativeSpendRow {
 export interface JoinedAdCreativeSpendRow {
   ad_id: string | null
   ad_name: string | null
+  campaign_id: string | null
+  campaign_name: string | null
+  adset_id: string | null
+  adset_name: string | null
   data: string
   spend: number
   impressions: number
@@ -29,7 +37,10 @@ export async function fetchLaunchOpsAdCreatives(
   launchopsDb: SupabaseClient,
   operacaoIds: string[]
 ): Promise<LaunchOpsAdCreative[]> {
-  const { data, error } = await launchopsDb.from('anuncio').select('id, ad_id, ad_name').in('operacao_id', operacaoIds)
+  const { data, error } = await launchopsDb
+    .from('anuncio')
+    .select('id, ad_id, ad_name, campaign_id, campaign_name, adset_id, adset_name')
+    .in('operacao_id', operacaoIds)
   if (error) throw error
   return (data ?? []) as LaunchOpsAdCreative[]
 }
@@ -66,6 +77,10 @@ export function joinAdCreativeSpend(
     joined.push({
       ad_id: creative.ad_id,
       ad_name: creative.ad_name,
+      campaign_id: creative.campaign_id,
+      campaign_name: creative.campaign_name,
+      adset_id: creative.adset_id,
+      adset_name: creative.adset_name,
       data: row.data_referencia,
       spend: row.spend,
       impressions: row.impressions,
@@ -88,6 +103,10 @@ export async function syncAdCreativeSpendForFunnel(
     data: row.data,
     ad_id: row.ad_id,
     ad_name: row.ad_name,
+    campaign_id: row.campaign_id,
+    campaign_name: row.campaign_name,
+    adset_id: row.adset_id,
+    adset_name: row.adset_name,
     spend: row.spend,
     impressions: row.impressions,
     link_clicks: row.link_clicks,

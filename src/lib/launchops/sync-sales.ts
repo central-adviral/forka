@@ -10,6 +10,7 @@ export interface LaunchOpsSaleRow {
   valor_liquido: number | null
   metodo_pagamento: string | null
   updated_at: string
+  transaction_id_plataforma: string | null
 }
 
 export async function fetchLaunchOpsSalesRows(
@@ -22,7 +23,9 @@ export async function fetchLaunchOpsSalesRows(
   return fetchAllPages<LaunchOpsSaleRow>((from, to) => {
     let query = launchopsDb
       .from('vendas')
-      .select('id, data_venda, produto_nome, status, valor_bruto, valor_liquido, metodo_pagamento, updated_at')
+      .select(
+        'id, data_venda, produto_nome, status, valor_bruto, valor_liquido, metodo_pagamento, updated_at, transaction_id_plataforma'
+      )
       .eq('plataforma', 'hubla')
       .eq('status', 'aprovada')
       .in('produto_nome', params.produtoNomes)
@@ -34,6 +37,29 @@ export async function fetchLaunchOpsSalesRows(
 }
 
 const UPSERT_BATCH_SIZE = 500
+const LOOKUP_CHUNK_SIZE = 200
+
+// PostgREST/Kong's GET query-string budget caps an `.in()` filter around 200-650 ids —
+// well below a first full-history sync's volume. Chunk the lookup the same way the
+// write path below is already batched, merging results into one Map.
+export async function findConversionIdsByExternalEventId(
+  appDb: SupabaseClient,
+  externalEventIds: string[],
+  chunkSize = LOOKUP_CHUNK_SIZE
+): Promise<Map<string, string>> {
+  const conversionIdByExternalEventId = new Map<string, string>()
+  if (externalEventIds.length === 0) return conversionIdByExternalEventId
+
+  for (let i = 0; i < externalEventIds.length; i += chunkSize) {
+    const chunk = externalEventIds.slice(i, i + chunkSize)
+    const { data, error } = await appDb.from('conversions').select('id, external_event_id').in('external_event_id', chunk)
+    if (error) throw error
+    for (const conversion of data ?? []) {
+      if (conversion.external_event_id) conversionIdByExternalEventId.set(conversion.external_event_id, conversion.id)
+    }
+  }
+  return conversionIdByExternalEventId
+}
 
 export async function syncSalesForFunnel(
   appDb: SupabaseClient,
@@ -41,6 +67,12 @@ export async function syncSalesForFunnel(
   rows: LaunchOpsSaleRow[]
 ): Promise<{ synced: number; latestUpdatedAt: string | null }> {
   if (rows.length === 0) return { synced: 0, latestUpdatedAt: null }
+
+  // Best-effort reconciliation: transaction_id_plataforma (LaunchOps) and conversions.external_event_id
+  // (ab-test-tool) both hold the Hubla invoice id. Most sales won't have a match — that's expected,
+  // not an error. One lookup for the whole batch, before it gets sliced into write batches below.
+  const transactionIds = [...new Set(rows.map((row) => row.transaction_id_plataforma).filter((id): id is string => Boolean(id)))]
+  const conversionIdByTransactionId = await findConversionIdsByExternalEventId(appDb, transactionIds)
 
   const payload = rows.map((row) => ({
     sales_funnel_id: salesFunnelId,
@@ -53,6 +85,8 @@ export async function syncSalesForFunnel(
     valor_liquido: row.valor_liquido,
     metodo_pagamento: row.metodo_pagamento,
     updated_at: row.updated_at,
+    transaction_id_plataforma: row.transaction_id_plataforma,
+    conversion_id: row.transaction_id_plataforma ? conversionIdByTransactionId.get(row.transaction_id_plataforma) ?? null : null,
   }))
 
   // A single upsert covering thousands of rows (e.g. a first full-history sync) risks
