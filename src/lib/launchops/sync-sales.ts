@@ -28,15 +28,15 @@ export async function fetchLaunchOpsSalesRows(
   return (data ?? []) as LaunchOpsSaleRow[]
 }
 
-export async function syncSalesForClient(
+export async function syncSalesForFunnel(
   appDb: SupabaseClient,
-  clientId: string,
+  salesFunnelId: string,
   rows: LaunchOpsSaleRow[]
 ): Promise<{ synced: number; latestUpdatedAt: string | null }> {
   if (rows.length === 0) return { synced: 0, latestUpdatedAt: null }
 
   const payload = rows.map((row) => ({
-    client_id: clientId,
+    sales_funnel_id: salesFunnelId,
     source: 'launchops_sync',
     external_id: row.id,
     data_venda: row.data_venda,
@@ -48,7 +48,7 @@ export async function syncSalesForClient(
     updated_at: row.updated_at,
   }))
 
-  const { error } = await appDb.from('sales').upsert(payload, { onConflict: 'client_id,source,external_id' })
+  const { error } = await appDb.from('sales').upsert(payload, { onConflict: 'sales_funnel_id,source,external_id' })
   if (error) throw error
 
   const latestUpdatedAt = rows[rows.length - 1].updated_at

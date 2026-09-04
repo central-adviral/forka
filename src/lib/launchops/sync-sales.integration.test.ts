@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { syncSalesForClient, type LaunchOpsSaleRow } from './sync-sales'
+import { syncSalesForFunnel, type LaunchOpsSaleRow } from './sync-sales'
 
 const db = createServiceRoleClient()
-let clientId: string
+let salesFunnelId: string
 
 beforeAll(async () => {
   const { data: user } = await db.auth.admin.createUser({
@@ -16,7 +16,12 @@ beforeAll(async () => {
     .insert({ owner_id: user!.user!.id, name: 'SyncSales', slug: `sync-sales-${Date.now()}` })
     .select()
     .single()
-  clientId = client!.id
+  const { data: funnel } = await db
+    .from('sales_funnels')
+    .insert({ client_id: client!.id, name: 'SyncSales Funnel', slug: 'sync-sales-funnel' })
+    .select()
+    .single()
+  salesFunnelId = funnel!.id
 })
 
 function row(overrides: Partial<LaunchOpsSaleRow> = {}): LaunchOpsSaleRow {
@@ -33,25 +38,25 @@ function row(overrides: Partial<LaunchOpsSaleRow> = {}): LaunchOpsSaleRow {
   }
 }
 
-describe('syncSalesForClient (integration)', () => {
+describe('syncSalesForFunnel (integration)', () => {
   it('inserts a new sale and re-running with the same row does not duplicate it', async () => {
     const saleRow = row()
-    await syncSalesForClient(db, clientId, [saleRow])
-    await syncSalesForClient(db, clientId, [saleRow])
+    await syncSalesForFunnel(db, salesFunnelId, [saleRow])
+    await syncSalesForFunnel(db, salesFunnelId, [saleRow])
 
-    const { data } = await db.from('sales').select('id').eq('client_id', clientId).eq('external_id', saleRow.id)
+    const { data } = await db.from('sales').select('id').eq('sales_funnel_id', salesFunnelId).eq('external_id', saleRow.id)
     expect(data!.length).toBe(1)
   })
 
   it('updates an existing sale in place when the row is re-synced with new values', async () => {
     const saleRow = row({ valor_bruto: 10 })
-    await syncSalesForClient(db, clientId, [saleRow])
-    await syncSalesForClient(db, clientId, [{ ...saleRow, valor_bruto: 12 }])
+    await syncSalesForFunnel(db, salesFunnelId, [saleRow])
+    await syncSalesForFunnel(db, salesFunnelId, [{ ...saleRow, valor_bruto: 12 }])
 
     const { data } = await db
       .from('sales')
       .select('valor_bruto')
-      .eq('client_id', clientId)
+      .eq('sales_funnel_id', salesFunnelId)
       .eq('external_id', saleRow.id)
       .single()
     expect(data!.valor_bruto).toBe(12)

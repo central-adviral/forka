@@ -70,15 +70,15 @@ export function joinAdCreativeSpend(
   return joined
 }
 
-export async function syncAdCreativeSpendForClient(
+export async function syncAdCreativeSpendForFunnel(
   appDb: SupabaseClient,
-  clientId: string,
+  salesFunnelId: string,
   rows: JoinedAdCreativeSpendRow[]
 ): Promise<{ synced: number }> {
   if (rows.length === 0) return { synced: 0 }
 
   const payload = rows.map((row) => ({
-    client_id: clientId,
+    sales_funnel_id: salesFunnelId,
     source: 'launchops_sync',
     data: row.data,
     ad_id: row.ad_id,
@@ -91,7 +91,7 @@ export async function syncAdCreativeSpendForClient(
 
   const { error } = await appDb
     .from('ad_creative_spend_daily')
-    .upsert(payload, { onConflict: 'client_id,source,data,ad_id,ad_name' })
+    .upsert(payload, { onConflict: 'sales_funnel_id,source,data,ad_id,ad_name' })
   if (error) throw error
   return { synced: payload.length }
 }

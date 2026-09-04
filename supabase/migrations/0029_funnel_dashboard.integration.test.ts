@@ -4,7 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role'
 
 const serviceDb = createServiceRoleClient()
 const ownerPassword = 'password123'
-let clientId: string
+let salesFunnelId: string
 let authedDb: SupabaseClient
 
 beforeAll(async () => {
@@ -19,10 +19,15 @@ beforeAll(async () => {
     .insert({ owner_id: user!.user!.id, name: 'Funnel RLS', slug: `funnel-rls-${Date.now()}` })
     .select()
     .single()
-  clientId = client!.id
+  const { data: funnel } = await serviceDb
+    .from('sales_funnels')
+    .insert({ client_id: client!.id, name: 'Funnel RLS Funnel', slug: 'funnel-rls-funnel' })
+    .select()
+    .single()
+  salesFunnelId = funnel!.id
 
   await serviceDb.from('sales').insert({
-    client_id: clientId,
+    sales_funnel_id: salesFunnelId,
     external_id: `sale-${Date.now()}`,
     data_venda: new Date().toISOString(),
     status: 'aprovada',
@@ -45,20 +50,20 @@ beforeAll(async () => {
 
 describe('funnel tables RLS', () => {
   it('lets the service role select the seeded sale', async () => {
-    const { data, error } = await serviceDb.from('sales').select('id').eq('client_id', clientId)
+    const { data, error } = await serviceDb.from('sales').select('id').eq('sales_funnel_id', salesFunnelId)
     expect(error).toBeNull()
     expect(data!.length).toBe(1)
   })
 
   it('lets the authenticated owner select their own sale via RLS', async () => {
-    const { data, error } = await authedDb.from('sales').select('id').eq('client_id', clientId)
+    const { data, error } = await authedDb.from('sales').select('id').eq('sales_funnel_id', salesFunnelId)
     expect(error).toBeNull()
     expect(data!.length).toBe(1)
   })
 
   it('rejects insert from the authenticated role — grants are select-only', async () => {
     const { error } = await authedDb.from('sales').insert({
-      client_id: clientId,
+      sales_funnel_id: salesFunnelId,
       external_id: `blocked-${Date.now()}`,
       data_venda: new Date().toISOString(),
       status: 'aprovada',

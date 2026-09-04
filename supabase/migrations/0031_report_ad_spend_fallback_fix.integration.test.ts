@@ -8,7 +8,6 @@ const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 const db = createServiceRoleClient()
 let testId: string
-let clientId: string
 let asOwner: SupabaseClient
 
 beforeAll(async () => {
@@ -26,7 +25,13 @@ beforeAll(async () => {
     .insert({ owner_id: user!.user!.id, name: 'ReportFallbackFix', slug: `report-fallback-fix-${Date.now()}` })
     .select()
     .single()
-  clientId = client!.id
+  const clientId = client!.id
+  const { data: funnel } = await db
+    .from('sales_funnels')
+    .insert({ client_id: clientId, name: 'ReportFallbackFix Funnel', slug: 'report-fallback-fix-funnel' })
+    .select()
+    .single()
+  const salesFunnelId = funnel!.id
   const { data: test } = await db
     .from('tests')
     .insert({ client_id: clientId, name: 'T', slug: `report-fallback-fix-t-${Date.now()}`, conversion_method: 'hubla_webhook' })
@@ -52,7 +57,7 @@ beforeAll(async () => {
     source_utms: { fb_ad_id: '', utm_term: 'Criativo Y' },
   })
   await db.from('ad_creative_spend_daily').insert({
-    client_id: clientId,
+    sales_funnel_id: salesFunnelId,
     source: 'launchops_sync',
     data: '2026-09-01',
     ad_id: null,

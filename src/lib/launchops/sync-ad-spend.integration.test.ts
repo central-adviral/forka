@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { syncAdSpendForClient, type AggregatedAdSpendRow } from './sync-ad-spend'
+import { syncAdSpendForFunnel, type AggregatedAdSpendRow } from './sync-ad-spend'
 
 const db = createServiceRoleClient()
-let clientId: string
+let salesFunnelId: string
 const operacaoIdA = crypto.randomUUID()
 const operacaoIdB = crypto.randomUUID()
 
@@ -18,21 +18,26 @@ beforeAll(async () => {
     .insert({ owner_id: user!.user!.id, name: 'SyncAdSpend', slug: `sync-adspend-${Date.now()}` })
     .select()
     .single()
-  clientId = client!.id
+  const { data: funnel } = await db
+    .from('sales_funnels')
+    .insert({ client_id: client!.id, name: 'SyncAdSpend Funnel', slug: 'sync-adspend-funnel' })
+    .select()
+    .single()
+  salesFunnelId = funnel!.id
 })
 
-describe('syncAdSpendForClient (integration)', () => {
+describe('syncAdSpendForFunnel (integration)', () => {
   it('keeps operation A untouched when only operation B is re-synced for the same day', async () => {
     const rowA: AggregatedAdSpendRow = { operacao_id: operacaoIdA, data: '2026-09-01', spend: 100, impressions: 1000, clicks: 10, leads: 2 }
     const rowB: AggregatedAdSpendRow = { operacao_id: operacaoIdB, data: '2026-09-01', spend: 40, impressions: 400, clicks: 4, leads: 1 }
-    await syncAdSpendForClient(db, clientId, [rowA, rowB])
+    await syncAdSpendForFunnel(db, salesFunnelId, [rowA, rowB])
 
-    await syncAdSpendForClient(db, clientId, [{ ...rowB, spend: 55 }])
+    await syncAdSpendForFunnel(db, salesFunnelId, [{ ...rowB, spend: 55 }])
 
     const { data } = await db
       .from('ad_spend_daily')
       .select('operacao_id, spend')
-      .eq('client_id', clientId)
+      .eq('sales_funnel_id', salesFunnelId)
       .eq('data', '2026-09-01')
       .order('operacao_id')
 

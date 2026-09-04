@@ -24,14 +24,14 @@ export interface DailyFunnelRow {
 
 export async function getDailyFunnel(
   db: SupabaseClient,
-  clientId: string,
+  salesFunnelId: string,
   since: string,
   until: string
 ): Promise<DailyFunnelRow[]> {
   const { data: salesRows, error: salesError } = await db
     .from('sales')
     .select('data_venda, valor_bruto, valor_liquido')
-    .eq('client_id', clientId)
+    .eq('sales_funnel_id', salesFunnelId)
     .gte('data_venda', brtDayBoundaryUtc(since))
     .lt('data_venda', brtDayBoundaryUtc(until))
   if (salesError) throw salesError
@@ -39,7 +39,7 @@ export async function getDailyFunnel(
   const { data: spendRows, error: spendError } = await db
     .from('ad_spend_daily')
     .select('data, spend, impressions, clicks')
-    .eq('client_id', clientId)
+    .eq('sales_funnel_id', salesFunnelId)
     .gte('data', since)
     .lt('data', until)
   if (spendError) throw spendError
@@ -87,14 +87,14 @@ export interface PaymentMethodBreakdown {
 
 export async function getPaymentMethodBreakdown(
   db: SupabaseClient,
-  clientId: string,
+  salesFunnelId: string,
   since: string,
   until: string
 ): Promise<PaymentMethodBreakdown[]> {
   const { data, error } = await db
     .from('sales')
     .select('metodo_pagamento, valor_bruto')
-    .eq('client_id', clientId)
+    .eq('sales_funnel_id', salesFunnelId)
     .gte('data_venda', brtDayBoundaryUtc(since))
     .lt('data_venda', brtDayBoundaryUtc(until))
   if (error) throw error
@@ -117,11 +117,11 @@ export interface SyncHealth {
   lastMessage: string | null
 }
 
-export async function getFunnelSyncHealth(db: SupabaseClient, clientId: string): Promise<SyncHealth[]> {
+export async function getFunnelSyncHealth(db: SupabaseClient, salesFunnelId: string): Promise<SyncHealth[]> {
   const { data, error } = await db
     .from('funnel_sync_state')
     .select('entity, last_run_at, last_result, last_message')
-    .eq('client_id', clientId)
+    .eq('sales_funnel_id', salesFunnelId)
   if (error) throw error
   return ((data ?? []) as { entity: string; last_run_at: string | null; last_result: string | null; last_message: string | null }[]).map(
     (row) => ({ entity: row.entity, lastRunAt: row.last_run_at, lastResult: row.last_result, lastMessage: row.last_message })

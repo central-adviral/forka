@@ -90,15 +90,15 @@ export function aggregateAdSpendByOperacaoDay(rows: LaunchOpsAdSpendRow[]): Aggr
   return [...byKey.values()]
 }
 
-export async function syncAdSpendForClient(
+export async function syncAdSpendForFunnel(
   appDb: SupabaseClient,
-  clientId: string,
+  salesFunnelId: string,
   rows: AggregatedAdSpendRow[]
 ): Promise<{ synced: number }> {
   if (rows.length === 0) return { synced: 0 }
 
   const payload = rows.map((row) => ({
-    client_id: clientId,
+    sales_funnel_id: salesFunnelId,
     source: 'launchops_sync',
     operacao_id: row.operacao_id,
     data: row.data,
@@ -109,7 +109,7 @@ export async function syncAdSpendForClient(
     updated_at: new Date().toISOString(),
   }))
 
-  const { error } = await appDb.from('ad_spend_daily').upsert(payload, { onConflict: 'client_id,source,operacao_id,data' })
+  const { error } = await appDb.from('ad_spend_daily').upsert(payload, { onConflict: 'sales_funnel_id,source,operacao_id,data' })
   if (error) throw error
   return { synced: payload.length }
 }
