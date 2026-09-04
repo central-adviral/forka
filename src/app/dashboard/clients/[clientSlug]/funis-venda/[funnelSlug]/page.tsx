@@ -4,6 +4,7 @@ import { getDailyFunnel, getFunnelSyncHealth, getPaymentMethodBreakdown } from '
 import { FunnelCone } from './funnel-cone'
 import { FunnelKpiCards } from './funnel-kpi-cards'
 import { FunnelPaymentPie } from './funnel-payment-pie'
+import { SyncFunnelButton } from './sync-funnel-button'
 
 function defaultDateRange() {
   // `until` is an exclusive upper bound in funnel-repo's query, so it must be tomorrow
@@ -69,12 +70,15 @@ export default async function SalesFunnelPage({
       </a>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-['Space_Grotesk'] text-xl font-semibold">{funnel.name}</h1>
-        <a
-          href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`}
-          className="rounded-[9px] border border-white/[0.08] px-4 py-2.5 text-[13.5px] font-medium text-[#8A90A6]"
-        >
-          Editar
-        </a>
+        <div className="flex items-center gap-2">
+          <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
+          <a
+            href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`}
+            className="rounded-[9px] border border-white/[0.08] px-4 py-2.5 text-[13.5px] font-medium text-[#8A90A6]"
+          >
+            Editar
+          </a>
+        </div>
       </div>
 
       <div className="mb-6 rounded-2xl border border-white/[0.08] p-4 text-[13.5px] text-[#8A90A6]">

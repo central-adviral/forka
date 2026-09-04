@@ -4,6 +4,9 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
+import { createLaunchOpsClient } from '@/lib/launchops/client'
+import { syncOneFunnel } from '@/lib/launchops/sync-funnel'
 
 const createSalesFunnelSchema = z.object({
   client_id: z.string().uuid(),
@@ -122,4 +125,28 @@ export async function editSalesFunnel(
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/funis-venda`)
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/funis-venda/${parsed.funnel_slug}`)
   redirect(`/dashboard/clients/${parsed.client_slug}/funis-venda/${parsed.funnel_slug}`)
+}
+
+export async function syncFunnelNow(context: { sales_funnel_id: string; client_slug: string; funnel_slug: string }) {
+  const supabase = await createServerSupabaseClient()
+  const { data: funnel, error } = await supabase
+    .from('sales_funnels')
+    .select('id, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url, funnel_source_service_role_key)')
+    .eq('id', context.sales_funnel_id)
+    .single()
+  if (error || !funnel) throw new Error('Funil não encontrado')
+
+  const source = funnel.clients as unknown as {
+    funnel_source_url: string | null
+    funnel_source_service_role_key: string | null
+  } | null
+  if (!source?.funnel_source_url || !source?.funnel_source_service_role_key) {
+    throw new Error('Configure a fonte de dados do funil na aba Integrações antes de atualizar')
+  }
+
+  const launchopsDb = createLaunchOpsClient({ url: source.funnel_source_url, serviceRoleKey: source.funnel_source_service_role_key })
+  const appDb = createServiceRoleClient()
+  await syncOneFunnel(appDb, launchopsDb, funnel)
+
+  revalidatePath(`/dashboard/clients/${context.client_slug}/funis-venda/${context.funnel_slug}`)
 }
