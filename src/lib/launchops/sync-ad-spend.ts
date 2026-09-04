@@ -109,7 +109,12 @@ export async function syncAdSpendForFunnel(
     updated_at: new Date().toISOString(),
   }))
 
-  const { error } = await appDb.from('ad_spend_daily').upsert(payload, { onConflict: 'sales_funnel_id,source,operacao_id,data' })
-  if (error) throw error
+  // Same batching rationale as syncSalesForFunnel: bound each upsert regardless of how
+  // many days a full-history sync ends up aggregating.
+  for (let i = 0; i < payload.length; i += 500) {
+    const batch = payload.slice(i, i + 500)
+    const { error } = await appDb.from('ad_spend_daily').upsert(batch, { onConflict: 'sales_funnel_id,source,operacao_id,data' })
+    if (error) throw error
+  }
   return { synced: payload.length }
 }

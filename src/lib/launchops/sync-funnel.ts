@@ -20,6 +20,14 @@ export interface SyncableFunnel {
   launchops_produto_nomes: string[] | null
 }
 
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
+    return (err as { message: string }).message
+  }
+  return String(err)
+}
+
 export async function syncOneFunnel(appDb: SupabaseClient, launchopsDb: SupabaseClient, funnel: SyncableFunnel) {
   await syncSalesEntity(appDb, launchopsDb, funnel)
   await syncAdSpendEntity(appDb, launchopsDb, funnel)
@@ -36,7 +44,7 @@ async function syncSalesEntity(appDb: SupabaseClient, launchopsDb: SupabaseClien
   } catch (err) {
     console.error('[sync-funnel-sales-failed]', { salesFunnelId: funnel.id }, err)
     try {
-      await recordSyncResult(appDb, { salesFunnelId: funnel.id, entity: 'sales', result: 'error', message: err instanceof Error ? err.message : String(err) })
+      await recordSyncResult(appDb, { salesFunnelId: funnel.id, entity: 'sales', result: 'error', message: errorMessage(err) })
     } catch (recordErr) {
       console.error('[sync-funnel-sales-record-failed]', { salesFunnelId: funnel.id }, recordErr)
     }
@@ -62,7 +70,7 @@ async function syncAdSpendEntity(appDb: SupabaseClient, launchopsDb: SupabaseCli
   } catch (err) {
     console.error('[sync-funnel-ad-spend-failed]', { salesFunnelId: funnel.id }, err)
     try {
-      await recordSyncResult(appDb, { salesFunnelId: funnel.id, entity: 'ad_spend_daily', result: 'error', message: err instanceof Error ? err.message : String(err) })
+      await recordSyncResult(appDb, { salesFunnelId: funnel.id, entity: 'ad_spend_daily', result: 'error', message: errorMessage(err) })
     } catch (recordErr) {
       console.error('[sync-funnel-ad-spend-record-failed]', { salesFunnelId: funnel.id }, recordErr)
     }
@@ -82,7 +90,7 @@ async function syncAdCreativeSpendEntity(appDb: SupabaseClient, launchopsDb: Sup
   } catch (err) {
     console.error('[sync-funnel-ad-creative-spend-failed]', { salesFunnelId: funnel.id }, err)
     try {
-      await recordSyncResult(appDb, { salesFunnelId: funnel.id, entity: 'ad_creative_spend_daily', result: 'error', message: err instanceof Error ? err.message : String(err) })
+      await recordSyncResult(appDb, { salesFunnelId: funnel.id, entity: 'ad_creative_spend_daily', result: 'error', message: errorMessage(err) })
     } catch (recordErr) {
       console.error('[sync-funnel-ad-creative-spend-record-failed]', { salesFunnelId: funnel.id }, recordErr)
     }

@@ -33,6 +33,8 @@ export async function fetchLaunchOpsSalesRows(
   })
 }
 
+const UPSERT_BATCH_SIZE = 500
+
 export async function syncSalesForFunnel(
   appDb: SupabaseClient,
   salesFunnelId: string,
@@ -53,8 +55,13 @@ export async function syncSalesForFunnel(
     updated_at: row.updated_at,
   }))
 
-  const { error } = await appDb.from('sales').upsert(payload, { onConflict: 'sales_funnel_id,source,external_id' })
-  if (error) throw error
+  // A single upsert covering thousands of rows (e.g. a first full-history sync) risks
+  // hitting a request-size or statement-timeout limit. Write in bounded batches instead.
+  for (let i = 0; i < payload.length; i += UPSERT_BATCH_SIZE) {
+    const batch = payload.slice(i, i + UPSERT_BATCH_SIZE)
+    const { error } = await appDb.from('sales').upsert(batch, { onConflict: 'sales_funnel_id,source,external_id' })
+    if (error) throw error
+  }
 
   const latestUpdatedAt = rows[rows.length - 1].updated_at
   return { synced: rows.length, latestUpdatedAt }
