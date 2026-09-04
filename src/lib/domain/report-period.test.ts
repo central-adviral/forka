@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolvePeriodSince, resolvePeriodUntil, resolveDateRange } from './report-period'
+import { resolvePeriodSince, resolvePeriodUntil, resolveDateRange, resolvePeriodDateRange, formatBr } from './report-period'
 
 const NOW = new Date('2026-08-30T15:30:00.000Z')
 
@@ -92,5 +92,36 @@ describe('resolveDateRange', () => {
     const range = resolveDateRange('2026-08-10', '2026-08-10')
     expect(range).not.toBeNull()
     expect(range!.until.getTime() - range!.since.getTime()).toBe(24 * 60 * 60 * 1000)
+  })
+})
+
+describe('resolvePeriodDateRange', () => {
+  it('resolves "7d" to a plain date-only since/until pair, until being tomorrow', () => {
+    const { since, until } = resolvePeriodDateRange('7d', undefined, undefined, NOW)
+    expect(since).toBe('2026-08-23')
+    expect(until).toBe('2026-08-31')
+  })
+
+  it('falls back to a fixed early sentinel date for "all" or unset, since these queries need a concrete bound', () => {
+    expect(resolvePeriodDateRange('all', undefined, undefined, NOW).since).toBe('2020-01-01')
+    expect(resolvePeriodDateRange(undefined, undefined, undefined, NOW).since).toBe('2020-01-01')
+  })
+
+  it('resolves "custom" using the desde/ate pair when both are present', () => {
+    const { since, until } = resolvePeriodDateRange('custom', '2026-08-01', '2026-08-15', NOW)
+    expect(since).toBe('2026-08-01')
+    expect(until).toBe('2026-08-16')
+  })
+
+  it('falls back to the default range when "custom" is missing desde/ate', () => {
+    const { since, until } = resolvePeriodDateRange('custom', undefined, undefined, NOW)
+    expect(since).toBe('2020-01-01')
+    expect(until).toBe('2026-08-31')
+  })
+})
+
+describe('formatBr', () => {
+  it('formats an ISO date-only string as DD/MM', () => {
+    expect(formatBr('2026-08-05')).toBe('05/08')
   })
 })

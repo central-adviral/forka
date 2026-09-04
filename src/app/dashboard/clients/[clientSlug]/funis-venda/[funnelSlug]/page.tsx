@@ -1,25 +1,21 @@
 import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getDailyFunnel, getFunnelSyncHealth, getPaymentMethodBreakdown } from '@/lib/repo/funnel-repo'
+import { REPORT_PERIODS, resolvePeriodDateRange, formatBr } from '@/lib/domain/report-period'
 import { FunnelCone } from './funnel-cone'
 import { FunnelKpiCards } from './funnel-kpi-cards'
 import { FunnelPaymentPie } from './funnel-payment-pie'
 import { SyncFunnelButton } from './sync-funnel-button'
 
-function defaultDateRange() {
-  // `until` is an exclusive upper bound in funnel-repo's query, so it must be tomorrow
-  // to include all of today's data.
-  const until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  return { since, until }
-}
-
 export default async function SalesFunnelPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ clientSlug: string; funnelSlug: string }>
+  searchParams: Promise<{ periodo?: string; desde?: string; ate?: string }>
 }) {
   const { clientSlug, funnelSlug } = await params
+  const { periodo, desde, ate } = await searchParams
   const supabase = await createServerSupabaseClient()
   const { data: client } = await supabase.from('clients').select('id, name, slug').eq('slug', clientSlug).maybeSingle()
   if (!client) notFound()
@@ -32,7 +28,7 @@ export default async function SalesFunnelPage({
     .maybeSingle()
   if (!funnel) notFound()
 
-  const { since, until } = defaultDateRange()
+  const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
   const [rows, health, paymentBreakdown] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
     getFunnelSyncHealth(supabase, funnel.id),
@@ -79,6 +75,65 @@ export default async function SalesFunnelPage({
             Editar
           </a>
         </div>
+      </div>
+
+      <div className="mb-6 flex gap-1.5">
+        {REPORT_PERIODS.map((option) => {
+          const isActive = (periodo ?? 'all') === option.value
+          return (
+            <a
+              key={option.value}
+              href={option.value === 'all' ? `?` : `?periodo=${option.value}`}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                isActive
+                  ? 'border-[#7C6FF0] bg-[#7C6FF0]/15 text-[#7C6FF0]'
+                  : 'border-white/[0.08] text-[#8A90A6] hover:text-[#E8EAF2]'
+              }`}
+            >
+              {option.label}
+            </a>
+          )
+        })}
+        <details className="relative" open={periodo === 'custom' || undefined}>
+          <summary
+            className={`cursor-pointer list-none rounded-full border px-3 py-1.5 text-xs font-medium ${
+              periodo === 'custom'
+                ? 'border-[#7C6FF0] bg-[#7C6FF0]/15 text-[#7C6FF0]'
+                : 'border-white/[0.08] text-[#8A90A6] hover:text-[#E8EAF2]'
+            }`}
+          >
+            {periodo === 'custom' && desde && ate ? `${formatBr(desde)} - ${formatBr(ate)}` : 'Personalizado'}
+          </summary>
+          <form
+            method="get"
+            className="absolute left-0 top-[calc(100%+6px)] z-10 flex flex-col gap-2 rounded-[10px] border border-white/[0.08] bg-[#141829] p-3 shadow-lg"
+          >
+            <input type="hidden" name="periodo" value="custom" />
+            <label className="flex flex-col gap-1 text-[11px] text-[#8A90A6]">
+              De
+              <input
+                type="date"
+                name="desde"
+                defaultValue={desde ?? ''}
+                required
+                className="rounded-[8px] border border-white/[0.08] bg-[#1B2036] px-2 py-1 text-xs text-[#E8EAF2]"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-[11px] text-[#8A90A6]">
+              Até
+              <input
+                type="date"
+                name="ate"
+                defaultValue={ate ?? ''}
+                required
+                className="rounded-[8px] border border-white/[0.08] bg-[#1B2036] px-2 py-1 text-xs text-[#E8EAF2]"
+              />
+            </label>
+            <button type="submit" className="rounded-[8px] bg-[#7C6FF0] px-3 py-1.5 text-xs font-semibold text-[#0B0E1A]">
+              Aplicar
+            </button>
+          </form>
+        </details>
       </div>
 
       <div className="mb-6 rounded-2xl border border-white/[0.08] p-4 text-[13.5px] text-[#8A90A6]">

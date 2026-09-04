@@ -4,15 +4,17 @@ import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { deleteSalesFunnel } from './actions'
 import { SalesFunnelStatusToggle } from './sales-funnel-status-toggle'
 import { getDailyFunnel, getFunnelSyncHealth } from '@/lib/repo/funnel-repo'
+import { REPORT_PERIODS, resolvePeriodDateRange, formatBr } from '@/lib/domain/report-period'
 
-function last7Days() {
-  const until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  return { since, until }
-}
-
-export default async function SalesFunnelsListPage({ params }: { params: Promise<{ clientSlug: string }> }) {
+export default async function SalesFunnelsListPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ clientSlug: string }>
+  searchParams: Promise<{ periodo?: string; desde?: string; ate?: string }>
+}) {
   const { clientSlug } = await params
+  const { periodo, desde, ate } = await searchParams
   const supabase = await createServerSupabaseClient()
   const { data: client } = await supabase.from('clients').select('id, name, slug').eq('slug', clientSlug).maybeSingle()
   if (!client) notFound()
@@ -23,7 +25,7 @@ export default async function SalesFunnelsListPage({ params }: { params: Promise
     .eq('client_id', client.id)
     .order('name')
 
-  const { since, until } = last7Days()
+  const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
   const currency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
   const summaries = await Promise.all(
@@ -69,6 +71,65 @@ export default async function SalesFunnelsListPage({ params }: { params: Promise
         </a>
       </div>
 
+      <div className="mb-6 flex gap-1.5">
+        {REPORT_PERIODS.map((option) => {
+          const isActive = (periodo ?? 'all') === option.value
+          return (
+            <a
+              key={option.value}
+              href={option.value === 'all' ? `?` : `?periodo=${option.value}`}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                isActive
+                  ? 'border-[#7C6FF0] bg-[#7C6FF0]/15 text-[#7C6FF0]'
+                  : 'border-white/[0.08] text-[#8A90A6] hover:text-[#E8EAF2]'
+              }`}
+            >
+              {option.label}
+            </a>
+          )
+        })}
+        <details className="relative" open={periodo === 'custom' || undefined}>
+          <summary
+            className={`cursor-pointer list-none rounded-full border px-3 py-1.5 text-xs font-medium ${
+              periodo === 'custom'
+                ? 'border-[#7C6FF0] bg-[#7C6FF0]/15 text-[#7C6FF0]'
+                : 'border-white/[0.08] text-[#8A90A6] hover:text-[#E8EAF2]'
+            }`}
+          >
+            {periodo === 'custom' && desde && ate ? `${formatBr(desde)} - ${formatBr(ate)}` : 'Personalizado'}
+          </summary>
+          <form
+            method="get"
+            className="absolute left-0 top-[calc(100%+6px)] z-10 flex flex-col gap-2 rounded-[10px] border border-white/[0.08] bg-[#141829] p-3 shadow-lg"
+          >
+            <input type="hidden" name="periodo" value="custom" />
+            <label className="flex flex-col gap-1 text-[11px] text-[#8A90A6]">
+              De
+              <input
+                type="date"
+                name="desde"
+                defaultValue={desde ?? ''}
+                required
+                className="rounded-[8px] border border-white/[0.08] bg-[#1B2036] px-2 py-1 text-xs text-[#E8EAF2]"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-[11px] text-[#8A90A6]">
+              Até
+              <input
+                type="date"
+                name="ate"
+                defaultValue={ate ?? ''}
+                required
+                className="rounded-[8px] border border-white/[0.08] bg-[#1B2036] px-2 py-1 text-xs text-[#E8EAF2]"
+              />
+            </label>
+            <button type="submit" className="rounded-[8px] bg-[#7C6FF0] px-3 py-1.5 text-xs font-semibold text-[#0B0E1A]">
+              Aplicar
+            </button>
+          </form>
+        </details>
+      </div>
+
       <div className="overflow-hidden rounded-2xl border border-white/[0.08]">
         {summaries.map((funnel, index) => (
           <div
@@ -89,7 +150,7 @@ export default async function SalesFunnelsListPage({ params }: { params: Promise
               </div>
               <div className="flex flex-col items-end">
                 <span className="font-['JetBrains_Mono'] text-[15px] font-medium">{currency(funnel.receita)}</span>
-                <span className="text-[11px] text-[#8A90A6]">receita (7d)</span>
+                <span className="text-[11px] text-[#8A90A6]">receita</span>
               </div>
               <div className="flex flex-col items-end">
                 <span className="font-['JetBrains_Mono'] text-[15px] font-medium">

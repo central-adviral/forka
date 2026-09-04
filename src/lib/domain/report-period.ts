@@ -47,3 +47,37 @@ export function resolveDateRange(desde: string | undefined, ate: string | undefi
   if (since.getTime() >= until.getTime()) return null
   return { since, until }
 }
+
+export function formatBr(iso: string): string {
+  const [, month, day] = iso.split('-')
+  return `${day}/${month}`
+}
+
+const ALL_TIME_SINCE = '2020-01-01'
+
+function toDateOnly(date: Date): string {
+  return date.toISOString().slice(0, 10)
+}
+
+// Same period vocabulary as resolvePeriodSince/resolvePeriodUntil, but returns plain
+// "YYYY-MM-DD" bounds (no unbounded null) for repos that query a `date` column directly,
+// like funnel-repo's daily aggregates. "all"/unset resolves to a fixed early sentinel date
+// rather than an open-ended lower bound, since these queries require a concrete value.
+export function resolvePeriodDateRange(
+  periodo: string | undefined,
+  desde: string | undefined,
+  ate: string | undefined,
+  now: Date = new Date()
+): { since: string; until: string } {
+  const tomorrow = toDateOnly(new Date(now.getTime() + DAY_MS))
+  if (periodo === 'custom') {
+    const range = resolveDateRange(desde, ate)
+    if (range) return { since: toDateOnly(range.since), until: toDateOnly(range.until) }
+  }
+  const sinceDate = resolvePeriodSince(periodo, now)
+  const untilDate = resolvePeriodUntil(periodo, now)
+  return {
+    since: sinceDate ? toDateOnly(sinceDate) : ALL_TIME_SINCE,
+    until: untilDate ? toDateOnly(untilDate) : tomorrow,
+  }
+}

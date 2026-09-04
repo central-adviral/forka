@@ -6,7 +6,7 @@ import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
 import { ReportCanvas } from './report-canvas'
 import { toggleTestStatus } from './actions'
-import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil, resolveDateRange } from '@/lib/domain/report-period'
+import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil, resolveDateRange, formatBr } from '@/lib/domain/report-period'
 import { RefreshButton } from './refresh-button'
 import { InsightPanel } from './insight-panel'
 import { MiniBarChart } from './mini-bar-chart'
@@ -67,11 +67,6 @@ interface AdReportRow {
   ad_spend: number | null
   ad_impressions: number | null
   ad_link_clicks: number | null
-}
-
-function formatBr(iso: string): string {
-  const [, month, day] = iso.split('-')
-  return `${day}/${month}`
 }
 
 const TH_CLASS = 'px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]'
