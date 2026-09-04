@@ -1,6 +1,9 @@
 import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getDailyFunnel, getFunnelSyncHealth } from '@/lib/repo/funnel-repo'
+import { getDailyFunnel, getFunnelSyncHealth, getPaymentMethodBreakdown } from '@/lib/repo/funnel-repo'
+import { FunnelCone } from './funnel-cone'
+import { FunnelKpiCards } from './funnel-kpi-cards'
+import { FunnelPaymentPie } from './funnel-payment-pie'
 
 function defaultDateRange() {
   // `until` is an exclusive upper bound in funnel-repo's query, so it must be tomorrow
@@ -17,12 +20,29 @@ export default async function FunnelPage({ params }: { params: Promise<{ clientS
   if (!client) notFound()
 
   const { since, until } = defaultDateRange()
-  const [rows, health] = await Promise.all([
+  const [rows, health, paymentBreakdown] = await Promise.all([
     getDailyFunnel(supabase, client.id, since, until),
     getFunnelSyncHealth(supabase, client.id),
+    getPaymentMethodBreakdown(supabase, client.id, since, until),
   ])
 
   const currency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+  const totals = rows.reduce(
+    (acc, row) => ({
+      investimento: acc.investimento + row.spend,
+      receitaBruta: acc.receitaBruta + row.receitaBruta,
+      vendas: acc.vendas + row.vendas,
+    }),
+    { investimento: 0, receitaBruta: 0, vendas: 0 }
+  )
+  const kpiTotals = {
+    investimento: totals.investimento,
+    receitaBruta: totals.receitaBruta,
+    resultado: totals.receitaBruta - totals.investimento,
+    roas: totals.investimento > 0 ? totals.receitaBruta / totals.investimento : null,
+    ticketMedio: totals.vendas > 0 ? totals.receitaBruta / totals.vendas : null,
+  }
 
   return (
     <div className="p-8">
@@ -36,6 +56,12 @@ export default async function FunnelPage({ params }: { params: Promise<{ clientS
           </div>
         ))}
       </div>
+
+      <FunnelKpiCards totals={kpiTotals} currency={currency} />
+
+      <FunnelCone days={rows} />
+
+      <FunnelPaymentPie breakdown={paymentBreakdown} currency={currency} />
 
       <div className="overflow-hidden rounded-2xl border border-white/[0.08]">
         <table className="w-full text-[13.5px]">
