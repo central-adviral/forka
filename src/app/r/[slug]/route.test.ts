@@ -71,6 +71,53 @@ describe('GET /r/[slug]', () => {
     expect(location.searchParams.get('utm_content')).toBeTruthy()
   })
 
+  it('captures fb_ad_id, fb_adset_id and fb_campaign_id from the incoming ad click', async () => {
+    vi.mocked(getTestBySlug).mockResolvedValue({
+      id: 'test-1',
+      slug: 'oferta-x',
+      status: 'active',
+      fallback_url: null,
+      test_type: 'page',
+      sales_page_url: null,
+      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
+    })
+    vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
+
+    const request = new NextRequest(
+      'https://ir.example.com/r/oferta-x?fb_ad_id=120210000000001&fb_adset_id=120210000000002&fb_campaign_id=120210000000003'
+    )
+    await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
+
+    expect(insertClickEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        sourceUtms: expect.objectContaining({
+          fb_ad_id: '120210000000001',
+          fb_adset_id: '120210000000002',
+          fb_campaign_id: '120210000000003',
+        }),
+      })
+    )
+  })
+
+  it('forwards fb_ad_id onto the destination url alongside the standard utms', async () => {
+    vi.mocked(getTestBySlug).mockResolvedValue({
+      id: 'test-1',
+      slug: 'oferta-x',
+      status: 'active',
+      fallback_url: null,
+      test_type: 'page',
+      sales_page_url: null,
+      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
+    })
+    vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
+
+    const request = new NextRequest('https://ir.example.com/r/oferta-x?fb_ad_id=120210000000001')
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
+    const location = new URL(response.headers.get('location')!)
+    expect(location.searchParams.get('fb_ad_id')).toBe('120210000000001')
+  })
+
   it('returns 404 when the test is missing and there is no fallback', async () => {
     vi.mocked(getTestBySlug).mockResolvedValue(null)
     const request = new NextRequest('https://ir.example.com/r/missing')

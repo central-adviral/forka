@@ -34,7 +34,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   if (isKnownBot(request.headers.get('user-agent'))) {
     const botSourceUtms = Object.fromEntries(
-      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term'].map((key) => [
+      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'fb_ad_id', 'fb_adset_id', 'fb_campaign_id'].map((key) => [
         key,
         request.nextUrl.searchParams.get(key) ?? '',
       ])
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const trackingId = crypto.randomUUID()
 
   const sourceUtms = Object.fromEntries(
-    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term'].map((key) => [
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'fb_ad_id', 'fb_adset_id', 'fb_campaign_id'].map((key) => [
       key,
       request.nextUrl.searchParams.get(key) ?? '',
     ])
