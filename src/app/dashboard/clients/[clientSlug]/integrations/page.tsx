@@ -149,6 +149,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
           <div>
             <label className="mb-1 block text-xs text-[#8A90A6]">Chave de acesso</label>
             <input
+              type="password"
               name="funnel_source_service_role_key"
               placeholder="chave de acesso"
               defaultValue={client.funnel_source_service_role_key ?? ''}
