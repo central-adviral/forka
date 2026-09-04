@@ -288,7 +288,7 @@ export default async function TestReportPage({
       <div className="flex h-[88px] flex-shrink-0 items-center justify-between border-b border-white/[0.08] px-8">
         <div>
           <a
-            href={`/dashboard/clients/${clientSlug}`}
+            href={`/dashboard/clients/${clientSlug}/tests`}
             className="mb-1 flex items-center gap-1 text-xs text-[#8A90A6] hover:text-[#E8EAF2]"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">

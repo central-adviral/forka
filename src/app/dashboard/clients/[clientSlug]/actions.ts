@@ -58,7 +58,7 @@ export async function deleteTest(testId: string, clientSlug: string) {
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('tests').delete().eq('id', testId)
   if (error) throw error
-  revalidatePath(`/dashboard/clients/${clientSlug}`)
+  revalidatePath(`/dashboard/clients/${clientSlug}/tests`)
 }
 
 const toggleTestStatusSchema = z.object({
@@ -79,5 +79,5 @@ export async function toggleTestStatus(input: z.infer<typeof toggleTestStatusSch
   if (error) throw error
   if (!data || data.length === 0) throw new Error('Test not found or not authorized to update')
 
-  revalidatePath(`/dashboard/clients/${parsed.client_slug}`)
+  revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests`)
 }
