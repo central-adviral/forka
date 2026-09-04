@@ -7,6 +7,8 @@ interface Client {
   id: string
   name: string
   slug: string
+  testsCount: number
+  funnelsCount: number
 }
 
 function initials(name: string): string {
@@ -28,12 +30,23 @@ export function DashboardShell({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const activeClient = clients.find((client) => pathname.startsWith(`/dashboard/clients/${client.slug}`))
 
   return (
     <div className="flex h-screen bg-[#0B0E1A] text-[#E8EAF2]">
       <aside className="flex w-[248px] flex-shrink-0 flex-col border-r border-white/[0.08] bg-[#141829] py-6">
         <div className="mb-6 flex items-center gap-2.5 px-5">
-          <span className="font-['Space_Grotesk'] text-[15px] font-semibold">Testes A/B</span>
+          <svg width="22" height="22" viewBox="0 0 26 26" fill="none">
+            <path d="M6 4v9c0 3 2 5 5 5" stroke="#7C6FF0" strokeWidth="2.2" strokeLinecap="round" />
+            <path d="M11 18l-4 4M11 18l4 4" stroke="#7C6FF0" strokeWidth="2.2" strokeLinecap="round" />
+            <circle cx="6" cy="4" r="2.4" fill="#7C6FF0" />
+          </svg>
+          <div>
+            <div className="font-['Space_Grotesk'] text-[15px] font-semibold leading-none">Forka</div>
+            <div className="mt-0.5 font-['JetBrains_Mono'] text-[9px] uppercase tracking-widest text-[#8A90A6]">
+              Ad tracker
+            </div>
+          </div>
         </div>
 
         <div className="mb-2.5 px-5 font-['JetBrains_Mono'] text-[11px] uppercase tracking-widest text-[#8A90A6]">
@@ -67,6 +80,42 @@ export function DashboardShell({
             + Novo cliente
           </Link>
         </div>
+
+        {activeClient && (
+          <div className="mt-6">
+            <div className="mb-2.5 truncate px-5 font-['JetBrains_Mono'] text-[11px] uppercase tracking-widest text-[#8A90A6]">
+              {activeClient.name}
+            </div>
+            <nav className="flex flex-col gap-0.5 px-3">
+              {[
+                { href: `/dashboard/clients/${activeClient.slug}`, label: 'Visão geral', count: null },
+                { href: `/dashboard/clients/${activeClient.slug}/tests`, label: 'Funil de Teste', count: activeClient.testsCount },
+                {
+                  href: `/dashboard/clients/${activeClient.slug}/funis-venda`,
+                  label: 'Funil de Venda',
+                  count: activeClient.funnelsCount,
+                },
+                { href: `/dashboard/clients/${activeClient.slug}/integrations`, label: 'Integrações', count: null },
+              ].map((item) => {
+                const active = pathname === item.href
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] ${
+                      active ? 'bg-[#7C6FF0]/[0.14] font-semibold text-[#E8EAF2]' : 'text-[#8A90A6] hover:text-[#E8EAF2]'
+                    }`}
+                  >
+                    {item.label}
+                    {item.count !== null && (
+                      <span className="ml-auto font-['JetBrains_Mono'] text-[10.5px] text-[#8A90A6]">{item.count}</span>
+                    )}
+                  </Link>
+                )
+              })}
+            </nav>
+          </div>
+        )}
 
         <div className="mt-auto border-t border-white/[0.08] px-5 pt-4">
           <div className="flex items-center gap-2.5">

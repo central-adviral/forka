@@ -5,6 +5,7 @@ import { deleteSalesFunnel } from './actions'
 import { SalesFunnelStatusToggle } from './sales-funnel-status-toggle'
 import { getDailyFunnel, getFunnelSyncHealth } from '@/lib/repo/funnel-repo'
 import { REPORT_PERIODS, resolvePeriodDateRange, formatBr } from '@/lib/domain/report-period'
+import { SyncStatus } from '@/components/sync-status'
 
 export default async function SalesFunnelsListPage({
   params,
@@ -39,11 +40,13 @@ export default async function SalesFunnelsListPage({
         { receita: 0, spend: 0 }
       )
       const lastSync = health.find((h) => h.lastRunAt)?.lastRunAt ?? null
+      const hasSyncError = health.some((h) => h.lastResult === 'error')
       return {
         ...funnel,
         receita: totals.receita,
         roas: totals.spend > 0 ? totals.receita / totals.spend : null,
         lastSync,
+        hasSyncError,
       }
     })
   )
@@ -130,7 +133,7 @@ export default async function SalesFunnelsListPage({
         </details>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/[0.08]">
+      <div className="card-shadow overflow-hidden rounded-2xl border border-white/[0.08]">
         {summaries.map((funnel, index) => (
           <div
             key={funnel.id}
@@ -158,9 +161,7 @@ export default async function SalesFunnelsListPage({
                 </span>
                 <span className="text-[11px] text-[#8A90A6]">ROAS</span>
               </div>
-              <span className="text-[11px] text-[#8A90A6]">
-                {funnel.lastSync ? `sincronizado ${new Date(funnel.lastSync).toLocaleString('pt-BR')}` : 'nunca sincronizou'}
-              </span>
+              <SyncStatus lastRunAt={funnel.lastSync} hasError={funnel.hasSyncError} />
             </a>
             <SalesFunnelStatusToggle salesFunnelId={funnel.id} clientSlug={client.slug} isActive={funnel.is_active} />
             <ConfirmDeleteButton action={deleteSalesFunnel.bind(null, funnel.id, client.slug)} />

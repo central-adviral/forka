@@ -66,7 +66,7 @@ export function FunnelCone({ totals, currency }: { totals: FunnelTotals; currenc
   const maxValue = Math.max(1, totals.impressions)
 
   return (
-    <div className="mb-6 rounded-2xl border border-white/[0.08] p-5">
+    <div className="card-shadow mb-6 rounded-2xl border border-white/[0.08] p-5">
       <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Funil de Tráfego</h2>
       <p className="mb-5 text-[13px] text-[#8A90A6]">
         Valor gasto no período: <span className="font-['JetBrains_Mono'] text-[#E8EAF2]">{currency(totals.spend)}</span>

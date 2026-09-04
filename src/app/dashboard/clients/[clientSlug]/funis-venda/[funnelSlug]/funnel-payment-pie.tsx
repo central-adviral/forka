@@ -31,7 +31,7 @@ export function FunnelPaymentPie({
   )
 
   return (
-    <div className="mb-6 rounded-2xl border border-white/[0.08] p-5">
+    <div className="card-shadow mb-6 rounded-2xl border border-white/[0.08] p-5">
       <h2 className="mb-5 font-['Space_Grotesk'] text-base font-semibold">Receita por método de pagamento</h2>
       <div className="flex items-center gap-8">
         <svg width="120" height="120" viewBox="0 0 100 100" className="-rotate-90 flex-shrink-0">

@@ -13,6 +13,9 @@
   --teal: #2dd4a8;
   --amber: #f5b94d;
   --rose: #f76c6c;
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 @theme inline {
@@ -27,4 +30,52 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.card-shadow {
+  box-shadow: var(--shadow-card);
+}
+
+.hover-lift {
+  transition: border-color 0.18s var(--ease), transform 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+.hover-lift:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pulse-dot--ok {
+  background: var(--teal);
+  animation: pulse-teal 2.2s infinite;
+}
+.pulse-dot--error {
+  background: var(--rose);
+  animation: pulse-rose 2.2s infinite;
+}
+@keyframes pulse-teal {
+  0% { box-shadow: 0 0 0 0 rgba(45, 212, 168, 0.45); }
+  70% { box-shadow: 0 0 0 7px rgba(45, 212, 168, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(45, 212, 168, 0); }
+}
+@keyframes pulse-rose {
+  0% { box-shadow: 0 0 0 0 rgba(247, 108, 108, 0.45); }
+  70% { box-shadow: 0 0 0 7px rgba(247, 108, 108, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(247, 108, 108, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot--ok, .pulse-dot--error {
+    animation: none;
+  }
 }

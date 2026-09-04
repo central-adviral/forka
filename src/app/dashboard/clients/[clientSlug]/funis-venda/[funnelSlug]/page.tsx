@@ -6,6 +6,7 @@ import { FunnelCone } from './funnel-cone'
 import { FunnelKpiCards } from './funnel-kpi-cards'
 import { FunnelPaymentPie } from './funnel-payment-pie'
 import { SyncFunnelButton } from './sync-funnel-button'
+import { SyncStatus } from '@/components/sync-status'
 
 export default async function SalesFunnelPage({
   params,
@@ -79,6 +80,12 @@ export default async function SalesFunnelPage({
     initiateCheckout: totals.initiateCheckout,
     vendas: totals.vendas,
   }
+  const kpiSparklines = {
+    receitaLiquida: rows.map((row) => row.receitaLiquida),
+    roas: rows.map((row) => (row.spend > 0 ? row.receitaLiquida / row.spend : 0)),
+  }
+  const lastSyncAt = health.find((h) => h.lastRunAt)?.lastRunAt ?? null
+  const hasSyncError = health.some((h) => h.lastResult === 'error')
 
   return (
     <div className="p-8">
@@ -93,7 +100,8 @@ export default async function SalesFunnelPage({
       </a>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-['Space_Grotesk'] text-xl font-semibold">{funnel.name}</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <SyncStatus lastRunAt={lastSyncAt} hasError={hasSyncError} />
           <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
           <a
             href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`}
@@ -163,7 +171,7 @@ export default async function SalesFunnelPage({
         </details>
       </div>
 
-      <div className="mb-6 rounded-2xl border border-white/[0.08] p-4 text-[13.5px] text-[#8A90A6]">
+      <div className="card-shadow mb-6 rounded-2xl border border-white/[0.08] p-4 text-[13.5px] text-[#8A90A6]">
         Spend pode estar subestimado — parte do gasto do Meta Ads ainda não está atribuída a esta operação na fonte.
         {health.map((h) => (
           <div key={h.entity}>
@@ -172,13 +180,13 @@ export default async function SalesFunnelPage({
         ))}
       </div>
 
-      <FunnelKpiCards totals={kpiTotals} currency={currency} />
+      <FunnelKpiCards totals={kpiTotals} currency={currency} sparklines={kpiSparklines} />
 
       <FunnelCone totals={coneTotals} currency={currency} />
 
       <FunnelPaymentPie breakdown={paymentBreakdown} currency={currency} />
 
-      <div className="overflow-hidden rounded-2xl border border-white/[0.08]">
+      <div className="card-shadow overflow-hidden rounded-2xl border border-white/[0.08]">
         <table className="w-full text-[13.5px]">
           <thead>
             <tr className="text-left text-[#8A90A6]">

@@ -39,7 +39,7 @@ export default async function ClientHubPage({ params }: { params: Promise<{ clie
       <div className="flex gap-5">
         <a
           href={`/dashboard/clients/${client.slug}/tests`}
-          className="flex-1 rounded-[14px] border border-white/[0.08] bg-[#141829] p-7 hover:border-[#7C6FF0]/40"
+          className="card-shadow hover-lift flex-1 rounded-[14px] border border-white/[0.08] bg-[#141829] p-7 hover:border-[#7C6FF0]/40"
         >
           <div className="mb-4 flex h-[52px] w-[52px] items-center justify-center rounded-xl bg-[#7C6FF0]/15">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#7C6FF0" strokeWidth="2">
@@ -55,7 +55,7 @@ export default async function ClientHubPage({ params }: { params: Promise<{ clie
 
         <a
           href={`/dashboard/clients/${client.slug}/funis-venda`}
-          className="flex-1 rounded-[14px] border border-white/[0.08] bg-[#141829] p-7 hover:border-[#2DD4A8]/40"
+          className="card-shadow hover-lift flex-1 rounded-[14px] border border-white/[0.08] bg-[#141829] p-7 hover:border-[#2DD4A8]/40"
         >
           <div className="mb-4 flex h-[52px] w-[52px] items-center justify-center rounded-xl bg-[#2DD4A8]/15">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2DD4A8" strokeWidth="2">
