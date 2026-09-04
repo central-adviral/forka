@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllPages } from './sync-ad-spend'
 
 export interface LaunchOpsAdCreative {
   id: string
@@ -38,15 +39,19 @@ export async function fetchLaunchOpsAdCreativeSpendRows(
   params: { anuncioIds: string[]; since: string | null }
 ): Promise<LaunchOpsAdCreativeSpendRow[]> {
   if (params.anuncioIds.length === 0) return []
-  let query = launchopsDb
-    .from('anuncio_dia')
-    .select('anuncio_id, data_referencia, spend, impressions, link_clicks, updated_at')
-    .in('anuncio_id', params.anuncioIds)
-    .order('updated_at', { ascending: true })
-  if (params.since) query = query.gt('updated_at', params.since)
-  const { data, error } = await query
-  if (error) throw error
-  return (data ?? []) as LaunchOpsAdCreativeSpendRow[]
+  // PostgREST caps a single response at ~1000 rows — a full-history first sync (since=null)
+  // that hits the cap would otherwise silently truncate and advance the cursor past
+  // everything still unsynced. Page through the full result, same fix as ad spend.
+  return fetchAllPages<LaunchOpsAdCreativeSpendRow>((from, to) => {
+    let query = launchopsDb
+      .from('anuncio_dia')
+      .select('anuncio_id, data_referencia, spend, impressions, link_clicks, updated_at')
+      .in('anuncio_id', params.anuncioIds)
+      .order('updated_at', { ascending: true })
+      .range(from, to)
+    if (params.since) query = query.gt('updated_at', params.since)
+    return query
+  })
 }
 
 export function joinAdCreativeSpend(

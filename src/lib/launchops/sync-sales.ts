@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { fetchAllPages } from './sync-ad-spend'
 
 export interface LaunchOpsSaleRow {
   id: string
@@ -15,17 +16,21 @@ export async function fetchLaunchOpsSalesRows(
   launchopsDb: SupabaseClient,
   params: { produtoNomes: string[]; since: string | null }
 ): Promise<LaunchOpsSaleRow[]> {
-  let query = launchopsDb
-    .from('vendas')
-    .select('id, data_venda, produto_nome, status, valor_bruto, valor_liquido, metodo_pagamento, updated_at')
-    .eq('plataforma', 'hubla')
-    .eq('status', 'aprovada')
-    .in('produto_nome', params.produtoNomes)
-    .order('updated_at', { ascending: true })
-  if (params.since) query = query.gt('updated_at', params.since)
-  const { data, error } = await query
-  if (error) throw error
-  return (data ?? []) as LaunchOpsSaleRow[]
+  // PostgREST caps a single response at ~1000 rows — a full-history first sync (since=null)
+  // that hits the cap would otherwise silently truncate and advance the cursor past
+  // everything still unsynced. Page through the full result, same fix as ad spend.
+  return fetchAllPages<LaunchOpsSaleRow>((from, to) => {
+    let query = launchopsDb
+      .from('vendas')
+      .select('id, data_venda, produto_nome, status, valor_bruto, valor_liquido, metodo_pagamento, updated_at')
+      .eq('plataforma', 'hubla')
+      .eq('status', 'aprovada')
+      .in('produto_nome', params.produtoNomes)
+      .order('updated_at', { ascending: true })
+      .range(from, to)
+    if (params.since) query = query.gt('updated_at', params.since)
+    return query
+  })
 }
 
 export async function syncSalesForFunnel(
