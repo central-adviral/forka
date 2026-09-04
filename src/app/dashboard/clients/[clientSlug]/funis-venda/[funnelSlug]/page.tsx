@@ -13,17 +13,29 @@ function defaultDateRange() {
   return { since, until }
 }
 
-export default async function FunnelPage({ params }: { params: Promise<{ clientSlug: string }> }) {
-  const { clientSlug } = await params
+export default async function SalesFunnelPage({
+  params,
+}: {
+  params: Promise<{ clientSlug: string; funnelSlug: string }>
+}) {
+  const { clientSlug, funnelSlug } = await params
   const supabase = await createServerSupabaseClient()
   const { data: client } = await supabase.from('clients').select('id, name, slug').eq('slug', clientSlug).maybeSingle()
   if (!client) notFound()
 
+  const { data: funnel } = await supabase
+    .from('sales_funnels')
+    .select('id, name, slug')
+    .eq('client_id', client.id)
+    .eq('slug', funnelSlug)
+    .maybeSingle()
+  if (!funnel) notFound()
+
   const { since, until } = defaultDateRange()
   const [rows, health, paymentBreakdown] = await Promise.all([
-    getDailyFunnel(supabase, client.id, since, until),
-    getFunnelSyncHealth(supabase, client.id),
-    getPaymentMethodBreakdown(supabase, client.id, since, until),
+    getDailyFunnel(supabase, funnel.id, since, until),
+    getFunnelSyncHealth(supabase, funnel.id),
+    getPaymentMethodBreakdown(supabase, funnel.id, since, until),
   ])
 
   const currency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -46,7 +58,24 @@ export default async function FunnelPage({ params }: { params: Promise<{ clientS
 
   return (
     <div className="p-8">
-      <h1 className="mb-6 font-['Space_Grotesk'] text-xl font-semibold">Funil de Vendas — {client.name}</h1>
+      <a
+        href={`/dashboard/clients/${client.slug}/funis-venda`}
+        className="mb-1 flex items-center gap-1 text-xs text-[#8A90A6] hover:text-[#E8EAF2]"
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Funis de Venda
+      </a>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="font-['Space_Grotesk'] text-xl font-semibold">{funnel.name}</h1>
+        <a
+          href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`}
+          className="rounded-[9px] border border-white/[0.08] px-4 py-2.5 text-[13.5px] font-medium text-[#8A90A6]"
+        >
+          Editar
+        </a>
+      </div>
 
       <div className="mb-6 rounded-2xl border border-white/[0.08] p-4 text-[13.5px] text-[#8A90A6]">
         Spend pode estar subestimado — parte do gasto do Meta Ads ainda não está atribuída a esta operação na fonte.
