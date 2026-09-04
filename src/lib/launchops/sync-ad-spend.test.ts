@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { aggregateAdSpendByOperacaoDay, type LaunchOpsAdSpendRow } from './sync-ad-spend'
+import { describe, it, expect, vi } from 'vitest'
+import { aggregateAdSpendByOperacaoDay, fetchAllPages, type LaunchOpsAdSpendRow } from './sync-ad-spend'
 
 describe('aggregateAdSpendByOperacaoDay', () => {
   it('sums spend across multiple campaigns/adsets for the same operation and day', () => {
@@ -24,5 +24,36 @@ describe('aggregateAdSpendByOperacaoDay', () => {
       { operacao_id: 'op-2', data_referencia: '2026-09-01', spend: 40, impressions: 400, clicks: 4, leads_periodo: 1, updated_at: '2026-09-01T10:00:00Z' },
     ]
     expect(aggregateAdSpendByOperacaoDay(rows).length).toBe(2)
+  })
+})
+
+describe('fetchAllPages', () => {
+  it('stops after a page shorter than pageSize, concatenating every page fetched', async () => {
+    const fetchPage = vi
+      .fn()
+      .mockResolvedValueOnce({ data: [1, 2], error: null })
+      .mockResolvedValueOnce({ data: [3], error: null })
+    const rows = await fetchAllPages(fetchPage, 2)
+    expect(rows).toEqual([1, 2, 3])
+    expect(fetchPage).toHaveBeenCalledTimes(2)
+    expect(fetchPage).toHaveBeenNthCalledWith(1, 0, 1)
+    expect(fetchPage).toHaveBeenNthCalledWith(2, 2, 3)
+  })
+
+  it('keeps fetching while every page comes back exactly full — this is the regression test for the truncation bug', async () => {
+    const fullPage = Array.from({ length: 3 }, (_, i) => i)
+    const fetchPage = vi
+      .fn()
+      .mockResolvedValueOnce({ data: fullPage, error: null })
+      .mockResolvedValueOnce({ data: fullPage, error: null })
+      .mockResolvedValueOnce({ data: [0], error: null })
+    const rows = await fetchAllPages(fetchPage, 3)
+    expect(rows.length).toBe(7)
+    expect(fetchPage).toHaveBeenCalledTimes(3)
+  })
+
+  it('throws if any page reports an error', async () => {
+    const fetchPage = vi.fn().mockResolvedValueOnce({ data: null, error: new Error('boom') })
+    await expect(fetchAllPages(fetchPage, 10)).rejects.toThrow('boom')
   })
 })

@@ -34,18 +34,39 @@ export async function fetchLaunchOpsAdSpendRows(
   return (data ?? []) as LaunchOpsAdSpendRow[]
 }
 
+export async function fetchAllPages<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  pageSize = 1000
+): Promise<T[]> {
+  const rows: T[] = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await fetchPage(from, from + pageSize - 1)
+    if (error) throw error
+    const page = data ?? []
+    rows.push(...page)
+    if (page.length < pageSize) break
+    from += pageSize
+  }
+  return rows
+}
+
 export async function fetchLaunchOpsAdSpendRowsForDays(
   launchopsDb: SupabaseClient,
   params: { operacaoIds: string[]; days: string[] }
 ): Promise<LaunchOpsAdSpendRow[]> {
   if (params.days.length === 0) return []
-  const { data, error } = await launchopsDb
-    .from('meta_ads_daily')
-    .select('operacao_id, data_referencia, spend, impressions, clicks, leads_periodo, updated_at')
-    .in('operacao_id', params.operacaoIds)
-    .in('data_referencia', params.days)
-  if (error) throw error
-  return (data ?? []) as LaunchOpsAdSpendRow[]
+  // PostgREST caps a single response at ~1000 rows — a full-day read that hits the cap would
+  // otherwise silently truncate and upsert a spend total lower than reality (same clobber
+  // class the incremental-vs-full-day fix exists to prevent). Page through the full result.
+  return fetchAllPages<LaunchOpsAdSpendRow>((from, to) =>
+    launchopsDb
+      .from('meta_ads_daily')
+      .select('operacao_id, data_referencia, spend, impressions, clicks, leads_periodo, updated_at')
+      .in('operacao_id', params.operacaoIds)
+      .in('data_referencia', params.days)
+      .range(from, to)
+  )
 }
 
 export function aggregateAdSpendByOperacaoDay(rows: LaunchOpsAdSpendRow[]): AggregatedAdSpendRow[] {
