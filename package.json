@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run --passWithNoTests --exclude \"**/*.integration.test.ts\"",
-    "test:integration": "vitest run integration"
+    "test:integration": "VITEST_INTEGRATION=1 vitest run integration"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
