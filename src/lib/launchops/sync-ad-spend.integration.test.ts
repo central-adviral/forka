@@ -28,8 +28,30 @@ beforeAll(async () => {
 
 describe('syncAdSpendForFunnel (integration)', () => {
   it('keeps operation A untouched when only operation B is re-synced for the same day', async () => {
-    const rowA: AggregatedAdSpendRow = { operacao_id: operacaoIdA, data: '2026-09-01', spend: 100, impressions: 1000, clicks: 10, leads: 2 }
-    const rowB: AggregatedAdSpendRow = { operacao_id: operacaoIdB, data: '2026-09-01', spend: 40, impressions: 400, clicks: 4, leads: 1 }
+    const rowA: AggregatedAdSpendRow = {
+      operacao_id: operacaoIdA,
+      data: '2026-09-01',
+      spend: 100,
+      impressions: 1000,
+      clicks: 10,
+      leads: 2,
+      reach: 800,
+      linkClicks: 60,
+      landingPageViews: 40,
+      initiateCheckout: 5,
+    }
+    const rowB: AggregatedAdSpendRow = {
+      operacao_id: operacaoIdB,
+      data: '2026-09-01',
+      spend: 40,
+      impressions: 400,
+      clicks: 4,
+      leads: 1,
+      reach: 350,
+      linkClicks: 20,
+      landingPageViews: 15,
+      initiateCheckout: 2,
+    }
     await syncAdSpendForFunnel(db, salesFunnelId, [rowA, rowB])
 
     await syncAdSpendForFunnel(db, salesFunnelId, [{ ...rowB, spend: 55 }])

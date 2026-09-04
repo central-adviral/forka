@@ -7,6 +7,9 @@ export interface LaunchOpsAdSpendRow {
   impressions: number
   clicks: number
   leads_periodo: number
+  reach: number
+  link_clicks: number
+  landing_page_views: number
   updated_at: string
 }
 
@@ -17,7 +20,14 @@ export interface AggregatedAdSpendRow {
   impressions: number
   clicks: number
   leads: number
+  reach: number
+  linkClicks: number
+  landingPageViews: number
+  initiateCheckout: number
 }
+
+const AD_SPEND_COLUMNS =
+  'operacao_id, data_referencia, spend, impressions, clicks, leads_periodo, reach, link_clicks, landing_page_views, updated_at'
 
 export async function fetchLaunchOpsAdSpendRows(
   launchopsDb: SupabaseClient,
@@ -25,7 +35,7 @@ export async function fetchLaunchOpsAdSpendRows(
 ): Promise<LaunchOpsAdSpendRow[]> {
   let query = launchopsDb
     .from('meta_ads_daily')
-    .select('operacao_id, data_referencia, spend, impressions, clicks, leads_periodo, updated_at')
+    .select(AD_SPEND_COLUMNS)
     .in('operacao_id', params.operacaoIds)
     .order('updated_at', { ascending: true })
   if (params.since) query = query.gt('updated_at', params.since)
@@ -62,7 +72,7 @@ export async function fetchLaunchOpsAdSpendRowsForDays(
   return fetchAllPages<LaunchOpsAdSpendRow>((from, to) =>
     launchopsDb
       .from('meta_ads_daily')
-      .select('operacao_id, data_referencia, spend, impressions, clicks, leads_periodo, updated_at')
+      .select(AD_SPEND_COLUMNS)
       .in('operacao_id', params.operacaoIds)
       .in('data_referencia', params.days)
       .range(from, to)
@@ -80,11 +90,63 @@ export function aggregateAdSpendByOperacaoDay(rows: LaunchOpsAdSpendRow[]): Aggr
       impressions: 0,
       clicks: 0,
       leads: 0,
+      reach: 0,
+      linkClicks: 0,
+      landingPageViews: 0,
+      initiateCheckout: 0,
     }
     existing.spend += row.spend
     existing.impressions += row.impressions
     existing.clicks += row.clicks
     existing.leads += row.leads_periodo
+    existing.reach += row.reach
+    existing.linkClicks += row.link_clicks
+    existing.landingPageViews += row.landing_page_views
+    byKey.set(key, existing)
+  }
+  return [...byKey.values()]
+}
+
+export interface InitiateCheckoutRow {
+  operacao_id: string
+  data: string
+  initiateCheckout: number
+}
+
+// initiate_checkout only exists at ad level in LaunchOps (anuncio_dia), not on the
+// operacao-level meta_ads_daily — join through anuncio to resolve operacao_id, then sum
+// per operacao/day the same way ad spend is aggregated.
+export async function fetchLaunchOpsInitiateCheckoutByOperacaoDay(
+  launchopsDb: SupabaseClient,
+  params: { operacaoIds: string[]; days: string[] }
+): Promise<InitiateCheckoutRow[]> {
+  if (params.days.length === 0) return []
+  const { data: anuncios, error: anunciosError } = await launchopsDb
+    .from('anuncio')
+    .select('id, operacao_id')
+    .in('operacao_id', params.operacaoIds)
+  if (anunciosError) throw anunciosError
+  const operacaoByAnuncioId = new Map((anuncios ?? []).map((a) => [a.id as string, a.operacao_id as string]))
+  const anuncioIds = [...operacaoByAnuncioId.keys()]
+  if (anuncioIds.length === 0) return []
+
+  const rows = await fetchAllPages<{ anuncio_id: string; data_referencia: string; initiate_checkout: number | null }>(
+    (from, to) =>
+      launchopsDb
+        .from('anuncio_dia')
+        .select('anuncio_id, data_referencia, initiate_checkout')
+        .in('anuncio_id', anuncioIds)
+        .in('data_referencia', params.days)
+        .range(from, to)
+  )
+
+  const byKey = new Map<string, { operacao_id: string; data: string; initiateCheckout: number }>()
+  for (const row of rows) {
+    const operacaoId = operacaoByAnuncioId.get(row.anuncio_id)
+    if (!operacaoId) continue
+    const key = `${operacaoId}|${row.data_referencia}`
+    const existing = byKey.get(key) ?? { operacao_id: operacaoId, data: row.data_referencia, initiateCheckout: 0 }
+    existing.initiateCheckout += row.initiate_checkout ?? 0
     byKey.set(key, existing)
   }
   return [...byKey.values()]
@@ -106,6 +168,10 @@ export async function syncAdSpendForFunnel(
     impressions: row.impressions,
     clicks: row.clicks,
     leads: row.leads,
+    reach: row.reach,
+    link_clicks: row.linkClicks,
+    landing_page_views: row.landingPageViews,
+    initiate_checkout: row.initiateCheckout,
     updated_at: new Date().toISOString(),
   }))
 

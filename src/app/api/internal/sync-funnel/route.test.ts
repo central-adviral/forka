@@ -21,6 +21,7 @@ vi.mock('@/lib/launchops/sync-ad-spend', () => ({
   fetchLaunchOpsAdSpendRows: vi.fn(async () => []),
   fetchLaunchOpsAdSpendRowsForDays: vi.fn(async () => []),
   aggregateAdSpendByOperacaoDay: vi.fn(() => []),
+  fetchLaunchOpsInitiateCheckoutByOperacaoDay: vi.fn(async () => []),
   syncAdSpendForFunnel: vi.fn(async () => ({ synced: 0 })),
 }))
 vi.mock('@/lib/launchops/sync-ad-creative-spend', () => ({
@@ -103,13 +104,29 @@ describe('GET /api/internal/sync-funnel', () => {
       impressions: 500,
       clicks: 5,
       leads_periodo: 1,
+      reach: 400,
+      link_clicks: 30,
+      landing_page_views: 20,
       updated_at: '2026-09-01T12:00:00Z',
     }
     const fullDayRows = [
       partialRow,
-      { operacao_id: 'op-1', data_referencia: '2026-09-01', spend: 30, impressions: 300, clicks: 3, leads_periodo: 0, updated_at: '2026-09-01T08:00:00Z' },
+      {
+        operacao_id: 'op-1',
+        data_referencia: '2026-09-01',
+        spend: 30,
+        impressions: 300,
+        clicks: 3,
+        leads_periodo: 0,
+        reach: 250,
+        link_clicks: 15,
+        landing_page_views: 10,
+        updated_at: '2026-09-01T08:00:00Z',
+      },
     ]
-    const fullDayAggregated = [{ operacao_id: 'op-1', data: '2026-09-01', spend: 80, impressions: 800, clicks: 8, leads: 1 }]
+    const fullDayAggregated = [
+      { operacao_id: 'op-1', data: '2026-09-01', spend: 80, impressions: 800, clicks: 8, leads: 1, reach: 650, linkClicks: 45, landingPageViews: 30, initiateCheckout: 0 },
+    ]
 
     vi.mocked(fetchLaunchOpsAdSpendRows).mockResolvedValueOnce([partialRow])
     vi.mocked(fetchLaunchOpsAdSpendRowsForDays).mockResolvedValueOnce(fullDayRows)
@@ -125,7 +142,9 @@ describe('GET /api/internal/sync-funnel', () => {
       days: ['2026-09-01'],
     })
     expect(aggregateAdSpendByOperacaoDay).toHaveBeenCalledWith(fullDayRows)
-    expect(syncAdSpendForFunnel).toHaveBeenCalledWith(expect.anything(), 'funnel-1', fullDayAggregated)
+    // fetchLaunchOpsInitiateCheckoutByOperacaoDay is mocked to resolve [] by default, so the
+    // merge step attaches initiateCheckout: 0 to every aggregated row before writing.
+    expect(syncAdSpendForFunnel).toHaveBeenCalledWith(expect.anything(), 'funnel-1', [{ ...fullDayAggregated[0], initiateCheckout: 0 }])
   })
 
   it('builds a separate LaunchOps client per funnel using that funnel own client credential, never mixing them up', async () => {

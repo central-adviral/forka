@@ -5,6 +5,7 @@ import {
   fetchLaunchOpsAdSpendRows,
   fetchLaunchOpsAdSpendRowsForDays,
   aggregateAdSpendByOperacaoDay,
+  fetchLaunchOpsInitiateCheckoutByOperacaoDay,
   syncAdSpendForFunnel,
 } from './sync-ad-spend'
 import {
@@ -63,7 +64,18 @@ async function syncAdSpendEntity(appDb: SupabaseClient, launchopsDb: SupabaseCli
         days,
       })
       const aggregated = aggregateAdSpendByOperacaoDay(fullDayRows)
-      await syncAdSpendForFunnel(appDb, funnel.id, aggregated)
+      const initiateCheckoutRows = await fetchLaunchOpsInitiateCheckoutByOperacaoDay(launchopsDb, {
+        operacaoIds: funnel.launchops_operacao_ids,
+        days,
+      })
+      const initiateCheckoutByKey = new Map(
+        initiateCheckoutRows.map((row) => [`${row.operacao_id}|${row.data}`, row.initiateCheckout])
+      )
+      const merged = aggregated.map((row) => ({
+        ...row,
+        initiateCheckout: initiateCheckoutByKey.get(`${row.operacao_id}|${row.data}`) ?? 0,
+      }))
+      await syncAdSpendForFunnel(appDb, funnel.id, merged)
     }
     const latestUpdatedAt = rawRows.length > 0 ? rawRows[rawRows.length - 1].updated_at : undefined
     await recordSyncResult(appDb, { salesFunnelId: funnel.id, entity: 'ad_spend_daily', result: 'ok', newCursor: latestUpdatedAt })

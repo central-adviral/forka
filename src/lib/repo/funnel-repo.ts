@@ -18,6 +18,10 @@ export interface DailyFunnelRow {
   spend: number
   impressions: number
   clicks: number
+  reach: number
+  linkClicks: number
+  landingPageViews: number
+  initiateCheckout: number
   roas: number | null
   cac: number | null
 }
@@ -38,7 +42,7 @@ export async function getDailyFunnel(
 
   const { data: spendRows, error: spendError } = await db
     .from('ad_spend_daily')
-    .select('data, spend, impressions, clicks')
+    .select('data, spend, impressions, clicks, reach, link_clicks, landing_page_views, initiate_checkout')
     .eq('sales_funnel_id', salesFunnelId)
     .gte('data', since)
     .lt('data', until)
@@ -46,12 +50,34 @@ export async function getDailyFunnel(
 
   const byDay = new Map<
     string,
-    { vendas: number; receitaBruta: number; receitaLiquida: number; spend: number; impressions: number; clicks: number }
+    {
+      vendas: number
+      receitaBruta: number
+      receitaLiquida: number
+      spend: number
+      impressions: number
+      clicks: number
+      reach: number
+      linkClicks: number
+      landingPageViews: number
+      initiateCheckout: number
+    }
   >()
   // Sales timestamps are UTC; ad_spend_daily.data already arrives in the ad account's
   // local timezone (America/Sao_Paulo), so bucket sales by the same BRT calendar day.
   const dayKey = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(iso))
-  const emptyEntry = () => ({ vendas: 0, receitaBruta: 0, receitaLiquida: 0, spend: 0, impressions: 0, clicks: 0 })
+  const emptyEntry = () => ({
+    vendas: 0,
+    receitaBruta: 0,
+    receitaLiquida: 0,
+    spend: 0,
+    impressions: 0,
+    clicks: 0,
+    reach: 0,
+    linkClicks: 0,
+    landingPageViews: 0,
+    initiateCheckout: 0,
+  })
 
   for (const row of (salesRows ?? []) as { data_venda: string; valor_bruto: number | null; valor_liquido: number | null }[]) {
     const key = dayKey(row.data_venda)
@@ -62,11 +88,24 @@ export async function getDailyFunnel(
     byDay.set(key, entry)
   }
 
-  for (const row of (spendRows ?? []) as { data: string; spend: number; impressions: number; clicks: number }[]) {
+  for (const row of (spendRows ?? []) as {
+    data: string
+    spend: number
+    impressions: number
+    clicks: number
+    reach: number
+    link_clicks: number
+    landing_page_views: number
+    initiate_checkout: number
+  }[]) {
     const entry = byDay.get(row.data) ?? emptyEntry()
     entry.spend += row.spend
     entry.impressions += row.impressions
     entry.clicks += row.clicks
+    entry.reach += row.reach
+    entry.linkClicks += row.link_clicks
+    entry.landingPageViews += row.landing_page_views
+    entry.initiateCheckout += row.initiate_checkout
     byDay.set(row.data, entry)
   }
 

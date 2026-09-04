@@ -41,16 +41,43 @@ export default async function SalesFunnelPage({
     (acc, row) => ({
       investimento: acc.investimento + row.spend,
       receitaBruta: acc.receitaBruta + row.receitaBruta,
+      receitaLiquida: acc.receitaLiquida + row.receitaLiquida,
       vendas: acc.vendas + row.vendas,
+      impressions: acc.impressions + row.impressions,
+      reach: acc.reach + row.reach,
+      linkClicks: acc.linkClicks + row.linkClicks,
+      landingPageViews: acc.landingPageViews + row.landingPageViews,
+      initiateCheckout: acc.initiateCheckout + row.initiateCheckout,
     }),
-    { investimento: 0, receitaBruta: 0, vendas: 0 }
+    {
+      investimento: 0,
+      receitaBruta: 0,
+      receitaLiquida: 0,
+      vendas: 0,
+      impressions: 0,
+      reach: 0,
+      linkClicks: 0,
+      landingPageViews: 0,
+      initiateCheckout: 0,
+    }
   )
   const kpiTotals = {
     investimento: totals.investimento,
-    receitaBruta: totals.receitaBruta,
-    resultado: totals.receitaBruta - totals.investimento,
-    roas: totals.investimento > 0 ? totals.receitaBruta / totals.investimento : null,
-    ticketMedio: totals.vendas > 0 ? totals.receitaBruta / totals.vendas : null,
+    receitaLiquida: totals.receitaLiquida,
+    vendas: totals.vendas,
+    cpa: totals.vendas > 0 ? totals.investimento / totals.vendas : null,
+    resultado: totals.receitaLiquida - totals.investimento,
+    roas: totals.investimento > 0 ? totals.receitaLiquida / totals.investimento : null,
+    ticketMedio: totals.vendas > 0 ? totals.receitaLiquida / totals.vendas : null,
+  }
+  const coneTotals = {
+    spend: totals.investimento,
+    impressions: totals.impressions,
+    reach: totals.reach,
+    linkClicks: totals.linkClicks,
+    landingPageViews: totals.landingPageViews,
+    initiateCheckout: totals.initiateCheckout,
+    vendas: totals.vendas,
   }
 
   return (
@@ -147,7 +174,7 @@ export default async function SalesFunnelPage({
 
       <FunnelKpiCards totals={kpiTotals} currency={currency} />
 
-      <FunnelCone days={rows} />
+      <FunnelCone totals={coneTotals} currency={currency} />
 
       <FunnelPaymentPie breakdown={paymentBreakdown} currency={currency} />
 
