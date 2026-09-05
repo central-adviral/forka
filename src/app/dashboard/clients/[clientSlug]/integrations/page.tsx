@@ -109,8 +109,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
         <form action={saveHublaToken.bind(null, { client_id: client.id, client_slug: client.slug })} className="flex gap-2">
           <input
             name="hubla_webhook_token"
-            placeholder="Token do webhook"
-            defaultValue={client.hubla_webhook_token ?? ''}
+            placeholder={client.hubla_webhook_token ? 'token configurado · cole um novo pra substituir' : 'Token do webhook'}
             className="flex-1 rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
           />
           <button
@@ -151,8 +150,9 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
             <input
               type="password"
               name="funnel_source_service_role_key"
-              placeholder="chave de acesso"
-              defaultValue={client.funnel_source_service_role_key ?? ''}
+              placeholder={
+                client.funnel_source_service_role_key ? 'chave configurada · cole uma nova pra substituir' : 'chave de acesso'
+              }
               className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
             />
           </div>

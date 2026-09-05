@@ -68,7 +68,7 @@ export async function verifyDomain(context: { client_id: string; client_slug: st
 const hublaTokenSchema = z.object({
   client_id: z.string().uuid(),
   client_slug: z.string(),
-  hubla_webhook_token: z.string().min(16, 'o token deve ter pelo menos 16 caracteres'),
+  hubla_webhook_token: z.string().min(16, 'o token deve ter pelo menos 16 caracteres').optional().or(z.literal('')),
 })
 
 export async function saveHublaToken(context: { client_id: string; client_slug: string }, formData: FormData) {
@@ -81,6 +81,8 @@ export async function saveHublaToken(context: { client_id: string; client_slug: 
     throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
   }
   const parsed = result.data
+  // O valor salvo nunca é ecoado de volta pro HTML — campo em branco significa "manter o token atual", não apagar.
+  if (!parsed.hubla_webhook_token) return
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase
     .from('clients')
@@ -109,13 +111,14 @@ export async function saveFunnelDataSource(context: { client_id: string; client_
   }
   const parsed = result.data
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase
-    .from('clients')
-    .update({
-      funnel_source_url: parsed.funnel_source_url || null,
-      funnel_source_service_role_key: parsed.funnel_source_service_role_key || null,
-    })
-    .eq('id', parsed.client_id)
+  const update: { funnel_source_url: string | null; funnel_source_service_role_key?: string } = {
+    funnel_source_url: parsed.funnel_source_url || null,
+  }
+  // O valor salvo nunca é ecoado de volta pro HTML — campo em branco significa "manter a chave atual", não apagar.
+  if (parsed.funnel_source_service_role_key) {
+    update.funnel_source_service_role_key = parsed.funnel_source_service_role_key
+  }
+  const { error } = await supabase.from('clients').update(update).eq('id', parsed.client_id)
   if (error) throw error
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/integrations`)
 }
