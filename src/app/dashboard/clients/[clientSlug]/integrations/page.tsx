@@ -94,11 +94,6 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
             </p>
 
             <VerifyDomainButton verifyAction={verifyDomain.bind(null, { client_id: client.id, client_slug: client.slug })} />
-
-            <p className="text-xs text-[#8A90A6]">
-              Depois que o DNS estiver verificado, avise o responsável técnico para finalizar o registro do
-              domínio — esse último passo ainda é manual.
-            </p>
           </>
         )}
       </section>

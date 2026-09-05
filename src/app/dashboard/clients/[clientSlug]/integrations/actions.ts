@@ -5,6 +5,7 @@ import { promises as dns } from 'node:dns'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { isCnameVerified } from '@/lib/domain/redirect-domain'
+import { addProjectDomain, removeProjectDomain } from '@/lib/vercel/domains'
 
 const domainSchema = z.object({
   client_id: z.string().uuid(),
@@ -29,11 +30,26 @@ export async function saveDomain(context: { client_id: string; client_slug: stri
   }
   const parsed = result.data
   const supabase = await createServerSupabaseClient()
+
+  const { data: current } = await supabase
+    .from('clients')
+    .select('custom_domain')
+    .eq('id', parsed.client_id)
+    .maybeSingle()
+
+  const added = await addProjectDomain(parsed.custom_domain)
+  if (!added.ok) throw new Error(added.error)
+
   const { error } = await supabase
     .from('clients')
     .update({ custom_domain: parsed.custom_domain, domain_status: 'pending' })
     .eq('id', parsed.client_id)
   if (error) throw error
+
+  if (current?.custom_domain && current.custom_domain !== parsed.custom_domain) {
+    await removeProjectDomain(current.custom_domain)
+  }
+
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/integrations`)
 }
 
