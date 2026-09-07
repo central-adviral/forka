@@ -50,7 +50,16 @@ export function ReportCanvas({
   }
 
   return (
-    <div ref={containerRef} className="relative m-6 h-[720px] flex-shrink-0 overflow-auto rounded-2xl border border-white/[0.08]">
+    <div
+      ref={containerRef}
+      className="relative m-6 h-[720px] flex-shrink-0 overflow-auto rounded-2xl border border-white/[0.08]"
+      style={{
+        // Two faint pools of light — violet where traffic enters, amber near the leader — so the
+        // canvas has depth instead of reading as a flat panel.
+        background:
+          'radial-gradient(120% 90% at 8% 10%, rgba(124,111,240,0.08), transparent 55%), radial-gradient(90% 70% at 92% 85%, rgba(245,185,77,0.06), transparent 55%), #10131F',
+      }}
+    >
       <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-[10px] border border-white/[0.08] bg-[#141829] px-1.5 py-1.5">
         <button
           type="button"
@@ -98,6 +107,7 @@ export function ReportCanvas({
           {layout.variants.map((variant) => (
             <path
               key={`traffic-${variant.id}`}
+              className="flow-edge"
               d={variant.trafficEdge.path}
               stroke="#4F8EF7"
               strokeWidth={variant.trafficEdge.strokeWidth}

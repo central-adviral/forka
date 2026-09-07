@@ -81,3 +81,11 @@ export function resolvePeriodDateRange(
     until: untilDate ? toDateOnly(untilDate) : tomorrow,
   }
 }
+
+// A test created minutes ago has been running for "1 dia", not zero -- the summary bar reads
+// as elapsed calendar days and never shows a bare 0.
+export function daysRunningSince(createdAtIso: string, now: Date = new Date()): number {
+  const created = new Date(createdAtIso).getTime()
+  if (Number.isNaN(created)) return 1
+  return Math.max(1, Math.ceil((now.getTime() - created) / DAY_MS))
+}

@@ -8,7 +8,7 @@ import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
 import { ReportCanvas } from './report-canvas'
 import { toggleTestStatus } from './actions'
-import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil, resolveDateRange, formatBr } from '@/lib/domain/report-period'
+import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil, resolveDateRange, formatBr, daysRunningSince } from '@/lib/domain/report-period'
 import { RefreshButton } from './refresh-button'
 import { InsightPanel } from './insight-panel'
 import { MiniBarChart } from './mini-bar-chart'
@@ -156,7 +156,7 @@ export default async function TestReportPage({
   const supabase = await createServerSupabaseClient()
   const { data: test, error: testError } = await supabase
     .from('tests')
-    .select('id, name, slug, status, conversion_method, fallback_url, test_type, client_id, clients(custom_domain, domain_status)')
+    .select('id, name, slug, status, conversion_method, fallback_url, test_type, client_id, created_at, clients(custom_domain, domain_status)')
     .eq('slug', testSlug)
     .maybeSingle()
 
@@ -243,6 +243,15 @@ export default async function TestReportPage({
   })
 
   const srmDetected = detectSampleRatioMismatch(rows.map((row) => ({ weightPct: row.weight_pct, visits: row.visits })))
+
+  const leaderRow = rows.reduce<(typeof rows)[number] | null>(
+    (best, row) =>
+      row.variant_id !== control?.variant_id && (!best || (row.confidencePct ?? -1) > (best.confidencePct ?? -1))
+        ? row
+        : best,
+    null
+  )
+  const daysRunning = daysRunningSince(test.created_at)
 
   const revenueByVariant = new Map(
     ((totalsReport as TotalsReportRow[]) ?? []).map((row) => [row.variant_id, row.revenue_cents])
@@ -415,6 +424,36 @@ export default async function TestReportPage({
           atualizar a página em instantes.
         </div>
       )}
+
+      <div className="mx-6 mt-4 flex flex-wrap items-center gap-x-7 gap-y-3 rounded-2xl border border-white/[0.08] bg-[#141829] px-6 py-4">
+        <div>
+          <div className="font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums">{totalVisits}</div>
+          <div className="text-[11.5px] text-[#8A90A6]">acessos totais</div>
+        </div>
+        <div className="h-[34px] w-px bg-white/[0.08]" />
+        <div>
+          <div className="font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums text-[#F5B94D]">
+            {leaderRow?.conversions ?? 0}
+          </div>
+          <div className="text-[11.5px] text-[#8A90A6]">vendas — variante líder</div>
+        </div>
+        <div className="h-[34px] w-px bg-white/[0.08]" />
+        <div>
+          <div className="font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums text-[#2DD4A8]">
+            {leaderRow?.confidencePct !== null && leaderRow?.confidencePct !== undefined
+              ? `${leaderRow.confidencePct}%`
+              : '—'}
+          </div>
+          <div className="text-[11.5px] text-[#8A90A6]">confiança estatística</div>
+        </div>
+        <div className="h-[34px] w-px bg-white/[0.08]" />
+        <div>
+          <div className="font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums">
+            {daysRunning} {daysRunning === 1 ? 'dia' : 'dias'}
+          </div>
+          <div className="text-[11.5px] text-[#8A90A6]">em execução</div>
+        </div>
+      </div>
 
       <ReportCanvas
         layout={layout}

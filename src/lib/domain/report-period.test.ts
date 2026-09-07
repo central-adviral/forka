@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolvePeriodSince, resolvePeriodUntil, resolveDateRange, resolvePeriodDateRange, formatBr } from './report-period'
+import { resolvePeriodSince, resolvePeriodUntil, resolveDateRange, resolvePeriodDateRange, formatBr, daysRunningSince } from './report-period'
 
 const NOW = new Date('2026-08-30T15:30:00.000Z')
 
@@ -123,5 +123,21 @@ describe('resolvePeriodDateRange', () => {
 describe('formatBr', () => {
   it('formats an ISO date-only string as DD/MM', () => {
     expect(formatBr('2026-08-05')).toBe('05/08')
+  })
+})
+
+describe('daysRunningSince', () => {
+  const now = new Date('2026-09-07T12:00:00.000Z')
+
+  it('counts elapsed days since the test was created', () => {
+    expect(daysRunningSince('2026-09-01T12:00:00.000Z', now)).toBe(6)
+  })
+
+  it('reports 1 for a test created minutes ago instead of 0', () => {
+    expect(daysRunningSince('2026-09-07T11:30:00.000Z', now)).toBe(1)
+  })
+
+  it('falls back to 1 when the date is unusable', () => {
+    expect(daysRunningSince('not-a-date', now)).toBe(1)
   })
 })
