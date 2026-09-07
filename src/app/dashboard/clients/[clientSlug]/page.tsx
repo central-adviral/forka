@@ -2,6 +2,20 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { deleteClient } from '../actions'
+import { getClientHubKpis } from '@/lib/repo/client-hub-repo'
+import { resolvePeriodDateRange } from '@/lib/domain/report-period'
+
+function KpiCard({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="card-shadow flex-1 rounded-[12px] border border-white/[0.08] bg-[#141829] p-4">
+      <div className="font-['JetBrains_Mono'] text-[10px] uppercase tracking-wider text-[#8A90A6]">{label}</div>
+      <div className="mt-1 font-['JetBrains_Mono'] text-[21px] font-semibold">{value}</div>
+      <div className="mt-1 truncate text-[11.5px] text-[#8A90A6]" title={hint}>
+        {hint}
+      </div>
+    </div>
+  )
+}
 
 export default async function ClientHubPage({ params }: { params: Promise<{ clientSlug: string }> }) {
   const { clientSlug } = await params
@@ -9,14 +23,21 @@ export default async function ClientHubPage({ params }: { params: Promise<{ clie
   const { data: client } = await supabase.from('clients').select('id, name, slug').eq('slug', clientSlug).maybeSingle()
   if (!client) notFound()
 
-  const [testsResult, funnelsResult] = await Promise.all([
+  const { since, until } = resolvePeriodDateRange('30d', undefined, undefined)
+  const [testsResult, funnelsResult, kpis] = await Promise.all([
     supabase.from('tests').select('id', { count: 'exact', head: true }).eq('client_id', client.id),
     supabase.from('sales_funnels').select('id', { count: 'exact', head: true }).eq('client_id', client.id),
+    getClientHubKpis(supabase, client.id, since, until).catch((error) => {
+      console.error('[client-hub-kpis-failed]', { clientId: client.id }, error)
+      return null
+    }),
   ])
   if (testsResult.error) console.error('[client-hub-tests-count-failed]', { clientId: client.id }, testsResult.error)
   if (funnelsResult.error) console.error('[client-hub-funnels-count-failed]', { clientId: client.id }, funnelsResult.error)
   const testsCount = testsResult.count ?? 0
   const funnelsCount = funnelsResult.count ?? 0
+
+  const currency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
   return (
     <div className="p-8">
@@ -35,6 +56,31 @@ export default async function ClientHubPage({ params }: { params: Promise<{ clie
           </a>
         </div>
       </div>
+
+      {kpis && (
+        <div className="mb-6 flex gap-3.5">
+          <KpiCard label="Receita — 30d" value={currency(kpis.revenue)} hint="Receita líquida dos funis de venda" />
+          <KpiCard
+            label="ROAS médio"
+            value={kpis.roas !== null ? `${kpis.roas.toFixed(2)}x` : '—'}
+            hint={kpis.roas !== null ? 'Receita ÷ investimento nos últimos 30d' : 'Sem gasto de mídia registrado'}
+          />
+          <KpiCard
+            label="Testes ativos"
+            value={String(kpis.activeTests)}
+            hint={`de ${testsCount} ${testsCount === 1 ? 'funil de teste' : 'funis de teste'}`}
+          />
+          <KpiCard
+            label="Melhor variante"
+            value={kpis.bestVariant ? `${kpis.bestVariant.liftPct > 0 ? '+' : ''}${kpis.bestVariant.liftPct.toFixed(0)}%` : '—'}
+            hint={
+              kpis.bestVariant
+                ? `${kpis.bestVariant.variantName} — ${kpis.bestVariant.testName}`
+                : 'Sem teste ativo com dados suficientes'
+            }
+          />
+        </div>
+      )}
 
       <div className="flex gap-5">
         <a
