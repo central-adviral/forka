@@ -30,11 +30,27 @@ export default async function SalesFunnelPage({
   if (!funnel) notFound()
 
   const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
-  const [rows, health, paymentBreakdown] = await Promise.all([
+  const [rows, health, paymentBreakdown, creativeResult] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
     getFunnelSyncHealth(supabase, funnel.id),
     getPaymentMethodBreakdown(supabase, funnel.id, since, until),
+    supabase.rpc('get_funnel_report_by_creative', {
+      p_sales_funnel_id: funnel.id,
+      p_since: since,
+      p_until: until,
+    }),
   ])
+  if (creativeResult.error) {
+    console.error('[funnel-creative-report-failed]', { salesFunnelId: funnel.id }, creativeResult.error)
+  }
+  const creatives = (creativeResult.data ?? []) as {
+    ad_name: string
+    spend: number
+    impressions: number
+    link_clicks: number
+    sales_count: number
+    revenue: number
+  }[]
 
   const currency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -185,6 +201,61 @@ export default async function SalesFunnelPage({
       <FunnelCone totals={coneTotals} currency={currency} />
 
       <FunnelPaymentPie breakdown={paymentBreakdown} currency={currency} />
+
+      <div className="card-shadow mb-6 overflow-hidden rounded-2xl border border-white/[0.08]">
+        <div className="flex items-baseline justify-between px-4 pt-4">
+          <h2 className="font-['Space_Grotesk'] text-base font-semibold">Por criativo</h2>
+          <span className="text-[11.5px] text-[#8A90A6]">
+            Cruza o gasto do anúncio com a venda que ele gerou
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="mt-3 w-full text-[13.5px]">
+            <thead>
+              <tr className="border-b border-white/[0.08] text-left text-[#8A90A6]">
+                <th className="p-3">Anúncio</th>
+                <th className="p-3">Gasto</th>
+                <th className="p-3">Vendas</th>
+                <th className="p-3">Receita</th>
+                <th className="p-3">ROAS</th>
+                <th className="p-3">CPA</th>
+              </tr>
+            </thead>
+            <tbody>
+              {creatives.length === 0 ? (
+                <tr>
+                  <td className="p-3 text-[#8A90A6]" colSpan={6}>
+                    Nenhum criativo com gasto ou venda no período.
+                  </td>
+                </tr>
+              ) : (
+                creatives.map((c) => {
+                  const roas = c.spend > 0 ? c.revenue / c.spend : null
+                  const cpa = c.sales_count > 0 ? c.spend / c.sales_count : null
+                  return (
+                    <tr key={c.ad_name} className="border-t border-white/[0.06]">
+                      <td className="max-w-[280px] truncate p-3" title={c.ad_name}>
+                        {c.ad_name}
+                      </td>
+                      <td className="p-3 font-['JetBrains_Mono'] tabular-nums">{currency(c.spend)}</td>
+                      <td className="p-3 font-['JetBrains_Mono'] tabular-nums">{c.sales_count}</td>
+                      <td className="p-3 font-['JetBrains_Mono'] tabular-nums">{currency(c.revenue)}</td>
+                      <td
+                        className={`p-3 font-['JetBrains_Mono'] tabular-nums ${
+                          roas !== null && roas >= 1 ? 'text-[#2DD4A8]' : 'text-[#8A90A6]'
+                        }`}
+                      >
+                        {roas !== null ? `${roas.toFixed(2)}x` : '—'}
+                      </td>
+                      <td className="p-3 font-['JetBrains_Mono'] tabular-nums">{cpa !== null ? currency(cpa) : '—'}</td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <div className="card-shadow overflow-hidden rounded-2xl border border-white/[0.08]">
         <table className="w-full text-[13.5px]">

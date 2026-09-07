@@ -11,6 +11,12 @@ export interface LaunchOpsSaleRow {
   metodo_pagamento: string | null
   updated_at: string
   transaction_id_plataforma: string | null
+  // Optional: a LaunchOps row predating the UTM columns simply omits them.
+  utm_source?: string | null
+  utm_medium?: string | null
+  utm_campaign?: string | null
+  utm_term?: string | null
+  utm_content?: string | null
 }
 
 export async function fetchLaunchOpsSalesRows(
@@ -24,7 +30,7 @@ export async function fetchLaunchOpsSalesRows(
     let query = launchopsDb
       .from('vendas')
       .select(
-        'id, data_venda, produto_nome, status, valor_bruto, valor_liquido, metodo_pagamento, updated_at, transaction_id_plataforma'
+        'id, data_venda, produto_nome, status, valor_bruto, valor_liquido, metodo_pagamento, updated_at, transaction_id_plataforma, utm_source, utm_medium, utm_campaign, utm_term, utm_content'
       )
       .eq('plataforma', 'hubla')
       .eq('status', 'aprovada')
@@ -130,6 +136,13 @@ export async function syncSalesForFunnel(
     updated_at: row.updated_at,
     transaction_id_plataforma: row.transaction_id_plataforma,
     conversion_id: row.transaction_id_plataforma ? conversionIdByTransactionId.get(row.transaction_id_plataforma) ?? null : null,
+    // LaunchOps records the ad on the sale itself; carrying it over is what lets revenue be
+    // read per creative for every sale, not only for the ones that came through a test.
+    utm_source: row.utm_source ?? null,
+    utm_medium: row.utm_medium ?? null,
+    utm_campaign: row.utm_campaign ?? null,
+    utm_term: row.utm_term ?? null,
+    utm_content: row.utm_content ?? null,
   }))
 
   // A single upsert covering thousands of rows (e.g. a first full-history sync) risks
