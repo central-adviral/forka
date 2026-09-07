@@ -36,6 +36,11 @@ export default defineConfig({
     // asserted against that same server's calendar day, and both shifted together. Matching
     // production is what makes those assertions mean anything.
     env: { TZ: 'UTC' },
+    // Integration tests all hit one local Postgres and create users through the same auth server,
+    // so running files in parallel makes them fight: whole files failed to start on some runs and
+    // an RLS assertion failed on others, differently each time. Sequential is the honest setting
+    // for a shared-database suite -- a suite that fails at random is one nobody believes.
+    fileParallelism: !isIntegration,
     // Outside integration mode the env in memory is production's, so these files are not
     // skipped by convention -- they are never collected in the first place.
     exclude: isIntegration ? defaultExclude : [...defaultExclude, '**/*.integration.test.ts'],

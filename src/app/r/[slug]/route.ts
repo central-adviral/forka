@@ -14,6 +14,21 @@ import { resolveEntryDestination, withTrackingId, withUtms } from '@/lib/domain/
 const COOKIE_MAX_AGE_DAYS = Number(process.env.COOKIE_MAX_AGE_DAYS ?? '30')
 const MAX_CLICKS_PER_IP_PER_HOUR = 30
 
+// What the ad's URL template puts on the link and this route keeps on the click. utm_content is
+// the adset name, and it was missing here -- the ad sent it and the click threw it away. The two
+// branches below (bot and human) captured the same list from two places, which is how they came
+// to differ from the template in the first place.
+const TRACKED_URL_PARAMS = [
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_term',
+  'utm_content',
+  'fb_ad_id',
+  'fb_adset_id',
+  'fb_campaign_id',
+] as const
+
 function getClientIp(request: NextRequest): string | null {
   const forwarded = request.headers.get('x-forwarded-for')
   if (forwarded) return forwarded.split(',')[0].trim()
@@ -34,7 +49,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   if (isKnownBot(request.headers.get('user-agent'))) {
     const botSourceUtms = Object.fromEntries(
-      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'fb_ad_id', 'fb_adset_id', 'fb_campaign_id'].map((key) => [
+      TRACKED_URL_PARAMS.map((key) => [
         key,
         request.nextUrl.searchParams.get(key) ?? '',
       ])
