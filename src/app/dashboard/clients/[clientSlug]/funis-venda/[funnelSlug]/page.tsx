@@ -212,10 +212,14 @@ export default async function SalesFunnelPage({
 
       {/* Funnel on the left, the three read-outs stacked on the right: the funnel is one tall
           shape and the analyses are short ones, so side by side they fill each other's space. */}
-      <div className="mb-6 grid items-start gap-5 lg:grid-cols-[1.1fr_1fr]">
-        <FunnelCone totals={coneTotals} currency={currency} />
+      {/* minmax(0,1fr) on both halves, not plain 1fr: the 24-bar chart has a wide min-content
+          and a plain fr column refuses to shrink below it, which squeezed the funnel to a sliver. */}
+      <div className="mb-6 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="min-w-0">
+          <FunnelCone totals={coneTotals} currency={currency} />
+        </div>
 
-        <div className="flex flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-5">
           <FunnelPaymentPie breakdown={paymentBreakdown} currency={currency} />
 
           <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
@@ -251,11 +255,14 @@ export default async function SalesFunnelPage({
           <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
             <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Vendas por horário</h2>
             <p className="mb-4 text-[12px] text-[#8A90A6]">Hora do dia (horário de Brasília)</p>
-            <MiniBarChart
-              data={salesByHour.map((h) => ({ label: `${String(h.hour).padStart(2, '0')}h`, value: h.sales_count }))}
-              valueFormat={(value) => `${value} vendas`}
-              barColor="#2DD4A8"
-            />
+            {/* Bare counts, not "N vendas": 24 bars in half a screen leaves no room for a word
+                above each one, and the panel title already says these are sales. */}
+            <div className="overflow-x-auto">
+              <MiniBarChart
+                data={salesByHour.map((h) => ({ label: `${String(h.hour).padStart(2, '0')}h`, value: h.sales_count }))}
+                barColor="#2DD4A8"
+              />
+            </div>
           </div>
         </div>
       </div>
