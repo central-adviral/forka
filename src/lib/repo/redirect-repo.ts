@@ -41,6 +41,7 @@ export async function insertClickEvent(
     trackingId: string
     sourceUtms: Record<string, string>
     ip?: string | null
+    userAgent?: string | null
     isBot?: boolean
   }
 ): Promise<void> {
@@ -51,6 +52,7 @@ export async function insertClickEvent(
     tracking_id: params.trackingId,
     source_utms: params.sourceUtms,
     ip: params.ip ?? null,
+    user_agent: params.userAgent ?? null,
     is_bot: params.isBot ?? false,
   })
   if (error) throw error

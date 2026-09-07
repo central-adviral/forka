@@ -48,6 +48,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           trackingId: crypto.randomUUID(),
           sourceUtms: botSourceUtms,
           ip: getClientIp(request),
+          userAgent: request.headers.get('user-agent'),
           isBot: true,
         })
       } catch (err) {
