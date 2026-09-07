@@ -37,6 +37,7 @@ export default async function EditSalesFunnelPage({
       <form
         action={editSalesFunnel.bind(null, {
           sales_funnel_id: funnel.id,
+          client_id: client.id,
           client_slug: client.slug,
           funnel_slug: funnel.slug,
         })}

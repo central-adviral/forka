@@ -8,6 +8,26 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { createLaunchOpsClient } from '@/lib/launchops/client'
 import { syncOneFunnel } from '@/lib/launchops/sync-funnel'
 
+async function assertNoDuplicateLaunchOpsMapping(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  clientId: string,
+  operacaoIds: string[],
+  excludeFunnelId?: string
+) {
+  let query = supabase.from('sales_funnels').select('id, name, launchops_operacao_ids').eq('client_id', clientId)
+  if (excludeFunnelId) query = query.neq('id', excludeFunnelId)
+  const { data, error } = await query
+  if (error) throw error
+  for (const funnel of data ?? []) {
+    const overlap = (funnel.launchops_operacao_ids ?? []).filter((id: string) => operacaoIds.includes(id))
+    if (overlap.length > 0) {
+      throw new Error(
+        `Operação(ões) já mapeada(s) no funil "${funnel.name}" — cada operação do LaunchOps só pode pertencer a um funil de venda por cliente, senão o gasto é somado em dobro`
+      )
+    }
+  }
+}
+
 const createSalesFunnelSchema = z.object({
   client_id: z.string().uuid(),
   client_slug: z.string(),
@@ -36,6 +56,7 @@ export async function createSalesFunnel(context: { client_id: string; client_slu
   const produtoNomes = parsed.launchops_produto_nomes.split(',').map((s) => s.trim()).filter(Boolean)
 
   const supabase = await createServerSupabaseClient()
+  await assertNoDuplicateLaunchOpsMapping(supabase, parsed.client_id, parsed.launchops_operacao_ids)
   const { error } = await supabase.from('sales_funnels').insert({
     client_id: parsed.client_id,
     name: parsed.name,
@@ -83,6 +104,7 @@ export async function toggleSalesFunnelStatus(input: z.infer<typeof toggleSalesF
 
 const editSalesFunnelSchema = z.object({
   sales_funnel_id: z.string().uuid(),
+  client_id: z.string().uuid(),
   client_slug: z.string(),
   funnel_slug: z.string(),
   name: z.string().min(1),
@@ -94,11 +116,12 @@ const editSalesFunnelSchema = z.object({
 })
 
 export async function editSalesFunnel(
-  context: { sales_funnel_id: string; client_slug: string; funnel_slug: string },
+  context: { sales_funnel_id: string; client_id: string; client_slug: string; funnel_slug: string },
   formData: FormData
 ) {
   const result = editSalesFunnelSchema.safeParse({
     sales_funnel_id: context.sales_funnel_id,
+    client_id: context.client_id,
     client_slug: context.client_slug,
     funnel_slug: context.funnel_slug,
     name: formData.get('name'),
@@ -112,6 +135,7 @@ export async function editSalesFunnel(
   const produtoNomes = parsed.launchops_produto_nomes.split(',').map((s) => s.trim()).filter(Boolean)
 
   const supabase = await createServerSupabaseClient()
+  await assertNoDuplicateLaunchOpsMapping(supabase, parsed.client_id, parsed.launchops_operacao_ids, parsed.sales_funnel_id)
   const { error } = await supabase
     .from('sales_funnels')
     .update({
