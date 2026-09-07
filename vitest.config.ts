@@ -3,14 +3,18 @@ import react from '@vitejs/plugin-react'
 import tsconfigPaths from 'vite-tsconfig-paths'
 import { existsSync } from 'node:fs'
 
-// Integration tests must never load .env.local -- that file points at production, and
-// these tests create/delete real rows. They load .env.test instead (checked into git,
-// safe: it only holds the standard local-Supabase-CLI default keys, which only work
-// against a `supabase start` instance on this machine, never a real remote project).
+// No test run loads .env.local. That file points at production, and the strongest guarantee that
+// a test cannot reach production is that its credentials are never in memory to begin with -- not
+// that some other rule keeps the test from asking. CI proves it holds: the unit job runs with no
+// Supabase environment at all, and every unit test mocks the client. The one that did not, and
+// built a real service-role client out of .env.local, is fixed in sync-sales.test.ts.
+//
+// Integration tests load .env.test instead: checked into git, and safe because it holds only the
+// standard local-Supabase-CLI default keys, which work against a `supabase start` instance on this
+// machine and never against a real remote project.
 const isIntegration = Boolean(process.env.VITEST_INTEGRATION)
-const envFile = isIntegration ? '.env.test' : '.env.local'
-if (existsSync(envFile)) {
-  process.loadEnvFile(envFile)
+if (isIntegration && existsSync('.env.test')) {
+  process.loadEnvFile('.env.test')
 }
 
 // Picking the env file was not enough on its own: a plain `vitest run` loads .env.local
