@@ -653,6 +653,14 @@ export default async function TestReportPage({
                       <div className="mt-1 truncate text-[12.5px] font-medium" title={c.adName}>
                         {c.adName}
                       </div>
+                      {c.hasThinData && (
+                        <span
+                          title="Poucos acessos ainda: o score deste criativo puxa para a média do teste até haver volume suficiente para confiar nos números dele."
+                          className="cursor-help rounded-full bg-white/[0.06] px-2 py-0.5 text-[9.5px] text-[#8A90A6]"
+                        >
+                          amostra pequena
+                        </span>
+                      )}
                       <div className="flex flex-wrap justify-center gap-2 border-t border-white/[0.06] pt-2 text-[10.5px] text-[#8A90A6]">
                         <span>ROAS <b className="font-['JetBrains_Mono'] text-[#E8EAF2]">{c.roas !== null ? `${c.roas.toFixed(2)}x` : '—'}</b></span>
                         <span>Taxa <b className="font-['JetBrains_Mono'] text-[#E8EAF2]">{c.conversionRate !== null ? `${(c.conversionRate * 100).toFixed(1)}%` : '—'}</b></span>
