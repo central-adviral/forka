@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig, defaultExclude } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tsconfigPaths from 'vite-tsconfig-paths'
 import { existsSync } from 'node:fs'
@@ -7,14 +7,32 @@ import { existsSync } from 'node:fs'
 // these tests create/delete real rows. They load .env.test instead (checked into git,
 // safe: it only holds the standard local-Supabase-CLI default keys, which only work
 // against a `supabase start` instance on this machine, never a real remote project).
-const envFile = process.env.VITEST_INTEGRATION ? '.env.test' : '.env.local'
+const isIntegration = Boolean(process.env.VITEST_INTEGRATION)
+const envFile = isIntegration ? '.env.test' : '.env.local'
 if (existsSync(envFile)) {
   process.loadEnvFile(envFile)
+}
+
+// Picking the env file was not enough on its own: a plain `vitest run` loads .env.local
+// AND still collects the integration tests, which then create rows straight in production
+// (it happened on 2026-09-04, and again on 2026-09-05). These two guards make that
+// impossible rather than merely discouraged.
+if (isIntegration) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+  if (!url.includes('127.0.0.1') && !url.includes('localhost')) {
+    throw new Error(
+      `Integration tests only run against a local Supabase. NEXT_PUBLIC_SUPABASE_URL is "${url}". ` +
+        'Start one with `supabase start` and make sure .env.test is the file being loaded.'
+    )
+  }
 }
 
 export default defineConfig({
   plugins: [tsconfigPaths(), react()],
   test: {
     environment: 'node',
+    // Outside integration mode the env in memory is production's, so these files are not
+    // skipped by convention -- they are never collected in the first place.
+    exclude: isIntegration ? defaultExclude : [...defaultExclude, '**/*.integration.test.ts'],
   },
 })
