@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push makes an in-flight run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Cheap gates first, so a typo does not wait on a database to boot.
+  verify:
+    name: typecheck · lint · unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm test
+
+  # The integration suite is the one that pins how a sale is attributed to an ad. It needs a real
+  # Postgres with every migration applied, which is a test in itself: the chain has to rebuild the
+  # database from nothing, in order, on every run.
+  integration:
+    name: integration (supabase)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: npm ci
+      - name: Start Supabase and apply every migration
+        run: supabase start
+      - name: Run integration tests
+        run: |
+          # Read the instance's own keys rather than trusting a committed copy: .env.test has gone
+          # stale before, when the CLI changed how it generates them, and a stale key surfaces as a
+          # connection error rather than as anything legible.
+          eval "$(supabase status -o env | sed 's/^/LOCAL_/')"
+          export NEXT_PUBLIC_SUPABASE_URL="$LOCAL_API_URL"
+          export NEXT_PUBLIC_SUPABASE_ANON_KEY="$LOCAL_ANON_KEY"
+          export SUPABASE_SERVICE_ROLE_KEY="$LOCAL_SERVICE_ROLE_KEY"
+          export VITEST_INTEGRATION=1
+          npx vitest run
