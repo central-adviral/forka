@@ -57,10 +57,10 @@ export function ReportCanvas({
         // Two faint pools of light — violet where traffic enters, amber near the leader — so the
         // canvas has depth instead of reading as a flat panel.
         background:
-          'radial-gradient(120% 90% at 8% 10%, rgba(124,111,240,0.08), transparent 55%), radial-gradient(90% 70% at 92% 85%, rgba(245,185,77,0.06), transparent 55%), #10131F',
+          'radial-gradient(120% 90% at 8% 10%, rgba(124,111,240,0.08), transparent 55%), radial-gradient(90% 70% at 92% 85%, rgba(245,185,77,0.06), transparent 55%), #090B12',
       }}
     >
-      <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-[10px] border border-white/[0.08] bg-[#141829] px-1.5 py-1.5">
+      <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-[10px] border border-white/[0.08] card-shadow bg-[#171B2C] px-1.5 py-1.5">
         <button
           type="button"
           onClick={() => zoomBy(-ZOOM_STEP)}
@@ -138,7 +138,7 @@ export function ReportCanvas({
         </svg>
 
         <div
-          className="absolute rounded-xl border border-white/[0.08] bg-[#141829] p-[18px]"
+          className="absolute rounded-xl border border-white/[0.08] card-shadow bg-[#171B2C] p-[18px]"
           style={{ left: layout.entryNode.x + 20, top: layout.entryNode.y + 20, width: layout.entryNode.w, height: layout.entryNode.h }}
         >
           <div className="mb-2.5 font-['JetBrains_Mono'] text-[10.5px] uppercase tracking-widest text-[#8A90A6]">
@@ -151,7 +151,7 @@ export function ReportCanvas({
 
         {layout.fallback && (
           <div
-            className="absolute rounded-[10px] border border-[#F76C6C]/30 bg-[#141829] px-3.5 py-2.5 opacity-85"
+            className="absolute rounded-[10px] border border-[#F76C6C]/30 card-shadow bg-[#171B2C] px-3.5 py-2.5 opacity-85"
             style={{ left: layout.fallback.node.x + 20, top: layout.fallback.node.y + 20, width: layout.fallback.node.w }}
           >
             <div className="mb-0.5 text-[10.5px] uppercase tracking-wide text-[#F76C6C]">Fallback</div>
@@ -162,9 +162,9 @@ export function ReportCanvas({
         {layout.variants.map((variant) => (
           <div key={variant.id}>
             <div
-              className={`absolute rounded-xl border bg-[#141829] p-[18px_20px] ${
+              className={`absolute rounded-xl border card-shadow bg-[#171B2C] p-[18px_20px] ${
                 variant.isLeader
-                  ? 'border-[#F5B94D] shadow-[0_0_0_3px_rgba(245,185,77,0.14),0_0_32px_rgba(245,185,77,0.18)]'
+                  ? 'border-[#F5B94D] shadow-[0_0_0_3px_rgba(245,185,77,0.14),0_0_32px_rgba(245,185,77,0.18),0_10px_28px_-12px_rgba(0,0,0,0.6)]'
                   : 'border-white/[0.08]'
               }`}
               style={{ left: variant.node.x + 20, top: variant.node.y + 20, width: variant.node.w, height: variant.node.h }}
@@ -217,8 +217,10 @@ export function ReportCanvas({
             </div>
 
             <div
-              className={`absolute flex flex-col justify-center rounded-xl border bg-[#141829] p-4 ${
-                variant.isLeader ? 'border-[#F5B94D] shadow-[0_0_24px_rgba(245,185,77,0.14)]' : 'border-white/[0.08]'
+              className={`absolute flex flex-col justify-center rounded-xl border card-shadow bg-[#171B2C] p-4 ${
+                variant.isLeader
+                  ? 'border-[#F5B94D] shadow-[0_0_24px_rgba(245,185,77,0.14),0_10px_28px_-12px_rgba(0,0,0,0.6)]'
+                  : 'border-white/[0.08]'
               }`}
               style={{
                 left: variant.conversionNode.x + 20,
