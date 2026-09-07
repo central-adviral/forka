@@ -11,7 +11,7 @@ import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil, resolveDateRang
 import { RefreshButton } from './refresh-button'
 import { CreativeMatrixPanel } from './creative-matrix-panel'
 import { InsightPanel } from './insight-panel'
-import { MiniBarChart } from './mini-bar-chart'
+import { MiniBarChart } from '@/components/mini-bar-chart'
 
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 

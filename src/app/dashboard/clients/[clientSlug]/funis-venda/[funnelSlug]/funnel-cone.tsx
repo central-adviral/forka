@@ -71,25 +71,41 @@ export function FunnelCone({ totals, currency }: { totals: FunnelTotals; currenc
       <p className="mb-5 text-[13px] text-[#8A90A6]">
         Valor gasto no período: <span className="font-['JetBrains_Mono'] text-[#E8EAF2]">{currency(totals.spend)}</span>
       </p>
-      <div className="flex flex-col items-center gap-2">
-        {stages.map((stage) => {
-          const widthPct = Math.max(14, (stage.value / maxValue) * 100)
+      <div className="relative mx-auto max-w-[460px]">
+        {/* Spine down the middle: the stages read as one funnel narrowing rather than as five
+            disconnected bars. */}
+        <div
+          className="absolute inset-y-2 left-1/2 w-px -translate-x-1/2"
+          style={{ background: 'linear-gradient(180deg, rgba(124,111,240,.35), rgba(45,212,168,.35))' }}
+        />
+        {stages.map((stage, index) => {
+          // Each stage tapers from its own share of the total down to the next stage's, so the
+          // drop between steps shows up as geometry, not only as a number.
+          const widthOf = (value: number) => Math.max(22, (value / maxValue) * 100)
+          const top = widthOf(stage.value)
+          const bottom = widthOf(stages[index + 1]?.value ?? stage.value * 0.82)
           return (
-            <div key={stage.label} className="flex w-full flex-col items-center">
+            <div key={stage.label} className={`relative ${index > 0 ? 'mt-4' : ''}`}>
               {stage.badges.length > 0 && (
-                <div className="mb-1.5 flex gap-2 font-['JetBrains_Mono'] text-[11px] text-[#8A90A6]">
+                <div className="mb-1.5 flex justify-center gap-3 font-['JetBrains_Mono'] text-[10.5px] text-[#8A90A6]">
                   {stage.badges.map((badge) => (
                     <span key={badge}>{badge}</span>
                   ))}
                 </div>
               )}
-              <div
-                className="flex items-center justify-center rounded-[10px] py-3.5 text-center transition-all"
-                style={{ width: `${widthPct}%`, backgroundColor: `${stage.color}1A`, border: `1px solid ${stage.color}55` }}
-              >
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]">{stage.label}</div>
-                  <div className="font-['JetBrains_Mono'] text-lg font-semibold" style={{ color: stage.color }}>
+              <div className="relative h-[74px]">
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    clipPath: `polygon(calc(50% - ${top / 2}%) 0, calc(50% + ${top / 2}%) 0, calc(50% + ${bottom / 2}%) 100%, calc(50% - ${bottom / 2}%) 100%)`,
+                    backgroundColor: `${stage.color}1A`,
+                    borderTop: `1px solid ${stage.color}66`,
+                    borderBottom: `1px solid ${stage.color}33`,
+                  }}
+                />
+                <div className="relative flex h-full flex-col items-center justify-center gap-0.5 px-2 text-center">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-[#8A90A6]">{stage.label}</div>
+                  <div className="font-['JetBrains_Mono'] text-[17px] font-bold leading-none" style={{ color: stage.color }}>
                     {stage.value.toLocaleString('pt-BR')}
                   </div>
                 </div>
@@ -98,6 +114,15 @@ export function FunnelCone({ totals, currency }: { totals: FunnelTotals; currenc
           )
         })}
       </div>
+      <p className="mt-4 text-center font-['JetBrains_Mono'] text-[11px] text-[#8A90A6]">
+        {stages[stages.length - 1].value.toLocaleString('pt-BR')} compras de{' '}
+        {totals.impressions.toLocaleString('pt-BR')} impressões · conversão total{' '}
+        <span className="text-[#E8EAF2]">
+          {totals.impressions > 0
+            ? `${((stages[stages.length - 1].value / totals.impressions) * 100).toFixed(3)}%`
+            : '—'}
+        </span>
+      </p>
     </div>
   )
 }

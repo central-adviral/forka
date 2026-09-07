@@ -7,6 +7,7 @@ import { FunnelKpiCards } from './funnel-kpi-cards'
 import { FunnelPaymentPie } from './funnel-payment-pie'
 import { SyncFunnelButton } from './sync-funnel-button'
 import { SyncStatus } from '@/components/sync-status'
+import { MiniBarChart } from '@/components/mini-bar-chart'
 
 export default async function SalesFunnelPage({
   params,
@@ -30,7 +31,7 @@ export default async function SalesFunnelPage({
   if (!funnel) notFound()
 
   const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
-  const [rows, health, paymentBreakdown, creativeResult] = await Promise.all([
+  const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
     getFunnelSyncHealth(supabase, funnel.id),
     getPaymentMethodBreakdown(supabase, funnel.id, since, until),
@@ -39,6 +40,8 @@ export default async function SalesFunnelPage({
       p_since: since,
       p_until: until,
     }),
+    supabase.rpc('get_funnel_sales_by_product', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
+    supabase.rpc('get_funnel_sales_by_hour', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
   ])
   if (creativeResult.error) {
     console.error('[funnel-creative-report-failed]', { salesFunnelId: funnel.id }, creativeResult.error)
@@ -51,6 +54,10 @@ export default async function SalesFunnelPage({
     sales_count: number
     revenue: number
   }[]
+  if (productResult.error) console.error('[funnel-product-report-failed]', { salesFunnelId: funnel.id }, productResult.error)
+  if (hourResult.error) console.error('[funnel-hour-report-failed]', { salesFunnelId: funnel.id }, hourResult.error)
+  const products = (productResult.data ?? []) as { produto: string; sales_count: number; revenue: number }[]
+  const salesByHour = (hourResult.data ?? []) as { hour: number; sales_count: number; revenue: number }[]
 
   const currency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -201,6 +208,48 @@ export default async function SalesFunnelPage({
       <FunnelCone totals={coneTotals} currency={currency} />
 
       <FunnelPaymentPie breakdown={paymentBreakdown} currency={currency} />
+
+      <div className="mb-6 grid gap-5 lg:grid-cols-2">
+        <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
+          <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Por produto</h2>
+          <p className="mb-4 text-[12px] text-[#8A90A6]">Onde a receita do funil se concentra</p>
+          {products.length === 0 ? (
+            <p className="text-[13px] text-[#8A90A6]">Nenhuma venda no período.</p>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {products.slice(0, 8).map((p) => {
+                const share = products[0].revenue > 0 ? (p.revenue / products[0].revenue) * 100 : 0
+                return (
+                  <div key={p.produto}>
+                    <div className="mb-1 flex items-baseline justify-between gap-3 text-[12.5px]">
+                      <span className="truncate" title={p.produto}>
+                        {p.produto}
+                      </span>
+                      <span className="flex-shrink-0 font-['JetBrains_Mono'] tabular-nums text-[#E8EAF2]">
+                        {currency(p.revenue)}
+                        <span className="ml-2 text-[11px] text-[#8A90A6]">{p.sales_count} vendas</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-[#1B2036]">
+                      <div className="h-full rounded-full bg-[#7C6FF0]" style={{ width: `${Math.max(2, share)}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
+          <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Vendas por horário</h2>
+          <p className="mb-4 text-[12px] text-[#8A90A6]">Hora do dia (horário de Brasília)</p>
+          <MiniBarChart
+            data={salesByHour.map((h) => ({ label: `${String(h.hour).padStart(2, '0')}h`, value: h.sales_count }))}
+            valueFormat={(value) => `${value} vendas`}
+            barColor="#2DD4A8"
+          />
+        </div>
+      </div>
 
       <div className="card-shadow mb-6 overflow-hidden rounded-2xl border border-white/[0.08]">
         <div className="flex items-baseline justify-between px-4 pt-4">
