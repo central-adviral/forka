@@ -105,7 +105,53 @@ describe('schema RLS isolation', () => {
     expect(variants!.filter((v) => v.is_control)).toHaveLength(1)
   })
 
-  it('owner can read/write their client integrations columns, another user cannot', async () => {
+  it('keeps client secrets out of reach of the data API, even for the owner', async () => {
+    const ownerEmail = `secrets-rls-owner-${Date.now()}@example.com`
+    const owner = await createTestUser(ownerEmail)
+
+    const { data: client, error } = await admin
+      .from('clients')
+      .insert({ owner_id: owner.id, name: 'Secrets RLS Test', slug: `secrets-rls-${Date.now()}` })
+      .select()
+      .single()
+    if (error) throw error
+
+    await admin.from('client_secrets').insert({ client_id: client.id, hubla_webhook_token: 'owner-token' })
+
+    // Proves the row exists before asserting nobody can see it -- otherwise the assertion below
+    // would pass simply because there was nothing there.
+    const { data: adminView } = await admin
+      .from('client_secrets')
+      .select('hubla_webhook_token')
+      .eq('client_id', client.id)
+      .single()
+    expect(adminView?.hubla_webhook_token).toBe('owner-token')
+
+    // The owner of the client still cannot read its secrets: client_secrets has RLS on, no
+    // policy and no grant, so the data API has no path to it. This is the F10 regression.
+    const ownerClient = await signIn(ownerEmail)
+    const { data: ownerView } = await ownerClient
+      .from('client_secrets')
+      .select('hubla_webhook_token')
+      .eq('client_id', client.id)
+    expect(ownerView ?? []).toHaveLength(0)
+
+    const { data: ownerWrite } = await ownerClient
+      .from('client_secrets')
+      .update({ hubla_webhook_token: 'stolen' })
+      .eq('client_id', client.id)
+      .select()
+    expect(ownerWrite ?? []).toHaveLength(0)
+
+    const { data: unchanged } = await admin
+      .from('client_secrets')
+      .select('hubla_webhook_token')
+      .eq('client_id', client.id)
+      .single()
+    expect(unchanged?.hubla_webhook_token).toBe('owner-token')
+  })
+
+  it('owner can read/write their client domain, another user cannot', async () => {
     const ownerEmail = `domain-rls-owner-${Date.now()}@example.com`
     const otherEmail = `domain-rls-other-${Date.now()}@example.com`
     const owner = await createTestUser(ownerEmail)
@@ -121,17 +167,16 @@ describe('schema RLS isolation', () => {
     const ownerClient = await signIn(ownerEmail)
     const { error: updateError } = await ownerClient
       .from('clients')
-      .update({ custom_domain: 'ir.example.com', hubla_webhook_token: 'owner-token' })
+      .update({ custom_domain: 'ir.example.com' })
       .eq('id', client.id)
     expect(updateError).toBeNull()
 
     const { data: ownVisible } = await ownerClient
       .from('clients')
-      .select('custom_domain, hubla_webhook_token')
+      .select('custom_domain')
       .eq('id', client.id)
       .single()
     expect(ownVisible?.custom_domain).toBe('ir.example.com')
-    expect(ownVisible?.hubla_webhook_token).toBe('owner-token')
 
     const otherClient = await signIn(otherEmail)
     const { data: otherUpdateResult } = await otherClient

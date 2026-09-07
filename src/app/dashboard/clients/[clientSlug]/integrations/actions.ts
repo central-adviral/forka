@@ -6,6 +6,19 @@ import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { isCnameVerified } from '@/lib/domain/redirect-domain'
 import { addProjectDomain, removeProjectDomain } from '@/lib/vercel/domains'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
+import { saveClientSecrets } from '@/lib/repo/client-secrets-repo'
+
+// Secrets are written with the service role, which bypasses RLS -- so the ownership check RLS
+// used to perform on the update has to happen explicitly, on the user's own session, first.
+async function assertOwnsClient(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  clientId: string
+): Promise<void> {
+  const { data, error } = await supabase.from('clients').select('id').eq('id', clientId).maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error('Cliente não encontrado')
+}
 
 const domainSchema = z.object({
   client_id: z.string().uuid(),
@@ -100,11 +113,10 @@ export async function saveHublaToken(context: { client_id: string; client_slug: 
   // O valor salvo nunca é ecoado de volta pro HTML — campo em branco significa "manter o token atual", não apagar.
   if (!parsed.hubla_webhook_token) return
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase
-    .from('clients')
-    .update({ hubla_webhook_token: parsed.hubla_webhook_token })
-    .eq('id', parsed.client_id)
-  if (error) throw error
+  await assertOwnsClient(supabase, parsed.client_id)
+  await saveClientSecrets(createServiceRoleClient(), parsed.client_id, {
+    hublaWebhookToken: parsed.hubla_webhook_token,
+  })
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/integrations`)
 }
 
@@ -127,14 +139,19 @@ export async function saveFunnelDataSource(context: { client_id: string; client_
   }
   const parsed = result.data
   const supabase = await createServerSupabaseClient()
-  const update: { funnel_source_url: string | null; funnel_source_service_role_key?: string } = {
-    funnel_source_url: parsed.funnel_source_url || null,
-  }
+  await assertOwnsClient(supabase, parsed.client_id)
+
+  const { error } = await supabase
+    .from('clients')
+    .update({ funnel_source_url: parsed.funnel_source_url || null })
+    .eq('id', parsed.client_id)
+  if (error) throw error
+
   // O valor salvo nunca é ecoado de volta pro HTML — campo em branco significa "manter a chave atual", não apagar.
   if (parsed.funnel_source_service_role_key) {
-    update.funnel_source_service_role_key = parsed.funnel_source_service_role_key
+    await saveClientSecrets(createServiceRoleClient(), parsed.client_id, {
+      funnelSourceServiceRoleKey: parsed.funnel_source_service_role_key,
+    })
   }
-  const { error } = await supabase.from('clients').update(update).eq('id', parsed.client_id)
-  if (error) throw error
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/integrations`)
 }

@@ -9,6 +9,15 @@ vi.mock('@/lib/supabase/service-role', () => ({
     from: () => ({ select: () => ({ eq: () => Promise.resolve({ data: listMock(), error: null }) }) }),
   })),
 }))
+// Secrets live in client_secrets, reachable only by the service role, and are looked up per
+// client_id -- so the mock is keyed the same way the route looks them up.
+const secretsByClientId: Record<string, string | null> = {}
+vi.mock('@/lib/repo/client-secrets-repo', () => ({
+  getClientSecrets: vi.fn(async (_db: unknown, clientId: string) => ({
+    funnelSourceServiceRoleKey: secretsByClientId[clientId] ?? null,
+    hublaWebhookToken: null,
+  })),
+}))
 vi.mock('@/lib/repo/funnel-sync-state-repo', () => ({
   getSyncCursor: vi.fn(async () => null),
   recordSyncResult: vi.fn(async () => undefined),
@@ -45,6 +54,7 @@ describe('GET /api/internal/sync-funnel', () => {
     vi.clearAllMocks()
     process.env.CRON_SECRET = 'test-secret'
     listMock.mockReturnValue([])
+    for (const key of Object.keys(secretsByClientId)) delete secretsByClientId[key]
   })
 
   it('rejects requests without a valid cron secret', async () => {
@@ -75,9 +85,10 @@ describe('GET /api/internal/sync-funnel', () => {
     listMock.mockReturnValue([
       {
         id: 'funnel-1',
+        client_id: 'client-1',
         launchops_operacao_ids: ['op-1'],
         launchops_produto_nomes: null,
-        clients: { funnel_source_url: null, funnel_source_service_role_key: null },
+        clients: { funnel_source_url: null },
       },
     ])
     const request = new NextRequest('https://app.example.com/api/internal/sync-funnel', {
@@ -92,11 +103,13 @@ describe('GET /api/internal/sync-funnel', () => {
     listMock.mockReturnValue([
       {
         id: 'funnel-1',
+        client_id: 'client-1',
         launchops_operacao_ids: ['op-1'],
         launchops_produto_nomes: null,
-        clients: { funnel_source_url: 'https://launchops.example.com', funnel_source_service_role_key: 'key' },
+        clients: { funnel_source_url: 'https://launchops.example.com' },
       },
     ])
+    secretsByClientId['client-1'] = 'key'
     const partialRow = {
       operacao_id: 'op-1',
       data_referencia: '2026-09-01',
@@ -151,17 +164,21 @@ describe('GET /api/internal/sync-funnel', () => {
     listMock.mockReturnValue([
       {
         id: 'funnel-a',
+        client_id: 'client-a',
         launchops_operacao_ids: null,
         launchops_produto_nomes: null,
-        clients: { funnel_source_url: 'https://client-a.example.com', funnel_source_service_role_key: 'key-a' },
+        clients: { funnel_source_url: 'https://client-a.example.com' },
       },
       {
         id: 'funnel-b',
+        client_id: 'client-b',
         launchops_operacao_ids: null,
         launchops_produto_nomes: null,
-        clients: { funnel_source_url: 'https://client-b.example.com', funnel_source_service_role_key: 'key-b' },
+        clients: { funnel_source_url: 'https://client-b.example.com' },
       },
     ])
+    secretsByClientId['client-a'] = 'key-a'
+    secretsByClientId['client-b'] = 'key-b'
     const request = new NextRequest('https://app.example.com/api/internal/sync-funnel', {
       headers: { authorization: 'Bearer test-secret' },
     })

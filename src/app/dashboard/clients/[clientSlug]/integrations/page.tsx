@@ -1,4 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
+import { getConfiguredSecrets } from '@/lib/repo/client-secrets-repo'
 import { notFound } from 'next/navigation'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
@@ -22,11 +24,16 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
   const supabase = await createServerSupabaseClient()
   const { data: client } = await supabase
     .from('clients')
-    .select('id, slug, custom_domain, domain_status, hubla_webhook_token, funnel_source_url, funnel_source_service_role_key')
+    .select('id, slug, custom_domain, domain_status, funnel_source_url')
     .eq('slug', clientSlug)
     .maybeSingle()
 
   if (!client) notFound()
+
+  // The secrets themselves never reach this component -- only whether each one is set. The row
+  // above is read on the user's session, which is what proves ownership before this
+  // service-role read.
+  const { hasHublaToken, hasFunnelSourceKey } = await getConfiguredSecrets(createServiceRoleClient(), client.id)
 
   const defaultDomain = process.env.NEXT_PUBLIC_REDIRECT_DOMAIN ?? ''
   const activeDomain = resolveRedirectDomain(
@@ -104,7 +111,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
         <form action={saveHublaToken.bind(null, { client_id: client.id, client_slug: client.slug })} className="flex gap-2">
           <input
             name="hubla_webhook_token"
-            placeholder={client.hubla_webhook_token ? 'token configurado · cole um novo pra substituir' : 'Token do webhook'}
+            placeholder={hasHublaToken ? 'token configurado · cole um novo pra substituir' : 'Token do webhook'}
             className="flex-1 rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
           />
           <button
@@ -146,7 +153,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
               type="password"
               name="funnel_source_service_role_key"
               placeholder={
-                client.funnel_source_service_role_key ? 'chave configurada · cole uma nova pra substituir' : 'chave de acesso'
+                hasFunnelSourceKey ? 'chave configurada · cole uma nova pra substituir' : 'chave de acesso'
               }
               className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
             />

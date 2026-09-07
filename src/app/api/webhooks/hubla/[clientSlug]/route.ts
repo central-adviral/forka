@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { HublaIrrelevantEventError, verifyHublaToken, parseHublaPaymentSucceeded } from '@/lib/domain/hubla'
 import { getClickEventByTrackingId, insertConversionIfNew } from '@/lib/repo/conversion-repo'
+import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
 
 // Hubla's payload can carry customer PII (name/email/phone/document/address) alongside the
 // invoice/UTM data we actually need to debug attribution. Rather than deny-listing known PII
@@ -33,18 +34,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { clientSlug } = await params
   const db = createServiceRoleClient()
 
-  const { data: client } = await db
-    .from('clients')
-    .select('id, hubla_webhook_token')
-    .eq('slug', clientSlug)
-    .maybeSingle()
+  const { data: client } = await db.from('clients').select('id').eq('slug', clientSlug).maybeSingle()
+  if (!client) {
+    return new NextResponse('Not found', { status: 404 })
+  }
 
-  if (!client || !client.hubla_webhook_token) {
+  const { hublaWebhookToken } = await getClientSecrets(db, client.id)
+  if (!hublaWebhookToken) {
     return new NextResponse('Not found', { status: 404 })
   }
 
   const receivedToken = request.headers.get('x-hubla-token')
-  if (!verifyHublaToken(receivedToken, client.hubla_webhook_token)) {
+  if (!verifyHublaToken(receivedToken, hublaWebhookToken)) {
     console.error(`[hubla-webhook] rejected: invalid or missing x-hubla-token for client ${clientSlug}`)
     return new NextResponse('Invalid token', { status: 401 })
   }

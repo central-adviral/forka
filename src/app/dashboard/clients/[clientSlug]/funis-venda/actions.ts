@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
+import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
 import { createLaunchOpsClient } from '@/lib/launchops/client'
 import { syncOneFunnel } from '@/lib/launchops/sync-funnel'
 
@@ -155,21 +156,21 @@ export async function syncFunnelNow(context: { sales_funnel_id: string; client_s
   const supabase = await createServerSupabaseClient()
   const { data: funnel, error } = await supabase
     .from('sales_funnels')
-    .select('id, client_id, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url, funnel_source_service_role_key)')
+    .select('id, client_id, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url)')
     .eq('id', context.sales_funnel_id)
     .single()
+  // This select runs on the user's session, so RLS is what proves they own the funnel. The
+  // service-role read below bypasses RLS and relies on that proof having already happened.
   if (error || !funnel) throw new Error('Funil não encontrado')
 
-  const source = funnel.clients as unknown as {
-    funnel_source_url: string | null
-    funnel_source_service_role_key: string | null
-  } | null
-  if (!source?.funnel_source_url || !source?.funnel_source_service_role_key) {
+  const sourceUrl = (funnel.clients as unknown as { funnel_source_url: string | null } | null)?.funnel_source_url
+  const appDb = createServiceRoleClient()
+  const { funnelSourceServiceRoleKey } = await getClientSecrets(appDb, funnel.client_id)
+  if (!sourceUrl || !funnelSourceServiceRoleKey) {
     throw new Error('Configure a fonte de dados do funil na aba Integrações antes de atualizar')
   }
 
-  const launchopsDb = createLaunchOpsClient({ url: source.funnel_source_url, serviceRoleKey: source.funnel_source_service_role_key })
-  const appDb = createServiceRoleClient()
+  const launchopsDb = createLaunchOpsClient({ url: sourceUrl, serviceRoleKey: funnelSourceServiceRoleKey })
   await syncOneFunnel(appDb, launchopsDb, funnel)
 
   revalidatePath(`/dashboard/clients/${context.client_slug}/funis-venda/${context.funnel_slug}`)

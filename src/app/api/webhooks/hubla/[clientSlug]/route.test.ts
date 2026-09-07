@@ -11,19 +11,23 @@ vi.mock('@/lib/repo/conversion-repo', () => ({
   getClickEventByTrackingId: vi.fn(),
   insertConversionIfNew: vi.fn(),
 }))
+// Table-aware on purpose: the token lives in client_secrets, and a mock that answered every table
+// with the same row would keep passing if the route went back to reading it off `clients`.
 vi.mock('@/lib/supabase/service-role', () => ({
   createServiceRoleClient: vi.fn(() => ({
-    from: () => ({
+    from: (table: string) => ({
       select: () => ({
         eq: () => ({
-          maybeSingle: () => Promise.resolve({ data: mockClientRow, error: null }),
+          maybeSingle: () =>
+            Promise.resolve({ data: table === 'client_secrets' ? mockSecretsRow : mockClientRow, error: null }),
         }),
       }),
     }),
   })),
 }))
 
-let mockClientRow: { id: string; hubla_webhook_token: string | null } | null
+let mockClientRow: { id: string } | null
+let mockSecretsRow: { hubla_webhook_token: string | null } | null
 
 import { POST } from './route'
 import { verifyHublaToken, parseHublaPaymentSucceeded, HublaIrrelevantEventError, HublaMalformedPayloadError } from '@/lib/domain/hubla'
@@ -40,7 +44,8 @@ function makeRequest(body: unknown, token = 'valid-token') {
 describe('POST /api/webhooks/hubla/[clientSlug]', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockClientRow = { id: 'client-1', hubla_webhook_token: 'valid-token' }
+    mockClientRow = { id: 'client-1' }
+    mockSecretsRow = { hubla_webhook_token: 'valid-token' }
   })
 
   it('returns 404 when the client slug does not exist', async () => {
@@ -50,7 +55,7 @@ describe('POST /api/webhooks/hubla/[clientSlug]', () => {
   })
 
   it('returns 404 when the client has no Hubla token configured', async () => {
-    mockClientRow = { id: 'client-1', hubla_webhook_token: null }
+    mockSecretsRow = { hubla_webhook_token: null }
     const response = await POST(makeRequest({}), { params: Promise.resolve({ clientSlug: 'gustavo-voe' }) })
     expect(response.status).toBe(404)
   })
