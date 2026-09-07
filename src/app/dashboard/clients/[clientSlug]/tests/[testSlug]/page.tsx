@@ -2,7 +2,6 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { probabilityToBeatControl } from '@/lib/domain/significance'
 import { detectSampleRatioMismatch } from '@/lib/domain/srm-check'
-import { scoreCreatives } from '@/lib/domain/creative-score'
 import { computeReportLayout } from '@/lib/domain/report-layout'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
@@ -10,6 +9,7 @@ import { ReportCanvas } from './report-canvas'
 import { toggleTestStatus } from './actions'
 import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil, resolveDateRange, formatBr, daysRunningSince } from '@/lib/domain/report-period'
 import { RefreshButton } from './refresh-button'
+import { CreativeMatrixPanel } from './creative-matrix-panel'
 import { InsightPanel } from './insight-panel'
 import { MiniBarChart } from './mini-bar-chart'
 
@@ -622,99 +622,14 @@ export default async function TestReportPage({
         })()}
       </div>
       <div className="mx-6 mb-6">
-        {(() => {
-          const adRows = (adReport as AdReportRow[]) ?? []
-
-          const byAdName = new Map<string, { spendCents: number; revenueCents: number; conversions: number; visitors: number; bestVariant: string; bestRate: number }>()
-          for (const row of adRows) {
-            const rate = row.visitors > 0 ? row.conversions / row.visitors : 0
-            const entry = byAdName.get(row.ad_name) ?? {
-              spendCents: 0,
-              revenueCents: 0,
-              conversions: 0,
-              visitors: 0,
-              bestVariant: row.variant_name,
-              bestRate: rate,
-            }
-            entry.spendCents += row.ad_spend ?? 0
-            entry.revenueCents += row.revenue_cents
-            entry.conversions += row.conversions
-            entry.visitors += row.visitors
-            if (rate > entry.bestRate) {
-              entry.bestVariant = row.variant_name
-              entry.bestRate = rate
-            }
-            byAdName.set(row.ad_name, entry)
-          }
-          const creativeRows = scoreCreatives(
-            Array.from(byAdName.entries()).map(([adName, m]) => ({ adName, ...m }))
-          )
-            .map((score) => ({ ...score, bestVariant: byAdName.get(score.adName)!.bestVariant }))
-            .sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
-
-          const scoreLabel = (score: number) =>
-            score >= 85 ? 'Excelente' : score >= 65 ? 'Bom' : score >= 40 ? 'Regular' : 'Fraco'
-          const scoreColor = (score: number) =>
-            score >= 85 ? '#2DD4A8' : score >= 65 ? '#4F8EF7' : score >= 40 ? '#F5B94D' : '#F76C6C'
-
-          return (
-            creativeRows.length > 0 && (
-              <div className="mb-8 overflow-hidden rounded-2xl border border-white/[0.08]">
-                <div className="flex items-center justify-between px-5 pt-4">
-                  <h2 className="font-['Space_Grotesk'] text-lg font-semibold">
-                    Score de Criativos
-                  </h2>
-                  <span className="rounded-full border border-dashed border-[#F5B94D]/50 bg-[#F5B94D]/[0.08] px-2.5 py-1 font-['JetBrains_Mono'] text-[10px] text-[#F5B94D]">
-                    Rascunho — critério em definição
-                  </span>
-                </div>
-                <p className="px-5 pb-2 pt-2 max-w-[66ch] text-[12px] text-[#8A90A6]">
-                  Ponderado pra taxa de conversão e custo por venda, não só entrega do anúncio — pesos ainda
-                  provisórios (ver <code>creative-score.ts</code>).
-                </p>
-                <div className="grid grid-cols-2 gap-3.5 p-5 pt-2 sm:grid-cols-4">
-                  {creativeRows.map((c, i) => (
-                    <div key={c.adName} className="flex flex-col items-center gap-1.5 rounded-[14px] border border-white/[0.08] bg-white/[0.02] p-4 text-center">
-                      <span className="self-start font-['JetBrains_Mono'] text-[10px] text-[#8A90A6]">#{i + 1}</span>
-                      {c.score !== null ? (
-                        <>
-                          <span className="font-['JetBrains_Mono'] text-xl font-bold">{c.score}</span>
-                          <span
-                            className="rounded-full px-2.5 py-0.5 font-['JetBrains_Mono'] text-[9.5px] font-bold uppercase tracking-wide"
-                            style={{ color: scoreColor(c.score), backgroundColor: `${scoreColor(c.score)}22` }}
-                          >
-                            {scoreLabel(c.score)}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-[11px] text-[#8A90A6]">sem dado suficiente</span>
-                      )}
-                      <div className="mt-1 truncate text-[12.5px] font-medium" title={c.adName}>
-                        {c.adName}
-                      </div>
-                      {c.hasThinData && (
-                        <span
-                          title="Poucos acessos ainda: o score deste criativo puxa para a média do teste até haver volume suficiente para confiar nos números dele."
-                          className="cursor-help rounded-full bg-white/[0.06] px-2 py-0.5 text-[9.5px] text-[#8A90A6]"
-                        >
-                          amostra pequena
-                        </span>
-                      )}
-                      <div className="flex flex-wrap justify-center gap-2 border-t border-white/[0.06] pt-2 text-[10.5px] text-[#8A90A6]">
-                        <span>ROAS <b className="font-['JetBrains_Mono'] text-[#E8EAF2]">{c.roas !== null ? `${c.roas.toFixed(2)}x` : '—'}</b></span>
-                        <span>Taxa <b className="font-['JetBrains_Mono'] text-[#E8EAF2]">{c.conversionRate !== null ? `${(c.conversionRate * 100).toFixed(1)}%` : '—'}</b></span>
-                        <span>CPA <b className="font-['JetBrains_Mono'] text-[#E8EAF2]">{c.cpaCents !== null ? `R$ ${(c.cpaCents / 100).toFixed(2)}` : '—'}</b></span>
-                      </div>
-                      <div className="text-[10px] text-[#8A90A6]">
-                        Performa melhor na <b className="text-[#8A90A6]">{c.bestVariant}</b>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          )
-        })()}
+        <CreativeMatrixPanel
+          adRows={(adReport as AdReportRow[]) ?? []}
+          variants={((totalsReport as TotalsReportRow[]) ?? []).map((r) => ({
+            id: r.variant_id,
+            name: r.variant_name,
+          }))}
+          assetLabel={assetLabel}
+        />
         <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Por anúncio</h2>
         {(() => {
           const adRows = (adReport as AdReportRow[]) ?? []
