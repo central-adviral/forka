@@ -149,7 +149,7 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
   // variants updated and others not (these calls aren't wrapped in a DB transaction).
   const { data: test, error: testFetchError } = await supabase
     .from('tests')
-    .select('test_type, variants(id)')
+    .select('test_type, variants(id, name)')
     .eq('id', parsed.test_id)
     .maybeSingle()
   if (testFetchError) throw testFetchError
@@ -162,8 +162,8 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
     throw new Error('Testes de checkout exigem a URL da página de vendas')
   }
 
-  const ownedIds = new Set((test.variants ?? []).map((v) => v.id))
-  const foreignVariant = parsed.variants.find((v) => !ownedIds.has(v.id))
+  const variantNameById = new Map((test.variants ?? []).map((v) => [v.id, v.name]))
+  const foreignVariant = parsed.variants.find((v) => !variantNameById.has(v.id))
   if (foreignVariant) {
     throw new Error(`Variante ${foreignVariant.id} não pertence a este teste`)
   }
@@ -177,17 +177,19 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
     .eq('id', parsed.test_id)
   if (testError) throw testError
 
-  for (const variant of parsed.variants) {
-    const { error } = await supabase
-      .from('variants')
-      .update({
-        weight_pct: variant.weight_pct,
-        destination_url: variant.destination_url,
-        thank_you_url: variant.thank_you_url || null,
-      })
-      .eq('id', variant.id)
-    if (error) throw error
-  }
+  // Uma única statement de upsert pra todas as variantes (em vez de um update por variante)
+  // — evita ficar com só algumas variantes atualizadas se uma falhar no meio do loop.
+  const { error: variantsError } = await supabase.from('variants').upsert(
+    parsed.variants.map((variant) => ({
+      id: variant.id,
+      test_id: parsed.test_id,
+      name: variantNameById.get(variant.id)!,
+      weight_pct: variant.weight_pct,
+      destination_url: variant.destination_url,
+      thank_you_url: variant.thank_you_url || null,
+    }))
+  )
+  if (variantsError) throw variantsError
 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests/${parsed.test_slug}`)
 }
