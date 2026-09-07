@@ -62,7 +62,12 @@ export function FunnelKpiCards({
   ]
 
   return (
-    <div className="card-shadow mb-6 grid grid-cols-2 divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] sm:grid-cols-4 sm:divide-y-0 lg:grid-cols-7 lg:divide-x">
+    <div
+      // The headline numbers get their own lifted surface with a violet edge, so the band reads
+      // as the summary of the page rather than as one more panel among the charts.
+      className="mb-6 grid grid-cols-2 divide-y divide-white/[0.06] rounded-2xl border border-[#7C6FF0]/25 bg-[#171B2C] sm:grid-cols-4 sm:divide-y-0 lg:grid-cols-7 lg:divide-x"
+      style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,.04), 0 10px 30px -18px rgba(124,111,240,.55)' }}
+    >
       {cards.map((card) => (
         <div key={card.label} className="p-4">
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]">{card.label}</div>

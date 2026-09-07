@@ -194,60 +194,69 @@ export default async function SalesFunnelPage({
         </details>
       </div>
 
-      <div className="card-shadow mb-6 rounded-2xl border border-white/[0.08] p-4 text-[13.5px] text-[#8A90A6]">
-        Spend pode estar subestimado — parte do gasto do Meta Ads ainda não está atribuída a esta operação na fonte.
-        {health.map((h) => (
-          <div key={h.entity}>
-            {h.entity}: {h.lastResult === 'error' ? `erro na última sincronização (${h.lastMessage ?? 'sem detalhes'})` : `ok, última execução ${h.lastRunAt ?? 'nunca'}`}
-          </div>
-        ))}
-      </div>
+      {/* Only speaks up when a sync actually failed. The healthy case is already covered by the
+          pulse in the header, and printing "ok, última execução ..." on every load was noise. */}
+      {hasSyncError && (
+        <div className="mb-6 rounded-2xl border border-[#F76C6C]/35 bg-[#F76C6C]/10 p-4 text-[13px] text-[#F76C6C]">
+          {health
+            .filter((h) => h.lastResult === 'error')
+            .map((h) => (
+              <div key={h.entity}>
+                Falha ao sincronizar {h.entity}: {h.lastMessage ?? 'sem detalhes'}
+              </div>
+            ))}
+        </div>
+      )}
 
       <FunnelKpiCards totals={kpiTotals} currency={currency} sparklines={kpiSparklines} />
 
-      <FunnelCone totals={coneTotals} currency={currency} />
+      {/* Funnel on the left, the three read-outs stacked on the right: the funnel is one tall
+          shape and the analyses are short ones, so side by side they fill each other's space. */}
+      <div className="mb-6 grid items-start gap-5 lg:grid-cols-[1.1fr_1fr]">
+        <FunnelCone totals={coneTotals} currency={currency} />
 
-      <FunnelPaymentPie breakdown={paymentBreakdown} currency={currency} />
+        <div className="flex flex-col gap-5">
+          <FunnelPaymentPie breakdown={paymentBreakdown} currency={currency} />
 
-      <div className="mb-6 grid gap-5 lg:grid-cols-2">
-        <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
-          <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Por produto</h2>
-          <p className="mb-4 text-[12px] text-[#8A90A6]">Onde a receita do funil se concentra</p>
-          {products.length === 0 ? (
-            <p className="text-[13px] text-[#8A90A6]">Nenhuma venda no período.</p>
-          ) : (
-            <div className="flex flex-col gap-2.5">
-              {products.slice(0, 8).map((p) => {
-                const share = products[0].revenue > 0 ? (p.revenue / products[0].revenue) * 100 : 0
-                return (
-                  <div key={p.produto}>
-                    <div className="mb-1 flex items-baseline justify-between gap-3 text-[12.5px]">
-                      <span className="truncate" title={p.produto}>
-                        {p.produto}
-                      </span>
-                      <span className="flex-shrink-0 font-['JetBrains_Mono'] tabular-nums text-[#E8EAF2]">
-                        {currency(p.revenue)}
-                        <span className="ml-2 text-[11px] text-[#8A90A6]">{p.sales_count} vendas</span>
-                      </span>
+          <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
+            <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Por produto</h2>
+            <p className="mb-4 text-[12px] text-[#8A90A6]">Onde a receita do funil se concentra</p>
+            {products.length === 0 ? (
+              <p className="text-[13px] text-[#8A90A6]">Nenhuma venda no período.</p>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {products.slice(0, 8).map((p) => {
+                  const share = products[0].revenue > 0 ? (p.revenue / products[0].revenue) * 100 : 0
+                  return (
+                    <div key={p.produto}>
+                      <div className="mb-1 flex items-baseline justify-between gap-3 text-[12.5px]">
+                        <span className="truncate" title={p.produto}>
+                          {p.produto}
+                        </span>
+                        <span className="flex-shrink-0 font-['JetBrains_Mono'] tabular-nums text-[#E8EAF2]">
+                          {currency(p.revenue)}
+                          <span className="ml-2 text-[11px] text-[#8A90A6]">{p.sales_count} vendas</span>
+                        </span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-[#1B2036]">
+                        <div className="h-full rounded-full bg-[#7C6FF0]" style={{ width: `${Math.max(2, share)}%` }} />
+                      </div>
                     </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-[#1B2036]">
-                      <div className="h-full rounded-full bg-[#7C6FF0]" style={{ width: `${Math.max(2, share)}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
 
-        <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
-          <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Vendas por horário</h2>
-          <p className="mb-4 text-[12px] text-[#8A90A6]">Hora do dia (horário de Brasília)</p>
-          <MiniBarChart
-            data={salesByHour.map((h) => ({ label: `${String(h.hour).padStart(2, '0')}h`, value: h.sales_count }))}
-            valueFormat={(value) => `${value} vendas`}
-            barColor="#2DD4A8"
-          />
+          <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
+            <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Vendas por horário</h2>
+            <p className="mb-4 text-[12px] text-[#8A90A6]">Hora do dia (horário de Brasília)</p>
+            <MiniBarChart
+              data={salesByHour.map((h) => ({ label: `${String(h.hour).padStart(2, '0')}h`, value: h.sales_count }))}
+              valueFormat={(value) => `${value} vendas`}
+              barColor="#2DD4A8"
+            />
+          </div>
         </div>
       </div>
 

@@ -66,11 +66,13 @@ export function FunnelCone({ totals, currency }: { totals: FunnelTotals; currenc
   const maxValue = Math.max(1, totals.impressions)
 
   return (
-    <div className="card-shadow mb-6 rounded-2xl border border-white/[0.08] p-5">
-      <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Funil de Tráfego</h2>
-      <p className="mb-5 text-[13px] text-[#8A90A6]">
-        Valor gasto no período: <span className="font-['JetBrains_Mono'] text-[#E8EAF2]">{currency(totals.spend)}</span>
-      </p>
+    <div className="card-shadow h-full rounded-2xl border border-white/[0.08] p-5">
+      <div className="mb-6 flex items-baseline justify-between gap-4">
+        <h2 className="font-['Space_Grotesk'] text-base font-semibold">Funil de tráfego</h2>
+        <span className="font-['JetBrains_Mono'] text-[11.5px] uppercase tracking-wider text-[#8A90A6]">
+          Gasto no período <span className="text-[#E8EAF2]">{currency(totals.spend)}</span>
+        </span>
+      </div>
       <div className="relative mx-auto max-w-[460px]">
         {/* Spine down the middle: the stages read as one funnel narrowing rather than as five
             disconnected bars. */}
