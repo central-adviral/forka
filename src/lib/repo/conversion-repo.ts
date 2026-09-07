@@ -34,7 +34,24 @@ export async function insertConversionIfNew(
   })
 
   if (error) {
-    if (error.code === '23505') return 'duplicate'
+    if (error.code === '23505') {
+      // Two very different things land on 23505. Hitting the external_event_id index means the
+      // platform redelivered a webhook it already sent -- dedup working as intended, and silence
+      // is right. Hitting unique (click_event_id, source) means a SECOND real purchase on the
+      // same click -- an order bump, a one-click upsell, a subscription renewal -- and that sale
+      // is dropped from every report. It stays dropped until the constraint changes (see
+      // docs/BANCO-DE-IDEIAS.md), but it should at least stop being invisible: with no trace at
+      // all there is no way to tell afterwards whether it ever happened.
+      const isRedelivery = (error.message ?? '').includes('external_event_id')
+      if (!isRedelivery) {
+        console.error('[conversion-duplicate-rejected]', {
+          clickEventId: params.clickEventId,
+          source: params.source,
+          externalEventId: params.externalEventId ?? null,
+        })
+      }
+      return 'duplicate'
+    }
     throw error
   }
   return 'inserted'

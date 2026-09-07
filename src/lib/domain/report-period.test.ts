@@ -12,22 +12,21 @@ describe('resolvePeriodSince', () => {
     expect(resolvePeriodSince(undefined, NOW)).toBeNull()
   })
 
-  it('returns midnight of the current day for "today"', () => {
-    const since = resolvePeriodSince('today', NOW)
-    expect(since?.getFullYear()).toBe(2026)
-    expect(since?.getMonth()).toBe(7)
-    expect(since?.getDate()).toBe(30)
-    expect(since?.getHours()).toBe(0)
-    expect(since?.getMinutes()).toBe(0)
+  // Asserted as absolute instants, never as getHours() on the running machine: the bug this pins
+  // is precisely the code reading the server's calendar instead of Brazil's, and a relative
+  // assertion shifts along with it and stays green. 03:00Z is midnight in Brazil.
+  it('returns Brazilian midnight of the current day for "today"', () => {
+    expect(resolvePeriodSince('today', NOW)?.toISOString()).toBe('2026-08-30T03:00:00.000Z')
   })
 
-  it('returns midnight of the previous day for "yesterday"', () => {
-    const since = resolvePeriodSince('yesterday', NOW)
-    expect(since?.getFullYear()).toBe(2026)
-    expect(since?.getMonth()).toBe(7)
-    expect(since?.getDate()).toBe(29)
-    expect(since?.getHours()).toBe(0)
-    expect(since?.getMinutes()).toBe(0)
+  it('still resolves to the Brazilian day when UTC has already rolled over', () => {
+    // 00:30 UTC on the 31st is still 21:30 on the 30th in Brazil, so "Hoje" is the 30th.
+    const lateNight = new Date('2026-08-31T00:30:00.000Z')
+    expect(resolvePeriodSince('today', lateNight)?.toISOString()).toBe('2026-08-30T03:00:00.000Z')
+  })
+
+  it('returns Brazilian midnight of the previous day for "yesterday"', () => {
+    expect(resolvePeriodSince('yesterday', NOW)?.toISOString()).toBe('2026-08-29T03:00:00.000Z')
   })
 
   it('returns 7 days before now for "7d"', () => {
@@ -40,21 +39,20 @@ describe('resolvePeriodSince', () => {
     expect(since?.getTime()).toBe(NOW.getTime() - 30 * 24 * 60 * 60 * 1000)
   })
 
-  it('returns the first day of the current month for "month"', () => {
-    const since = resolvePeriodSince('month', NOW)
-    expect(since?.getFullYear()).toBe(2026)
-    expect(since?.getMonth()).toBe(7)
-    expect(since?.getDate()).toBe(1)
+  it('returns the first Brazilian day of the current month for "month"', () => {
+    expect(resolvePeriodSince('month', NOW)?.toISOString()).toBe('2026-08-01T03:00:00.000Z')
+  })
+
+  it('picks the month by the Brazilian date, not the UTC one', () => {
+    // 01:00 UTC on 1 September is still 22:00 on 31 August in Brazil, so the month is August.
+    const turnOfMonth = new Date('2026-09-01T01:00:00.000Z')
+    expect(resolvePeriodSince('month', turnOfMonth)?.toISOString()).toBe('2026-08-01T03:00:00.000Z')
   })
 })
 
 describe('resolvePeriodUntil', () => {
-  it('returns midnight of the current day for "yesterday", bounding it to a single day', () => {
-    const until = resolvePeriodUntil('yesterday', NOW)
-    expect(until?.getFullYear()).toBe(2026)
-    expect(until?.getMonth()).toBe(7)
-    expect(until?.getDate()).toBe(30)
-    expect(until?.getHours()).toBe(0)
+  it('returns Brazilian midnight of the current day for "yesterday", bounding it to a single day', () => {
+    expect(resolvePeriodUntil('yesterday', NOW)?.toISOString()).toBe('2026-08-30T03:00:00.000Z')
   })
 
   it('returns null for every other period', () => {
@@ -68,10 +66,12 @@ describe('resolvePeriodUntil', () => {
 })
 
 describe('resolveDateRange', () => {
-  it('spans midnight of "desde" to midnight of the day after "ate"', () => {
+  it('spans Brazilian midnight of "desde" to Brazilian midnight of the day after "ate"', () => {
+    // The operator typed Brazilian calendar days; the bounds must be those days, not the
+    // server's. Absolute instants again, so the assertion cannot drift with the machine.
     const range = resolveDateRange('2026-08-01', '2026-08-15')
-    expect(range?.since.toISOString()).toBe(new Date('2026-08-01T00:00:00').toISOString())
-    expect(range?.until.toISOString()).toBe(new Date('2026-08-16T00:00:00').toISOString())
+    expect(range?.since.toISOString()).toBe('2026-08-01T03:00:00.000Z')
+    expect(range?.until.toISOString()).toBe('2026-08-16T03:00:00.000Z')
   })
 
   it('returns null when either date is missing', () => {

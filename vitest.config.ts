@@ -31,6 +31,11 @@ export default defineConfig({
   plugins: [tsconfigPaths(), react()],
   test: {
     environment: 'node',
+    // Vercel runs the app in UTC. Running the suite in the developer's own zone (BRT here) let a
+    // whole class of date bug pass unseen: the code read the server's calendar day, the test
+    // asserted against that same server's calendar day, and both shifted together. Matching
+    // production is what makes those assertions mean anything.
+    env: { TZ: 'UTC' },
     // Outside integration mode the env in memory is production's, so these files are not
     // skipped by convention -- they are never collected in the first place.
     exclude: isIntegration ? defaultExclude : [...defaultExclude, '**/*.integration.test.ts'],

@@ -1,14 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
 
-// Brazil has had no DST since 2019, so BRT is a fixed UTC-3 offset — a BRT calendar day
-// boundary ("YYYY-MM-DDT00:00:00" local) is always this same UTC instant. `since`/`until` are
-// plain date strings (e.g. "2026-08-04"); querying `data_venda` against them directly compares
-// against UTC midnight, not BRT midnight — dayKey() below buckets by BRT day, so the query
-// bound has to line up with the same boundary or a sale near midnight BRT can fall outside the
-// requested range even though its BRT day is inside it.
-function brtDayBoundaryUtc(dateOnly: string): string {
-  return `${dateOnly}T03:00:00.000Z`
-}
+// `since`/`until` are plain date strings (e.g. "2026-08-04"); querying data_venda against them
+// directly would compare with UTC midnight, not BRT midnight -- dayKey() below buckets by BRT
+// day, so the bound has to line up or a sale near midnight BRT falls outside a range its own day
+// is inside. This file had the app's only correct handling of that; the definition now lives in
+// report-period so every period in the app resolves against the same boundary.
 
 export interface DailyFunnelRow {
   data: string

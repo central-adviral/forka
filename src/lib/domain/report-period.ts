@@ -11,10 +11,26 @@ export const REPORT_PERIODS: { value: ReportPeriod; label: string }[] = [
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
+// Every period in this file is a BRAZILIAN calendar day, never the server's. On Vercel the server
+// runs in UTC, so setHours(0,0,0,0) made "Hoje" start at 21:00 of the previous day for the
+// operator, and a report opened between 21:00 and midnight already showed tomorrow's date.
+//
+// Brazil has had no DST since 2019, so BRT is a fixed UTC-3 offset and a BRT calendar day always
+// begins at this same UTC instant. Same convention funnel-repo has always used for data_venda.
+const BRT_OFFSET_MS = 3 * 60 * 60 * 1000
+
+export function brtDayBoundaryUtc(dateOnly: string): string {
+  return `${dateOnly}T03:00:00.000Z`
+}
+
+/** The BRT calendar date the instant falls on, as "YYYY-MM-DD". */
+function toDateOnly(date: Date): string {
+  return new Date(date.getTime() - BRT_OFFSET_MS).toISOString().slice(0, 10)
+}
+
+/** Midnight in Brazil for the BRT day the instant falls on, as the UTC instant it really is. */
 function startOfDay(date: Date): Date {
-  const start = new Date(date)
-  start.setHours(0, 0, 0, 0)
-  return start
+  return new Date(brtDayBoundaryUtc(toDateOnly(date)))
 }
 
 export function resolvePeriodSince(period: string | undefined, now: Date = new Date()): Date | null {
@@ -28,7 +44,7 @@ export function resolvePeriodSince(period: string | undefined, now: Date = new D
     case '30d':
       return new Date(now.getTime() - 30 * DAY_MS)
     case 'month':
-      return new Date(now.getFullYear(), now.getMonth(), 1)
+      return new Date(brtDayBoundaryUtc(`${toDateOnly(now).slice(0, 7)}-01`))
     default:
       return null
   }
@@ -40,8 +56,10 @@ export function resolvePeriodUntil(period: string | undefined, now: Date = new D
 
 export function resolveDateRange(desde: string | undefined, ate: string | undefined): { since: Date; until: Date } | null {
   if (!desde || !ate) return null
-  const since = new Date(`${desde}T00:00:00`)
-  const ateStart = new Date(`${ate}T00:00:00`)
+  // The operator typed Brazilian calendar days; without the offset these parsed in the server's
+  // zone, which on Vercel means the range starts and ends three hours early.
+  const since = new Date(brtDayBoundaryUtc(desde))
+  const ateStart = new Date(brtDayBoundaryUtc(ate))
   if (Number.isNaN(since.getTime()) || Number.isNaN(ateStart.getTime())) return null
   const until = new Date(ateStart.getTime() + DAY_MS)
   if (since.getTime() >= until.getTime()) return null
@@ -54,10 +72,6 @@ export function formatBr(iso: string): string {
 }
 
 const ALL_TIME_SINCE = '2020-01-01'
-
-function toDateOnly(date: Date): string {
-  return date.toISOString().slice(0, 10)
-}
 
 // Same period vocabulary as resolvePeriodSince/resolvePeriodUntil, but returns plain
 // "YYYY-MM-DD" bounds (no unbounded null) for repos that query a `date` column directly,
