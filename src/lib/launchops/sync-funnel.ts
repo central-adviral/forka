@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getSyncCursor, recordSyncResult } from '@/lib/repo/funnel-sync-state-repo'
-import { fetchLaunchOpsSalesRows, syncSalesForFunnel } from './sync-sales'
+import { fetchLaunchOpsSalesRows, syncSalesForFunnel, reconcileUnmatchedSales } from './sync-sales'
 import {
   fetchLaunchOpsAdSpendRows,
   fetchLaunchOpsAdSpendRowsForDays,
@@ -41,6 +41,8 @@ async function syncSalesEntity(appDb: SupabaseClient, launchopsDb: SupabaseClien
     const cursor = await getSyncCursor(appDb, funnel.id, 'sales')
     const rows = await fetchLaunchOpsSalesRows(launchopsDb, { produtoNomes: funnel.launchops_produto_nomes, since: cursor })
     const { latestUpdatedAt } = await syncSalesForFunnel(appDb, funnel.id, rows)
+    const { reconciled } = await reconcileUnmatchedSales(appDb, funnel.id)
+    if (reconciled > 0) console.log('[sync-funnel-sales-reconciled]', { salesFunnelId: funnel.id, reconciled })
     await recordSyncResult(appDb, { salesFunnelId: funnel.id, entity: 'sales', result: 'ok', newCursor: latestUpdatedAt ?? undefined })
   } catch (err) {
     console.error('[sync-funnel-sales-failed]', { salesFunnelId: funnel.id }, err)

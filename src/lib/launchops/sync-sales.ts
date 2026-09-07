@@ -61,6 +61,49 @@ export async function findConversionIdsByExternalEventId(
   return conversionIdByExternalEventId
 }
 
+const RECONCILE_LOOKBACK_DAYS = 90
+const RECONCILE_ROW_LIMIT = 500
+
+// A sale that syncs before its conversion exists (webhook lands late, or the sale is synced
+// first) stays with conversion_id null forever: the incremental sync only revisits rows whose
+// updated_at moved. This second pass re-checks recent unmatched sales on every sync.
+export async function reconcileUnmatchedSales(
+  appDb: SupabaseClient,
+  salesFunnelId: string,
+  now: Date = new Date()
+): Promise<{ reconciled: number }> {
+  const since = new Date(now.getTime() - RECONCILE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: pending, error } = await appDb
+    .from('sales')
+    .select('id, transaction_id_plataforma')
+    .eq('sales_funnel_id', salesFunnelId)
+    .is('conversion_id', null)
+    .not('transaction_id_plataforma', 'is', null)
+    .gte('data_venda', since)
+    .limit(RECONCILE_ROW_LIMIT)
+  if (error) throw error
+  if (!pending || pending.length === 0) return { reconciled: 0 }
+
+  const transactionIds = [
+    ...new Set(pending.map((row) => row.transaction_id_plataforma).filter((id): id is string => Boolean(id))),
+  ]
+  const conversionIdByTransactionId = await findConversionIdsByExternalEventId(appDb, transactionIds)
+  if (conversionIdByTransactionId.size === 0) return { reconciled: 0 }
+
+  let reconciled = 0
+  for (const sale of pending) {
+    const conversionId = sale.transaction_id_plataforma
+      ? conversionIdByTransactionId.get(sale.transaction_id_plataforma)
+      : undefined
+    if (!conversionId) continue
+    const { error: updateError } = await appDb.from('sales').update({ conversion_id: conversionId }).eq('id', sale.id)
+    if (updateError) throw updateError
+    reconciled++
+  }
+  return { reconciled }
+}
+
 export async function syncSalesForFunnel(
   appDb: SupabaseClient,
   salesFunnelId: string,
