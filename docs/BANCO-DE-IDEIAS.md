@@ -13,8 +13,26 @@ ou a renovação mensal de uma assinatura — o insert bate no índice,
 `200 OK`. A venda simplesmente não aparece no relatório.
 
 **Não é urgente: o Vitor confirmou em 07/09 que não vende order bump nem
-recorrência hoje.** Vira prioridade no dia em que passar a vender, e **ele
-precisa avisar** — o banco não tem como perceber sozinho.
+recorrência hoje.** Vira prioridade no dia em que passar a vender.
+
+**E dá para medir, ao contrário do que eu afirmei primeiro.** A conversão é
+rejeitada, mas a **venda sobrevive** em `sales` — duas vendas apontando para o
+mesmo tracking id são exatamente uma segunda compra no mesmo clique:
+
+```sql
+select count(*) filter (where vendas > 1) as cliques_com_mais_de_uma_compra,
+       coalesce(sum(vendas - 1) filter (where vendas > 1), 0) as compras_perdidas
+from (
+  select utm_content, count(*) as vendas
+  from sales
+  where utm_content ~ '^[0-9a-f]{8}-[0-9a-f]{4}-'
+  group by 1
+) t;
+```
+
+Rodado em produção em 07/09: **0 de 212** cliques com venda tinham mais de uma.
+Rodar isso de novo é o jeito de saber se o modelo de negócio mudou sem ninguém
+ter avisado.
 
 **Como consertar quando for a hora**: trocar a unicidade para
 `(source, external_event_id)` — o id da fatura, único por natureza — e deixar
