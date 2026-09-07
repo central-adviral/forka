@@ -42,29 +42,20 @@ beforeAll(async () => {
     .single()
   testId = test!.id
 
-  const { data: variant } = await db
+  // Both variants in one insert: the deferred integrity trigger (0037) rejects a test left
+  // with weights that don't sum to 100, which is what inserting them one at a time produces.
+  const { data: variants, error: variantsError } = await db
     .from('variants')
-    .insert({
-      test_id: test!.id,
-      name: 'A',
-      weight_pct: 50,
-      destination_url: 'https://example.com/a',
-    })
+    .insert([
+      { test_id: test!.id, name: 'A', weight_pct: 50, destination_url: 'https://example.com/a', is_control: true },
+      // is_control spelled out on both rows: a bulk insert sends one column list, so a key
+      // present on only one row lands as NULL instead of falling back to the column default.
+      { test_id: test!.id, name: 'B', weight_pct: 50, destination_url: 'https://example.com/b', is_control: false },
+    ])
     .select()
-    .single()
-  variantId = variant!.id
-
-  const { data: variantB } = await db
-    .from('variants')
-    .insert({
-      test_id: test!.id,
-      name: 'B',
-      weight_pct: 50,
-      destination_url: 'https://example.com/b',
-    })
-    .select()
-    .single()
-  variantBId = variantB!.id
+  if (variantsError) throw variantsError
+  variantId = variants!.find((v) => v.name === 'A')!.id
+  variantBId = variants!.find((v) => v.name === 'B')!.id
 })
 
 describe('redirect-repo', () => {

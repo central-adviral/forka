@@ -36,7 +36,7 @@ describe('get_test_report_by_source', () => {
       .single()
     const { data: variant } = await admin
       .from('variants')
-      .insert({ test_id: test!.id, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' })
+      .insert({ test_id: test!.id, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a', is_control: true })
       .select()
       .single()
 

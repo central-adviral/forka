@@ -37,7 +37,7 @@ beforeAll(async () => {
   testSlug = test!.slug
   const { data: variant } = await db
     .from('variants')
-    .insert({ test_id: test!.id, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' })
+    .insert({ test_id: test!.id, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a', is_control: true })
     .select()
     .single()
   trackingId = crypto.randomUUID()

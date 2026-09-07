@@ -40,7 +40,7 @@ beforeAll(async () => {
   testId = test!.id
   const { data: variant } = await db
     .from('variants')
-    .insert({ test_id: testId, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a' })
+    .insert({ test_id: testId, name: 'A', weight_pct: 100, destination_url: 'https://example.com/a', is_control: true })
     .select()
     .single()
   const variantId = variant!.id
