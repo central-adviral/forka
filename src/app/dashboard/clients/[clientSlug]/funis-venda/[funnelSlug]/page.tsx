@@ -48,6 +48,10 @@ export default async function SalesFunnelPage({
   }
   const creatives = (creativeResult.data ?? []) as {
     ad_name: string
+    /** Null when the (name, adset) key still covers more than one ad -- see ad_count. */
+    ad_id: string | null
+    adset_name: string | null
+    ad_count: number
     spend: number
     impressions: number
     link_clicks: number
@@ -298,9 +302,22 @@ export default async function SalesFunnelPage({
                   const roas = c.spend > 0 ? c.revenue / c.spend : null
                   const cpa = c.sales_count > 0 ? c.spend / c.sales_count : null
                   return (
-                    <tr key={c.ad_name} className="border-t border-white/[0.06]">
-                      <td className="max-w-[280px] truncate p-3" title={c.ad_name}>
-                        {c.ad_name}
+                    <tr key={`${c.ad_name}|${c.adset_name ?? ''}`} className="border-t border-white/[0.06]">
+                      <td className="max-w-[280px] p-3" title={c.ad_name}>
+                        <div className="truncate">{c.ad_name}</div>
+                        {(c.adset_name || c.ad_count > 1) && (
+                          <div className="mt-0.5 truncate text-[11px] text-[#8A90A6]">
+                            {c.adset_name}
+                            {c.ad_count > 1 && (
+                              <span
+                                title="Estes anúncios têm o mesmo nome e o mesmo conjunto. Nada na venda os separa, então a linha soma os dois em vez de creditar um deles no chute."
+                                className="ml-1.5 cursor-help rounded-full bg-[#F5B94D]/[0.12] px-1.5 py-0.5 text-[10px] text-[#F5B94D]"
+                              >
+                                {c.ad_count} anúncios somados
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="p-3 font-['JetBrains_Mono'] tabular-nums">{currency(c.spend)}</td>
                       <td className="p-3 font-['JetBrains_Mono'] tabular-nums">{c.sales_count}</td>

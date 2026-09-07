@@ -49,15 +49,17 @@ export function CreativeMatrixPanel({ adRows, variants, assetLabel }: Props) {
   )
   if (matrix.length === 0) return null
 
-  const spendByAdName = new Map<string, number>()
+  // The report repeats each ad's total spend on every variant row it appears in, and it arrives
+  // in reais while the score works in cents. Summing would bill the ad once per variant.
+  const spendCentsByAdName = new Map<string, number>()
   for (const row of adRows) {
-    spendByAdName.set(row.ad_name, (spendByAdName.get(row.ad_name) ?? 0) + (row.ad_spend ?? 0))
+    if (row.ad_spend !== null) spendCentsByAdName.set(row.ad_name, Math.round(row.ad_spend * 100))
   }
 
   const scores = scoreCreatives(
     matrix.map((row) => ({
       adName: row.adName,
-      spendCents: spendByAdName.get(row.adName) ?? 0,
+      spendCents: spendCentsByAdName.get(row.adName) ?? 0,
       revenueCents: row.totals.revenueCents,
       conversions: adRows
         .filter((r) => r.ad_name === row.adName)
