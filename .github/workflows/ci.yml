@@ -22,6 +22,11 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Next generates the route and layout types (LayoutProps and friends) into .next/types, and
+      # tsconfig includes them. A developer machine has them lying around from an earlier dev run,
+      # so `tsc --noEmit` passed locally while failing on a clean checkout -- the first thing this
+      # workflow caught. typegen produces them without paying for a full build.
+      - run: npx next typegen
       - run: npx tsc --noEmit
       - run: npm run lint
       - run: npm test
