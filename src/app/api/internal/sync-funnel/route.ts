@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
   const { data: funnels, error: funnelsError } = await appDb
     .from('sales_funnels')
-    .select('id, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url, funnel_source_service_role_key)')
+    .select('id, client_id, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url, funnel_source_service_role_key)')
     .eq('is_active', true)
   if (funnelsError) {
     console.error('[sync-funnel-funnels-failed]', funnelsError)

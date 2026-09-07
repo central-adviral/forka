@@ -10,6 +10,7 @@ import {
 } from './sync-ad-spend'
 import {
   fetchLaunchOpsAdCreatives,
+  fetchLaunchOpsAdCreativesByAdIds,
   fetchLaunchOpsAdCreativeSpendRows,
   joinAdCreativeSpend,
   syncAdCreativeSpendForFunnel,
@@ -17,8 +18,32 @@ import {
 
 export interface SyncableFunnel {
   id: string
+  client_id?: string | null
   launchops_operacao_ids: string[] | null
   launchops_produto_nomes: string[] | null
+}
+
+// Ad ids this client's own tests actually received traffic from. Used to widen the creative
+// fetch beyond the mapped operation, so an unclassified ad still gets its spend synced.
+async function adIdsSeenInClicks(appDb: SupabaseClient, clientId: string): Promise<string[]> {
+  const { data: tests, error: testsError } = await appDb.from('tests').select('id').eq('client_id', clientId)
+  if (testsError) throw testsError
+  const testIds = (tests ?? []).map((t) => t.id)
+  if (testIds.length === 0) return []
+
+  const { data, error } = await appDb
+    .from('click_events')
+    .select('source_utms')
+    .in('test_id', testIds)
+    .not('source_utms->>fb_ad_id', 'is', null)
+  if (error) throw error
+
+  const ids = new Set<string>()
+  for (const row of data ?? []) {
+    const adId = (row.source_utms as Record<string, string> | null)?.fb_ad_id
+    if (adId) ids.add(adId)
+  }
+  return [...ids]
 }
 
 function errorMessage(err: unknown): string {
@@ -95,7 +120,10 @@ async function syncAdCreativeSpendEntity(appDb: SupabaseClient, launchopsDb: Sup
   if (!funnel.launchops_operacao_ids?.length) return
   try {
     const cursor = await getSyncCursor(appDb, funnel.id, 'ad_creative_spend_daily')
-    const creatives = await fetchLaunchOpsAdCreatives(launchopsDb, funnel.launchops_operacao_ids)
+    const byOperation = await fetchLaunchOpsAdCreatives(launchopsDb, funnel.launchops_operacao_ids)
+    const seenAdIds = funnel.client_id ? await adIdsSeenInClicks(appDb, funnel.client_id) : []
+    const byClickedAdId = await fetchLaunchOpsAdCreativesByAdIds(launchopsDb, seenAdIds)
+    const creatives = [...new Map([...byOperation, ...byClickedAdId].map((c) => [c.id, c])).values()]
     const spendRows = await fetchLaunchOpsAdCreativeSpendRows(launchopsDb, { anuncioIds: creatives.map((c) => c.id), since: cursor })
     const joined = joinAdCreativeSpend(creatives, spendRows)
     await syncAdCreativeSpendForFunnel(appDb, funnel.id, joined)

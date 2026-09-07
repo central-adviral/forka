@@ -73,7 +73,7 @@ describe('get_test_report_by_ad — spend enrichment', () => {
   it('returns total spend for the period, not spend multiplied by click count', async () => {
     const { data, error } = await asOwner.rpc('get_test_report_by_ad', { p_test_id: testId, p_since: null, p_until: null })
     expect(error).toBeNull()
-    const row = (data as { ad_name: string; clicks: number; ad_spend: number }[]).find((r) => r.ad_name === 'ad-123')
+    const row = (data as { ad_name: string; clicks: number; ad_spend: number }[]).find((r) => r.ad_name === 'Criativo X')
     expect(row?.clicks).toBe(3)
     expect(row?.ad_spend).toBe(50)
   })

@@ -155,7 +155,7 @@ export async function syncFunnelNow(context: { sales_funnel_id: string; client_s
   const supabase = await createServerSupabaseClient()
   const { data: funnel, error } = await supabase
     .from('sales_funnels')
-    .select('id, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url, funnel_source_service_role_key)')
+    .select('id, client_id, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url, funnel_source_service_role_key)')
     .eq('id', context.sales_funnel_id)
     .single()
   if (error || !funnel) throw new Error('Funil não encontrado')

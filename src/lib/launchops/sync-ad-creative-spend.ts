@@ -45,6 +45,29 @@ export async function fetchLaunchOpsAdCreatives(
   return (data ?? []) as LaunchOpsAdCreative[]
 }
 
+const AD_ID_LOOKUP_CHUNK = 200
+
+// An ad duplicated in Meta lands in LaunchOps with operacao_id null until someone classifies it,
+// and null never matches the operation filter above -- so its spend was skipped in silence even
+// though LaunchOps had it recorded. Ads seen in this client's own clicks are therefore fetched by
+// id as well, which keeps attribution working whether or not anyone got around to classifying them.
+export async function fetchLaunchOpsAdCreativesByAdIds(
+  launchopsDb: SupabaseClient,
+  adIds: string[]
+): Promise<LaunchOpsAdCreative[]> {
+  if (adIds.length === 0) return []
+  const creatives: LaunchOpsAdCreative[] = []
+  for (let i = 0; i < adIds.length; i += AD_ID_LOOKUP_CHUNK) {
+    const { data, error } = await launchopsDb
+      .from('anuncio')
+      .select('id, ad_id, ad_name, campaign_id, campaign_name, adset_id, adset_name')
+      .in('ad_id', adIds.slice(i, i + AD_ID_LOOKUP_CHUNK))
+    if (error) throw error
+    creatives.push(...((data ?? []) as LaunchOpsAdCreative[]))
+  }
+  return creatives
+}
+
 export async function fetchLaunchOpsAdCreativeSpendRows(
   launchopsDb: SupabaseClient,
   params: { anuncioIds: string[]; since: string | null }

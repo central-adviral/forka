@@ -99,7 +99,7 @@ describe('sales_funnels', () => {
 
     const { data: byAd, error } = await asOwner.rpc('get_test_report_by_ad', { p_test_id: test!.id })
     expect(error).toBeNull()
-    const row = byAd!.find((r: { ad_name: string }) => r.ad_name === 'ad-1')
+    const row = byAd!.find((r: { ad_name: string }) => r.ad_name === 'Anúncio X')
     expect(row).toMatchObject({ ad_spend: 150, ad_impressions: 1500, ad_link_clicks: 75 })
   })
 
@@ -151,7 +151,7 @@ describe('sales_funnels', () => {
 
     const { data: byAd, error } = await asOwner.rpc('get_test_report_by_ad', { p_test_id: test!.id })
     expect(error).toBeNull()
-    const row = byAd!.find((r: { ad_name: string }) => r.ad_name === 'ad-bot')
+    const row = byAd!.find((r: { ad_name: string }) => r.ad_name === 'Anúncio Bot')
     expect(row).toMatchObject({ clicks: 0, bot_clicks: 1, ad_spend: 30 })
   })
 
@@ -201,12 +201,12 @@ describe('sales_funnels', () => {
 
     const beforeDelete = await asOwner.rpc('get_test_report_by_ad', { p_test_id: test!.id })
     expect(beforeDelete.error).toBeNull()
-    expect(beforeDelete.data!.find((r: { ad_name: string }) => r.ad_name === 'ad-keep')).toMatchObject({ ad_spend: 35, clicks: 1 })
+    expect(beforeDelete.data!.find((r: { ad_name: string }) => r.ad_name === 'Anúncio Fica')).toMatchObject({ ad_spend: 35, clicks: 1 })
 
     await admin.from('sales_funnels').delete().eq('id', funnelToDelete!.id)
 
     const afterDelete = await asOwner.rpc('get_test_report_by_ad', { p_test_id: test!.id })
     expect(afterDelete.error).toBeNull()
-    expect(afterDelete.data!.find((r: { ad_name: string }) => r.ad_name === 'ad-keep')).toMatchObject({ ad_spend: 20, clicks: 1 })
+    expect(afterDelete.data!.find((r: { ad_name: string }) => r.ad_name === 'Anúncio Fica')).toMatchObject({ ad_spend: 20, clicks: 1 })
   })
 })
