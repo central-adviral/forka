@@ -57,7 +57,7 @@ beforeAll(async () => {
     .select()
     .single()
 
-  await admin.from('ad_creative_spend_daily').insert([
+  const { error: spendError } = await admin.from('ad_creative_spend_daily').insert([
     {
       sales_funnel_id: funnel!.id,
       data: '2026-09-01',
@@ -137,6 +137,9 @@ beforeAll(async () => {
       link_clicks: 10,
     },
   ])
+  // A rejected fixture surfaces as "expected 0 to be 77" three tests later otherwise, instead of
+  // naming the constraint it violated.
+  expect(spendError).toBeNull()
 
   // Every row spells out created_at: a bulk insert through PostgREST sets any key a row omits
   // to NULL instead of falling back to the column default, and one NULL rejects the whole batch.
