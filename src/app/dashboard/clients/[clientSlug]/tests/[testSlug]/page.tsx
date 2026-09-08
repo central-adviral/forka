@@ -7,13 +7,24 @@ import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
 import { ReportCanvas } from './report-canvas'
 import { toggleTestStatus } from './actions'
-import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil, resolveDateRange, formatBr, daysRunningSince } from '@/lib/domain/report-period'
+import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil, resolveDateRange, resolvePreviousWindow, formatBr, daysRunningSince } from '@/lib/domain/report-period'
 import { RefreshButton } from './refresh-button'
 import { CreativeMatrixPanel } from './creative-matrix-panel'
 import { InsightPanel } from './insight-panel'
 import { MiniBarChart } from '@/components/mini-bar-chart'
 
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+
+// Tabs live in the URL rather than in client state, because this page is a Server Component that
+// queries per render: a tab needing three of the reports pays for three, not for all of them.
+const REPORT_TABS = [
+  { value: 'desempenho', label: 'Desempenho' },
+  { value: 'criativos', label: 'Criativos' },
+  { value: 'origens', label: 'Origens' },
+  { value: 'insight', label: 'Insight' },
+] as const
+
+type ReportTab = (typeof REPORT_TABS)[number]['value']
 
 interface WeekdayReportRow {
   weekday: number
@@ -112,18 +123,54 @@ function ThWithInfo({ label, info }: { label: string; info: string }) {
   )
 }
 
-function BarCell({ value, max, format }: { value: number; max: number; format: string }) {
+function BarCell({
+  value,
+  max,
+  format,
+  children,
+}: {
+  value: number
+  max: number
+  format: string
+  children?: React.ReactNode
+}) {
   const pct = max > 0 ? Math.max(value > 0 ? 6 : 0, (value / max) * 100) : 0
   return (
     <td className={TD_CLASS}>
       <div className="absolute inset-y-1.5 left-0 rounded-r bg-[#7C6FF0]/[0.14]" style={{ width: `${pct}%` }} />
       <span className="relative">{format}</span>
+      {children && <div className="relative mt-0.5">{children}</div>}
     </td>
   )
 }
 
-function RateCell({ rate }: { rate: string }) {
-  return <td className={`${TD_CLASS} ${Number(rate) > 0 ? 'text-[#2DD4A8]' : 'text-[#8A90A6]'}`}>{rate}%</td>
+function RateCell({ rate, children }: { rate: string; children?: React.ReactNode }) {
+  return (
+    <td className={`${TD_CLASS} ${Number(rate) > 0 ? 'text-[#2DD4A8]' : 'text-[#8A90A6]'}`}>
+      {rate}%
+      {children && <div className="mt-0.5">{children}</div>}
+    </td>
+  )
+}
+
+// Counts and money read as a percentage; a rate reads in percentage points, because a rate that
+// moves from 2,1% to 3,4% rose 1,3 p.p., not 62%.
+function Delta({ current, previous, unit }: { current: number; previous: number | null; unit: 'pct' | 'pp' }) {
+  if (previous === null) return <span className="text-[11px] text-[#565F7A]">—</span>
+  const diff = unit === 'pp' ? current - previous : previous === 0 ? null : ((current - previous) / previous) * 100
+  if (diff === null) {
+    return <span className="text-[11px] text-[#565F7A]">novo</span>
+  }
+  const rounded = unit === 'pp' ? diff.toFixed(1) : Math.round(diff).toString()
+  const sign = diff > 0 ? '+' : ''
+  const tone = diff > 0 ? 'text-[#2DD4A8]' : diff < 0 ? 'text-[#F76C6C]' : 'text-[#565F7A]'
+  return (
+    <span className={`font-['JetBrains_Mono'] text-[11px] ${tone}`}>
+      {sign}
+      {rounded}
+      {unit === 'pp' ? ' p.p.' : '%'}
+    </span>
+  )
 }
 
 function BotTag({ clicks, botClicks }: { clicks: number; botClicks: number }) {
@@ -144,15 +191,19 @@ export default async function TestReportPage({
   searchParams,
 }: {
   params: Promise<{ clientSlug: string; testSlug: string }>
-  searchParams: Promise<{ periodo?: string; desde?: string; ate?: string }>
+  searchParams: Promise<{ periodo?: string; desde?: string; ate?: string; aba?: string; comparar?: string }>
 }) {
   const { clientSlug, testSlug } = await params
-  const { periodo, desde, ate } = await searchParams
+  const { periodo, desde, ate, aba, comparar } = await searchParams
+  const tab: ReportTab = REPORT_TABS.some((option) => option.value === aba) ? (aba as ReportTab) : 'desempenho'
   const customRange = periodo === 'custom' ? resolveDateRange(desde, ate) : null
   const since = periodo === 'custom' ? (customRange?.since ?? null) : resolvePeriodSince(periodo)
   const sinceIso = since ? since.toISOString() : null
   const until = periodo === 'custom' ? (customRange?.until ?? null) : resolvePeriodUntil(periodo)
   const untilIso = until ? until.toISOString() : null
+  const previousWindow = comparar === '1' ? resolvePreviousWindow(since, until) : null
+  const previousSinceIso = previousWindow ? previousWindow.since.toISOString() : null
+  const previousUntilIso = previousWindow ? previousWindow.until.toISOString() : null
   const supabase = await createServerSupabaseClient()
   const { data: test, error: testError } = await supabase
     .from('tests')
@@ -170,8 +221,14 @@ export default async function TestReportPage({
   }
   if (!test) notFound()
 
+  // get_test_report and the variant rows feed the header and the summary bar, which every tab
+  // shows; the rest is fetched only by the tab that renders it.
+  const skip = Promise.resolve({ data: null, error: null })
+  const needsTotals = tab === 'desempenho' || tab === 'criativos'
+  const period = { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }
+  const previousPeriod = { p_test_id: test.id, p_since: previousSinceIso, p_until: previousUntilIso }
+
   const [
-    { data: pixelVariants, error: pixelVariantsError },
     { data: variantRows, error: variantRowsError },
     { data: report, error: reportError },
     { data: sourceReport, error: sourceReportError },
@@ -179,20 +236,20 @@ export default async function TestReportPage({
     { data: totalsReport, error: totalsReportError },
     { data: weekdayReport, error: weekdayReportError },
     { data: hourReport, error: hourReportError },
+    { data: previousReport },
+    { data: previousTotalsReport },
   ] = await Promise.all([
-    test.conversion_method === 'thank_you_page'
-      ? supabase.from('variants').select('id, name, thank_you_url').eq('test_id', test.id)
-      : Promise.resolve({ data: null, error: null }),
     supabase.from('variants').select('id, destination_url, is_control').eq('test_id', test.id),
-    supabase.rpc('get_test_report', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
-    supabase.rpc('get_test_report_by_source', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
-    supabase.rpc('get_test_report_by_ad', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
-    supabase.rpc('get_test_report_totals', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
-    supabase.rpc('get_test_report_by_weekday', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
-    supabase.rpc('get_test_report_by_hour', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
+    supabase.rpc('get_test_report', period),
+    tab === 'origens' ? supabase.rpc('get_test_report_by_source', period) : skip,
+    tab === 'criativos' ? supabase.rpc('get_test_report_by_ad', period) : skip,
+    needsTotals ? supabase.rpc('get_test_report_totals', period) : skip,
+    tab === 'desempenho' ? supabase.rpc('get_test_report_by_weekday', period) : skip,
+    tab === 'desempenho' ? supabase.rpc('get_test_report_by_hour', period) : skip,
+    previousWindow ? supabase.rpc('get_test_report', previousPeriod) : skip,
+    previousWindow && tab === 'desempenho' ? supabase.rpc('get_test_report_totals', previousPeriod) : skip,
   ])
 
-  if (pixelVariantsError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'pixelVariants' }, pixelVariantsError)
   if (variantRowsError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'variantRows' }, variantRowsError)
   if (reportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report' }, reportError)
   if (sourceReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_source' }, sourceReportError)
@@ -224,7 +281,6 @@ export default async function TestReportPage({
     process.env.NEXT_PUBLIC_REDIRECT_DOMAIN ?? ''
   )
   const redirectUrl = `https://${activeDomain}/r/${test.slug}`
-  const checkoutLinkUrl = `https://${activeDomain}/c/${test.slug}`
 
   const baseRows = ((report as ReportRow[]) ?? []).map((row) => ({
     ...row,
@@ -276,7 +332,6 @@ export default async function TestReportPage({
 
   const assetLabel = test.test_type === 'checkout' ? 'Checkout' : 'Página'
   const assetArticle = test.test_type === 'checkout' ? 'o' : 'a'
-  const assetDemonstrative = test.test_type === 'checkout' ? 'este' : 'esta'
 
   const confidenceLabelById = new Map(
     rows.map((row) => [
@@ -290,6 +345,30 @@ export default async function TestReportPage({
   )
 
   const totalVisits = rows.reduce((sum, row) => sum + row.visits, 0)
+
+  // "Tudo" has no window before it, so the toggle is not offered there at all.
+  const comparableWindow = resolvePreviousWindow(since, until)
+  const previousLabel = comparableWindow
+    ? `${formatBr(comparableWindow.since.toISOString().slice(0, 10))} - ${formatBr(
+        new Date(comparableWindow.until.getTime() - 1).toISOString().slice(0, 10)
+      )}`
+    : null
+  const comparingQuery = new URLSearchParams()
+  if (periodo) comparingQuery.set('periodo', periodo)
+  if (periodo === 'custom' && desde) comparingQuery.set('desde', desde)
+  if (periodo === 'custom' && ate) comparingQuery.set('ate', ate)
+  if (tab !== 'desempenho') comparingQuery.set('aba', tab)
+  if (comparar !== '1') comparingQuery.set('comparar', '1')
+  const comparingHref = comparingQuery.size > 0 ? `?${comparingQuery}` : '?'
+
+  const previousRows = (previousReport as ReportRow[] | null) ?? null
+  const previousTotalVisits = previousRows ? previousRows.reduce((sum, row) => sum + row.visits, 0) : null
+  const previousConversionsByVariant = new Map(
+    ((previousTotalsReport as TotalsReportRow[] | null) ?? []).map((row) => [row.variant_id, row])
+  )
+  const previousLeaderConversions = previousRows
+    ? (previousRows.find((row) => row.variant_id === leaderRow?.variant_id)?.conversions ?? 0)
+    : null
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -416,6 +495,43 @@ export default async function TestReportPage({
             </button>
           </form>
         </details>
+        {previousLabel && (
+          <a
+            href={comparingHref}
+            className={`ml-auto rounded-full border px-3 py-1.5 text-xs font-medium ${
+              comparar === '1'
+                ? 'border-[#7C6FF0] bg-[#7C6FF0]/15 text-[#7C6FF0]'
+                : 'border-dashed border-white/20 text-[#8A90A6] hover:text-[#E8EAF2]'
+            }`}
+          >
+            vs {previousLabel}
+          </a>
+        )}
+      </div>
+
+      <div className="mx-6 mt-5 flex gap-1 border-b border-white/[0.08]">
+        {REPORT_TABS.map((option) => {
+          const query = new URLSearchParams()
+          if (periodo) query.set('periodo', periodo)
+          if (periodo === 'custom' && desde) query.set('desde', desde)
+          if (periodo === 'custom' && ate) query.set('ate', ate)
+          if (comparar === '1') query.set('comparar', '1')
+          if (option.value !== 'desempenho') query.set('aba', option.value)
+          const isActive = tab === option.value
+          return (
+            <a
+              key={option.value}
+              href={query.size > 0 ? `?${query}` : '?'}
+              className={`-mb-px border-b-2 px-3.5 py-2.5 text-[13px] font-medium transition-colors ${
+                isActive
+                  ? 'border-[#7C6FF0] text-[#E8EAF2]'
+                  : 'border-transparent text-[#8A90A6] hover:text-[#E8EAF2]'
+              }`}
+            >
+              {option.label}
+            </a>
+          )
+        })}
       </div>
 
       {hasPartialDataError && (
@@ -428,14 +544,22 @@ export default async function TestReportPage({
       <div className="mx-6 mt-4 flex flex-wrap items-center gap-x-7 gap-y-3 rounded-2xl border border-white/[0.08] bg-[#141829] px-6 py-4">
         <div>
           <div className="font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums">{totalVisits}</div>
-          <div className="text-[11.5px] text-[#8A90A6]">acessos totais</div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11.5px] text-[#8A90A6]">acessos totais</span>
+            {previousTotalVisits !== null && <Delta current={totalVisits} previous={previousTotalVisits} unit="pct" />}
+          </div>
         </div>
         <div className="h-[34px] w-px bg-white/[0.08]" />
         <div>
           <div className="font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums text-[#F5B94D]">
             {leaderRow?.conversions ?? 0}
           </div>
-          <div className="text-[11.5px] text-[#8A90A6]">vendas — variante líder</div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11.5px] text-[#8A90A6]">vendas — variante líder</span>
+            {previousLeaderConversions !== null && (
+              <Delta current={leaderRow?.conversions ?? 0} previous={previousLeaderConversions} unit="pct" />
+            )}
+          </div>
         </div>
         <div className="h-[34px] w-px bg-white/[0.08]" />
         <div>
@@ -455,6 +579,8 @@ export default async function TestReportPage({
         </div>
       </div>
 
+      {tab === 'desempenho' && (
+        <>
       <ReportCanvas
         layout={layout}
         redirectUrl={redirectUrl}
@@ -501,22 +627,6 @@ export default async function TestReportPage({
           />
         </div>
       </div>
-      {test.test_type === 'checkout' && (
-        <div className="mx-6 mb-6">
-          <h2 className="mb-2 font-['Space_Grotesk'] text-lg font-semibold">Link do botão de comprar</h2>
-          <div className="rounded-[10px] border border-white/[0.08] p-3">
-            <div className="mb-2 flex items-center gap-1.5">
-              <p className="break-all font-['JetBrains_Mono'] text-xs text-[#4F8EF7]">{checkoutLinkUrl}</p>
-              <CopyButton text={checkoutLinkUrl} />
-            </div>
-            <p className="text-xs text-[#8A90A6]">
-              Cole este endereço no botão de comprar da página de vendas. Se a página tiver vários botões de
-              compra, todos recebem o mesmo endereço. Trocar os checkouts ou os pesos depois não exige mexer na
-              página de novo.
-            </p>
-          </div>
-        </div>
-      )}
       <div className="mx-6 mb-6">
         <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Total por {assetLabel.toLowerCase()}</h2>
         {(() => {
@@ -539,32 +649,74 @@ export default async function TestReportPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {totalsRows.map((row) => (
+                  {totalsRows.map((row) => {
+                    const previous = previousConversionsByVariant.get(row.variant_id) ?? null
+                    return (
                     <tr key={row.variant_id} className={`${TR_CLASS} ${row.clicks === 0 ? 'opacity-50' : ''}`}>
-                      <td className={TD_CLASS}>{row.variant_name}</td>
-                      <BarCell value={row.clicks} max={maxClicks} format={String(row.clicks)} />
-                      <td className={TD_CLASS}>{row.visitors}</td>
-                      <td className={TD_CLASS}>{row.conversions}</td>
+                      <td className={TD_CLASS}>
+                        {row.variant_name}
+                        {previous && (
+                          <div className="mt-0.5 font-['JetBrains_Mono'] text-[10.5px] normal-case text-[#565F7A]">
+                            período anterior
+                          </div>
+                        )}
+                      </td>
+                      <BarCell value={row.clicks} max={maxClicks} format={String(row.clicks)}>
+                        {previous && <Delta current={row.clicks} previous={previous.clicks} unit="pct" />}
+                      </BarCell>
+                      <td className={TD_CLASS}>
+                        {row.visitors}
+                        {previous && (
+                          <div className="mt-0.5">
+                            <Delta current={row.visitors} previous={previous.visitors} unit="pct" />
+                          </div>
+                        )}
+                      </td>
+                      <td className={TD_CLASS}>
+                        {row.conversions}
+                        {previous && (
+                          <div className="mt-0.5">
+                            <Delta current={row.conversions} previous={previous.conversions} unit="pct" />
+                          </div>
+                        )}
+                      </td>
                       <BarCell
                         value={row.revenue_cents}
                         max={maxRevenue}
                         format={`R$ ${(row.revenue_cents / 100).toFixed(2)}`}
-                      />
+                      >
+                        {previous && (
+                          <Delta current={row.revenue_cents} previous={previous.revenue_cents} unit="pct" />
+                        )}
+                      </BarCell>
                       <td className={TD_CLASS}>
                         R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}
                       </td>
                       <td className={TD_CLASS}>
                         R$ {(row.visitors > 0 ? row.revenue_cents / row.visitors / 100 : 0).toFixed(2)}
                       </td>
-                      <RateCell rate={row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'} />
+                      <RateCell rate={row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'}>
+                        {previous && (
+                          <Delta
+                            current={row.clicks > 0 ? (row.conversions / row.clicks) * 100 : 0}
+                            previous={previous.clicks > 0 ? (previous.conversions / previous.clicks) * 100 : 0}
+                            unit="pp"
+                          />
+                        )}
+                      </RateCell>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
           )
         })()}
       </div>
+        </>
+      )}
+      {tab === 'origens' && (
+        <>
       <div className="mx-6 mb-6">
         <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Por origem (UTM)</h2>
         {(() => {
@@ -621,6 +773,10 @@ export default async function TestReportPage({
           )
         })()}
       </div>
+        </>
+      )}
+      {tab === 'criativos' && (
+        <>
       <div className="mx-6 mb-6">
         <CreativeMatrixPanel
           adRows={(adReport as AdReportRow[]) ?? []}
@@ -703,56 +859,12 @@ export default async function TestReportPage({
           )
         })()}
       </div>
+        </>
+      )}
+      {tab === 'insight' && (
+        <>
       <InsightPanel testId={test.id} sinceIso={sinceIso} untilIso={untilIso} />
-      {pixelVariants && pixelVariants.length > 0 && (
-        <div className="mx-6 mb-6">
-          <h2 className="mb-2 font-['Space_Grotesk'] text-lg font-semibold">Pixel de conversão (thank-you page)</h2>
-          {pixelVariants.map((variant) => {
-            const isSafeUrl = variant.thank_you_url ? /^https?:\/\//i.test(variant.thank_you_url) : false
-            return (
-              <div key={variant.id} className="mb-4 rounded-[10px] border border-white/[0.08] p-3">
-                <p className="mb-2 text-sm text-[#8A90A6]">
-                  {assetLabel} {variant.name}
-                  {variant.thank_you_url && isSafeUrl ? (
-                    <>
-                      {' '}
-                      — cole na página:{' '}
-                      <a
-                        className="text-[#4F8EF7] underline"
-                        href={variant.thank_you_url}
-                        rel="noopener noreferrer"
-                        target="_blank"
-                      >
-                        {variant.thank_you_url}
-                      </a>
-                    </>
-                  ) : variant.thank_you_url ? (
-                    <> — URL de thank-you configurada tem um formato inválido: {variant.thank_you_url}</>
-                  ) : (
-                    <> — nenhuma URL de thank-you configurada para {assetDemonstrative} {assetLabel.toLowerCase()}</>
-                  )}
-                </p>
-                <p className="mb-2 text-xs text-[#8A90A6]">
-                  Importante: seu construtor de página/funil precisa estar configurado para repassar os
-                  parâmetros da URL original no redirecionamento pra esta página, senão o pixel nunca recebe
-                  o tracking id.
-                </p>
-                <pre className="overflow-x-auto rounded bg-[#1B2036] p-2 text-xs">
-                  <code>{`<script>
-  (function () {
-    var params = new URLSearchParams(window.location.search);
-    var tid = params.get('utm_content') || params.get('tid');
-    if (tid) {
-      var img = new Image();
-      img.src = 'https://${activeDomain}/ty/${test.slug}?tid=' + encodeURIComponent(tid);
-    }
-  })();
-</script>`}</code>
-                </pre>
-              </div>
-            )
-          })}
-        </div>
+        </>
       )}
     </div>
   )

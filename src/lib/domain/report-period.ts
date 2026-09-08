@@ -103,3 +103,22 @@ export function daysRunningSince(createdAtIso: string, now: Date = new Date()): 
   if (Number.isNaN(created)) return 1
   return Math.max(1, Math.ceil((now.getTime() - created) / DAY_MS))
 }
+
+// The window to compare against: same duration as the current one, ending where it begins.
+//
+// Equal duration rather than the calendar equivalent, deliberately. On the 8th, "Este mês" holds
+// 8 elapsed days; comparing it against a full 31-day month would report a collapse that never
+// happened. An open-ended `until` means the window runs to now, so "7 dias" compares against the
+// 7 before it. A null `since` is "Tudo", which has no before -- returning null there keeps the
+// report from inventing a baseline.
+export function resolvePreviousWindow(
+  since: Date | null,
+  until: Date | null,
+  now: Date = new Date()
+): { since: Date; until: Date } | null {
+  if (!since) return null
+  const currentEnd = until ?? now
+  const duration = currentEnd.getTime() - since.getTime()
+  if (!(duration > 0)) return null
+  return { since: new Date(since.getTime() - duration), until: new Date(since.getTime()) }
+}

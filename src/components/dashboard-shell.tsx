@@ -49,6 +49,11 @@ export function DashboardShell({
 }) {
   const pathname = usePathname()
   const activeClient = clients.find((client) => pathname.startsWith(`/dashboard/clients/${client.slug}`))
+  // The open test, read off the URL rather than passed down: the shell renders above the page that
+  // knows which test it is, so a prop would have to be threaded through every route under /tests.
+  const activeTestSlug = activeClient
+    ? pathname.match(new RegExp(`^/dashboard/clients/${activeClient.slug}/tests/([^/]+)`))?.[1]
+    : undefined
 
   return (
     <div className="flex h-screen bg-[#0B0E1A] text-[#E8EAF2]">
@@ -106,30 +111,52 @@ export function DashboardShell({
             </div>
             <nav className="flex flex-col gap-0.5 px-3">
               {[
-                { href: `/dashboard/clients/${activeClient.slug}`, label: 'Visão geral', count: null, icon: NAV_ICONS.overview },
+                {
+                  href: `/dashboard/clients/${activeClient.slug}`,
+                  label: 'Visão geral',
+                  count: null,
+                  icon: NAV_ICONS.overview,
+                  subItems: undefined,
+                },
                 {
                   href: `/dashboard/clients/${activeClient.slug}/tests`,
                   label: 'Funil de Teste',
                   count: activeClient.testsCount,
                   icon: NAV_ICONS.tests,
+                  // Performance lives in the report's tabs; what is setup rather than performance
+                  // gets its own screen, and shows up here only while a test is open.
+                  subItems: activeTestSlug
+                    ? [
+                        {
+                          href: `/dashboard/clients/${activeClient.slug}/tests/${activeTestSlug}`,
+                          label: 'Relatório',
+                        },
+                        {
+                          href: `/dashboard/clients/${activeClient.slug}/tests/${activeTestSlug}/link`,
+                          label: 'Link e rastreio',
+                        },
+                      ]
+                    : undefined,
                 },
                 {
                   href: `/dashboard/clients/${activeClient.slug}/funis-venda`,
                   label: 'Funil de Venda',
                   count: activeClient.funnelsCount,
                   icon: NAV_ICONS.funnels,
+                  subItems: undefined,
                 },
                 {
                   href: `/dashboard/clients/${activeClient.slug}/integrations`,
                   label: 'Integrações',
                   count: null,
                   icon: NAV_ICONS.integrations,
+                  subItems: undefined,
                 },
               ].map((item) => {
                 const active = pathname === item.href
                 return (
+                  <div key={item.href}>
                   <Link
-                    key={item.href}
                     href={item.href}
                     className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors ${
                       active
@@ -154,6 +181,24 @@ export function DashboardShell({
                       <span className="ml-auto font-['JetBrains_Mono'] text-[10.5px] text-[#565F7A]">{item.count}</span>
                     )}
                   </Link>
+                  {item.subItems && (
+                    <div className="ml-[19px] mt-0.5 flex flex-col gap-0.5 border-l border-white/[0.08] pl-3">
+                      {item.subItems.map((sub) => (
+                        <Link
+                          key={sub.href}
+                          href={sub.href}
+                          className={`rounded-lg px-2.5 py-1.5 text-[12.5px] transition-colors ${
+                            pathname === sub.href
+                              ? 'bg-[#171B2C] font-semibold text-[#E8EAF2] shadow-[inset_2px_0_0_#7C6FF0]'
+                              : 'text-[#8A90A6] hover:bg-[#171B2C]/60 hover:text-[#E8EAF2]'
+                          }`}
+                        >
+                          {sub.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                  </div>
                 )
               })}
             </nav>
