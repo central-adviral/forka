@@ -300,6 +300,36 @@ export default async function TestReportPage({
 
   const srmDetected = detectSampleRatioMismatch(rows.map((row) => ({ weightPct: row.weight_pct, visits: row.visits })))
 
+  // Três estados, e as instruções de dois deles são opostas de propósito. Sem volume, esperar
+  // resolve; com o sorteio enviesado, esperar acumula mais tráfego torto sobre um teste que já
+  // está inválido. Só o segundo caso risca o número: sem volume ele não está errado, está cedo.
+  const dataQuality =
+    srmDetected === null
+      ? {
+          trustworthy: false,
+          strikeConfidence: false,
+          badge: '◷ ainda sem volume',
+          instruction: 'mantenha o teste rodando',
+          explain:
+            'Menos de 100 visitas: ainda não dá para checar se o sorteio está respeitando os pesos, nem para confiar na leitura de confiança. Não é erro — é cedo.',
+        }
+      : srmDetected
+        ? {
+            trustworthy: false,
+            strikeConfidence: true,
+            badge: '⚠ sorteio fora do peso',
+            instruction: 'investigue antes de decidir',
+            explain:
+              'SRM: a proporção real de visitas por variante está estatisticamente diferente do peso configurado — pode ser bot, cache ou bug no sorteio. Esperar mais tráfego não corrige, só acumula dado contaminado.',
+          }
+        : {
+            trustworthy: true,
+            strikeConfidence: false,
+            badge: '✓ dados confiáveis',
+            instruction: 'confiança estatística',
+            explain: 'O tráfego chegou na proporção configurada, então a leitura de confiança se sustenta.',
+          }
+
   const leaderRow = rows.reduce<(typeof rows)[number] | null>(
     (best, row) =>
       row.variant_id !== control?.variant_id && (!best || (row.confidencePct ?? -1) > (best.confidencePct ?? -1))
@@ -372,7 +402,7 @@ export default async function TestReportPage({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <div className="flex h-[88px] flex-shrink-0 items-center justify-between border-b border-white/[0.08] px-8">
+      <div className="flex flex-shrink-0 flex-wrap items-start justify-between gap-4 border-b border-white/[0.08] px-8 py-4">
         <div>
           <a
             href={`/dashboard/clients/${clientSlug}/tests`}
@@ -383,36 +413,30 @@ export default async function TestReportPage({
             </svg>
             Testes
           </a>
-          <div className="flex items-center gap-2.5">
-            <h1 className="font-['Space_Grotesk'] text-[19px] font-semibold">{test.name}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-['Space_Grotesk'] text-[24px] font-semibold tracking-[-0.015em]">{test.name}</h1>
+            {/* Estado do teste como ponto + palavra: é contexto de baixa frequência e não deve
+                competir com o nome. O julgamento do dado desceu para junto do número que ele
+                qualifica, na barra de resumo. */}
             <span
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-medium ${
-                test.status === 'active' ? 'border-[#2DD4A8]/35 text-[#2DD4A8]' : 'border-[#F76C6C]/35 text-[#F76C6C]'
+              className={`flex items-center gap-1.5 text-xs ${
+                test.status === 'active' ? 'text-[#2DD4A8]' : 'text-[#F76C6C]'
               }`}
             >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  test.status === 'active' ? 'bg-[#2DD4A8]' : 'bg-[#F76C6C]'
+                }`}
+              />
               {test.status === 'active' ? 'Ativo' : 'Pausado'}
             </span>
-            {srmDetected !== null && (
-              <span
-                title="SRM: a proporção real de visitas por variante está estatisticamente diferente do peso configurado — pode ser bot, cache ou bug no sorteio."
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-medium ${
-                  srmDetected ? 'border-[#F76C6C]/35 text-[#F76C6C]' : 'border-[#2DD4A8]/35 text-[#2DD4A8]'
-                }`}
-              >
-                {srmDetected ? '⚠ SRM: tráfego fora do esperado' : '✓ Dados confiáveis'}
-              </span>
-            )}
           </div>
-          <div className="mt-1 flex items-center gap-1.5">
-            <p className="font-['JetBrains_Mono'] text-xs text-[#8A90A6]">{redirectUrl}</p>
+          <div className="mt-2 flex items-center gap-1.5">
+            <p className="font-['JetBrains_Mono'] text-xs text-[#565F7A]">{redirectUrl}</p>
             <CopyButton text={redirectUrl} />
           </div>
         </div>
-        <div className="flex items-center gap-5">
-          <div className="flex flex-col items-end">
-            <span className="font-['JetBrains_Mono'] text-[17px] font-medium">{totalVisits}</span>
-            <span className="text-[11px] text-[#8A90A6]">acessos</span>
-          </div>
+        <div className="flex items-center gap-3">
           <RefreshButton />
           <a
             href={`/dashboard/clients/${clientSlug}/tests/${test.slug}/edit`}
@@ -438,7 +462,8 @@ export default async function TestReportPage({
         </div>
       </div>
 
-      <div className="mx-6 mt-4 flex gap-1.5">
+      <div className="mx-6 mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-white/[0.08]">
+      <div className="flex gap-1.5 py-2">
         {REPORT_PERIODS.map((option) => {
           const isActive = (periodo ?? 'all') === option.value
           return (
@@ -509,7 +534,7 @@ export default async function TestReportPage({
         )}
       </div>
 
-      <div className="mx-6 mt-5 flex gap-1 border-b border-white/[0.08]">
+      <div className="order-first flex gap-1">
         {REPORT_TABS.map((option) => {
           const query = new URLSearchParams()
           if (periodo) query.set('periodo', periodo)
@@ -532,6 +557,7 @@ export default async function TestReportPage({
             </a>
           )
         })}
+      </div>
       </div>
 
       {hasPartialDataError && (
@@ -563,12 +589,34 @@ export default async function TestReportPage({
         </div>
         <div className="h-[34px] w-px bg-white/[0.08]" />
         <div>
-          <div className="font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums text-[#2DD4A8]">
-            {leaderRow?.confidencePct !== null && leaderRow?.confidencePct !== undefined
-              ? `${leaderRow.confidencePct}%`
-              : '—'}
+          <div className="flex items-center gap-2.5">
+            <div
+              className={`font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums ${
+                dataQuality.trustworthy
+                  ? 'text-[#2DD4A8]'
+                  : dataQuality.strikeConfidence
+                    ? 'text-[#565F7A] line-through decoration-[#F5B94D] decoration-2'
+                    : 'text-[#565F7A]'
+              }`}
+            >
+              {leaderRow?.confidencePct !== null && leaderRow?.confidencePct !== undefined
+                ? `${leaderRow.confidencePct}%`
+                : '—'}
+            </div>
+            <span
+              title={dataQuality.explain}
+              className={`flex cursor-help items-center gap-1.5 rounded-full border px-2.5 py-1 font-['JetBrains_Mono'] text-[10.5px] ${
+                dataQuality.trustworthy
+                  ? 'border-[#2DD4A8]/30 bg-[#2DD4A8]/[0.08] text-[#2DD4A8]'
+                  : 'border-[#F5B94D]/32 bg-[#F5B94D]/[0.09] text-[#F5B94D]'
+              }`}
+            >
+              {dataQuality.badge}
+            </span>
           </div>
-          <div className="text-[11.5px] text-[#8A90A6]">confiança estatística</div>
+          <div className={`text-[11.5px] ${dataQuality.trustworthy ? 'text-[#8A90A6]' : 'text-[#F5B94D]'}`}>
+            {dataQuality.instruction}
+          </div>
         </div>
         <div className="h-[34px] w-px bg-white/[0.08]" />
         <div>
