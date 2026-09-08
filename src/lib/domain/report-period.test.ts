@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolvePeriodSince, resolvePeriodUntil, resolveDateRange, resolvePeriodDateRange, formatBr, daysRunningSince } from './report-period'
+import { resolvePeriodSince, resolvePeriodUntil, resolveDateRange, resolvePeriodDateRange, resolvePreviousWindow, formatBr, daysRunningSince } from './report-period'
 
 const NOW = new Date('2026-08-30T15:30:00.000Z')
 
@@ -139,5 +139,65 @@ describe('daysRunningSince', () => {
 
   it('falls back to 1 when the date is unusable', () => {
     expect(daysRunningSince('not-a-date', now)).toBe(1)
+  })
+})
+
+// The comparison window has the same duration as the current one and ends where it begins.
+// A calendar-aligned rule would compare 8 elapsed days of "Este mês" against a full 31-day
+// month and invent a collapse; equal duration never does.
+describe('resolvePreviousWindow', () => {
+  // A Tuesday, 15:00 in Brazil.
+  const now = new Date('2026-09-08T18:00:00.000Z')
+
+  it('shifts a 7-day window back by exactly 7 days', () => {
+    const since = resolvePeriodSince('7d', now)!
+    const previous = resolvePreviousWindow(since, resolvePeriodUntil('7d', now), now)!
+    expect(previous.until.toISOString()).toBe(since.toISOString())
+    expect(previous.since.toISOString()).toBe(new Date(since.getTime() - 7 * 86400000).toISOString())
+  })
+
+  it('compares today against yesterday, on Brazilian calendar days', () => {
+    const since = resolvePeriodSince('today', now)!
+    const previous = resolvePreviousWindow(since, resolvePeriodUntil('today', now), now)!
+    // "Hoje" runs from midnight in Brazil to now, so the window before it is the same span
+    // ending at that midnight -- never the server's midnight.
+    expect(previous.until.toISOString()).toBe('2026-09-08T03:00:00.000Z')
+    expect(previous.since.getTime()).toBeLessThan(previous.until.getTime())
+  })
+
+  it('gives yesterday a full previous day', () => {
+    const since = resolvePeriodSince('yesterday', now)!
+    const until = resolvePeriodUntil('yesterday', now)!
+    const previous = resolvePreviousWindow(since, until, now)!
+    expect(previous.until.toISOString()).toBe(since.toISOString())
+    expect(previous.until.getTime() - previous.since.getTime()).toBe(86400000)
+  })
+
+  it('compares a partial month against the same number of elapsed days, not a full month', () => {
+    const since = resolvePeriodSince('month', now)!
+    const previous = resolvePreviousWindow(since, resolvePeriodUntil('month', now), now)!
+    const elapsed = now.getTime() - since.getTime()
+    expect(previous.until.getTime() - previous.since.getTime()).toBe(elapsed)
+    expect(previous.until.toISOString()).toBe(since.toISOString())
+  })
+
+  it('mirrors a custom range onto the span immediately before it', () => {
+    const range = resolveDateRange('2026-09-01', '2026-09-07')!
+    const previous = resolvePreviousWindow(range.since, range.until, now)!
+    expect(previous.until.toISOString()).toBe(range.since.toISOString())
+    expect(previous.until.getTime() - previous.since.getTime()).toBe(
+      range.until.getTime() - range.since.getTime()
+    )
+  })
+
+  // "Tudo" has no before. Offering a comparison there would invent a baseline out of nothing.
+  it('returns null when the current window has no lower bound', () => {
+    expect(resolvePreviousWindow(null, null, now)).toBeNull()
+  })
+
+  it('returns null for a window that ends before it starts', () => {
+    const since = new Date('2026-09-08T00:00:00.000Z')
+    const until = new Date('2026-09-07T00:00:00.000Z')
+    expect(resolvePreviousWindow(since, until, now)).toBeNull()
   })
 })
