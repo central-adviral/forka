@@ -171,7 +171,6 @@ export default async function TestReportPage({
   if (!test) notFound()
 
   const [
-    { data: pixelVariants, error: pixelVariantsError },
     { data: variantRows, error: variantRowsError },
     { data: report, error: reportError },
     { data: sourceReport, error: sourceReportError },
@@ -180,9 +179,6 @@ export default async function TestReportPage({
     { data: weekdayReport, error: weekdayReportError },
     { data: hourReport, error: hourReportError },
   ] = await Promise.all([
-    test.conversion_method === 'thank_you_page'
-      ? supabase.from('variants').select('id, name, thank_you_url').eq('test_id', test.id)
-      : Promise.resolve({ data: null, error: null }),
     supabase.from('variants').select('id, destination_url, is_control').eq('test_id', test.id),
     supabase.rpc('get_test_report', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
     supabase.rpc('get_test_report_by_source', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
@@ -192,7 +188,6 @@ export default async function TestReportPage({
     supabase.rpc('get_test_report_by_hour', { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }),
   ])
 
-  if (pixelVariantsError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'pixelVariants' }, pixelVariantsError)
   if (variantRowsError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'variantRows' }, variantRowsError)
   if (reportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report' }, reportError)
   if (sourceReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_source' }, sourceReportError)
@@ -224,7 +219,6 @@ export default async function TestReportPage({
     process.env.NEXT_PUBLIC_REDIRECT_DOMAIN ?? ''
   )
   const redirectUrl = `https://${activeDomain}/r/${test.slug}`
-  const checkoutLinkUrl = `https://${activeDomain}/c/${test.slug}`
 
   const baseRows = ((report as ReportRow[]) ?? []).map((row) => ({
     ...row,
@@ -276,7 +270,6 @@ export default async function TestReportPage({
 
   const assetLabel = test.test_type === 'checkout' ? 'Checkout' : 'Página'
   const assetArticle = test.test_type === 'checkout' ? 'o' : 'a'
-  const assetDemonstrative = test.test_type === 'checkout' ? 'este' : 'esta'
 
   const confidenceLabelById = new Map(
     rows.map((row) => [
@@ -501,22 +494,6 @@ export default async function TestReportPage({
           />
         </div>
       </div>
-      {test.test_type === 'checkout' && (
-        <div className="mx-6 mb-6">
-          <h2 className="mb-2 font-['Space_Grotesk'] text-lg font-semibold">Link do botão de comprar</h2>
-          <div className="rounded-[10px] border border-white/[0.08] p-3">
-            <div className="mb-2 flex items-center gap-1.5">
-              <p className="break-all font-['JetBrains_Mono'] text-xs text-[#4F8EF7]">{checkoutLinkUrl}</p>
-              <CopyButton text={checkoutLinkUrl} />
-            </div>
-            <p className="text-xs text-[#8A90A6]">
-              Cole este endereço no botão de comprar da página de vendas. Se a página tiver vários botões de
-              compra, todos recebem o mesmo endereço. Trocar os checkouts ou os pesos depois não exige mexer na
-              página de novo.
-            </p>
-          </div>
-        </div>
-      )}
       <div className="mx-6 mb-6">
         <h2 className="mb-2 mt-8 font-['Space_Grotesk'] text-lg font-semibold">Total por {assetLabel.toLowerCase()}</h2>
         {(() => {
@@ -704,56 +681,6 @@ export default async function TestReportPage({
         })()}
       </div>
       <InsightPanel testId={test.id} sinceIso={sinceIso} untilIso={untilIso} />
-      {pixelVariants && pixelVariants.length > 0 && (
-        <div className="mx-6 mb-6">
-          <h2 className="mb-2 font-['Space_Grotesk'] text-lg font-semibold">Pixel de conversão (thank-you page)</h2>
-          {pixelVariants.map((variant) => {
-            const isSafeUrl = variant.thank_you_url ? /^https?:\/\//i.test(variant.thank_you_url) : false
-            return (
-              <div key={variant.id} className="mb-4 rounded-[10px] border border-white/[0.08] p-3">
-                <p className="mb-2 text-sm text-[#8A90A6]">
-                  {assetLabel} {variant.name}
-                  {variant.thank_you_url && isSafeUrl ? (
-                    <>
-                      {' '}
-                      — cole na página:{' '}
-                      <a
-                        className="text-[#4F8EF7] underline"
-                        href={variant.thank_you_url}
-                        rel="noopener noreferrer"
-                        target="_blank"
-                      >
-                        {variant.thank_you_url}
-                      </a>
-                    </>
-                  ) : variant.thank_you_url ? (
-                    <> — URL de thank-you configurada tem um formato inválido: {variant.thank_you_url}</>
-                  ) : (
-                    <> — nenhuma URL de thank-you configurada para {assetDemonstrative} {assetLabel.toLowerCase()}</>
-                  )}
-                </p>
-                <p className="mb-2 text-xs text-[#8A90A6]">
-                  Importante: seu construtor de página/funil precisa estar configurado para repassar os
-                  parâmetros da URL original no redirecionamento pra esta página, senão o pixel nunca recebe
-                  o tracking id.
-                </p>
-                <pre className="overflow-x-auto rounded bg-[#1B2036] p-2 text-xs">
-                  <code>{`<script>
-  (function () {
-    var params = new URLSearchParams(window.location.search);
-    var tid = params.get('utm_content') || params.get('tid');
-    if (tid) {
-      var img = new Image();
-      img.src = 'https://${activeDomain}/ty/${test.slug}?tid=' + encodeURIComponent(tid);
-    }
-  })();
-</script>`}</code>
-                </pre>
-              </div>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }
