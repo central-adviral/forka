@@ -10,24 +10,17 @@ import {
   readAssignedVariantId,
 } from '@/lib/domain/cookie-assignment'
 import { resolveEntryDestination, withTrackingId, withUtms } from '@/lib/domain/test-destination'
+import { TRACKED_URL_PARAMS } from '@/lib/domain/campaign-link'
 
 const COOKIE_MAX_AGE_DAYS = Number(process.env.COOKIE_MAX_AGE_DAYS ?? '30')
 const MAX_CLICKS_PER_IP_PER_HOUR = 30
 
-// What the ad's URL template puts on the link and this route keeps on the click. utm_content is
-// the adset name, and it was missing here -- the ad sent it and the click threw it away. The two
-// branches below (bot and human) captured the same list from two places, which is how they came
-// to differ from the template in the first place.
-const TRACKED_URL_PARAMS = [
-  'utm_source',
-  'utm_medium',
-  'utm_campaign',
-  'utm_term',
-  'utm_content',
-  'fb_ad_id',
-  'fb_adset_id',
-  'fb_campaign_id',
-] as const
+// Both branches below capture through this, so neither can drift from the template again. The last
+// time they each held their own copy, the human one omitted utm_content and every real visitor's
+// click threw the adset name away while the bot's kept it.
+function captureTrackedParams(searchParams: URLSearchParams): Record<string, string> {
+  return Object.fromEntries(TRACKED_URL_PARAMS.map((key) => [key, searchParams.get(key) ?? '']))
+}
 
 function getClientIp(request: NextRequest): string | null {
   const forwarded = request.headers.get('x-forwarded-for')
@@ -48,12 +41,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   if (isKnownBot(request.headers.get('user-agent'))) {
-    const botSourceUtms = Object.fromEntries(
-      TRACKED_URL_PARAMS.map((key) => [
-        key,
-        request.nextUrl.searchParams.get(key) ?? '',
-      ])
-    )
+    const botSourceUtms = captureTrackedParams(request.nextUrl.searchParams)
     after(async () => {
       try {
         await insertClickEvent(db, {
@@ -97,12 +85,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const trackingId = crypto.randomUUID()
 
-  const sourceUtms = Object.fromEntries(
-    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'fb_ad_id', 'fb_adset_id', 'fb_campaign_id'].map((key) => [
-      key,
-      request.nextUrl.searchParams.get(key) ?? '',
-    ])
-  )
+  const sourceUtms = captureTrackedParams(request.nextUrl.searchParams)
 
   const ip = getClientIp(request)
   after(async () => {
