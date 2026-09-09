@@ -3,21 +3,19 @@
 Itens levantados durante o desenvolvimento que ficaram fora do escopo do momento —
 não são bugs nem trabalho em andamento, são candidatos a próxima rodada.
 
-## Mais de uma conversão por clique — order bump, upsell, recorrência (2026-09-07)
+## ~~Mais de uma conversão por clique~~ — RESOLVIDO em 2026-09-08
 
-Hoje um clique só pode gerar **uma** conversão: `conversions` tem
-`unique (click_event_id, source)` (`0001_init.sql:49`). Se o mesmo comprador
-gerar um segundo `invoice.payment_succeeded` — order bump, upsell em one-click,
-ou a renovação mensal de uma assinatura — o insert bate no índice,
-`conversion-repo.ts` traduz o erro `23505` para `'duplicate'` e a rota responde
-`200 OK`. A venda simplesmente não aparece no relatório.
+Migration `0050`. A unicidade saiu de `(click_event_id, source)` e passou a ser o id da
+fatura, que já era único globalmente pelo índice `conversions_external_event_id_idx`.
+Um clique passa a registrar quantas vendas o comprador fizer: order bump, upsell de
+um clique, renovação de assinatura.
 
-**Não é urgente: o Vitor confirmou em 07/09 que não vende order bump nem
-recorrência hoje.** Vira prioridade no dia em que passar a vender.
+O gatilho foi o Vitor habilitar 4 produtos e a oferta "1K Latam | CK Principal | Up
+(principal)" na Hubla em 08/09 — exatamente o caso que esta seção dizia que viraria
+prioridade "no dia em que passar a vender".
 
-**E dá para medir, ao contrário do que eu afirmei primeiro.** A conversão é
-rejeitada, mas a **venda sobrevive** em `sales` — duas vendas apontando para o
-mesmo tracking id são exatamente uma segunda compra no mesmo clique:
+**Não foi medido quanto se perdeu antes** — decisão dele, para não atrasar a correção.
+A consulta que mediria continua abaixo, caso alguém queira o número depois:
 
 ```sql
 select count(*) filter (where vendas > 1) as cliques_com_mais_de_uma_compra,
@@ -30,20 +28,9 @@ from (
 ) t;
 ```
 
-Rodado em produção em 07/09: **0 de 212** cliques com venda tinham mais de uma.
-Rodar isso de novo é o jeito de saber se o modelo de negócio mudou sem ninguém
-ter avisado.
-
-**Como consertar quando for a hora**: trocar a unicidade para
-`(source, external_event_id)` — o id da fatura, único por natureza — e deixar
-`click_event_id` como FK repetível. Para `thank_you_page`, que não tem id
-externo, gerar um determinístico (`tracking_id` + dia).
-
-Veio da auditoria externa de 07/09 (artifact 945cb013, item F2). A auditoria
-afirmava que "upsell e recorrência caem": a restrição é fato verificado, mas a
-perda é previsão, não medição. Mitigado em parte no mesmo dia — a rejeição
-agora é logada como `[conversion-duplicate-rejected]` em vez de sumir, então se
-começar a acontecer aparece nos logs em vez de ser descoberto meses depois.
+O pixel de thank-you page manteve a trava de um por clique, num índice parcial próprio:
+ele não tem fatura para chavear e dispara a cada carregamento da página, então sem isso
+uma recarga do navegador viraria faturamento.
 
 ## Superfície real de LGPD, medida (2026-09-07)
 

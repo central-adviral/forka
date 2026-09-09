@@ -94,4 +94,46 @@ describe('conversion-repo', () => {
     })
     expect(second).toBe('duplicate')
   })
+
+  // Migration 0050. Before it, this was the shape that silently dropped revenue: an upsell on
+  // the same click hit unique (click_event_id, source) and the sale disappeared from every
+  // report while the webhook answered 200.
+  it('records a second purchase on the same click, as an upsell or a renewal produces', async () => {
+    const stamp = Date.now()
+    const principal = await insertConversionIfNew(db, {
+      clickEventId,
+      source: 'hubla_webhook',
+      externalEventId: `inv_principal_${stamp}`,
+      valueCents: 9700,
+    })
+    const upsell = await insertConversionIfNew(db, {
+      clickEventId,
+      source: 'hubla_webhook',
+      externalEventId: `inv_upsell_${stamp}`,
+      valueCents: 4700,
+    })
+
+    expect(principal).toBe('inserted')
+    expect(upsell).toBe('inserted')
+  })
+
+  // The other half of the same change: freeing the click must not turn a redelivered webhook
+  // into a second sale. The invoice is what stays unique.
+  it('still absorbs a redelivered webhook, which carries the invoice it already sent', async () => {
+    const externalEventId = `inv_redelivered_${Date.now()}`
+    await insertConversionIfNew(db, { clickEventId, source: 'hubla_webhook', externalEventId, valueCents: 9700 })
+    const again = await insertConversionIfNew(db, { clickEventId, source: 'hubla_webhook', externalEventId, valueCents: 9700 })
+
+    expect(again).toBe('duplicate')
+  })
+
+  // The thank-you pixel has no invoice: it fires on every load of the page, so one per click is
+  // the only thing keeping a browser refresh from becoming revenue.
+  it('still counts the thank-you pixel once per click, however many times the page loads', async () => {
+    const first = await insertConversionIfNew(db, { clickEventId, source: 'thank_you_page' })
+    const reload = await insertConversionIfNew(db, { clickEventId, source: 'thank_you_page' })
+
+    expect(first).toBe('inserted')
+    expect(reload).toBe('duplicate')
+  })
 })
