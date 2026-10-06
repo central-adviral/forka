@@ -128,8 +128,19 @@ export default async function SalesFunnelPage({
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-['Space_Grotesk'] text-xl font-semibold">{funnel.name}</h1>
         <div className="flex items-center gap-3">
+          {rows.length > 0 && (
+            <span className="text-[12px] text-[#A1A1AA]" title="De onde vem o investimento deste projeto">
+              Investimento: {rows[0].spendSource === 'frentes' ? 'regras de campanha' : 'operação do LaunchOps'}
+            </span>
+          )}
           <SyncStatus lastRunAt={lastSyncAt} hasError={hasSyncError} />
           <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
+          <a
+            href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`}
+            className="rounded-[9px] border border-white/[0.08] px-4 py-2.5 text-[13.5px] font-medium text-[#A1A1AA]"
+          >
+            Regras de campanha
+          </a>
           <a
             href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`}
             className="rounded-[9px] border border-white/[0.08] px-4 py-2.5 text-[13.5px] font-medium text-[#A1A1AA]"

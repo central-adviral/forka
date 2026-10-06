@@ -73,6 +73,7 @@ function pageLabel(pathname: string, clientSlug: string | undefined): string {
   if (last === 'new') return rest[0] === 'tests' ? 'Novo teste' : 'Novo projeto'
   if (last === 'edit') return 'Editar'
   if (last === 'link') return 'Link e rastreio'
+  if (last === 'regras') return 'Regras de campanha'
   if (rest[0] === 'integrations') return 'Integrações'
   if (rest[0] === 'membros') return 'Membros'
   if (rest[0] === 'tests') return rest.length === 1 ? 'Teste A/B' : 'Relatório'
