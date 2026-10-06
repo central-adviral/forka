@@ -90,14 +90,29 @@ describe('countPaidLeads', () => {
   it('counts paid leads per São Paulo day and campaign, skipping leads with no campaign', () => {
     expect(
       countPaidLeads([
-        { data_captacao: '2026-09-27T02:30:00Z', captacao_campaign: '120256561707910538' },
-        { data_captacao: '2026-09-26T15:00:00Z', captacao_campaign: '120256561707910538' },
-        { data_captacao: '2026-09-27T15:00:00Z', captacao_campaign: '120256561707910538' },
-        { data_captacao: '2026-09-27T15:00:00Z', captacao_campaign: null },
+        { data_captacao: '2026-09-27T02:30:00Z', captacao_campaign: '120256561707910538', captacao_content: null },
+        { data_captacao: '2026-09-26T15:00:00Z', captacao_campaign: '120256561707910538', captacao_content: null },
+        { data_captacao: '2026-09-27T15:00:00Z', captacao_campaign: '120256561707910538', captacao_content: null },
+        { data_captacao: '2026-09-27T15:00:00Z', captacao_campaign: null, captacao_content: null },
       ])
     ).toEqual([
       { data_referencia: '2026-09-26', campaign_id: '120256561707910538', leads_periodo: 2 },
       { data_referencia: '2026-09-27', campaign_id: '120256561707910538', leads_periodo: 1 },
     ])
+  })
+})
+
+describe('countPaidLeads with a label in place of the campaign id', () => {
+  it('places the lead on the campaign of its ad, and drops it when the ad is unknown', () => {
+    const campaignByAdId = new Map([['120249338952560044', '120249336581250044']])
+    expect(
+      countPaidLeads(
+        [
+          { data_captacao: '2026-09-20T15:00:00Z', captacao_campaign: 'MTV-T15-GER', captacao_content: '120249338952560044' },
+          { data_captacao: '2026-09-20T16:00:00Z', captacao_campaign: 'MTV-T15-GER', captacao_content: '999999999999' },
+        ],
+        campaignByAdId
+      )
+    ).toEqual([{ data_referencia: '2026-09-20', campaign_id: '120249336581250044', leads_periodo: 1 }])
   })
 })

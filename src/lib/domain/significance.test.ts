@@ -36,4 +36,14 @@ describe('probabilityToBeatControl', () => {
     const p = probabilityToBeatControl({ visits: 0, conversions: 0 }, { visits: 0, conversions: 0 }, rand, 1000)
     expect(p).toBeNull()
   })
+
+  it('does not read a control with more conversions than visits as a certain win (0050)', () => {
+    // 12 conversions on 10 visits used to turn the control's rate into exactly 100% on every draw,
+    // so a close variant scored 0% to beat it.
+    const rand = mulberry32(7)
+    const p = probabilityToBeatControl({ visits: 10, conversions: 12 }, { visits: 10, conversions: 9 }, rand, 5000)
+    expect(p).not.toBeNull()
+    expect(Number.isNaN(p)).toBe(false)
+    expect(p!).toBeGreaterThan(0.05)
+  })
 })

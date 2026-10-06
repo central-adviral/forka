@@ -71,12 +71,17 @@ export async function fetchLaunchOpsAdDayRows(launchopsDb: SupabaseClient, param
 export interface LaunchOpsPaidLeadRow {
   data_captacao: string
   captacao_campaign: string | null
+  captacao_content: string | null
 }
 
+const META_ID = /^[0-9]{6,}$/
+const AD_LOOKUP_CHUNK = 200
+
 // meta_ads_daily.leads_periodo was never filled. The leads themselves are in `leads`: a paid one
-// (captacao_medium = 'paid') carries the Meta campaign id in captacao_campaign (2026-10-06 check:
-// 3282 of 3282 paid leads match an anuncio.campaign_id). Duplicates are left out, so the CPL is per
-// person, not per form submission.
+// (captacao_medium = 'paid') carries the Meta campaign id in captacao_campaign and the ad id in
+// captacao_content. Some forms wrote a label ("MTV-T15-GER") where the campaign id goes; those are
+// tied to their campaign through the ad id (2026-10-06 check: 344 of 344 carry a known ad id).
+// Duplicates are left out, so the CPL is per person, not per form submission.
 export async function fetchLaunchOpsCampaignLeads(
   launchopsDb: SupabaseClient,
   params: { since: string }
@@ -84,24 +89,48 @@ export async function fetchLaunchOpsCampaignLeads(
   const rows = await fetchAllPages<LaunchOpsPaidLeadRow>((from, to) =>
     launchopsDb
       .from('leads')
-      .select('data_captacao, captacao_campaign')
+      .select('data_captacao, captacao_campaign, captacao_content')
       .eq('captacao_medium', 'paid')
       .not('is_duplicata', 'is', true)
       .gte('data_captacao', brtDayBoundaryUtc(params.since))
       .order('id', { ascending: true })
       .range(from, to)
   )
-  return countPaidLeads(rows)
+  const adIds = [
+    ...new Set(
+      rows
+        .filter((row) => !META_ID.test(row.captacao_campaign ?? '') && META_ID.test(row.captacao_content ?? ''))
+        .map((row) => row.captacao_content as string)
+    ),
+  ]
+  const campaignByAdId = new Map<string, string>()
+  for (let i = 0; i < adIds.length; i += AD_LOOKUP_CHUNK) {
+    const { data, error } = await launchopsDb
+      .from('anuncio')
+      .select('ad_id, campaign_id')
+      .in('ad_id', adIds.slice(i, i + AD_LOOKUP_CHUNK))
+    if (error) throw error
+    for (const ad of (data ?? []) as { ad_id: string; campaign_id: string | null }[]) {
+      if (ad.campaign_id) campaignByAdId.set(ad.ad_id, ad.campaign_id)
+    }
+  }
+  return countPaidLeads(rows, campaignByAdId)
 }
 
-/** Paid leads per São Paulo day and campaign. */
-export function countPaidLeads(rows: LaunchOpsPaidLeadRow[]): LaunchOpsCampaignLeadsRow[] {
+/** Paid leads per São Paulo day and campaign; a lead without a campaign id is placed by its ad. */
+export function countPaidLeads(
+  rows: LaunchOpsPaidLeadRow[],
+  campaignByAdId: Map<string, string> = new Map()
+): LaunchOpsCampaignLeadsRow[] {
   const byKey = new Map<string, LaunchOpsCampaignLeadsRow>()
   for (const row of rows) {
-    if (!row.captacao_campaign) continue
+    const campaignId = META_ID.test(row.captacao_campaign ?? '')
+      ? (row.captacao_campaign as string)
+      : campaignByAdId.get(row.captacao_content ?? '')
+    if (!campaignId) continue
     const day = new Date(new Date(row.data_captacao).getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
-    const key = `${day}|${row.captacao_campaign}`
-    const current = byKey.get(key) ?? { data_referencia: day, campaign_id: row.captacao_campaign, leads_periodo: 0 }
+    const key = `${day}|${campaignId}`
+    const current = byKey.get(key) ?? { data_referencia: day, campaign_id: campaignId, leads_periodo: 0 }
     current.leads_periodo = (current.leads_periodo ?? 0) + 1
     byKey.set(key, current)
   }
@@ -224,6 +253,18 @@ export async function syncCampaignsForClient(
       fetchLaunchOpsAdDayRows(launchopsDb, { since }),
       fetchLaunchOpsCampaignLeads(launchopsDb, { since }),
     ])
+    // An empty read with no error would replace every day of the window with nothing and log a
+    // success. LaunchOps never forgets spend it already had, so when the Central holds spend inside
+    // the window and the read brings no row at all, the read is broken: stop before touching a day.
+    if (adRows.length === 0) {
+      const { count: windowCount, error: windowError } = await appDb
+        .from('campaign_daily')
+        .select('campaign_id', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .gte('data', since)
+      if (windowError) throw windowError
+      if ((windowCount ?? 0) > 0) throw new Error(`LaunchOps returned no ad rows since ${since}; kept the existing campaign days`)
+    }
     const days = aggregateAdDays(adRows, leadRows)
     const byDay = new Map<string, CampaignDay[]>()
     for (const day of days) byDay.set(day.data, [...(byDay.get(day.data) ?? []), day])

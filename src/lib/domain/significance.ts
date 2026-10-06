@@ -40,11 +40,15 @@ export function probabilityToBeatControl(
   samples = 10000
 ): number | null {
   if (control.visits === 0 || variant.visits === 0) return null
+  // Since 0050 one click can carry several conversions (upsell, renewal), so conversions can pass
+  // visits. A Beta needs both shapes above zero; past that point the variant converted every visit.
+  const controlConversions = Math.min(control.conversions, control.visits)
+  const variantConversions = Math.min(variant.conversions, variant.visits)
   const normal = makeSeededNormal(rand)
   let wins = 0
   for (let i = 0; i < samples; i++) {
-    const controlRate = sampleBeta(control.conversions + 1, control.visits - control.conversions + 1, rand, normal)
-    const variantRate = sampleBeta(variant.conversions + 1, variant.visits - variant.conversions + 1, rand, normal)
+    const controlRate = sampleBeta(controlConversions + 1, control.visits - controlConversions + 1, rand, normal)
+    const variantRate = sampleBeta(variantConversions + 1, variant.visits - variantConversions + 1, rand, normal)
     if (variantRate > controlRate) wins++
   }
   return wins / samples
