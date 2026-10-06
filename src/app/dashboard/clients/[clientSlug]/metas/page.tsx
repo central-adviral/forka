@@ -26,10 +26,12 @@ export default async function MetasPage({
   const [watchers, { data: funnels }, { data: fronts }, { data: canEdit }] = await Promise.all([
     getWatchers(supabase, client.id),
     supabase.from('sales_funnels').select('id, name').eq('client_id', client.id).order('name'),
-    supabase.from('project_fronts').select('id, name, sales_funnel_id, sales_funnels!project_fronts_sales_funnel_id_fkey!inner(client_id)').eq('sales_funnels.client_id', client.id).order('position'),
+    supabase.from('project_fronts').select('id, name, sales_funnel_id, naming_rules(kind, value), sales_funnels!project_fronts_sales_funnel_id_fkey!inner(client_id)').eq('sales_funnels.client_id', client.id).order('position'),
     supabase.rpc('has_client_role', { p_client_id: client.id, p_min_role: 'gestor' }),
   ])
   const context = { client_id: client.id as string, client_slug: client.slug as string }
+  const ruleLabel = (front: { naming_rules: { kind: string; value: string }[] | null }) =>
+    (front.naming_rules ?? []).filter((rule) => rule.kind === 'include').map((rule) => rule.value).join(' + ')
 
   return (
     <div className="flex max-w-[1240px] flex-col gap-9 px-14 pb-24 pt-12">
@@ -78,7 +80,12 @@ export default async function MetasPage({
                     <b className="font-semibold">{METRICS[watcher.metric].label}</b>
                     <span className="block text-[11.5px] text-[var(--ct-text-3)]">{METRICS[watcher.metric].hint}</span>
                   </td>
-                  <td className="px-5 py-3">{watcher.projectName}{watcher.frontName ? ` · ${watcher.frontName}` : ''}</td>
+                  <td className="px-5 py-3">
+                    {watcher.projectName}
+                    <span className="block text-[11.5px] text-[var(--ct-text-3)]">
+                      {watcher.frontName ? `frente ${watcher.frontName} · só mídia` : 'projeto inteiro · todas as frentes + vendas'}
+                    </span>
+                  </td>
                   <td className="px-5 py-3 text-[var(--ct-text-2)]">{METRICS[watcher.metric].bad}</td>
                   <td className={`${mono} px-5 py-3 text-right`}>{formatMetric(watcher.metric, watcher.target)}</td>
                   <td className={`${mono} px-5 py-3 text-right text-[var(--ct-warn)]`}>{formatMetric(watcher.metric, band.warn)}</td>
@@ -121,16 +128,43 @@ export default async function MetasPage({
               <option value="" disabled>escolher projeto ou frente</option>
               {(funnels ?? []).map((funnel) => (
                 <optgroup key={funnel.id} label={funnel.name}>
-                  <option value={`${funnel.id}|`}>{funnel.name} · projeto inteiro</option>
+                  <option value={`${funnel.id}|`}>{funnel.name} inteiro · investimento + vendas (use para CPA)</option>
                   {(fronts ?? [])
                     .filter((front) => front.sales_funnel_id === funnel.id)
                     .map((front) => (
-                      <option key={front.id} value={`${funnel.id}|${front.id}`}>{funnel.name} · {front.name}</option>
+                      <option key={front.id} value={`${funnel.id}|${front.id}`}>
+                        Frente {front.name} · só investimento{ruleLabel(front) ? ` das campanhas com ${ruleLabel(front)}` : ''}
+                      </option>
                     ))}
                 </optgroup>
               ))}
             </select>
           </label>
+          <div className="rounded-[12px] bg-[var(--ct-surface-2)] px-4 py-3 text-xs leading-relaxed text-[var(--ct-text-2)] md:col-span-3 xl:order-last xl:col-span-6">
+            <b className="text-[var(--ct-text)]">Projeto inteiro x frente</b>
+            <ul className="mt-1.5 flex flex-col gap-1">
+              <li>
+                <b className="text-[var(--ct-text)]">Projeto inteiro</b>: soma o investimento de <i>todas</i> as frentes do projeto e conta
+                <i> todas</i> as vendas dos produtos dele, de qualquer origem (anúncio, bio, sem UTM). É o único lugar com vendas,
+                então CPA geral e CPA de anúncio só existem aqui.
+              </li>
+              <li>
+                <b className="text-[var(--ct-text)]">Frente</b>: só o investimento das campanhas que casam com a regra de nome da frente.
+                Uma venda não diz de qual frente veio, por isso a frente não tem vendas e serve para métricas de mídia: CPM, CTR,
+                connect rate, CPL e investimento.
+              </li>
+              {(funnels ?? []).map((funnel) => {
+                const own = (fronts ?? []).filter((front) => front.sales_funnel_id === funnel.id)
+                if (own.length !== 1) return null
+                return (
+                  <li key={funnel.id}>
+                    Hoje o {funnel.name} tem uma frente só ({own[0].name}), então o investimento dos dois é o mesmo; a diferença é que
+                    o {funnel.name} inteiro também tem as vendas.
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Métrica
             <select name="metric" required className={field}>
