@@ -36,7 +36,7 @@ export async function getClientHubKpis(
     (funnels ?? []).map((funnel) => getDailyFunnel(db, funnel.id, since, until))
   )
   const money = funnelDays.flat().reduce(
-    (acc, row) => ({ revenue: acc.revenue + row.receitaLiquida, spend: acc.spend + row.spend }),
+    (acc, row) => ({ revenue: acc.revenue + row.receitaLiquida, spend: acc.spend + row.spendComImposto }),
     { revenue: 0, spend: 0 }
   )
 

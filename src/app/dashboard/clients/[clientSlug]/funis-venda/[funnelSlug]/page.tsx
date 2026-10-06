@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getDailyFunnel, getFunnelSyncHealth, getPaymentMethodBreakdown } from '@/lib/repo/funnel-repo'
+import { getDailyFunnel, getFunnelSyncHealth, getPaymentMethodBreakdown, getSalesByOrigin } from '@/lib/repo/funnel-repo'
 import { REPORT_PERIODS, resolvePeriodDateRange, formatBr } from '@/lib/domain/report-period'
 import { FunnelCone } from './funnel-cone'
 import { FunnelKpiCards } from './funnel-kpi-cards'
@@ -8,6 +8,7 @@ import { FunnelPaymentPie } from './funnel-payment-pie'
 import { SyncFunnelButton } from './sync-funnel-button'
 import { SyncStatus } from '@/components/sync-status'
 import { MiniBarChart } from '@/components/mini-bar-chart'
+import { SalesOriginPanel } from './sales-origin-panel'
 
 export default async function SalesFunnelPage({
   params,
@@ -31,7 +32,7 @@ export default async function SalesFunnelPage({
   if (!funnel) notFound()
 
   const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
-  const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult] = await Promise.all([
+  const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
     getFunnelSyncHealth(supabase, funnel.id),
     getPaymentMethodBreakdown(supabase, funnel.id, since, until),
@@ -42,6 +43,8 @@ export default async function SalesFunnelPage({
     }),
     supabase.rpc('get_funnel_sales_by_product', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
     supabase.rpc('get_funnel_sales_by_hour', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
+    getSalesByOrigin(supabase, funnel.id, since, until),
+    supabase.from('client_tax_rates').select('valid_from', { count: 'exact', head: true }).eq('client_id', client.id),
   ])
   if (creativeResult.error) {
     console.error('[funnel-creative-report-failed]', { salesFunnelId: funnel.id }, creativeResult.error)
@@ -67,10 +70,12 @@ export default async function SalesFunnelPage({
 
   const totals = rows.reduce(
     (acc, row) => ({
-      investimento: acc.investimento + row.spend,
+      investimento: acc.investimento + row.spendComImposto,
       receitaBruta: acc.receitaBruta + row.receitaBruta,
       receitaLiquida: acc.receitaLiquida + row.receitaLiquida,
       vendas: acc.vendas + row.vendas,
+      vendasAnuncio: acc.vendasAnuncio + row.vendasAnuncio,
+      vendasUpsell: acc.vendasUpsell + row.vendasUpsell,
       impressions: acc.impressions + row.impressions,
       reach: acc.reach + row.reach,
       linkClicks: acc.linkClicks + row.linkClicks,
@@ -82,6 +87,8 @@ export default async function SalesFunnelPage({
       receitaBruta: 0,
       receitaLiquida: 0,
       vendas: 0,
+      vendasAnuncio: 0,
+      vendasUpsell: 0,
       impressions: 0,
       reach: 0,
       linkClicks: 0,
@@ -91,9 +98,14 @@ export default async function SalesFunnelPage({
   )
   const kpiTotals = {
     investimento: totals.investimento,
+    comImposto: (taxRates ?? 0) > 0,
     receitaLiquida: totals.receitaLiquida,
     vendas: totals.vendas,
+    vendasUpsell: totals.vendasUpsell,
+    // Project overview: spend over EVERY entry sale, whatever brought the buyer in. The ad CPA
+    // beside it, and every creative row below, count only the sale the UTM ties to an ad.
     cpa: totals.vendas > 0 ? totals.investimento / totals.vendas : null,
+    cpaAnuncio: totals.vendasAnuncio > 0 ? totals.investimento / totals.vendasAnuncio : null,
     resultado: totals.receitaLiquida - totals.investimento,
     roas: totals.investimento > 0 ? totals.receitaLiquida / totals.investimento : null,
     ticketMedio: totals.vendas > 0 ? totals.receitaLiquida / totals.vendas : null,
@@ -109,7 +121,7 @@ export default async function SalesFunnelPage({
   }
   const kpiSparklines = {
     receitaLiquida: rows.map((row) => row.receitaLiquida),
-    roas: rows.map((row) => (row.spend > 0 ? row.receitaLiquida / row.spend : 0)),
+    roas: rows.map((row) => (row.spendComImposto > 0 ? row.receitaLiquida / row.spendComImposto : 0)),
   }
   const lastSyncAt = health.find((h) => h.lastRunAt)?.lastRunAt ?? null
   const hasSyncError = health.some((h) => h.lastResult === 'error')
@@ -224,6 +236,8 @@ export default async function SalesFunnelPage({
       )}
 
       <FunnelKpiCards totals={kpiTotals} currency={currency} sparklines={kpiSparklines} />
+
+      <SalesOriginPanel origins={salesByOrigin} currency={currency} />
 
       {/* Funnel on the left, the three read-outs stacked on the right: the funnel is one tall
           shape and the analyses are short ones, so side by side they fill each other's space. */}
@@ -368,7 +382,7 @@ export default async function SalesFunnelPage({
                 <td className="p-3">{row.data}</td>
                 <td className="p-3">{row.vendas}</td>
                 <td className="p-3">{currency(row.receitaBruta)}</td>
-                <td className="p-3">{currency(row.spend)}</td>
+                <td className="p-3">{currency(row.spendComImposto)}</td>
                 <td className="p-3">{row.roas !== null ? row.roas.toFixed(2) : '—'}</td>
                 <td className="p-3">{row.cac !== null ? currency(row.cac) : '—'}</td>
               </tr>

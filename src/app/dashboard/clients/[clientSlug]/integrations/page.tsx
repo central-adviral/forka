@@ -4,7 +4,7 @@ import { getConfiguredSecrets } from '@/lib/repo/client-secrets-repo'
 import { notFound } from 'next/navigation'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
-import { saveDomain, verifyDomain, saveHublaToken, saveFunnelDataSource } from './actions'
+import { saveDomain, verifyDomain, saveHublaToken, saveFunnelDataSource, saveMetaTax } from './actions'
 import { VerifyDomainButton } from './verify-domain-button'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -43,6 +43,11 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
     defaultDomain
   )
   const webhookUrl = `https://${activeDomain}/api/webhooks/hubla/${client.slug}`
+  const { data: taxRates } = await supabase
+    .from('client_tax_rates')
+    .select('valid_from, factor')
+    .eq('client_id', client.id)
+    .order('valid_from', { ascending: false })
 
   return (
     <div className="max-w-xl space-y-8 p-8">
@@ -171,6 +176,50 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
           Usada pela sincronização automática de vendas e gasto de mídia dos funis deste cliente. Cada funil de
           venda tem seu próprio mapeamento de operação/produto, configurado na tela do funil.
         </p>
+      </section>
+
+      <section className="space-y-4 rounded-2xl border border-white/[0.08] p-5">
+        <h2 className="font-['Space_Grotesk'] text-base font-semibold">Imposto do Meta</h2>
+        <p className="text-xs text-[#A1A1AA]">
+          O gasto chega do Meta sem imposto. O percentual daqui entra no investimento, no CPA e no ROAS a partir da data
+          informada; os dias anteriores mantêm a taxa que valia antes.
+        </p>
+        {(taxRates ?? []).length > 0 ? (
+          <ul className="space-y-1 text-[13px]">
+            {(taxRates ?? []).map((rate) => (
+              <li key={rate.valid_from} className="font-['JetBrains_Mono'] tabular-nums">
+                {((Number(rate.factor) - 1) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}% desde{' '}
+                {rate.valid_from.split('-').reverse().join('/')}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[13px] text-[#F2B866]">Nenhum imposto configurado: o investimento aparece sem imposto.</p>
+        )}
+        <form action={saveMetaTax.bind(null, { client_id: client.id, client_slug: client.slug })} className="flex flex-wrap items-end gap-3">
+          <label className="text-xs text-[#A1A1AA]">
+            Imposto (%)
+            <input
+              name="percent"
+              inputMode="decimal"
+              required
+              placeholder="13,8"
+              className="mt-1 block w-28 rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 py-2.5 text-sm text-[#EDEDF0] outline-none focus:border-[#8B9BFF]"
+            />
+          </label>
+          <label className="text-xs text-[#A1A1AA]">
+            Vale a partir de
+            <input
+              type="date"
+              name="valid_from"
+              required
+              className="mt-1 block rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 py-2.5 text-sm text-[#EDEDF0] outline-none focus:border-[#8B9BFF]"
+            />
+          </label>
+          <button type="submit" className="rounded-[10px] bg-[#8B9BFF] px-4 py-2.5 text-sm font-semibold text-[#000000]">
+            Salvar imposto
+          </button>
+        </form>
       </section>
     </div>
   )

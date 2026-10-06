@@ -149,3 +149,31 @@ export async function saveFunnelDataSource(context: { client_id: string; client_
   }
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/integrations`)
 }
+
+// The Meta tax is entered as a percentage and stored as a factor from a date on, so a rate change
+// never rewrites the investment of past days (0055).
+const taxSchema = z.object({
+  client_id: z.string().uuid(),
+  client_slug: z.string(),
+  percent: z.coerce.number().min(0, 'o imposto não pode ser negativo').max(99, 'informe o imposto em %, ex: 13,8'),
+  valid_from: z.iso.date('informe a data de início'),
+})
+
+export async function saveMetaTax(context: { client_id: string; client_slug: string }, formData: FormData) {
+  const result = taxSchema.safeParse({
+    ...context,
+    percent: String(formData.get('percent') ?? '').replace(',', '.'),
+    valid_from: formData.get('valid_from'),
+  })
+  if (!result.success) throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
+  const supabase = await createServerSupabaseClient()
+  await assertClientRole(supabase, result.data.client_id, 'gestor')
+  const { error } = await supabase
+    .from('client_tax_rates')
+    .upsert(
+      { client_id: result.data.client_id, valid_from: result.data.valid_from, factor: 1 + result.data.percent / 100 },
+      { onConflict: 'client_id,valid_from' }
+    )
+  if (error) throw error
+  revalidatePath(`/dashboard/clients/${result.data.client_slug}/integrations`)
+}

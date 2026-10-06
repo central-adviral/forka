@@ -6,10 +6,16 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface DailyFunnelRow {
   data: string
+  /** Entry sales of any origin: the CPA base of the project overview. */
   vendas: number
+  /** Entry sales the UTM ties to an ad: the CPA base of creatives, campaigns and tests. */
+  vendasAnuncio: number
+  vendasUpsell: number
   receitaBruta: number
   receitaLiquida: number
   spend: number
+  /** Spend with the client's Meta tax applied for that day (0055); equals spend when none is set. */
+  spendComImposto: number
   impressions: number
   clicks: number
   reach: number
@@ -35,9 +41,12 @@ export async function getDailyFunnel(
   return ((data ?? []) as {
     data: string
     vendas: number
+    vendas_anuncio: number
+    vendas_upsell: number
     receita_bruta: number
     receita_liquida: number
     spend: number
+    spend_com_imposto: number
     impressions: number
     clicks: number
     reach: number
@@ -47,25 +56,46 @@ export async function getDailyFunnel(
     spend_source: 'frentes' | 'operacao'
   }[]).map((row) => {
     const vendas = Number(row.vendas)
-    const spend = Number(row.spend)
+    const spendComImposto = Number(row.spend_com_imposto)
     const receitaBruta = Number(row.receita_bruta)
     return {
       data: row.data,
       vendas,
+      vendasAnuncio: Number(row.vendas_anuncio),
+      vendasUpsell: Number(row.vendas_upsell),
       receitaBruta,
       receitaLiquida: Number(row.receita_liquida),
-      spend,
+      spend: Number(row.spend),
+      spendComImposto,
       impressions: Number(row.impressions),
       clicks: Number(row.clicks),
       reach: Number(row.reach),
       linkClicks: Number(row.link_clicks),
       landingPageViews: Number(row.landing_page_views),
       initiateCheckout: Number(row.initiate_checkout),
-      roas: spend > 0 ? receitaBruta / spend : null,
-      cac: vendas > 0 ? spend / vendas : null,
+      roas: spendComImposto > 0 ? receitaBruta / spendComImposto : null,
+      cac: vendas > 0 ? spendComImposto / vendas : null,
       spendSource: row.spend_source,
     }
   })
+}
+
+export interface SalesByOrigin {
+  origem: string
+  vendas: number
+  vendasUpsell: number
+  receitaBruta: number
+}
+
+export async function getSalesByOrigin(db: SupabaseClient, salesFunnelId: string, since: string, until: string): Promise<SalesByOrigin[]> {
+  const { data, error } = await db.rpc('get_funnel_sales_by_origin', { p_sales_funnel_id: salesFunnelId, p_since: since, p_until: until })
+  if (error) throw error
+  return ((data ?? []) as { origem: string; vendas: number; vendas_upsell: number; receita_bruta: number }[]).map((row) => ({
+    origem: row.origem,
+    vendas: Number(row.vendas),
+    vendasUpsell: Number(row.vendas_upsell),
+    receitaBruta: Number(row.receita_bruta),
+  }))
 }
 
 export interface PaymentMethodBreakdown {

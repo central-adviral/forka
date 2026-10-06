@@ -12,6 +12,6 @@ const NEVER_CALLED = {} as SupabaseClient
 describe('syncSalesForFunnel', () => {
   it('returns latestUpdatedAt as null for an empty batch, without touching the db', async () => {
     const result = await syncSalesForFunnel(NEVER_CALLED, 'unused', [])
-    expect(result).toEqual({ synced: 0, latestUpdatedAt: null })
+    expect(result).toEqual({ synced: 0, removed: 0, latestUpdatedAt: null })
   })
 })
