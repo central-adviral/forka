@@ -17,7 +17,7 @@ export default async function EditSalesFunnelPage({
 
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, launchops_operacao_ids, launchops_produto_nomes')
+    .select('id, name, slug, launchops_operacao_ids, launchops_produto_nomes, starts_on, ends_on')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
@@ -61,6 +61,20 @@ export default async function EditSalesFunnelPage({
             className={inputClass}
           />
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-xs text-[#A1A1AA]">
+            Janela · início
+            <input type="date" name="starts_on" defaultValue={funnel.starts_on ?? ''} className={`${inputClass} mt-1`} />
+          </label>
+          <label className="block text-xs text-[#A1A1AA]">
+            Janela · fim
+            <input type="date" name="ends_on" defaultValue={funnel.ends_on ?? ''} className={`${inputClass} mt-1`} />
+          </label>
+        </div>
+        <p className="text-xs text-[#A1A1AA]">
+          Opcional. Uma frente que lê outro projeto (ex.: a Captação Paga do lançamento lendo o perpétuo) só conta os dias
+          dentro desta janela. Vazio = sem limite.
+        </p>
         <button type="submit" className="rounded-[10px] bg-[#8B9BFF] px-4 py-2.5 text-sm font-semibold text-[#000000]">
           Salvar alterações
         </button>

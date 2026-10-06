@@ -10,7 +10,7 @@ import {
   type ClassifiedCampaign,
 } from '@/lib/domain/campaign-rules'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { addRule, createFront, deleteFront, removeRule } from './actions'
+import { addRule, createFront, deleteFront, pinCampaign, removeRule, unpinCampaign } from './actions'
 
 interface FrontRow {
   id: string
@@ -18,6 +18,7 @@ interface FrontRow {
   name: string
   position: number
   sales_funnel_id: string
+  source_sales_funnel_id: string | null
   sales_funnels: { name: string } | null
   naming_rules: { id: string; kind: 'include' | 'exclude'; value: string }[]
 }
@@ -29,6 +30,12 @@ const PERIODS = [
 
 const currency = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+
+const ASSIGNMENT_LABEL: Record<NonNullable<ClassifiedCampaign['assignment']>, string> = {
+  manual: 'fixada à mão',
+  auto: 'fixada pelo nome',
+  nome: 'pelo nome · fixa no próximo sync',
+}
 
 const mono = 'font-[family-name:var(--font-geist-mono)]'
 const fieldClass =
@@ -57,25 +64,32 @@ export default async function CampaignRulesPage({
   if (!funnel) notFound()
 
   const { since, until } = resolvePeriodDateRange(periodo, undefined, undefined)
-  const [{ data: canEdit }, { data: frontRows }, { data: campaignRows }, { data: lastSync }] = await Promise.all([
+  const [{ data: canEdit }, { data: frontRows }, { data: campaignRows }, { data: lastSync }, { data: otherFunnels }] = await Promise.all([
     supabase.rpc('has_client_role', { p_client_id: client.id, p_min_role: 'gestor' }),
     supabase
       .from('project_fronts')
-      .select('id, code, name, position, sales_funnel_id, sales_funnels!inner(name, client_id), naming_rules(id, kind, value)')
+      .select('id, code, name, position, sales_funnel_id, source_sales_funnel_id, sales_funnels!inner(name, client_id), naming_rules(id, kind, value)')
       .eq('sales_funnels.client_id', client.id)
       .order('position'),
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: since, p_until: until }),
     supabase.from('campaign_daily').select('synced_at').eq('client_id', client.id).order('synced_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('sales_funnels').select('id, name').eq('client_id', client.id).neq('id', funnel.id).order('name'),
   ])
 
   const allFronts = (frontRows ?? []) as unknown as FrontRow[]
   const fronts = allFronts.filter((front) => front.sales_funnel_id === funnel.id)
   const frontById = new Map(allFronts.map((front) => [front.id, front]))
+  const funnelNameById = new Map((otherFunnels ?? []).map((other) => [other.id as string, other.name as string]))
+  // Only fronts with campaigns of their own can own one; a front that reads another project cannot.
+  const ownerFronts = allFronts.filter((front) => !front.source_sales_funnel_id)
   const campaigns = (campaignRows ?? []) as ClassifiedCampaign[]
   const summary = summarizeFronts(campaigns, fronts.map((front) => front.id))
   const projectFrontIds = new Set(fronts.map((front) => front.id))
   const conflicts = conflictingCampaigns(campaigns, projectFrontIds)
   const orphans = orphanCampaigns(campaigns)
+  const unclassifiedSpend = campaigns
+    .filter((campaign) => campaign.front_ids.length === 0)
+    .reduce((sum, campaign) => sum + Number(campaign.spend), 0)
   const orphanSpend = orphans.reduce((sum, campaign) => sum + Number(campaign.spend), 0)
   const projectSpend = campaigns
     .filter((campaign) => campaign.front_ids.some((id) => projectFrontIds.has(id)))
@@ -84,6 +98,7 @@ export default async function CampaignRulesPage({
 
   const base = `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`
   const context = { client_slug: client.slug, funnel_slug: funnel.slug, sales_funnel_id: funnel.id }
+  const pinContext = { ...context, client_id: client.id as string }
 
   function frontLabel(frontId: string): { text: string; own: boolean } {
     const front = frontById.get(frontId)
@@ -101,9 +116,9 @@ export default async function CampaignRulesPage({
           </Link>
           <h1 className="mt-2.5 text-[30px] font-semibold tracking-[-0.04em]">Regras de campanha</h1>
           <p className="mt-2 max-w-[70ch] text-sm text-[var(--ct-text-2)]">
-            É assim que a Central sabe quais campanhas pertencem a cada frente deste projeto. Uma frente pega a campanha
-            quando o nome contém todos os textos verdes e nenhum dos vermelhos. Toda campanha com gasto deve cair em
-            exatamente uma frente.
+            Cada campanha tem um dono só: uma frente. O nome sugere o dono (contém todos os textos verdes e nenhum dos
+            vermelhos) e o sync fixa essa escolha, então renomear a campanha no Gerenciador não muda o histórico. Você
+            pode fixar o dono à mão na tabela. Uma frente também pode ler outro projeto, só dentro da janela deste.
           </p>
         </div>
         <div className="ml-auto flex items-center gap-1 rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface)] p-[3px]">
@@ -137,7 +152,7 @@ export default async function CampaignRulesPage({
         {[
           { label: 'Gasto do projeto', value: currency(projectSpend), foot: `campanhas nas frentes · ${periodo === '7d' ? '7' : '30'} dias` },
           { label: 'Frentes', value: String(fronts.length), foot: 'deste projeto' },
-          { label: 'Sem frente', value: currency(orphanSpend), foot: `${orphans.length} campanhas fora de qualquer projeto` },
+          { label: 'Não classificado', value: currency(unclassifiedSpend), foot: 'sem dono · aparece em todos os totais' },
           {
             label: 'Última leitura',
             value: lastSync?.synced_at
@@ -168,11 +183,12 @@ export default async function CampaignRulesPage({
               <b className="block text-[#FF7A73]">
                 {conflicts.length} {conflicts.length === 1 ? 'campanha está' : 'campanhas estão'} em mais de uma frente
               </b>
-              O gasto delas contaria duas vezes. Adicione um “não contém” numa das frentes.
+              O nome bate com mais de uma frente, então nenhuma conta o gasto até alguém escolher. Fixe o dono na tabela
+              abaixo ou ajuste as regras.
               <ul className="mt-2 flex flex-col gap-1">
                 {conflicts.slice(0, 8).map((campaign) => (
                   <li key={campaign.campaign_id} className={`${mono} text-[12px]`}>
-                    {campaign.campaign_name} → {campaign.front_ids.map((id) => frontLabel(id).text).join(' + ')}
+                    {campaign.campaign_name} → {campaign.suggested_front_ids.map((id) => frontLabel(id).text).join(' ou ')}
                   </li>
                 ))}
               </ul>
@@ -183,7 +199,7 @@ export default async function CampaignRulesPage({
               <b className="block text-[#F2B866]">
                 {orphans.length} campanhas com gasto e sem frente somam {currency(orphanSpend)}
               </b>
-              Elas estão fora de qualquer relatório. As maiores:
+              Elas aparecem como Não classificado em todos os totais, até ganharem uma regra ou um dono fixado. As maiores:
               <ul className="mt-2 flex flex-col gap-1">
                 {orphans.slice(0, 6).map((campaign) => (
                   <li key={campaign.campaign_id} className={`${mono} text-[12px]`}>
@@ -211,6 +227,7 @@ export default async function CampaignRulesPage({
           const stats = summary.get(front.id) ?? { campaigns: 0, spend: 0, leads: 0 }
           const frontContext = { ...context, front_id: front.id }
           const includes = front.naming_rules.filter((rule) => rule.kind === 'include')
+          const sourceName = front.source_sales_funnel_id ? funnelNameById.get(front.source_sales_funnel_id) ?? 'outro projeto' : null
           return (
             <div key={front.id} className="flex flex-col gap-3 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-6 py-5">
               <div className="flex flex-wrap items-center gap-3">
@@ -224,6 +241,13 @@ export default async function CampaignRulesPage({
                   <ConfirmDeleteButton action={deleteFront.bind(null, frontContext)} label="Remover" warning="Remover a frente e as regras?" />
                 )}
               </div>
+              {sourceName && (
+                <p className="text-[12.5px] text-[var(--ct-text-2)]">
+                  Lê as campanhas do projeto <b>{sourceName}</b>, só nos dias dentro da janela deste projeto. Não tem
+                  regras próprias: as campanhas continuam com um dono só.
+                </p>
+              )}
+              {!sourceName && (
               <div className="flex flex-wrap items-center gap-1.5">
                 {front.naming_rules.map((rule) => (
                   <span
@@ -246,7 +270,8 @@ export default async function CampaignRulesPage({
                   <span className="text-[12px] text-[var(--ct-text-3)]">sem “contém”, esta frente não pega nenhuma campanha</span>
                 )}
               </div>
-              {canEdit && (
+              )}
+              {canEdit && !sourceName && (
                 <form action={addRule.bind(null, frontContext)} className="flex flex-wrap items-center gap-2">
                   <select name="kind" defaultValue="include" className={fieldClass} aria-label="Tipo da regra">
                     <option value="include">contém</option>
@@ -273,6 +298,17 @@ export default async function CampaignRulesPage({
             <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
               Nome
               <input name="name" required placeholder="Captação Gratuita" className={`${fieldClass} w-64`} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
+              Campanhas
+              <select name="source_sales_funnel_id" defaultValue="" className={fieldClass}>
+                <option value="">próprias, pelas regras de nome</option>
+                {(otherFunnels ?? []).map((other) => (
+                  <option key={other.id} value={other.id}>
+                    lê o projeto {other.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <button type="submit" className="rounded-[8px] bg-[var(--ct-accent)] px-3.5 py-1.5 text-[12.5px] font-semibold text-black hover:brightness-110">
               + Nova frente
@@ -307,6 +343,7 @@ export default async function CampaignRulesPage({
                 <tr className={`${mono} text-left text-[10.5px] uppercase tracking-[0.06em] text-[var(--ct-text-3)]`}>
                   <th className="px-5 py-3 font-medium">Campanha</th>
                   <th className="px-5 py-3 font-medium">Frente</th>
+                  <th className="px-5 py-3 font-medium">Dono</th>
                   <th className="px-5 py-3 text-right font-medium">Gasto</th>
                   <th className="px-5 py-3 text-right font-medium">Leads</th>
                   <th className="px-5 py-3 text-right font-medium">Último dia</th>
@@ -318,16 +355,18 @@ export default async function CampaignRulesPage({
                     <td className={`${mono} max-w-[560px] px-5 py-2.5 text-[12px] text-[var(--ct-text-2)]`}>{campaign.campaign_name}</td>
                     <td className="px-5 py-2.5">
                       <div className="flex flex-wrap gap-1">
-                        {campaign.front_ids.length === 0 && <span className="text-[11.5px] text-[#F2B866]">sem frente</span>}
+                        {campaign.front_ids.length === 0 && (
+                          <span className="text-[11.5px] text-[#F2B866]">
+                            {campaign.suggested_front_ids.length > 1 ? 'em conflito' : 'não classificado'}
+                          </span>
+                        )}
                         {campaign.front_ids.map((id) => {
                           const label = frontLabel(id)
                           return (
                             <span
                               key={id}
                               className={`${mono} rounded-full px-2 py-0.5 text-[11px] ${
-                                campaign.front_ids.length > 1
-                                  ? 'bg-[rgba(255,122,115,0.12)] text-[#FF7A73]'
-                                  : label.own
+                                label.own
                                     ? 'bg-[var(--ct-an-soft)] text-[var(--ct-an)]'
                                     : 'bg-[var(--ct-surface-3)] text-[var(--ct-text-3)]'
                               }`}
@@ -336,6 +375,36 @@ export default async function CampaignRulesPage({
                             </span>
                           )
                         })}
+                      </div>
+                    </td>
+                    <td className="px-5 py-2.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[11.5px] text-[var(--ct-text-3)]">
+                          {campaign.assignment ? ASSIGNMENT_LABEL[campaign.assignment] : 'sem dono'}
+                        </span>
+                        {canEdit && (
+                          <form action={pinCampaign.bind(null, pinContext)} className="flex items-center gap-1">
+                            <input type="hidden" name="campaign_id" value={campaign.campaign_id} />
+                            <select name="front_id" defaultValue={campaign.front_ids[0] ?? ''} aria-label={`Dono de ${campaign.campaign_name}`} className={`${fieldClass} py-1 text-[11.5px]`}>
+                              <option value="" disabled>escolher</option>
+                              {ownerFronts.map((front) => (
+                                <option key={front.id} value={front.id}>
+                                  {frontLabel(front.id).text}
+                                </option>
+                              ))}
+                            </select>
+                            <button type="submit" className="text-[11.5px] font-medium text-[var(--ct-accent)] hover:underline">
+                              fixar
+                            </button>
+                          </form>
+                        )}
+                        {canEdit && campaign.assignment === 'manual' && (
+                          <form action={unpinCampaign.bind(null, { ...pinContext, campaign_id: campaign.campaign_id })}>
+                            <button type="submit" className="text-[11.5px] text-[var(--ct-text-3)] hover:underline">
+                              soltar
+                            </button>
+                          </form>
+                        )}
                       </div>
                     </td>
                     <td className={`${mono} px-5 py-2.5 text-right`}>{currency(Number(campaign.spend))}</td>

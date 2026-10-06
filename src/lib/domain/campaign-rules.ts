@@ -7,7 +7,12 @@ export interface ClassifiedCampaign {
   spend: number
   leads: number
   last_day: string
+  /** Fronts that count the campaign: its owner plus every front reading the owner's project. */
   front_ids: string[]
+  /** Fronts whose name rules match. More than one, with no owner, is a conflict to resolve. */
+  suggested_front_ids: string[]
+  /** manual = pinned by a gestor · auto = frozen by the sync · nome = single live match · null = no owner. */
+  assignment: 'manual' | 'auto' | 'nome' | null
 }
 
 export interface FrontSummary {
@@ -30,16 +35,19 @@ export function summarizeFronts(campaigns: ClassifiedCampaign[], frontIds: strin
   return summary
 }
 
-/** Campaigns counted by more than one front, at least one of them in this project. */
+/** Campaigns whose name matches two or more fronts, one of them in this project: no front counts them until someone picks. */
 export function conflictingCampaigns(campaigns: ClassifiedCampaign[], projectFrontIds: Set<string>): ClassifiedCampaign[] {
   return campaigns.filter(
-    (campaign) => campaign.front_ids.length > 1 && campaign.front_ids.some((id) => projectFrontIds.has(id))
+    (campaign) =>
+      campaign.front_ids.length === 0 &&
+      campaign.suggested_front_ids.length > 1 &&
+      campaign.suggested_front_ids.some((id) => projectFrontIds.has(id))
   )
 }
 
-/** Campaigns with spend that no front of any project of the client counts. */
+/** Campaigns with spend that no front of any project of the client counts or even suggests. */
 export function orphanCampaigns(campaigns: ClassifiedCampaign[]): ClassifiedCampaign[] {
-  return campaigns.filter((campaign) => campaign.front_ids.length === 0)
+  return campaigns.filter((campaign) => campaign.front_ids.length === 0 && campaign.suggested_front_ids.length === 0)
 }
 
 /** The bracketed tags of the naming convention ([MTV-T15], [GER]...), ranked by the spend they carry. */

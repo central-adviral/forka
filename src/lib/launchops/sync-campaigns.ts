@@ -158,7 +158,7 @@ export async function syncCampaignsForClient(
   launchopsDb: SupabaseClient,
   clientId: string,
   now: Date = new Date()
-): Promise<{ since: string; campaignDays: number }> {
+): Promise<{ since: string; campaignDays: number; frozenOwners: number }> {
   const { count, error: countError } = await appDb
     .from('campaign_daily')
     .select('campaign_id', { count: 'exact', head: true })
@@ -177,5 +177,9 @@ export async function syncCampaignsForClient(
     const { error } = await appDb.from('campaign_daily').upsert(chunk, { onConflict: 'client_id,data,campaign_id' })
     if (error) throw error
   }
-  return { since, campaignDays: days.length }
+  // A campaign the rules match exactly once gets that front frozen as its owner (0054), so a
+  // rename in the Ads Manager does not move its history to another front.
+  const { data: frozen, error: freezeError } = await appDb.rpc('freeze_campaign_fronts', { p_client_id: clientId })
+  if (freezeError) throw freezeError
+  return { since, campaignDays: days.length, frozenOwners: Number(frozen ?? 0) }
 }

@@ -115,7 +115,10 @@ const editSalesFunnelSchema = z.object({
     .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean))
     .pipe(z.array(z.string().uuid('IDs de operação devem ser UUIDs válidos'))),
   launchops_produto_nomes: z.string(),
-})
+  // The project's window: a front that reads another project only counts these days (0054).
+  starts_on: z.union([z.literal(''), z.iso.date()]).transform((value) => value || null),
+  ends_on: z.union([z.literal(''), z.iso.date()]).transform((value) => value || null),
+}).refine((value) => !value.starts_on || !value.ends_on || value.ends_on >= value.starts_on, 'o fim da janela vem depois do início')
 
 export async function editSalesFunnel(
   context: { sales_funnel_id: string; client_id: string; client_slug: string; funnel_slug: string },
@@ -129,6 +132,8 @@ export async function editSalesFunnel(
     name: formData.get('name'),
     launchops_operacao_ids: formData.get('launchops_operacao_ids'),
     launchops_produto_nomes: formData.get('launchops_produto_nomes'),
+    starts_on: formData.get('starts_on') ?? '',
+    ends_on: formData.get('ends_on') ?? '',
   })
   if (!result.success) {
     throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
@@ -144,6 +149,8 @@ export async function editSalesFunnel(
       name: parsed.name,
       launchops_operacao_ids: parsed.launchops_operacao_ids,
       launchops_produto_nomes: produtoNomes,
+      starts_on: parsed.starts_on,
+      ends_on: parsed.ends_on,
       updated_at: new Date().toISOString(),
     })
     .eq('id', parsed.sales_funnel_id)

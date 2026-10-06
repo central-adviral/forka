@@ -19,6 +19,8 @@ interface CampaignRow {
   campaign_id: string
   spend: number
   front_ids: string[]
+  suggested_front_ids: string[]
+  assignment: string | null
 }
 
 describe('campaign fronts and naming rules (0053)', () => {
@@ -93,15 +95,101 @@ describe('campaign fronts and naming rules (0053)', () => {
     expect((await campaigns(owner.db)).get('pre-1')!.front_ids).toEqual([front!.id])
   })
 
-  it('reports a campaign taken by two fronts so its spend is not counted twice silently', async () => {
+  it('counts a campaign matched by two fronts in neither, until someone picks its owner (0054)', async () => {
     const { data: front } = await owner.db
       .from('project_fronts')
       .insert({ sales_funnel_id: funnelId, code: 'TUDO', name: 'Tudo do T15' })
       .select()
       .single()
     await owner.db.from('naming_rules').insert({ front_id: front!.id, kind: 'include', value: 'mtv-t15' })
-    expect((await campaigns(owner.db)).get('ger-1')!.front_ids).toHaveLength(2)
+    const conflict = (await campaigns(owner.db)).get('ger-1')!
+    expect(conflict.front_ids).toEqual([])
+    expect(conflict.suggested_front_ids).toHaveLength(2)
+
+    const { error } = await owner.db
+      .from('campaign_fronts')
+      .insert({ client_id: clientId, campaign_id: 'ger-1', front_id: front!.id, source: 'manual' })
+    expect(error).toBeNull()
+    const pinned = (await campaigns(owner.db)).get('ger-1')!
+    expect(pinned.front_ids).toEqual([front!.id])
+    expect(pinned.assignment).toBe('manual')
+
     await owner.db.from('project_fronts').delete().eq('id', front!.id)
+    expect((await campaigns(owner.db)).get('ger-1')!.assignment).toBe('nome')
+  })
+
+  it('keeps the frozen owner when the campaign is renamed, and releases it when the rules change (0054)', async () => {
+    const { data: frozen, error } = await admin.rpc('freeze_campaign_fronts', { p_client_id: clientId })
+    expect(error).toBeNull()
+    expect(Number(frozen)).toBeGreaterThan(0)
+    const before = (await campaigns(owner.db)).get('ger-1')!
+    expect(before.assignment).toBe('auto')
+
+    await admin
+      .from('campaign_daily')
+      .update({ campaign_name: '07 - [MTV-T15][PRE][CAPTACAO] - Renomeada' })
+      .eq('client_id', clientId)
+      .eq('campaign_id', 'ger-1')
+    const renamed = (await campaigns(owner.db)).get('ger-1')!
+    expect(renamed.front_ids).toEqual(before.front_ids)
+    expect(renamed.assignment).toBe('auto')
+
+    const { data: preFront } = await admin.from('project_fronts').select('id').eq('sales_funnel_id', funnelId).eq('code', 'PRE').single()
+    await owner.db.from('naming_rules').insert({ front_id: preFront!.id, kind: 'exclude', value: 'renomeada-nunca' })
+    const released = (await campaigns(owner.db)).get('ger-1')!
+    expect(released.assignment).toBe('nome')
+    expect(released.front_ids).toEqual([preFront!.id])
+
+    await admin
+      .from('campaign_daily')
+      .update({ campaign_name: '07 - [MTV-T15][GER][CAPTACAO] - Escala' })
+      .eq('client_id', clientId)
+      .eq('campaign_id', 'ger-1')
+    await admin.from('naming_rules').delete().eq('front_id', preFront!.id).eq('value', 'renomeada-nunca')
+  })
+
+  it('lets a front read another project only inside its own window, without a second owner (0054)', async () => {
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+    const { data: perpetual } = await admin
+      .from('sales_funnels')
+      .insert({ client_id: clientId, name: '1K-LATAM', slug: `1k-latam-${Date.now()}` })
+      .select()
+      .single()
+    const { data: perpetualFront } = await admin
+      .from('project_fronts')
+      .insert({ sales_funnel_id: perpetual!.id, code: 'PAG', name: 'Venda 1K' })
+      .select()
+      .single()
+    await admin.from('naming_rules').insert({ front_id: perpetualFront!.id, kind: 'include', value: '[1K-POR-DIA]' })
+    await admin.from('campaign_daily').insert([
+      { client_id: clientId, data: today, campaign_id: 'paga-1', campaign_name: '05 - [1K-POR-DIA][VENDA]', spend: 200 },
+      { client_id: clientId, data: yesterday, campaign_id: 'paga-1', campaign_name: '05 - [1K-POR-DIA][VENDA]', spend: 50 },
+    ])
+    await admin.from('sales_funnels').update({ starts_on: today }).eq('id', funnelId)
+    const { data: mirror, error } = await owner.db
+      .from('project_fronts')
+      .insert({ sales_funnel_id: funnelId, code: 'PAGA', name: 'Captação Paga', source_sales_funnel_id: perpetual!.id })
+      .select()
+      .single()
+    expect(error).toBeNull()
+
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+    const { data: daily } = await owner.db.rpc('get_project_front_daily', { p_sales_funnel_id: funnelId, p_since: yesterday, p_until: tomorrow })
+    const mirrorDays = (daily as { front_id: string; data: string; spend: number }[]).filter((row) => row.front_id === mirror!.id)
+    expect(mirrorDays.map((row) => [row.data, Number(row.spend)])).toEqual([[today, 200]])
+
+    const { data: perpetualDaily } = await owner.db.rpc('get_project_front_daily', { p_sales_funnel_id: perpetual!.id, p_since: yesterday, p_until: tomorrow })
+    expect((perpetualDaily as { spend: number }[]).reduce((sum, row) => sum + Number(row.spend), 0)).toBe(250)
+
+    const { error: ownError } = await admin
+      .from('campaign_fronts')
+      .insert({ client_id: clientId, campaign_id: 'paga-1', front_id: mirror!.id, source: 'manual' })
+    expect(ownError).not.toBeNull()
+
+    await admin.from('project_fronts').delete().eq('id', mirror!.id)
+    await admin.from('sales_funnels').update({ starts_on: null }).eq('id', funnelId)
+    await admin.from('campaign_daily').delete().eq('client_id', clientId).eq('campaign_id', 'paga-1')
+    await admin.from('sales_funnels').delete().eq('id', perpetual!.id)
   })
 
   it('lets a cliente read the classification but not change the rules', async () => {
