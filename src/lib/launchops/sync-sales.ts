@@ -41,7 +41,8 @@ export async function fetchLaunchOpsSalesRows(
       .select(
         'id, data_venda, produto_nome, status, valor_bruto, valor_liquido, metodo_pagamento, updated_at, transaction_id_plataforma, utm_source, utm_medium, utm_campaign, utm_term, utm_content, is_upsell'
       )
-      .eq('plataforma', 'hubla')
+      // No platform filter: the product names already pick the project's sales, and the same
+      // product is sold on more than one checkout (1K LATAM on Hubla and on Pagtrust).
       // Every status, not only approved: a refund is the same row changing status, and filtering it
       // out meant the Central never learned the sale was gone.
       .in('produto_nome', params.produtoNomes)

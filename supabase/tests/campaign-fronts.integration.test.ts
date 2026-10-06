@@ -230,6 +230,20 @@ describe('campaign fronts and naming rules (0053)', () => {
     expect(day.spend_source).toBe('frentes')
   })
 
+  it('keeps the operation spend on the days before the client has campaigns synced (0060)', async () => {
+    const before = new Date(Date.now() - 10 * 86_400_000).toISOString().slice(0, 10)
+    const after = new Date(Date.now() - 9 * 86_400_000).toISOString().slice(0, 10)
+    const { error } = await admin
+      .from('ad_spend_daily')
+      .insert({ sales_funnel_id: funnelId, operacao_id: crypto.randomUUID(), data: before, spend: 77 })
+    expect(error).toBeNull()
+    const { data } = await owner.db.rpc('get_funnel_daily', { p_sales_funnel_id: funnelId, p_since: before, p_until: after })
+    const day = (data as { spend: number; spend_source: string }[])[0]
+    expect(Number(day.spend)).toBe(77)
+    expect(day.spend_source).toBe('operacao')
+    await admin.from('ad_spend_daily').delete().eq('sales_funnel_id', funnelId).eq('data', before)
+  })
+
   it('sums daily spend per front of the project', async () => {
     const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
     const { data, error } = await owner.db.rpc('get_project_front_daily', { p_sales_funnel_id: funnelId, p_since: today, p_until: tomorrow })
