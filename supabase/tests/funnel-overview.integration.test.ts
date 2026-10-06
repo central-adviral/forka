@@ -216,3 +216,43 @@ describe('each project classifies its products (0061)', () => {
     expect(count).toBe(3)
   })
 })
+
+describe('the breakdowns cut the period at the São Paulo day, end exclusive (0062)', () => {
+  it('keeps a late-evening sale in its own day and leaves the next day out', async () => {
+    const email = `bounds-${Date.now()}@example.com`
+    const { data: user } = await admin.auth.admin.createUser({ email, password: 'password123', email_confirm: true })
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+    await db.auth.signInWithPassword({ email, password: 'password123' })
+    const { data: client } = await admin
+      .from('clients')
+      .insert({ owner_id: user!.user!.id, name: 'Bounds', slug: `bounds-${Date.now()}` })
+      .select()
+      .single()
+    const { data: funnel } = await admin.from('sales_funnels').insert({ client_id: client!.id, name: 'B', slug: 'b' }).select().single()
+    const sale = (externalId: string, at: string) => ({
+      sales_funnel_id: funnel!.id,
+      external_id: externalId,
+      data_venda: at,
+      status: 'aprovada',
+      produto: 'Entrada',
+      valor_bruto: 10,
+      valor_liquido: 9,
+      is_upsell: false,
+      utm_source: 'facebookads',
+      utm_term: 'Anúncio 01',
+      utm_content: 'Conjunto 01',
+    })
+    // 23:30 in São Paulo on the 20th is already the 21st in UTC; the 21st at noon is outside.
+    await admin.from('sales').insert([sale('late', '2026-09-21T02:30:00Z'), sale('next', '2026-09-21T15:00:00Z')])
+
+    const args = { p_sales_funnel_id: funnel!.id, p_since: '2026-09-20', p_until: '2026-09-21' }
+    const { data: byProduct, error } = await db.rpc('get_funnel_sales_by_product', args)
+    expect(error).toBeNull()
+    expect((byProduct as { sales_count: number }[]).map((row) => Number(row.sales_count))).toEqual([1])
+    const { data: byHour } = await db.rpc('get_funnel_sales_by_hour', args)
+    expect((byHour as { hour: number; sales_count: number }[]).filter((row) => Number(row.sales_count) > 0).map((row) => row.hour)).toEqual([23])
+    const { data: byCreative, error: creativeError } = await db.rpc('get_funnel_report_by_creative', args)
+    expect(creativeError).toBeNull()
+    expect((byCreative as { sales_count: number }[]).reduce((sum, row) => sum + Number(row.sales_count), 0)).toBe(1)
+  })
+})
