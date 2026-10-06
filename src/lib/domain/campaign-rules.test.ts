@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { bracketTags, conflictingCampaigns, orphanCampaigns, summarizeFronts, type ClassifiedCampaign } from './campaign-rules'
+import { bracketTags, conflictingCampaigns, orphanCampaigns, reconcileSpend, summarizeFronts, type ClassifiedCampaign } from './campaign-rules'
 
 function campaign(name: string, spend: number, frontIds: string[], leads = 0, suggested = frontIds): ClassifiedCampaign {
   return {
@@ -66,5 +66,22 @@ describe('bracketTags', () => {
       { tag: '[VENDA]', spend: 80, campaigns: 1 },
       { tag: '[PRE]', spend: 20, campaigns: 1 },
     ])
+  })
+})
+
+describe('reconcileSpend', () => {
+  it('adds up to the Meta total when every campaign has at most one front', () => {
+    const result = reconcileSpend([
+      { spend: 100, front_ids: ['f1'] },
+      { spend: 40, front_ids: [] },
+    ])
+    expect(result).toEqual({ total: 140, classified: 100, unclassified: 40, doubleCounted: 0 })
+    expect(result.classified + result.unclassified).toBe(result.total)
+  })
+
+  it('measures the spend a campaign claimed by two fronts adds on top of the Meta total', () => {
+    const result = reconcileSpend([{ spend: 100, front_ids: ['f1', 'f2'] }])
+    expect(result.classified + result.unclassified - result.total).toBe(100)
+    expect(result.doubleCounted).toBe(100)
   })
 })

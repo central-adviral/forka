@@ -8,6 +8,7 @@ import { getClientDaily, saoPauloDay, type ClientDay } from '@/lib/repo/today-re
 import { buildAttention, type AttentionItem } from '@/lib/domain/attention'
 import { getAlerts, getWatchers } from '@/lib/repo/watchers-repo'
 import { METRICS, formatMetric } from '@/lib/domain/watchers'
+import { projectDay } from '@/lib/domain/day-pace'
 
 const PERIODS = [
   { value: 'hoje', label: 'Hoje' },
@@ -77,7 +78,7 @@ export default async function TodayPage({
     getClientDaily(supabase, client.id, week.since, week.until),
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: monthSince, p_until: week.until }),
     supabase.from('sync_runs').select('finished_at, error').eq('client_id', client.id).not('finished_at', 'is', null).order('started_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('sales_funnels').select('slug, name, is_active').eq('client_id', client.id).order('name'),
+    supabase.from('sales_funnels').select('slug, name, is_active, daily_sales_target').eq('client_id', client.id).order('name'),
     supabase.from('tests').select('id, name').eq('client_id', client.id).eq('status', 'active'),
     supabase.rpc('has_client_role', { p_client_id: client.id, p_min_role: 'owner' }),
   ])
@@ -127,14 +128,24 @@ export default async function TodayPage({
     watcherAlerts,
   })
 
+  // The day's target is the sum of the active projects' targets; the projection uses the sales up
+  // to the last Meta pull, the same cut the partial CPA uses.
+  const dailyTarget = (funnels ?? []).filter((funnel) => funnel.is_active).reduce((total, funnel) => total + (funnel.daily_sales_target ?? 0), 0)
+  const projected = period === 'hoje' ? projectDay(vendas, metaDataAt ? new Date(metaDataAt) : new Date()) : null
+  const salesFoot =
+    dailyTarget > 0 && period !== '7d'
+      ? `meta ${dailyTarget.toLocaleString('pt-BR')}${projected !== null ? ` · projeção ${projected.toLocaleString('pt-BR')}` : ''}`
+      : `${vendasAnuncio.toLocaleString('pt-BR')} de anúncio`
+  const salesTag = dailyTarget > 0 && projected !== null ? (projected >= dailyTarget ? 'no ritmo' : 'abaixo do ritmo') : 'todas'
+
   const weekdayLabel = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit' })
   const sparkOf = (key: 'spendComImposto' | 'vendas' | 'leads') => weekDays.map((day) => day[key])
   const kpis = [
     { label: 'Investimento', tag: 'c/ imposto', value: currency(spend), foot: `${currency(sum(weekDays, 'spendComImposto'))} em 7 dias`, spark: sparkOf('spendComImposto'), color: 'var(--ct-an)' },
-    { label: 'Vendas de entrada', tag: 'todas', value: vendas.toLocaleString('pt-BR'), foot: `${vendasAnuncio.toLocaleString('pt-BR')} de anúncio`, spark: sparkOf('vendas'), color: 'var(--ct-ok)' },
+    { label: 'Vendas de entrada', tag: salesTag, value: vendas.toLocaleString('pt-BR'), foot: salesFoot, spark: sparkOf('vendas'), color: 'var(--ct-ok)' },
     { label: 'CPA geral', tag: partial ? 'parcial' : 'todas', value: vendas > 0 ? currency2(spend / vendas) : '—', foot: vendasAnuncio > 0 ? `de anúncio ${currency2(spend / vendasAnuncio)}` : 'sem venda de anúncio', spark: [], color: '' },
-    { label: 'Leads', tag: 'Meta', value: leads.toLocaleString('pt-BR'), foot: 'contados pelo Meta', spark: sparkOf('leads'), color: 'var(--ct-painel)' },
-    { label: 'CPL', tag: partial ? 'parcial' : 'Meta', value: leads > 0 ? currency2(spend / leads) : '—', foot: 'investimento ÷ leads', spark: [], color: '' },
+    { label: 'Leads', tag: 'pagos', value: leads.toLocaleString('pt-BR'), foot: 'leads de anúncio, sem duplicata', spark: sparkOf('leads'), color: 'var(--ct-painel)' },
+    { label: 'CPL', tag: partial ? 'parcial' : 'pagos', value: leads > 0 ? currency2(spend / leads) : '—', foot: 'investimento ÷ leads', spark: [], color: '' },
   ]
 
   const maxVendas = Math.max(...weekDays.map((day) => day.vendas), 1)

@@ -67,3 +67,28 @@ export function bracketTags(campaigns: ClassifiedCampaign[], limit = 16): { tag:
     .sort((a, b) => b.spend - a.spend)
     .slice(0, limit)
 }
+
+export interface SpendReconciliation {
+  total: number
+  classified: number
+  unclassified: number
+  /** Spend counted by more than one front: the fronts sum above the Meta total by this much. */
+  doubleCounted: number
+}
+
+// Every front of every project plus "não classificado" must add up to the Meta spend of the
+// client. A campaign two fronts claim is counted twice, which is the gap this measures.
+export function reconcileSpend(campaigns: Pick<ClassifiedCampaign, 'spend' | 'front_ids'>[]): SpendReconciliation {
+  let total = 0
+  let classified = 0
+  let unclassified = 0
+  let doubleCounted = 0
+  for (const campaign of campaigns) {
+    const spend = Number(campaign.spend)
+    total += spend
+    if (campaign.front_ids.length === 0) unclassified += spend
+    else classified += spend * campaign.front_ids.length
+    if (campaign.front_ids.length > 1) doubleCounted += spend * (campaign.front_ids.length - 1)
+  }
+  return { total, classified, unclassified, doubleCounted }
+}

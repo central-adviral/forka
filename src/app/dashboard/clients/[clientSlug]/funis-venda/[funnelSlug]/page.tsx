@@ -4,6 +4,7 @@ import { getDailyFunnel, getFunnelSyncHealth, getPaymentMethodBreakdown, getSale
 import { REPORT_PERIODS, resolvePeriodDateRange, formatBr } from '@/lib/domain/report-period'
 import { FunnelCone } from './funnel-cone'
 import { FunnelKpiCards } from './funnel-kpi-cards'
+import { MIN_SALES_FOR_CPA, topByCpa, topBySales } from '@/lib/domain/creative-ranking'
 import { FunnelPaymentPie } from './funnel-payment-pie'
 import { SyncFunnelButton } from './sync-funnel-button'
 import { SyncStatus } from '@/components/sync-status'
@@ -371,6 +372,38 @@ export default async function SalesFunnelPage({
         </div>
       </div>
 
+      )}
+
+      {tab === 'criativos' && creatives.length > 0 && (
+      <div className="mb-6 grid gap-4 md:grid-cols-2">
+        {[
+          { title: 'Top 10 por compras', hint: 'quem mais vendeu no período', rows: topBySales(creatives).map((c) => ({ c, value: `${c.sales_count} ${c.sales_count === 1 ? 'venda' : 'vendas'}`, sub: `CPA ${currency(c.spend / c.sales_count)}` })) },
+          { title: 'Top 10 por CPA', hint: `menor custo por venda, com ${MIN_SALES_FOR_CPA}+ vendas`, rows: topByCpa(creatives).map((c) => ({ c, value: currency(c.cpa), sub: `${c.sales_count} vendas` })) },
+        ].map((block) => (
+          <div key={block.title} className="card-shadow rounded-2xl border border-[var(--ct-line)] p-4">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <h3 className="font-[family-name:var(--font-sora)] text-[14px] font-semibold">{block.title}</h3>
+              <span className="text-[11.5px] text-[var(--ct-text-2)]">{block.hint}</span>
+            </div>
+            {block.rows.length === 0 ? (
+              <p className="text-[12.5px] text-[var(--ct-text-2)]">Nenhum anúncio com vendas suficientes no período.</p>
+            ) : (
+              <ol className="flex flex-col gap-1.5">
+                {block.rows.map(({ c, value, sub }, index) => (
+                  <li key={`${c.ad_name}|${c.adset_name ?? ''}`} className="flex items-center gap-3 text-[13px]">
+                    <span className="w-5 flex-none text-right font-[family-name:var(--font-geist-mono)] text-[11px] text-[var(--ct-text-3)]">{index + 1}</span>
+                    <span className="min-w-0 flex-1 truncate" title={`${c.ad_name}${c.adset_name ? ` · ${c.adset_name}` : ''}`}>{c.ad_name}</span>
+                    <span className="flex-none text-right font-[family-name:var(--font-geist-mono)] tabular-nums">
+                      {value}
+                      <span className="block text-[11px] text-[var(--ct-text-2)]">{sub}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        ))}
+      </div>
       )}
 
       {tab === 'criativos' && (
