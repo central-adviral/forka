@@ -8,17 +8,7 @@ import { isCnameVerified } from '@/lib/domain/redirect-domain'
 import { addProjectDomain, removeProjectDomain } from '@/lib/vercel/domains'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { saveClientSecrets } from '@/lib/repo/client-secrets-repo'
-
-// Secrets are written with the service role, which bypasses RLS -- so the ownership check RLS
-// used to perform on the update has to happen explicitly, on the user's own session, first.
-async function assertOwnsClient(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
-  clientId: string
-): Promise<void> {
-  const { data, error } = await supabase.from('clients').select('id').eq('id', clientId).maybeSingle()
-  if (error) throw error
-  if (!data) throw new Error('Cliente não encontrado')
-}
+import { assertClientRole } from '@/lib/repo/client-access-repo'
 
 const domainSchema = z.object({
   client_id: z.string().uuid(),
@@ -43,6 +33,9 @@ export async function saveDomain(context: { client_id: string; client_slug: stri
   }
   const parsed = result.data
   const supabase = await createServerSupabaseClient()
+  // The domain is registered on Vercel before the update below, and that update silently matches no
+  // row for a member who is not an owner -- so the role has to be settled first.
+  await assertClientRole(supabase, parsed.client_id, 'owner')
 
   const { data: current } = await supabase
     .from('clients')
@@ -68,6 +61,7 @@ export async function saveDomain(context: { client_id: string; client_slug: stri
 
 export async function verifyDomain(context: { client_id: string; client_slug: string }): Promise<{ verified: boolean }> {
   const supabase = await createServerSupabaseClient()
+  await assertClientRole(supabase, context.client_id, 'owner')
 
   // Re-read the domain to verify from the DB (RLS-scoped to the caller's own clients) instead
   // of trusting a domain string passed in from the caller — otherwise this becomes an open DNS
@@ -113,7 +107,7 @@ export async function saveHublaToken(context: { client_id: string; client_slug: 
   // O valor salvo nunca é ecoado de volta pro HTML — campo em branco significa "manter o token atual", não apagar.
   if (!parsed.hubla_webhook_token) return
   const supabase = await createServerSupabaseClient()
-  await assertOwnsClient(supabase, parsed.client_id)
+  await assertClientRole(supabase, parsed.client_id, 'owner')
   await saveClientSecrets(createServiceRoleClient(), parsed.client_id, {
     hublaWebhookToken: parsed.hubla_webhook_token,
   })
@@ -139,7 +133,7 @@ export async function saveFunnelDataSource(context: { client_id: string; client_
   }
   const parsed = result.data
   const supabase = await createServerSupabaseClient()
-  await assertOwnsClient(supabase, parsed.client_id)
+  await assertClientRole(supabase, parsed.client_id, 'owner')
 
   const { error } = await supabase
     .from('clients')
