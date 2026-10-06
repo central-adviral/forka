@@ -124,6 +124,8 @@ export default async function SalesFunnelPage({
     roas: rows.map((row) => (row.spendComImposto > 0 ? row.receitaLiquida / row.spendComImposto : 0)),
   }
   const lastSyncAt = health.find((h) => h.lastRunAt)?.lastRunAt ?? null
+  const partialToday = rows.find((row) => row.dadosAte)
+  const timeBr = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
   const hasSyncError = health.some((h) => h.lastResult === 'error')
 
   return (
@@ -235,6 +237,16 @@ export default async function SalesFunnelPage({
         </div>
       )}
 
+      {partialToday?.dadosAte && (
+        <p className="mb-3 text-[12.5px] text-[#A1A1AA]" role="status">
+          <span className="mr-2 rounded-full bg-[#F2B866]/[0.12] px-2 py-0.5 text-[11px] text-[#F2B866]">hoje parcial</span>
+          Gasto do Meta até {timeBr(partialToday.dadosAte)}. As vendas de hoje entram até esse horário para o CPA comparar
+          igual com igual
+          {partialToday.vendasAposDados > 0
+            ? `; ${partialToday.vendasAposDados.toLocaleString('pt-BR')} chegaram depois e entram no próximo pull.`
+            : '.'}
+        </p>
+      )}
       <FunnelKpiCards totals={kpiTotals} currency={currency} sparklines={kpiSparklines} />
 
       <SalesOriginPanel origins={salesByOrigin} currency={currency} />
@@ -379,7 +391,14 @@ export default async function SalesFunnelPage({
           <tbody>
             {rows.map((row) => (
               <tr key={row.data} className="border-t border-white/[0.08]">
-                <td className="p-3">{row.data}</td>
+                <td className="p-3">
+                  {row.data}
+                  {row.dadosAte && (
+                    <span className="ml-2 rounded-full bg-[#F2B866]/[0.12] px-2 py-0.5 text-[11px] text-[#F2B866]">
+                      parcial · até {timeBr(row.dadosAte)}
+                    </span>
+                  )}
+                </td>
                 <td className="p-3">{row.vendas}</td>
                 <td className="p-3">{currency(row.receitaBruta)}</td>
                 <td className="p-3">{currency(row.spendComImposto)}</td>

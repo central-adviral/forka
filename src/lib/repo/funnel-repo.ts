@@ -26,6 +26,10 @@ export interface DailyFunnelRow {
   cac: number | null
   /** Where the spend came from: the project's campaign fronts, or the LaunchOps operation mapping. */
   spendSource: 'frentes' | 'operacao'
+  /** Today only: the moment of the last Meta pull. Today's sales above are cut there (0057). */
+  dadosAte: string | null
+  /** Today only: sales that arrived after that pull, left out of the day's CPA. */
+  vendasAposDados: number
 }
 
 export async function getDailyFunnel(
@@ -54,6 +58,8 @@ export async function getDailyFunnel(
     landing_page_views: number
     initiate_checkout: number
     spend_source: 'frentes' | 'operacao'
+    dados_ate: string | null
+    vendas_apos_dados: number
   }[]).map((row) => {
     const vendas = Number(row.vendas)
     const spendComImposto = Number(row.spend_com_imposto)
@@ -76,6 +82,8 @@ export async function getDailyFunnel(
       roas: spendComImposto > 0 ? receitaBruta / spendComImposto : null,
       cac: vendas > 0 ? spendComImposto / vendas : null,
       spendSource: row.spend_source,
+      dadosAte: row.dados_ate,
+      vendasAposDados: Number(row.vendas_apos_dados ?? 0),
     }
   })
 }

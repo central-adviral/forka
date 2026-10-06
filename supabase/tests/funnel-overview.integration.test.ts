@@ -73,3 +73,48 @@ describe('project overview: entry vs upsell, sale origin and Meta tax (0055)', (
     expect(byOrigin).toEqual({ anuncio: [1, 1], anuncio_legado: [1, 0], organico_bio: [1, 0], sem_utm: [1, 0] })
   })
 })
+
+describe('today is a partial day (0057)', () => {
+  it('cuts today sales at the last Meta pull and reports the later ones apart', async () => {
+    const { data: user } = await admin.auth.admin.createUser({ email: `partial-${Date.now()}@example.com`, password: 'password123', email_confirm: true })
+    const { data: client } = await admin
+      .from('clients')
+      .insert({ owner_id: user!.user!.id, name: 'Partial', slug: `partial-${Date.now()}` })
+      .select()
+      .single()
+    const { data: funnel } = await admin.from('sales_funnels').insert({ client_id: client!.id, name: 'Hoje', slug: 'hoje' }).select().single()
+    const { data: front } = await admin.from('project_fronts').insert({ sales_funnel_id: funnel!.id, code: 'PAG', name: 'Venda' }).select().single()
+    await admin.from('naming_rules').insert({ front_id: front!.id, kind: 'include', value: 'venda' })
+
+    const now = Date.now()
+    const today = new Date(now).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+    const tomorrow = new Date(now + 86_400_000).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+    const lastPull = new Date(now - 2 * 60_000).toISOString()
+    await admin.from('campaign_daily').insert({
+      client_id: client!.id,
+      data: today,
+      campaign_id: 'c1',
+      campaign_name: 'venda',
+      spend: 100,
+      source_updated_at: lastPull,
+    })
+    const sale = (externalId: string, minutesAgo: number) => ({
+      sales_funnel_id: funnel!.id,
+      external_id: externalId,
+      data_venda: new Date(now - minutesAgo * 60_000).toISOString(),
+      status: 'aprovada',
+      valor_bruto: 10,
+      valor_liquido: 9,
+      is_upsell: false,
+    })
+    // Minutes apart, so both stay on today's São Paulo date unless the test runs in the day's first 3 minutes.
+    await admin.from('sales').insert([sale('before', 3), sale('after', 1)])
+
+    const { data, error } = await admin.rpc('get_funnel_daily', { p_sales_funnel_id: funnel!.id, p_since: today, p_until: tomorrow })
+    expect(error).toBeNull()
+    const row = (data as { vendas: number; vendas_apos_dados: number; dados_ate: string | null }[])[0]
+    expect(Number(row.vendas)).toBe(1)
+    expect(Number(row.vendas_apos_dados)).toBe(1)
+    expect(new Date(row.dados_ate!).toISOString()).toBe(lastPull)
+  })
+})
