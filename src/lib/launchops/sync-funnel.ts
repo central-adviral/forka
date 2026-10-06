@@ -11,6 +11,7 @@ import {
 import {
   fetchLaunchOpsAdCreatives,
   fetchLaunchOpsAdCreativesByAdIds,
+  fetchLaunchOpsAdCreativesByCampaignIds,
   fetchLaunchOpsAdCreativeSpendRows,
   joinAdCreativeSpend,
   syncAdCreativeSpendForFunnel,
@@ -128,15 +129,50 @@ async function syncAdSpendEntity(appDb: SupabaseClient, launchopsDb: SupabaseCli
   }
 }
 
+// Campaigns owned by this project's own fronts (not the ones reading another project), or null when
+// the project has no fronts and still relies on the LaunchOps operation mapping.
+async function projectCampaignIds(appDb: SupabaseClient, funnel: SyncableFunnel): Promise<string[] | null> {
+  if (!funnel.client_id) return null
+  const { data: fronts, error } = await appDb
+    .from('project_fronts')
+    .select('id')
+    .eq('sales_funnel_id', funnel.id)
+    .is('source_sales_funnel_id', null)
+  if (error) throw error
+  if (!fronts?.length) return null
+  const frontIds = new Set(fronts.map((front) => front.id as string))
+  const { data: campaigns, error: campaignsError } = await appDb.rpc('get_client_campaigns', {
+    p_client_id: funnel.client_id,
+    p_since: '2000-01-01',
+    p_until: '2100-01-01',
+  })
+  if (campaignsError) throw campaignsError
+  return ((campaigns ?? []) as { campaign_id: string; front_ids: string[] }[])
+    .filter((campaign) => (campaign.front_ids ?? []).some((id) => frontIds.has(id)))
+    .map((campaign) => campaign.campaign_id)
+}
+
 async function syncAdCreativeSpendEntity(appDb: SupabaseClient, launchopsDb: SupabaseClient, funnel: SyncableFunnel) {
-  if (!funnel.launchops_operacao_ids?.length) return
   try {
+    const campaignIds = await projectCampaignIds(appDb, funnel)
+    if (!campaignIds && !funnel.launchops_operacao_ids?.length) return
     const cursor = await getSyncCursor(appDb, funnel.id, 'ad_creative_spend_daily')
-    const byOperation = await fetchLaunchOpsAdCreatives(launchopsDb, funnel.launchops_operacao_ids)
-    const seenAdIds = funnel.client_id ? await adIdsSeenInClicks(appDb, funnel.client_id) : []
+    // LaunchOps stopped tagging operations (2026-09-23), so a project with fronts takes its ads from
+    // the campaigns its fronts own. That set changes with the rules, and a campaign joining a front
+    // must bring its whole history, so the fronts path re-reads everything instead of using a cursor.
+    // bsheep: full re-read per sync is ~6k rows today; move to a per-campaign cursor if anuncio_dia grows large
+    const byScope = campaignIds
+      ? await fetchLaunchOpsAdCreativesByCampaignIds(launchopsDb, campaignIds)
+      : await fetchLaunchOpsAdCreatives(launchopsDb, funnel.launchops_operacao_ids!)
+    // The clicked-ads widening only patches the operation mapping; with fronts it would pull in ads
+    // of campaigns the project does not own and inflate its creative spend.
+    const seenAdIds = !campaignIds && funnel.client_id ? await adIdsSeenInClicks(appDb, funnel.client_id) : []
     const byClickedAdId = await fetchLaunchOpsAdCreativesByAdIds(launchopsDb, seenAdIds)
-    const creatives = [...new Map([...byOperation, ...byClickedAdId].map((c) => [c.id, c])).values()]
-    const spendRows = await fetchLaunchOpsAdCreativeSpendRows(launchopsDb, { anuncioIds: creatives.map((c) => c.id), since: cursor })
+    const creatives = [...new Map([...byScope, ...byClickedAdId].map((c) => [c.id, c])).values()]
+    const spendRows = await fetchLaunchOpsAdCreativeSpendRows(launchopsDb, {
+      anuncioIds: creatives.map((c) => c.id),
+      since: campaignIds ? null : cursor,
+    })
     const joined = joinAdCreativeSpend(creatives, spendRows)
     await syncAdCreativeSpendForFunnel(appDb, funnel.id, joined)
     const latestUpdatedAt = spendRows.length > 0 ? spendRows[spendRows.length - 1].updated_at : undefined

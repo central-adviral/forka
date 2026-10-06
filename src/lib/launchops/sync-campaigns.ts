@@ -1,12 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllPages } from './sync-ad-spend'
+import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
 
 // Every campaign the client's LaunchOps knows about, operation or not: the operation mapping there
 // stopped being maintained, and projects now pick campaigns through fronts (0053, 0054).
 //
 // Spend is summed from the per-ad table (anuncio_dia): its totals are the ones that match the
-// fronts and the creative numbers (data review of 2026-10-06). Leads only exist per ad set, so they
-// still come from meta_ads_daily -- they are a count shown beside the spend, never a cost base.
+// fronts and the creative numbers (data review of 2026-10-06). Leads are counted from LaunchOps'
+// own lead records (see fetchLaunchOpsCampaignLeads) -- a count beside the spend, never a cost base.
 
 export interface LaunchOpsAdDayRow {
   data_referencia: string
@@ -67,19 +68,44 @@ export async function fetchLaunchOpsAdDayRows(launchopsDb: SupabaseClient, param
   )
 }
 
+export interface LaunchOpsPaidLeadRow {
+  data_captacao: string
+  captacao_campaign: string | null
+}
+
+// meta_ads_daily.leads_periodo was never filled. The leads themselves are in `leads`: a paid one
+// (captacao_medium = 'paid') carries the Meta campaign id in captacao_campaign (2026-10-06 check:
+// 3282 of 3282 paid leads match an anuncio.campaign_id). Duplicates are left out, so the CPL is per
+// person, not per form submission.
 export async function fetchLaunchOpsCampaignLeads(
   launchopsDb: SupabaseClient,
   params: { since: string }
 ): Promise<LaunchOpsCampaignLeadsRow[]> {
-  return fetchAllPages<LaunchOpsCampaignLeadsRow>((from, to) =>
+  const rows = await fetchAllPages<LaunchOpsPaidLeadRow>((from, to) =>
     launchopsDb
-      .from('meta_ads_daily')
-      .select('data_referencia, campaign_id, leads_periodo')
-      .gte('data_referencia', params.since)
-      .gt('leads_periodo', 0)
+      .from('leads')
+      .select('data_captacao, captacao_campaign')
+      .eq('captacao_medium', 'paid')
+      .not('is_duplicata', 'is', true)
+      .gte('data_captacao', brtDayBoundaryUtc(params.since))
       .order('id', { ascending: true })
       .range(from, to)
   )
+  return countPaidLeads(rows)
+}
+
+/** Paid leads per São Paulo day and campaign. */
+export function countPaidLeads(rows: LaunchOpsPaidLeadRow[]): LaunchOpsCampaignLeadsRow[] {
+  const byKey = new Map<string, LaunchOpsCampaignLeadsRow>()
+  for (const row of rows) {
+    if (!row.captacao_campaign) continue
+    const day = new Date(new Date(row.data_captacao).getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const key = `${day}|${row.captacao_campaign}`
+    const current = byKey.get(key) ?? { data_referencia: day, campaign_id: row.captacao_campaign, leads_periodo: 0 }
+    current.leads_periodo = (current.leads_periodo ?? 0) + 1
+    byKey.set(key, current)
+  }
+  return [...byKey.values()]
 }
 
 /** anuncio_dia is per ad; the Central counts per campaign and day. */
