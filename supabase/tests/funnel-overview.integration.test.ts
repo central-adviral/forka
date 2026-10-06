@@ -118,3 +118,38 @@ describe('today is a partial day (0057)', () => {
     expect(new Date(row.dados_ate!).toISOString()).toBe(lastPull)
   })
 })
+
+describe('client day for the Hoje screen (0058)', () => {
+  it('counts each campaign once even when a project reads another, and sums sales of every project', async () => {
+    const { data: user } = await admin.auth.admin.createUser({ email: `client-day-${Date.now()}@example.com`, password: 'password123', email_confirm: true })
+    const { data: client } = await admin
+      .from('clients')
+      .insert({ owner_id: user!.user!.id, name: 'Client Day', slug: `client-day-${Date.now()}` })
+      .select()
+      .single()
+    const { data: perpetual } = await admin.from('sales_funnels').insert({ client_id: client!.id, name: '1K', slug: '1k' }).select().single()
+    const { data: launch } = await admin.from('sales_funnels').insert({ client_id: client!.id, name: 'T15', slug: 't15' }).select().single()
+    const { data: owner } = await admin.from('project_fronts').insert({ sales_funnel_id: perpetual!.id, code: 'PAG', name: 'Venda' }).select().single()
+    await admin.from('naming_rules').insert({ front_id: owner!.id, kind: 'include', value: '[1K]' })
+    await admin.from('project_fronts').insert({ sales_funnel_id: launch!.id, code: 'PAGA', name: 'Paga', source_sales_funnel_id: perpetual!.id })
+    const day = '2026-09-20'
+    await admin.from('campaign_daily').insert({ client_id: client!.id, data: day, campaign_id: 'c1', campaign_name: '[1K] venda', spend: 500, leads: 7 })
+    const sale = (funnelId: string, externalId: string) => ({
+      sales_funnel_id: funnelId,
+      external_id: externalId,
+      data_venda: `${day}T15:00:00Z`,
+      status: 'aprovada',
+      valor_bruto: 10,
+      valor_liquido: 9,
+      is_upsell: false,
+    })
+    await admin.from('sales').insert([sale(perpetual!.id, 'p-1'), sale(launch!.id, 'l-1')])
+
+    const { data, error } = await admin.rpc('get_client_daily', { p_client_id: client!.id, p_since: day, p_until: '2026-09-21' })
+    expect(error).toBeNull()
+    const row = (data as { spend: number; leads: number; vendas: number }[])[0]
+    expect(Number(row.spend)).toBe(500)
+    expect(Number(row.leads)).toBe(7)
+    expect(Number(row.vendas)).toBe(2)
+  })
+})
