@@ -16,6 +16,7 @@ interface Client {
   name: string
   slug: string
   testsCount: number
+  openAlerts: number
   projects: ShellProject[]
   role: ClientRole
 }
@@ -46,6 +47,12 @@ const ICONS = {
   ),
   plus: <path d="M8 3v10M3 8h10" />,
   rules: <path d="M2.5 4h11M4.5 8h7M6.5 12h3" />,
+  targets: (
+    <>
+      <circle cx="8" cy="8" r="5.5" />
+      <circle cx="8" cy="8" r="2.5" />
+    </>
+  ),
   members: (
     <>
       <circle cx="6" cy="5.5" r="2.5" />
@@ -77,6 +84,8 @@ function pageLabel(pathname: string, clientSlug: string | undefined): string {
   if (last === 'regras') return 'Regras de campanha'
   if (rest[0] === 'integrations') return 'Integrações'
   if (rest[0] === 'membros') return 'Membros'
+  if (rest[0] === 'painel') return 'Painel de Controle'
+  if (rest[0] === 'metas') return 'Metas e alvos'
   if (rest[0] === 'tests') return rest.length === 1 ? 'Teste A/B' : 'Relatório'
   if (rest[0] === 'funis-venda') return 'Análises'
   return ''
@@ -315,14 +324,10 @@ export function DashboardShell({
               </NavLink>
 
               <GroupLabel>Ferramentas</GroupLabel>
-              <span
-                className="flex cursor-default items-center gap-2.5 whitespace-nowrap rounded-[7px] px-2.5 py-[7px] text-[13.5px] font-medium text-[var(--ct-text-3)]"
-                title="Vigias, alertas e relatórios — Fase 3 do roadmap"
-              >
+              <NavLink href={`${base}/painel`} active={pathname.startsWith(`${base}/painel`)} count={activeClient.openAlerts || undefined}>
                 <Dot color="var(--ct-painel)" />
                 Painel de Controle
-                <span className="ml-auto rounded-full border border-dashed border-[var(--ct-line-2)] px-1.5 font-[family-name:var(--font-geist-mono)] text-[9.5px]">breve</span>
-              </span>
+              </NavLink>
               <NavLink href={`${base}/funis-venda`} active={pathname.startsWith(`${base}/funis-venda`)} count={activeClient.projects.length}>
                 <Dot color="var(--ct-an)" />
                 Análises
@@ -358,6 +363,12 @@ export function DashboardShell({
                 >
                   <Icon>{ICONS.rules}</Icon>
                   Regras de campanha
+                </NavLink>
+              )}
+              {canEdit && (
+                <NavLink href={`${base}/metas`} active={pathname.startsWith(`${base}/metas`)}>
+                  <Icon>{ICONS.targets}</Icon>
+                  Metas e alvos
                 </NavLink>
               )}
               {canConfigure && (

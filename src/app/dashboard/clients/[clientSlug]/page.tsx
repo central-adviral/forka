@@ -6,6 +6,8 @@ import { deleteClient } from '../actions'
 import { findBestVariant } from '@/lib/repo/client-hub-repo'
 import { getClientDaily, saoPauloDay, type ClientDay } from '@/lib/repo/today-repo'
 import { buildAttention, type AttentionItem } from '@/lib/domain/attention'
+import { getAlerts, getWatchers } from '@/lib/repo/watchers-repo'
+import { METRICS, formatMetric } from '@/lib/domain/watchers'
 
 const PERIODS = [
   { value: 'hoje', label: 'Hoje' },
@@ -79,7 +81,22 @@ export default async function TodayPage({
     supabase.from('tests').select('id, name').eq('client_id', client.id).eq('status', 'active'),
     supabase.rpc('has_client_role', { p_client_id: client.id, p_min_role: 'owner' }),
   ])
-  const bestVariant = await findBestVariant(supabase, activeTests ?? [], monthSince, week.until).catch(() => null)
+  const [bestVariant, watchers, alerts] = await Promise.all([
+    findBestVariant(supabase, activeTests ?? [], monthSince, week.until).catch(() => null),
+    getWatchers(supabase, client.id),
+    getAlerts(supabase, client.id),
+  ])
+  const watcherById = new Map(watchers.map((watcher) => [watcher.id, watcher]))
+  const watcherAlerts = alerts.flatMap((alert) => {
+    const watcher = watcherById.get(alert.watcherId)
+    if (alert.closedAt || !watcher) return []
+    const scope = `${watcher.projectName}${watcher.frontName ? ` · ${watcher.frontName}` : ''}`
+    return [{
+      severity: alert.severity,
+      title: `${scope} · ${METRICS[watcher.metric].label} ${alert.severity === 'crit' ? 'crítico' : 'em atenção'}`,
+      detail: `${formatMetric(watcher.metric, alert.value)} contra alvo de ${formatMetric(watcher.metric, watcher.target)} no último dia fechado.`,
+    }]
+  })
 
   const periodDays =
     period === 'hoje' ? weekDays.filter((day) => day.data === today)
@@ -107,6 +124,7 @@ export default async function TodayPage({
     unclassified: { count: orphans.length, spend: orphans.reduce((total, c) => total + Number(c.spend), 0) },
     rulesHref: firstProject ? `${base}/funis-venda/${firstProject.slug}/regras` : null,
     bestVariant,
+    watcherAlerts,
   })
 
   const weekdayLabel = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit' })

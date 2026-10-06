@@ -48,3 +48,21 @@ describe('buildAttention', () => {
     expect(buildAttention(input({ lastRun: null, metaDataAt: null }))[0].title).toBe('As campanhas deste cliente ainda não foram lidas')
   })
 })
+
+describe('buildAttention with watcher alerts', () => {
+  it('lists an open alert as a Painel de Controle item, critical ones first', () => {
+    const items = buildAttention({
+      base: '/dashboard/clients/voe',
+      now,
+      metaDataAt: '2026-10-06T16:07:00Z',
+      lastRun: { finishedAt: '2026-10-06T16:12:00Z', error: null },
+      conflicts: [],
+      unclassified: { count: 1, spend: 80 },
+      rulesHref: null,
+      bestVariant: null,
+      watcherAlerts: [{ severity: 'crit', title: '1K · CPA geral crítico', detail: 'R$ 84,10 contra alvo de R$ 55,00' }],
+    })
+    expect(items[0]).toMatchObject({ severity: 'crit', tool: 'painel', href: '/dashboard/clients/voe/painel' })
+    expect(items[1].tool).toBe('config')
+  })
+})

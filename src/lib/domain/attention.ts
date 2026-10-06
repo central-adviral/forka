@@ -21,6 +21,8 @@ export interface AttentionInput {
   unclassified: { count: number; spend: number }
   rulesHref: string | null
   bestVariant: { testName: string; variantName: string; liftPct: number } | null
+  /** Open watcher alerts (0059), already worded. */
+  watcherAlerts?: { severity: 'warn' | 'crit'; title: string; detail: string }[]
 }
 
 const STALE_AFTER_MS = 2 * 60 * 60 * 1000
@@ -68,6 +70,10 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
         href: `${input.base}/integrations`,
       })
     }
+  }
+
+  for (const alert of input.watcherAlerts ?? []) {
+    items.push({ severity: alert.severity, title: alert.title, detail: alert.detail, tool: 'painel', href: `${input.base}/painel` })
   }
 
   if (input.conflicts.length > 0) {

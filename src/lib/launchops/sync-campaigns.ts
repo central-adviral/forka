@@ -215,6 +215,10 @@ export async function syncCampaignsForClient(
     const { data: frozen, error: freezeError } = await appDb.rpc('freeze_campaign_fronts', { p_client_id: clientId })
     if (freezeError) throw freezeError
 
+    // Fresh numbers, so the watchers judge the last closed day again and open or close alerts (0059).
+    const { error: watchError } = await appDb.rpc('evaluate_watchers', { p_client_id: clientId })
+    if (watchError) throw watchError
+
     await appDb
       .from('sync_runs')
       .update({ finished_at: new Date().toISOString(), rows_read: adRows.length, rows_written: days.length })
