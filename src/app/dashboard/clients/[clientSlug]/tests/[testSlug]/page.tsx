@@ -82,7 +82,7 @@ interface AdReportRow {
   ad_link_clicks: number | null
 }
 
-const TH_CLASS = 'px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]'
+const TH_CLASS = 'px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[#A1A1AA]'
 const TD_CLASS = 'relative px-4 py-2.5'
 const TR_CLASS = 'border-b border-white/[0.04] last:border-0 even:bg-white/[0.015] hover:bg-white/[0.035]'
 
@@ -102,10 +102,10 @@ const METRIC_INFO = {
 function InfoTooltip({ text }: { text: string }) {
   return (
     <span className="group relative ml-1 inline-flex cursor-help align-middle">
-      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white/20 text-[9px] font-bold normal-case text-[#8A90A6]">
+      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white/20 text-[9px] font-bold normal-case text-[#A1A1AA]">
         !
       </span>
-      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 w-48 -translate-x-1/2 rounded-md border border-white/[0.08] bg-[#1B2036] p-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-[#E8EAF2] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 w-48 -translate-x-1/2 rounded-md border border-white/[0.08] bg-[#111114] p-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-[#EDEDF0] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
         {text}
       </span>
     </span>
@@ -137,7 +137,7 @@ function BarCell({
   const pct = max > 0 ? Math.max(value > 0 ? 6 : 0, (value / max) * 100) : 0
   return (
     <td className={TD_CLASS}>
-      <div className="absolute inset-y-1.5 left-0 rounded-r bg-[#7C6FF0]/[0.14]" style={{ width: `${pct}%` }} />
+      <div className="absolute inset-y-1.5 left-0 rounded-r bg-[#8B9BFF]/[0.14]" style={{ width: `${pct}%` }} />
       <span className="relative">{format}</span>
       {children && <div className="relative mt-0.5">{children}</div>}
     </td>
@@ -146,7 +146,7 @@ function BarCell({
 
 function RateCell({ rate, children }: { rate: string; children?: React.ReactNode }) {
   return (
-    <td className={`${TD_CLASS} ${Number(rate) > 0 ? 'text-[#2DD4A8]' : 'text-[#8A90A6]'}`}>
+    <td className={`${TD_CLASS} ${Number(rate) > 0 ? 'text-[#4ADE9B]' : 'text-[#A1A1AA]'}`}>
       {rate}%
       {children && <div className="mt-0.5">{children}</div>}
     </td>
@@ -156,14 +156,14 @@ function RateCell({ rate, children }: { rate: string; children?: React.ReactNode
 // Counts and money read as a percentage; a rate reads in percentage points, because a rate that
 // moves from 2,1% to 3,4% rose 1,3 p.p., not 62%.
 function Delta({ current, previous, unit }: { current: number; previous: number | null; unit: 'pct' | 'pp' }) {
-  if (previous === null) return <span className="text-[11px] text-[#565F7A]">—</span>
+  if (previous === null) return <span className="text-[11px] text-[#6B6B76]">—</span>
   const diff = unit === 'pp' ? current - previous : previous === 0 ? null : ((current - previous) / previous) * 100
   if (diff === null) {
-    return <span className="text-[11px] text-[#565F7A]">novo</span>
+    return <span className="text-[11px] text-[#6B6B76]">novo</span>
   }
   const rounded = unit === 'pp' ? diff.toFixed(1) : Math.round(diff).toString()
   const sign = diff > 0 ? '+' : ''
-  const tone = diff > 0 ? 'text-[#2DD4A8]' : diff < 0 ? 'text-[#F76C6C]' : 'text-[#565F7A]'
+  const tone = diff > 0 ? 'text-[#4ADE9B]' : diff < 0 ? 'text-[#FF7A73]' : 'text-[#6B6B76]'
   return (
     <span className={`font-['JetBrains_Mono'] text-[11px] ${tone}`}>
       {sign}
@@ -179,7 +179,7 @@ function BotTag({ clicks, botClicks }: { clicks: number; botClicks: number }) {
   return (
     <span
       title="Cliques adicionais identificados como bot/crawler (ex.: pré-visualização de link da Meta) — não contam em visitas, vendas ou faturamento."
-      className="ml-2 inline-flex cursor-help items-center rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium normal-case text-[#8A90A6]"
+      className="ml-2 inline-flex cursor-help items-center rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium normal-case text-[#A1A1AA]"
     >
       {pct}% bot
     </span>
@@ -215,7 +215,7 @@ export default async function TestReportPage({
     console.error('[test-report-fetch-failed]', { testSlug }, testError)
     return (
       <div className="p-8">
-        <p className="text-sm text-[#8A90A6]">Não foi possível carregar este teste agora. Tente novamente em instantes.</p>
+        <p className="text-sm text-[#A1A1AA]">Não foi possível carregar este teste agora. Tente novamente em instantes.</p>
       </div>
     )
   }
@@ -268,7 +268,7 @@ export default async function TestReportPage({
   if (reportError || !report || report.length === 0) {
     return (
       <div className="p-8">
-        <p className="text-sm text-[#8A90A6]">
+        <p className="text-sm text-[#A1A1AA]">
           Não foi possível carregar os dados deste teste. Tente novamente em instantes.
         </p>
       </div>
@@ -406,7 +406,7 @@ export default async function TestReportPage({
         <div>
           <a
             href={`/dashboard/clients/${clientSlug}/tests`}
-            className="mb-1 flex items-center gap-1 text-xs text-[#8A90A6] hover:text-[#E8EAF2]"
+            className="mb-1 flex items-center gap-1 text-xs text-[#A1A1AA] hover:text-[#EDEDF0]"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -420,19 +420,19 @@ export default async function TestReportPage({
                 qualifica, na barra de resumo. */}
             <span
               className={`flex items-center gap-1.5 text-xs ${
-                test.status === 'active' ? 'text-[#2DD4A8]' : 'text-[#F76C6C]'
+                test.status === 'active' ? 'text-[#4ADE9B]' : 'text-[#FF7A73]'
               }`}
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
-                  test.status === 'active' ? 'bg-[#2DD4A8]' : 'bg-[#F76C6C]'
+                  test.status === 'active' ? 'bg-[#4ADE9B]' : 'bg-[#FF7A73]'
                 }`}
               />
               {test.status === 'active' ? 'Ativo' : 'Pausado'}
             </span>
           </div>
           <div className="mt-2 flex items-center gap-1.5">
-            <p className="font-['JetBrains_Mono'] text-xs text-[#565F7A]">{redirectUrl}</p>
+            <p className="font-['JetBrains_Mono'] text-xs text-[#6B6B76]">{redirectUrl}</p>
             <CopyButton text={redirectUrl} />
           </div>
         </div>
@@ -440,7 +440,7 @@ export default async function TestReportPage({
           <RefreshButton />
           <a
             href={`/dashboard/clients/${clientSlug}/tests/${test.slug}/edit`}
-            className="flex h-9 items-center rounded-[9px] border border-white/[0.08] bg-transparent px-4 text-[13px] font-medium text-[#8A90A6]"
+            className="flex h-9 items-center rounded-[9px] border border-white/[0.08] bg-transparent px-4 text-[13px] font-medium text-[#A1A1AA]"
           >
             Editar
           </a>
@@ -454,7 +454,7 @@ export default async function TestReportPage({
           >
             <button
               type="submit"
-              className="h-9 rounded-[9px] border border-white/[0.08] bg-transparent px-4 text-[13px] font-medium text-[#8A90A6]"
+              className="h-9 rounded-[9px] border border-white/[0.08] bg-transparent px-4 text-[13px] font-medium text-[#A1A1AA]"
             >
               {test.status === 'active' ? 'Pausar teste' : 'Ativar teste'}
             </button>
@@ -472,8 +472,8 @@ export default async function TestReportPage({
               href={option.value === 'all' ? `?` : `?periodo=${option.value}`}
               className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
                 isActive
-                  ? 'border-[#7C6FF0] bg-[#7C6FF0]/15 text-[#7C6FF0]'
-                  : 'border-white/[0.08] text-[#8A90A6] hover:text-[#E8EAF2]'
+                  ? 'border-[#8B9BFF] bg-[#8B9BFF]/15 text-[#8B9BFF]'
+                  : 'border-white/[0.08] text-[#A1A1AA] hover:text-[#EDEDF0]'
               }`}
             >
               {option.label}
@@ -484,38 +484,38 @@ export default async function TestReportPage({
           <summary
             className={`cursor-pointer list-none rounded-full border px-3 py-1.5 text-xs font-medium ${
               periodo === 'custom'
-                ? 'border-[#7C6FF0] bg-[#7C6FF0]/15 text-[#7C6FF0]'
-                : 'border-white/[0.08] text-[#8A90A6] hover:text-[#E8EAF2]'
+                ? 'border-[#8B9BFF] bg-[#8B9BFF]/15 text-[#8B9BFF]'
+                : 'border-white/[0.08] text-[#A1A1AA] hover:text-[#EDEDF0]'
             }`}
           >
             {periodo === 'custom' && desde && ate ? `${formatBr(desde)} - ${formatBr(ate)}` : 'Personalizado'}
           </summary>
           <form
             method="get"
-            className="absolute left-0 top-[calc(100%+6px)] z-10 flex flex-col gap-2 rounded-[10px] border border-white/[0.08] bg-[#141829] p-3 shadow-lg"
+            className="absolute left-0 top-[calc(100%+6px)] z-10 flex flex-col gap-2 rounded-[10px] border border-white/[0.08] bg-[#0A0A0C] p-3 shadow-lg"
           >
             <input type="hidden" name="periodo" value="custom" />
-            <label className="flex flex-col gap-1 text-[11px] text-[#8A90A6]">
+            <label className="flex flex-col gap-1 text-[11px] text-[#A1A1AA]">
               De
               <input
                 type="date"
                 name="desde"
                 defaultValue={desde ?? ''}
                 required
-                className="rounded-[8px] border border-white/[0.08] bg-[#1B2036] px-2 py-1 text-xs text-[#E8EAF2]"
+                className="rounded-[8px] border border-white/[0.08] bg-[#111114] px-2 py-1 text-xs text-[#EDEDF0]"
               />
             </label>
-            <label className="flex flex-col gap-1 text-[11px] text-[#8A90A6]">
+            <label className="flex flex-col gap-1 text-[11px] text-[#A1A1AA]">
               Até
               <input
                 type="date"
                 name="ate"
                 defaultValue={ate ?? ''}
                 required
-                className="rounded-[8px] border border-white/[0.08] bg-[#1B2036] px-2 py-1 text-xs text-[#E8EAF2]"
+                className="rounded-[8px] border border-white/[0.08] bg-[#111114] px-2 py-1 text-xs text-[#EDEDF0]"
               />
             </label>
-            <button type="submit" className="rounded-[8px] bg-[#7C6FF0] px-3 py-1.5 text-xs font-semibold text-[#0B0E1A]">
+            <button type="submit" className="rounded-[8px] bg-[#8B9BFF] px-3 py-1.5 text-xs font-semibold text-[#000000]">
               Aplicar
             </button>
           </form>
@@ -525,8 +525,8 @@ export default async function TestReportPage({
             href={comparingHref}
             className={`ml-auto rounded-full border px-3 py-1.5 text-xs font-medium ${
               comparar === '1'
-                ? 'border-[#7C6FF0] bg-[#7C6FF0]/15 text-[#7C6FF0]'
-                : 'border-dashed border-white/20 text-[#8A90A6] hover:text-[#E8EAF2]'
+                ? 'border-[#8B9BFF] bg-[#8B9BFF]/15 text-[#8B9BFF]'
+                : 'border-dashed border-white/20 text-[#A1A1AA] hover:text-[#EDEDF0]'
             }`}
           >
             vs {previousLabel}
@@ -549,8 +549,8 @@ export default async function TestReportPage({
               href={query.size > 0 ? `?${query}` : '?'}
               className={`-mb-px border-b-2 px-3.5 py-2.5 text-[13px] font-medium transition-colors ${
                 isActive
-                  ? 'border-[#7C6FF0] text-[#E8EAF2]'
-                  : 'border-transparent text-[#8A90A6] hover:text-[#E8EAF2]'
+                  ? 'border-[#8B9BFF] text-[#EDEDF0]'
+                  : 'border-transparent text-[#A1A1AA] hover:text-[#EDEDF0]'
               }`}
             >
               {option.label}
@@ -561,27 +561,27 @@ export default async function TestReportPage({
       </div>
 
       {hasPartialDataError && (
-        <div className="mx-6 mt-4 rounded-[10px] border border-[#F5B94D]/35 bg-[#F5B94D]/10 px-4 py-2.5 text-xs text-[#F5B94D]">
+        <div className="mx-6 mt-4 rounded-[10px] border border-[#F2B866]/35 bg-[#F2B866]/10 px-4 py-2.5 text-xs text-[#F2B866]">
           Alguns dados desta página podem estar incompletos — houve uma falha ao carregar parte do relatório. Tente
           atualizar a página em instantes.
         </div>
       )}
 
-      <div className="mx-6 mt-4 flex flex-wrap items-center gap-x-7 gap-y-3 rounded-2xl border border-white/[0.08] bg-[#141829] px-6 py-4">
+      <div className="mx-6 mt-4 flex flex-wrap items-center gap-x-7 gap-y-3 rounded-2xl border border-white/[0.08] bg-[#0A0A0C] px-6 py-4">
         <div>
           <div className="font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums">{totalVisits}</div>
           <div className="flex items-center gap-2">
-            <span className="text-[11.5px] text-[#8A90A6]">acessos totais</span>
+            <span className="text-[11.5px] text-[#A1A1AA]">acessos totais</span>
             {previousTotalVisits !== null && <Delta current={totalVisits} previous={previousTotalVisits} unit="pct" />}
           </div>
         </div>
         <div className="h-[34px] w-px bg-white/[0.08]" />
         <div>
-          <div className="font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums text-[#F5B94D]">
+          <div className="font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums text-[#F2B866]">
             {leaderRow?.conversions ?? 0}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[11.5px] text-[#8A90A6]">vendas — variante líder</span>
+            <span className="text-[11.5px] text-[#A1A1AA]">vendas — variante líder</span>
             {previousLeaderConversions !== null && (
               <Delta current={leaderRow?.conversions ?? 0} previous={previousLeaderConversions} unit="pct" />
             )}
@@ -593,10 +593,10 @@ export default async function TestReportPage({
             <div
               className={`font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums ${
                 dataQuality.trustworthy
-                  ? 'text-[#2DD4A8]'
+                  ? 'text-[#4ADE9B]'
                   : dataQuality.strikeConfidence
-                    ? 'text-[#565F7A] line-through decoration-[#F5B94D] decoration-2'
-                    : 'text-[#565F7A]'
+                    ? 'text-[#6B6B76] line-through decoration-[#F2B866] decoration-2'
+                    : 'text-[#6B6B76]'
               }`}
             >
               {leaderRow?.confidencePct !== null && leaderRow?.confidencePct !== undefined
@@ -607,14 +607,14 @@ export default async function TestReportPage({
               title={dataQuality.explain}
               className={`flex cursor-help items-center gap-1.5 rounded-full border px-2.5 py-1 font-['JetBrains_Mono'] text-[10.5px] ${
                 dataQuality.trustworthy
-                  ? 'border-[#2DD4A8]/30 bg-[#2DD4A8]/[0.08] text-[#2DD4A8]'
-                  : 'border-[#F5B94D]/32 bg-[#F5B94D]/[0.09] text-[#F5B94D]'
+                  ? 'border-[#4ADE9B]/30 bg-[#4ADE9B]/[0.08] text-[#4ADE9B]'
+                  : 'border-[#F2B866]/32 bg-[#F2B866]/[0.09] text-[#F2B866]'
               }`}
             >
               {dataQuality.badge}
             </span>
           </div>
-          <div className={`text-[11.5px] ${dataQuality.trustworthy ? 'text-[#8A90A6]' : 'text-[#F5B94D]'}`}>
+          <div className={`text-[11.5px] ${dataQuality.trustworthy ? 'text-[#A1A1AA]' : 'text-[#F2B866]'}`}>
             {dataQuality.instruction}
           </div>
         </div>
@@ -623,7 +623,7 @@ export default async function TestReportPage({
           <div className="font-['JetBrains_Mono'] text-[22px] font-semibold tabular-nums">
             {daysRunning} {daysRunning === 1 ? 'dia' : 'dias'}
           </div>
-          <div className="text-[11.5px] text-[#8A90A6]">em execução</div>
+          <div className="text-[11.5px] text-[#A1A1AA]">em execução</div>
         </div>
       </div>
 
@@ -639,7 +639,7 @@ export default async function TestReportPage({
       />
       <div className="mx-6 mb-6 grid grid-cols-1 divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] md:grid-cols-3 md:divide-x md:divide-y-0">
         <div className="p-5">
-          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[#A1A1AA]">
             Faturamento por {assetLabel.toLowerCase()}
           </h3>
           <MiniBarChart
@@ -648,11 +648,11 @@ export default async function TestReportPage({
               value: row.revenue_cents,
             }))}
             valueFormat={(v) => `R$ ${(v / 100).toFixed(0)}`}
-            barColor="#2DD4A8"
+            barColor="#4ADE9B"
           />
         </div>
         <div className="p-5">
-          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[#A1A1AA]">
             Cliques por dia da semana
           </h3>
           <MiniBarChart
@@ -663,7 +663,7 @@ export default async function TestReportPage({
           />
         </div>
         <div className="p-5">
-          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[#A1A1AA]">
             Vendas por horário do dia
           </h3>
           <MiniBarChart
@@ -704,7 +704,7 @@ export default async function TestReportPage({
                       <td className={TD_CLASS}>
                         {row.variant_name}
                         {previous && (
-                          <div className="mt-0.5 font-['JetBrains_Mono'] text-[10.5px] normal-case text-[#565F7A]">
+                          <div className="mt-0.5 font-['JetBrains_Mono'] text-[10.5px] normal-case text-[#6B6B76]">
                             período anterior
                           </div>
                         )}
@@ -861,7 +861,7 @@ export default async function TestReportPage({
                 <tbody>
                   {adRows.length === 0 ? (
                     <tr>
-                      <td className={`${TD_CLASS} text-[#8A90A6]`} colSpan={12}>
+                      <td className={`${TD_CLASS} text-[#A1A1AA]`} colSpan={12}>
                         Nenhum clique com anúncio identificado ainda.
                       </td>
                     </tr>

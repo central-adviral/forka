@@ -57,25 +57,25 @@ export function ReportCanvas({
         // Two faint pools of light — violet where traffic enters, amber near the leader — so the
         // canvas has depth instead of reading as a flat panel.
         background:
-          'radial-gradient(120% 90% at 8% 10%, rgba(124,111,240,0.08), transparent 55%), radial-gradient(90% 70% at 92% 85%, rgba(245,185,77,0.06), transparent 55%), #090B12',
+          'radial-gradient(120% 90% at 8% 10%, rgba(124,111,240,0.08), transparent 55%), radial-gradient(90% 70% at 92% 85%, rgba(245,185,77,0.06), transparent 55%), #000000',
       }}
     >
-      <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-[10px] border border-white/[0.08] card-shadow bg-[#171B2C] px-1.5 py-1.5">
+      <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-[10px] border border-white/[0.08] card-shadow bg-[#1A1A1F] px-1.5 py-1.5">
         <button
           type="button"
           onClick={() => zoomBy(-ZOOM_STEP)}
-          className="flex h-6 w-6 items-center justify-center rounded-md text-sm font-medium text-[#8A90A6] hover:text-[#E8EAF2]"
+          className="flex h-6 w-6 items-center justify-center rounded-md text-sm font-medium text-[#A1A1AA] hover:text-[#EDEDF0]"
           aria-label="Diminuir zoom"
         >
           −
         </button>
-        <span className="w-10 text-center font-['JetBrains_Mono'] text-[11px] text-[#8A90A6]">
+        <span className="w-10 text-center font-['JetBrains_Mono'] text-[11px] text-[#A1A1AA]">
           {Math.round(zoom * 100)}%
         </span>
         <button
           type="button"
           onClick={() => zoomBy(ZOOM_STEP)}
-          className="flex h-6 w-6 items-center justify-center rounded-md text-sm font-medium text-[#8A90A6] hover:text-[#E8EAF2]"
+          className="flex h-6 w-6 items-center justify-center rounded-md text-sm font-medium text-[#A1A1AA] hover:text-[#EDEDF0]"
           aria-label="Aumentar zoom"
         >
           +
@@ -83,7 +83,7 @@ export function ReportCanvas({
         <button
           type="button"
           onClick={() => setAutoFit(true)}
-          className="ml-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-[#8A90A6] hover:text-[#E8EAF2]"
+          className="ml-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-[#A1A1AA] hover:text-[#EDEDF0]"
         >
           Ajustar
         </button>
@@ -128,7 +128,7 @@ export function ReportCanvas({
           {layout.fallback && (
             <path
               d={layout.fallback.edge.path}
-              stroke="#F76C6C"
+              stroke="#FF7A73"
               strokeWidth={2}
               strokeDasharray="5 5"
               strokeLinecap="round"
@@ -138,33 +138,33 @@ export function ReportCanvas({
         </svg>
 
         <div
-          className="absolute rounded-xl border border-white/[0.08] card-shadow bg-[#171B2C] p-[18px]"
+          className="absolute rounded-xl border border-white/[0.08] card-shadow bg-[#1A1A1F] p-[18px]"
           style={{ left: layout.entryNode.x + 20, top: layout.entryNode.y + 20, width: layout.entryNode.w, height: layout.entryNode.h }}
         >
-          <div className="mb-2.5 font-['JetBrains_Mono'] text-[10.5px] uppercase tracking-widest text-[#8A90A6]">
+          <div className="mb-2.5 font-['JetBrains_Mono'] text-[10.5px] uppercase tracking-widest text-[#A1A1AA]">
             Link do teste
           </div>
           <div className="mb-4 break-all font-['JetBrains_Mono'] text-[12.5px] text-[#4F8EF7]">{redirectUrl}</div>
           <div className="font-['Space_Grotesk'] text-[22px] font-semibold">{totalVisits}</div>
-          <div className="text-[11.5px] text-[#8A90A6]">acessos totais</div>
+          <div className="text-[11.5px] text-[#A1A1AA]">acessos totais</div>
         </div>
 
         {layout.fallback && (
           <div
-            className="absolute rounded-[10px] border border-[#F76C6C]/30 card-shadow bg-[#171B2C] px-3.5 py-2.5 opacity-85"
+            className="absolute rounded-[10px] border border-[#FF7A73]/30 card-shadow bg-[#1A1A1F] px-3.5 py-2.5 opacity-85"
             style={{ left: layout.fallback.node.x + 20, top: layout.fallback.node.y + 20, width: layout.fallback.node.w }}
           >
-            <div className="mb-0.5 text-[10.5px] uppercase tracking-wide text-[#F76C6C]">Fallback</div>
-            <div className="font-['JetBrains_Mono'] text-[11.5px] text-[#8A90A6]">{fallbackUrl}</div>
+            <div className="mb-0.5 text-[10.5px] uppercase tracking-wide text-[#FF7A73]">Fallback</div>
+            <div className="font-['JetBrains_Mono'] text-[11.5px] text-[#A1A1AA]">{fallbackUrl}</div>
           </div>
         )}
 
         {layout.variants.map((variant) => (
           <div key={variant.id}>
             <div
-              className={`absolute rounded-xl border card-shadow bg-[#171B2C] p-[18px_20px] ${
+              className={`absolute rounded-xl border card-shadow bg-[#1A1A1F] p-[18px_20px] ${
                 variant.isLeader
-                  ? 'border-[#F5B94D] shadow-[0_0_0_3px_rgba(245,185,77,0.14),0_0_32px_rgba(245,185,77,0.18),0_10px_28px_-12px_rgba(0,0,0,0.6)]'
+                  ? 'border-[#F2B866] shadow-[0_0_0_3px_rgba(245,185,77,0.14),0_0_32px_rgba(245,185,77,0.18),0_10px_28px_-12px_rgba(0,0,0,0.6)]'
                   : 'border-white/[0.08]'
               }`}
               style={{ left: variant.node.x + 20, top: variant.node.y + 20, width: variant.node.w, height: variant.node.h }}
@@ -176,29 +176,29 @@ export function ReportCanvas({
                     {assetLabel} {variant.name}
                   </span>
                   {variant.isLeader && (
-                    <span className="rounded-full bg-[#F5B94D]/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[#F5B94D]">
+                    <span className="rounded-full bg-[#F2B866]/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-[#F2B866]">
                       Líder
                     </span>
                   )}
                 </div>
-                <span className="rounded-full bg-[#1B2036] px-2.5 py-0.5 font-['JetBrains_Mono'] text-[11.5px] text-[#8A90A6]">
+                <span className="rounded-full bg-[#111114] px-2.5 py-0.5 font-['JetBrains_Mono'] text-[11.5px] text-[#A1A1AA]">
                   alvo {variant.weightPct}%
                 </span>
               </div>
               <div className="mb-3.5 grid grid-cols-2 gap-x-7 gap-y-2.5">
                 <div>
                   <div className="font-['JetBrains_Mono'] text-base font-medium">{variant.visits}</div>
-                  <div className="text-[11px] text-[#8A90A6]">acessos</div>
+                  <div className="text-[11px] text-[#A1A1AA]">acessos</div>
                 </div>
                 <div>
                   <div className="font-['JetBrains_Mono'] text-base font-medium">{variant.conversions}</div>
-                  <div className="text-[11px] text-[#8A90A6]">conversões</div>
+                  <div className="text-[11px] text-[#A1A1AA]">conversões</div>
                 </div>
                 <div>
                   <div className="font-['JetBrains_Mono'] text-base font-medium">
                     R$ {(variant.visits > 0 ? variant.revenueCents / variant.visits / 100 : 0).toFixed(2)}
                   </div>
-                  <div className="text-[11px] text-[#8A90A6]">R$/clique</div>
+                  <div className="text-[11px] text-[#A1A1AA]">R$/clique</div>
                 </div>
                 <div>
                   <div className="font-['JetBrains_Mono'] text-base font-medium">
@@ -208,18 +208,18 @@ export function ReportCanvas({
                       : 0
                     ).toFixed(2)}
                   </div>
-                  <div className="text-[11px] text-[#8A90A6]">R$/acesso</div>
+                  <div className="text-[11px] text-[#A1A1AA]">R$/acesso</div>
                 </div>
               </div>
-              <div className="truncate border-t border-white/[0.08] pt-3 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">
+              <div className="truncate border-t border-white/[0.08] pt-3 font-['JetBrains_Mono'] text-xs text-[#A1A1AA]">
                 {variant.destinationUrl}
               </div>
             </div>
 
             <div
-              className={`absolute flex flex-col justify-center rounded-xl border card-shadow bg-[#171B2C] p-4 ${
+              className={`absolute flex flex-col justify-center rounded-xl border card-shadow bg-[#1A1A1F] p-4 ${
                 variant.isLeader
-                  ? 'border-[#F5B94D] shadow-[0_0_24px_rgba(245,185,77,0.14),0_10px_28px_-12px_rgba(0,0,0,0.6)]'
+                  ? 'border-[#F2B866] shadow-[0_0_24px_rgba(245,185,77,0.14),0_10px_28px_-12px_rgba(0,0,0,0.6)]'
                   : 'border-white/[0.08]'
               }`}
               style={{
@@ -229,14 +229,14 @@ export function ReportCanvas({
                 height: variant.conversionNode.h,
               }}
             >
-              <div className="mb-2 text-[10.5px] uppercase tracking-wide text-[#8A90A6]">Conversão</div>
+              <div className="mb-2 text-[10.5px] uppercase tracking-wide text-[#A1A1AA]">Conversão</div>
               <div
                 className="font-['JetBrains_Mono'] text-[26px] font-semibold leading-none"
-                style={{ color: variant.isLeader ? '#F5B94D' : '#2DD4A8' }}
+                style={{ color: variant.isLeader ? '#F2B866' : '#4ADE9B' }}
               >
                 {variant.ratePct.toFixed(1)}%
               </div>
-              <div className="mt-1 text-[11.5px] text-[#8A90A6]">
+              <div className="mt-1 text-[11.5px] text-[#A1A1AA]">
                 {variant.conversions} vendas · {confidenceLabelById.get(variant.id)}
               </div>
             </div>

@@ -9,19 +9,19 @@ export default function NewClientPage() {
           name="name"
           required
           placeholder="Nome"
-          className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
+          className="w-full rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 py-2.5 text-sm text-[#EDEDF0] placeholder:text-[#A1A1AA] outline-none focus:border-[#8B9BFF]"
         />
         <input
           name="slug"
           required
           placeholder="slug (ex: nicho-fitness)"
           pattern="[a-z0-9-]+"
-          className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
+          className="w-full rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 py-2.5 text-sm text-[#EDEDF0] placeholder:text-[#A1A1AA] outline-none focus:border-[#8B9BFF]"
         />
-        <p className="text-xs text-[#8A90A6]">
+        <p className="text-xs text-[#A1A1AA]">
           Vira parte da URL interna do cliente — use letras minúsculas e hífen (ex: gustavo-voe)
         </p>
-        <button type="submit" className="rounded-[10px] bg-[#7C6FF0] px-4 py-2.5 text-sm font-semibold text-[#0B0E1A]">
+        <button type="submit" className="rounded-[10px] bg-[#8B9BFF] px-4 py-2.5 text-sm font-semibold text-[#000000]">
           Criar
         </button>
       </form>

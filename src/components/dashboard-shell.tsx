@@ -1,31 +1,55 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createBrowserSupabaseClient } from '@/lib/supabase/browser'
+import type { ClientRole } from '@/lib/repo/client-access-repo'
+
+export interface ShellProject {
+  name: string
+  slug: string
+  isActive: boolean
+}
 
 interface Client {
   id: string
   name: string
   slug: string
   testsCount: number
-  funnelsCount: number
+  projects: ShellProject[]
+  role: ClientRole
 }
 
-// Same glyphs as the "Forka Redesign" mockup, inlined: four icons at one size don't justify
-// pulling in an icon package.
-const NAV_ICONS = {
+const ROLE_LABEL: Record<ClientRole, string> = {
+  owner: 'Owner',
+  gestor: 'Gestor',
+  analista: 'Analista',
+  cliente: 'Cliente · leitura',
+}
+
+// Inlined glyphs: a handful of icons at one size don't justify pulling in an icon package.
+const ICONS = {
   overview: (
     <>
-      <rect x="3" y="3" width="8" height="8" rx="2" />
-      <rect x="13" y="3" width="8" height="8" rx="2" />
-      <rect x="3" y="13" width="8" height="8" rx="2" />
-      <rect x="13" y="13" width="8" height="8" rx="2" />
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M8 5v3l2 1.5" />
     </>
   ),
-  tests: <path d="M4 12h6M14 12h6M10 6l4 6-4 6" strokeLinecap="round" strokeLinejoin="round" />,
-  funnels: <path d="M4 4h16l-6 8v6l-4 2v-8L4 4z" strokeLinecap="round" strokeLinejoin="round" />,
-  integrations: (
-    <path d="M9 3v4M15 3v4M4 8h16M6 8v10a2 2 0 002 2h8a2 2 0 002-2V8" strokeLinecap="round" strokeLinejoin="round" />
+  integrations: <path d="M6 4.5 4.5 3a2.1 2.1 0 0 0-3 3L3 7.5M10 11.5l1.5 1.5a2.1 2.1 0 0 0 3-3L13 8.5M5.5 10.5l5-5" />,
+  portfolio: (
+    <>
+      <rect x="2" y="2.5" width="5" height="5" rx="1.2" />
+      <rect x="9" y="2.5" width="5" height="5" rx="1.2" />
+      <rect x="2" y="9.5" width="5" height="4" rx="1.2" />
+      <rect x="9" y="9.5" width="5" height="4" rx="1.2" />
+    </>
+  ),
+  plus: <path d="M8 3v10M3 8h10" />,
+  members: (
+    <>
+      <circle cx="6" cy="5.5" r="2.5" />
+      <path d="M1.5 13.5c.6-2.4 2.3-3.5 4.5-3.5s3.9 1.1 4.5 3.5M11 3.2a2.4 2.4 0 0 1 0 4.6M12.5 10.3c1 .5 1.7 1.6 2 3.2" />
+    </>
   ),
 } as const
 
@@ -38,6 +62,137 @@ function initials(name: string): string {
     .join('')
 }
 
+// Breadcrumb label for the page, read off the last meaningful URL segment.
+function pageLabel(pathname: string, clientSlug: string | undefined): string {
+  if (pathname === '/dashboard') return 'Carteira'
+  if (pathname === '/dashboard/clients/new') return 'Novo cliente'
+  if (!clientSlug) return ''
+  const rest = pathname.slice(`/dashboard/clients/${clientSlug}`.length).split('/').filter(Boolean)
+  if (rest.length === 0) return 'Visão geral'
+  const last = rest[rest.length - 1]
+  if (last === 'new') return rest[0] === 'tests' ? 'Novo teste' : 'Novo projeto'
+  if (last === 'edit') return 'Editar'
+  if (last === 'link') return 'Link e rastreio'
+  if (rest[0] === 'integrations') return 'Integrações'
+  if (rest[0] === 'membros') return 'Membros'
+  if (rest[0] === 'tests') return rest.length === 1 ? 'Teste A/B' : 'Relatório'
+  if (rest[0] === 'funis-venda') return 'Análises'
+  return ''
+}
+
+function Icon({ children }: { children: React.ReactNode }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="h-[15px] w-[15px] flex-none"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  )
+}
+
+function NavLink({
+  href,
+  active,
+  children,
+  count,
+}: {
+  href: string
+  active: boolean
+  children: React.ReactNode
+  count?: number
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? 'page' : undefined}
+      className={`flex items-center gap-2.5 rounded-[7px] px-2.5 py-[7px] text-[13.5px] font-medium transition-colors ${
+        active
+          ? 'bg-[var(--ct-surface-3)] text-[var(--ct-text)]'
+          : 'text-[var(--ct-text-2)] hover:bg-[var(--ct-surface-2)] hover:text-[var(--ct-text)]'
+      }`}
+    >
+      {children}
+      {count !== undefined && (
+        <span className="ml-auto rounded-full bg-[var(--ct-surface-3)] px-[7px] py-px font-[family-name:var(--font-geist-mono)] text-[10.5px] text-[var(--ct-text-3)]">
+          {count}
+        </span>
+      )}
+    </Link>
+  )
+}
+
+function Dot({ color }: { color: string }) {
+  return <span className="mx-[4.5px] h-[7px] w-[7px] flex-none rounded-full" style={{ background: color }} />
+}
+
+function GroupLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="px-2.5 pb-[5px] pt-2.5 font-[family-name:var(--font-geist-mono)] text-[10.5px] font-medium uppercase tracking-[0.08em] text-[var(--ct-text-3)]">
+      {children}
+    </span>
+  )
+}
+
+function Picker({
+  label,
+  value,
+  badge,
+  badgeTone,
+  children,
+}: {
+  label: string
+  value: string
+  badge: string
+  badgeTone?: 'an'
+  children: React.ReactNode
+}) {
+  return (
+    <details className="group relative">
+      <summary className="flex w-full cursor-pointer list-none items-center gap-2.5 rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-2.5 py-2 text-left hover:border-[var(--ct-line-2)] [&::-webkit-details-marker]:hidden">
+        <span
+          className={`grid h-6 w-6 flex-none place-items-center rounded-[7px] font-[family-name:var(--font-geist-mono)] text-[10.5px] font-medium ${
+            badgeTone === 'an' ? 'bg-[var(--ct-an-soft)] text-[var(--ct-an)]' : 'bg-[var(--ct-surface-3)] text-[var(--ct-text)]'
+          }`}
+        >
+          {badge}
+        </span>
+        <span className="flex min-w-0 flex-col leading-tight">
+          <small className="font-[family-name:var(--font-geist-mono)] text-[10px] uppercase tracking-[0.06em] text-[var(--ct-text-3)]">
+            {label}
+          </small>
+          <b className="truncate text-[13px] font-semibold">{value}</b>
+        </span>
+        <span className="ml-auto text-[11px] text-[var(--ct-text-3)]" aria-hidden="true">
+          ⇅
+        </span>
+      </summary>
+      <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 flex max-h-72 flex-col gap-px overflow-y-auto rounded-[10px] border border-[var(--ct-line-2)] bg-[var(--ct-surface-2)] p-1 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.8)]">
+        {children}
+      </div>
+    </details>
+  )
+}
+
+function PickerItem({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className={`flex items-center gap-2 truncate rounded-[7px] px-2.5 py-1.5 text-[13px] ${
+        active ? 'bg-[var(--ct-surface-3)] text-[var(--ct-text)]' : 'text-[var(--ct-text-2)] hover:bg-[var(--ct-surface-3)] hover:text-[var(--ct-text)]'
+      }`}
+    >
+      {children}
+    </Link>
+  )
+}
+
 export function DashboardShell({
   clients,
   userEmail,
@@ -48,174 +203,192 @@ export function DashboardShell({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
-  const activeClient = clients.find((client) => pathname.startsWith(`/dashboard/clients/${client.slug}`))
-  // The open test, read off the URL rather than passed down: the shell renders above the page that
-  // knows which test it is, so a prop would have to be threaded through every route under /tests.
-  const activeTestSlug = activeClient
-    ? pathname.match(new RegExp(`^/dashboard/clients/${activeClient.slug}/tests/([^/]+)`))?.[1]
-    : undefined
+  const router = useRouter()
+  async function signOut() {
+    await createBrowserSupabaseClient().auth.signOut()
+    router.replace('/login')
+    router.refresh()
+  }
+  const activeClient = clients.find(
+    (client) => pathname === `/dashboard/clients/${client.slug}` || pathname.startsWith(`/dashboard/clients/${client.slug}/`)
+  )
+  const base = activeClient ? `/dashboard/clients/${activeClient.slug}` : ''
+  // The open test and project, read off the URL rather than passed down: the shell renders above
+  // the page that knows which one it is, so a prop would have to be threaded through every route.
+  const activeTestSlug = activeClient ? pathname.match(new RegExp(`^${base}/tests/([^/]+)`))?.[1] : undefined
+  const activeProjectSlug = activeClient ? pathname.match(new RegExp(`^${base}/funis-venda/([^/]+)`))?.[1] : undefined
+  const activeProject = activeClient?.projects.find((project) => project.slug === activeProjectSlug)
+  const canConfigure = activeClient?.role === 'owner'
+  const page = pageLabel(pathname, activeClient?.slug)
 
   return (
-    <div className="flex h-screen bg-[#0B0E1A] text-[#E8EAF2]">
-      <aside className="flex w-[248px] flex-shrink-0 flex-col border-r border-white/[0.08] bg-[#0B0E17] py-6">
-        <div className="mb-6 flex items-center gap-2.5 px-5">
-          <svg width="22" height="22" viewBox="0 0 26 26" fill="none">
-            <path d="M6 4v9c0 3 2 5 5 5" stroke="#7C6FF0" strokeWidth="2.2" strokeLinecap="round" />
-            <path d="M11 18l-4 4M11 18l4 4" stroke="#7C6FF0" strokeWidth="2.2" strokeLinecap="round" />
-            <circle cx="6" cy="4" r="2.4" fill="#7C6FF0" />
-          </svg>
-          <div>
-            <div className="font-['Space_Grotesk'] text-[15px] font-semibold leading-none">Forka</div>
-            <div className="mt-0.5 font-['JetBrains_Mono'] text-[9px] uppercase tracking-widest text-[#8A90A6]">
-              Ad tracker
-            </div>
-          </div>
+    <div className="flex h-screen bg-[var(--ct-bg)] font-[family-name:var(--font-geist)] text-[var(--ct-text)]">
+      <aside className="flex w-[248px] flex-none flex-col gap-[18px] overflow-y-auto border-r border-[var(--ct-line)] bg-[var(--ct-surface)] px-3 py-[18px]">
+        <Link href="/dashboard" className="flex items-center gap-2.5 px-2 py-0.5">
+          <span
+            className="grid h-[30px] w-[30px] flex-none place-items-center rounded-[9px]"
+            style={{ background: 'linear-gradient(145deg, var(--ct-an), var(--ct-painel) 55%, var(--ct-ab))' }}
+            aria-hidden="true"
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4">
+              <path d="M2 12 L6 7 L9 9.5 L14 3" stroke="#0A0C11" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <span>
+            <b className="block text-sm font-semibold tracking-[-0.02em]">Central de Tráfego</b>
+            <span className="block font-[family-name:var(--font-geist-mono)] text-[10.5px] text-[var(--ct-text-3)]">
+              black sheep · v0.1
+            </span>
+          </span>
+        </Link>
+
+        <div className="flex flex-col gap-1.5" key={pathname}>
+          <Picker
+            label="Cliente"
+            value={activeClient?.name ?? 'Escolher cliente'}
+            badge={activeClient ? initials(activeClient.name) : '··'}
+          >
+            {clients.map((client) => (
+              <PickerItem key={client.id} href={`/dashboard/clients/${client.slug}`} active={client.id === activeClient?.id}>
+                {client.name}
+              </PickerItem>
+            ))}
+            {clients.length === 0 && <span className="px-2.5 py-1.5 text-[12.5px] text-[var(--ct-text-3)]">Nenhum cliente ainda</span>}
+          </Picker>
+          {activeClient && (
+            <Picker
+              label="Projeto"
+              value={activeProject?.name ?? 'Todos os projetos'}
+              badge={activeProject ? initials(activeProject.name) : '∗'}
+              badgeTone="an"
+            >
+              <PickerItem href={`${base}/funis-venda`} active={!activeProject}>
+                Todos os projetos
+              </PickerItem>
+              {activeClient.projects.map((project) => (
+                <PickerItem key={project.slug} href={`${base}/funis-venda/${project.slug}`} active={project.slug === activeProjectSlug}>
+                  <span className="truncate">{project.name}</span>
+                  {!project.isActive && <span className="ml-auto text-[11px] text-[var(--ct-text-3)]">pausado</span>}
+                </PickerItem>
+              ))}
+            </Picker>
+          )}
         </div>
 
-        <div className="mb-2.5 px-5 font-['JetBrains_Mono'] text-[11px] uppercase tracking-widest text-[#8A90A6]">
-          Clientes
-        </div>
+        <nav className="flex flex-col gap-px" aria-label="Navegação">
+          {activeClient && (
+            <>
+              <NavLink href={base} active={pathname === base}>
+                <Icon>{ICONS.overview}</Icon>
+                Visão geral
+              </NavLink>
 
-        <nav className="flex flex-col gap-0.5 px-3">
-          {clients.map((client) => {
-            const active = pathname.startsWith(`/dashboard/clients/${client.slug}`)
-            return (
-              <Link
-                key={client.id}
-                href={`/dashboard/clients/${client.slug}`}
-                className={`flex items-center gap-2.5 rounded-lg px-2 py-2.5 ${active ? 'bg-[#7C6FF0]/[0.14]' : ''}`}
+              <GroupLabel>Ferramentas</GroupLabel>
+              <span
+                className="flex cursor-default items-center gap-2.5 whitespace-nowrap rounded-[7px] px-2.5 py-[7px] text-[13.5px] font-medium text-[var(--ct-text-3)]"
+                title="Vigias, alertas e relatórios — Fase 3 do roadmap"
               >
-                <span
-                  className={`flex h-[26px] w-[26px] items-center justify-center rounded-[7px] font-['Space_Grotesk'] text-xs font-bold ${
-                    active ? 'bg-[#7C6FF0] text-[#0B0E1A]' : 'bg-[#1B2036] text-[#8A90A6]'
-                  }`}
-                >
-                  {initials(client.name)}
-                </span>
-                <span className={`text-[13.5px] ${active ? 'font-semibold' : 'text-[#8A90A6]'}`}>{client.name}</span>
-              </Link>
-            )
-          })}
+                <Dot color="var(--ct-painel)" />
+                Painel de Controle
+                <span className="ml-auto rounded-full border border-dashed border-[var(--ct-line-2)] px-1.5 font-[family-name:var(--font-geist-mono)] text-[9.5px]">breve</span>
+              </span>
+              <NavLink href={`${base}/funis-venda`} active={pathname.startsWith(`${base}/funis-venda`)} count={activeClient.projects.length}>
+                <Dot color="var(--ct-an)" />
+                Análises
+              </NavLink>
+              <NavLink href={`${base}/tests`} active={pathname === `${base}/tests` || pathname === `${base}/tests/new`} count={activeClient.testsCount}>
+                <Dot color="var(--ct-ab)" />
+                Teste A/B
+              </NavLink>
+              {activeTestSlug && activeTestSlug !== 'new' && (
+                <div className="ml-[19px] flex flex-col gap-px border-l border-[var(--ct-line)] pl-3">
+                  {[
+                    { href: `${base}/tests/${activeTestSlug}`, label: 'Relatório' },
+                    { href: `${base}/tests/${activeTestSlug}/link`, label: 'Link e rastreio' },
+                  ].map((sub) => (
+                    <NavLink key={sub.href} href={sub.href} active={pathname === sub.href}>
+                      <span className="text-[12.5px]">{sub.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+
+              {canConfigure && (
+                <>
+                  <GroupLabel>Configurar</GroupLabel>
+                  <NavLink href={`${base}/integrations`} active={pathname.startsWith(`${base}/integrations`)}>
+                    <Icon>{ICONS.integrations}</Icon>
+                    Integrações
+                  </NavLink>
+                  <NavLink href={`${base}/membros`} active={pathname.startsWith(`${base}/membros`)}>
+                    <Icon>{ICONS.members}</Icon>
+                    Membros
+                  </NavLink>
+                </>
+              )}
+            </>
+          )}
+
+          <GroupLabel>Agência</GroupLabel>
+          <NavLink href="/dashboard" active={pathname === '/dashboard'} count={clients.length}>
+            <Icon>{ICONS.portfolio}</Icon>
+            Carteira
+          </NavLink>
+          <NavLink href="/dashboard/clients/new" active={pathname === '/dashboard/clients/new'}>
+            <Icon>{ICONS.plus}</Icon>
+            Novo cliente
+          </NavLink>
         </nav>
 
-        <div className="px-5 pt-2">
-          <Link href="/dashboard/clients/new" className="text-[13px] font-medium text-[#7C6FF0] hover:text-[#9C90F5]">
-            + Novo cliente
-          </Link>
-        </div>
-
-        {activeClient && (
-          <div className="mt-6">
-            <div className="mb-2.5 truncate px-5 font-['JetBrains_Mono'] text-[11px] uppercase tracking-widest text-[#8A90A6]">
-              {activeClient.name}
-            </div>
-            <nav className="flex flex-col gap-0.5 px-3">
-              {[
-                {
-                  href: `/dashboard/clients/${activeClient.slug}`,
-                  label: 'Visão geral',
-                  count: null,
-                  icon: NAV_ICONS.overview,
-                  subItems: undefined,
-                },
-                {
-                  href: `/dashboard/clients/${activeClient.slug}/tests`,
-                  label: 'Funil de Teste',
-                  count: activeClient.testsCount,
-                  icon: NAV_ICONS.tests,
-                  // Performance lives in the report's tabs; what is setup rather than performance
-                  // gets its own screen, and shows up here only while a test is open.
-                  subItems: activeTestSlug
-                    ? [
-                        {
-                          href: `/dashboard/clients/${activeClient.slug}/tests/${activeTestSlug}`,
-                          label: 'Relatório',
-                        },
-                        {
-                          href: `/dashboard/clients/${activeClient.slug}/tests/${activeTestSlug}/link`,
-                          label: 'Link e rastreio',
-                        },
-                      ]
-                    : undefined,
-                },
-                {
-                  href: `/dashboard/clients/${activeClient.slug}/funis-venda`,
-                  label: 'Funil de Venda',
-                  count: activeClient.funnelsCount,
-                  icon: NAV_ICONS.funnels,
-                  subItems: undefined,
-                },
-                {
-                  href: `/dashboard/clients/${activeClient.slug}/integrations`,
-                  label: 'Integrações',
-                  count: null,
-                  icon: NAV_ICONS.integrations,
-                  subItems: undefined,
-                },
-              ].map((item) => {
-                const active = pathname === item.href
-                return (
-                  <div key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors ${
-                      active
-                        ? 'bg-[#171B2C] font-semibold text-[#E8EAF2] shadow-[inset_2px_0_0_#7C6FF0]'
-                        : 'text-[#8A90A6] hover:bg-[#171B2C]/60 hover:text-[#E8EAF2]'
-                    }`}
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="flex-shrink-0 opacity-85"
-                      aria-hidden="true"
-                    >
-                      {item.icon}
-                    </svg>
-                    {item.label}
-                    {item.count !== null && (
-                      <span className="ml-auto font-['JetBrains_Mono'] text-[10.5px] text-[#565F7A]">{item.count}</span>
-                    )}
-                  </Link>
-                  {item.subItems && (
-                    <div className="ml-[19px] mt-0.5 flex flex-col gap-0.5 border-l border-white/[0.08] pl-3">
-                      {item.subItems.map((sub) => (
-                        <Link
-                          key={sub.href}
-                          href={sub.href}
-                          className={`rounded-lg px-2.5 py-1.5 text-[12.5px] transition-colors ${
-                            pathname === sub.href
-                              ? 'bg-[#171B2C] font-semibold text-[#E8EAF2] shadow-[inset_2px_0_0_#7C6FF0]'
-                              : 'text-[#8A90A6] hover:bg-[#171B2C]/60 hover:text-[#E8EAF2]'
-                          }`}
-                        >
-                          {sub.label}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                  </div>
-                )
-              })}
-            </nav>
-          </div>
-        )}
-
-        <div className="mt-auto border-t border-white/[0.08] px-5 pt-4">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1B2036] text-xs font-semibold text-[#8A90A6]">
-              {userEmail[0]?.toUpperCase() ?? '?'}
-            </span>
-            <span className="font-['JetBrains_Mono'] text-[11.5px] text-[#8A90A6]">{userEmail}</span>
-          </div>
+        <div className="mt-auto flex items-center gap-2.5 rounded-[10px] bg-[var(--ct-surface-2)] px-2.5 py-2">
+          <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-[var(--ct-surface-3)] text-xs font-semibold text-[var(--ct-text-2)]">
+            {userEmail[0]?.toUpperCase() ?? '?'}
+          </span>
+          <span className="flex min-w-0 flex-col leading-tight">
+            <span className="truncate font-[family-name:var(--font-geist-mono)] text-[11.5px] text-[var(--ct-text-2)]">{userEmail}</span>
+            {activeClient && <span className="text-[11px] text-[var(--ct-text-3)]">{ROLE_LABEL[activeClient.role]}</span>}
+          </span>
+          <button
+            type="button"
+            onClick={signOut}
+            className="ml-auto flex-none rounded-md px-1.5 py-0.5 text-[11.5px] text-[var(--ct-text-3)] hover:bg-[var(--ct-surface-3)] hover:text-[var(--ct-text)]"
+          >
+            Sair
+          </button>
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-auto">{children}</main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex flex-none items-center gap-3 border-b border-[var(--ct-line)] bg-black/70 px-8 py-3 backdrop-blur-md">
+          <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-[13px] text-[var(--ct-text-3)]">
+            <span>Black Sheep</span>
+            {activeClient && (
+              <>
+                <i className="not-italic opacity-50">/</i>
+                <span>{activeClient.name}</span>
+              </>
+            )}
+            {activeProject && (
+              <>
+                <i className="not-italic opacity-50">/</i>
+                <span>{activeProject.name}</span>
+              </>
+            )}
+            {page && (
+              <>
+                <i className="not-italic opacity-50">/</i>
+                <b className="font-medium text-[var(--ct-text)]">{page}</b>
+              </>
+            )}
+          </div>
+          {activeClient && activeClient.role !== 'owner' && activeClient.role !== 'gestor' && (
+            <span className="ml-auto rounded-full bg-[var(--ct-accent-soft)] px-2.5 py-1 text-[12px] font-medium text-[var(--ct-accent)]">
+              Somente leitura
+            </span>
+          )}
+        </div>
+        <main className="min-w-0 flex-1 overflow-auto">{children}</main>
+      </div>
     </div>
   )
 }
