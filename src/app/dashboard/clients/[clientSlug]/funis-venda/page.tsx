@@ -39,29 +39,29 @@ export default async function SalesFunnelsListPage({
         <div>
           <a
             href={`/dashboard/clients/${client.slug}`}
-            className="mb-1 flex items-center gap-1 text-xs text-[#A1A1AA] hover:text-[#EDEDF0]"
+            className="mb-1 flex items-center gap-1 text-xs text-[var(--ct-text-2)] hover:text-[var(--ct-text)]"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             {client.name}
           </a>
-          <h1 className="font-['Space_Grotesk'] text-xl font-semibold">Funis de Venda</h1>
+          <h1 className="font-[family-name:var(--font-sora)] text-xl font-semibold">Funis de Venda</h1>
         </div>
         <a
           href={`/dashboard/clients/${client.slug}/funis-venda/new`}
-          className="rounded-[9px] bg-[#4ADE9B] px-4 py-2.5 text-[13.5px] font-semibold text-[#000000]"
+          className="rounded-[9px] bg-[var(--ct-ok)] px-4 py-2.5 text-[13.5px] font-semibold text-[var(--ct-on-accent)]"
         >
           + Novo funil
         </a>
       </div>
 
-      <div className="card-shadow overflow-hidden rounded-2xl border border-white/[0.08]">
+      <div className="card-shadow overflow-hidden rounded-2xl border border-[var(--ct-line)]">
         {summaries.map((funnel, index) => (
           <div
             key={funnel.id}
-            className={`flex items-center gap-5 bg-[#0A0A0C] px-6 py-5 hover:bg-[#111114] ${
-              index < summaries.length - 1 ? 'border-b border-white/[0.08]' : ''
+            className={`flex items-center gap-5 bg-[var(--ct-surface)] px-6 py-5 hover:bg-[var(--ct-surface-2)] ${
+              index < summaries.length - 1 ? 'border-b border-[var(--ct-line)]' : ''
             } ${!funnel.is_active ? 'opacity-70' : ''}`}
           >
             <a
@@ -69,8 +69,8 @@ export default async function SalesFunnelsListPage({
               className="flex min-w-0 flex-1 items-center gap-5"
             >
               <div className="min-w-0 flex-1">
-                <div className="font-['Space_Grotesk'] text-[15px] font-semibold">{funnel.name}</div>
-                <div className="font-['JetBrains_Mono'] text-xs text-[#A1A1AA]">
+                <div className="font-[family-name:var(--font-sora)] text-[15px] font-semibold">{funnel.name}</div>
+                <div className="font-[family-name:var(--font-geist-mono)] text-xs text-[var(--ct-text-2)]">
                   {(funnel.launchops_operacao_ids ?? []).length} operações, {(funnel.launchops_produto_nomes ?? []).length} produtos
                 </div>
               </div>
@@ -80,7 +80,7 @@ export default async function SalesFunnelsListPage({
             <ConfirmDeleteButton action={deleteSalesFunnel.bind(null, funnel.id, client.slug)} />
           </div>
         ))}
-        {summaries.length === 0 && <div className="px-6 py-8 text-sm text-[#A1A1AA]">Nenhum funil de venda ainda.</div>}
+        {summaries.length === 0 && <div className="px-6 py-8 text-sm text-[var(--ct-text-2)]">Nenhum funil de venda ainda.</div>}
       </div>
     </div>
   )

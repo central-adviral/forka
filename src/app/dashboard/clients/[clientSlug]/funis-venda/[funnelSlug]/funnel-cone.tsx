@@ -26,14 +26,14 @@ export function FunnelCone({ totals, currency }: { totals: FunnelTotals; currenc
     {
       label: 'Impressões',
       value: totals.impressions,
-      color: '#8B9BFF',
+      color: 'var(--ct-accent)',
       badges: cpm !== null ? [`CPM ${currency(cpm)}`] : [],
     },
-    { label: 'Alcance', value: totals.reach, color: '#A5B2FF', badges: [] },
+    { label: 'Alcance', value: totals.reach, color: 'var(--ct-accent)', badges: [] },
     {
       label: 'Cliques no Link',
       value: totals.linkClicks,
-      color: '#4F8EF7',
+      color: 'var(--ct-an)',
       badges: [ctr !== null ? `CTR ${(ctr * 100).toFixed(1)}%` : null, cpc !== null ? `CPC ${currency(cpc)}` : null].filter(
         (b): b is string => b !== null
       ),
@@ -41,7 +41,7 @@ export function FunnelCone({ totals, currency }: { totals: FunnelTotals; currenc
     {
       label: 'View Page',
       value: totals.landingPageViews,
-      color: '#3FB8E8',
+      color: 'var(--ct-an)',
       badges: [
         connectRate !== null ? `Connect Rate ${(connectRate * 100).toFixed(1)}%` : null,
         custoViewPage !== null ? `Custo ${currency(custoViewPage)}` : null,
@@ -50,7 +50,7 @@ export function FunnelCone({ totals, currency }: { totals: FunnelTotals; currenc
     {
       label: 'Finalização de Compra',
       value: totals.initiateCheckout,
-      color: '#F2B866',
+      color: 'var(--ct-warn)',
       badges: [
         conversaoPaginaVendas !== null ? `Conv. Pág. Vendas ${(conversaoPaginaVendas * 100).toFixed(1)}%` : null,
         custoInitiateCheckout !== null ? `Custo ${currency(custoInitiateCheckout)}` : null,
@@ -59,18 +59,18 @@ export function FunnelCone({ totals, currency }: { totals: FunnelTotals; currenc
     {
       label: 'Compras',
       value: totals.vendas,
-      color: '#4ADE9B',
+      color: 'var(--ct-ok)',
       badges: conversaoCheckout !== null ? [`Conv. Checkout ${(conversaoCheckout * 100).toFixed(1)}%`] : [],
     },
   ]
   const maxValue = Math.max(1, totals.impressions)
 
   return (
-    <div className="card-shadow h-full rounded-2xl border border-white/[0.08] p-5">
+    <div className="card-shadow h-full rounded-2xl border border-[var(--ct-line)] p-5">
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="whitespace-nowrap font-['Space_Grotesk'] text-base font-semibold">Funil de tráfego</h2>
-        <span className="whitespace-nowrap font-['JetBrains_Mono'] text-[11px] uppercase tracking-wider text-[#A1A1AA]">
-          Gasto <span className="text-[#EDEDF0]">{currency(totals.spend)}</span>
+        <h2 className="whitespace-nowrap font-[family-name:var(--font-sora)] text-base font-semibold">Funil de tráfego</h2>
+        <span className="whitespace-nowrap font-[family-name:var(--font-geist-mono)] text-[11px] uppercase tracking-wider text-[var(--ct-text-2)]">
+          Gasto <span className="text-[var(--ct-text)]">{currency(totals.spend)}</span>
         </span>
       </div>
       <div className="relative mx-auto max-w-[460px]">
@@ -89,7 +89,7 @@ export function FunnelCone({ totals, currency }: { totals: FunnelTotals; currenc
           return (
             <div key={stage.label} className={`relative ${index > 0 ? 'mt-4' : ''}`}>
               {stage.badges.length > 0 && (
-                <div className="mb-1.5 flex justify-center gap-3 font-['JetBrains_Mono'] text-[10.5px] text-[#A1A1AA]">
+                <div className="mb-1.5 flex justify-center gap-3 font-[family-name:var(--font-geist-mono)] text-[10.5px] text-[var(--ct-text-2)]">
                   {stage.badges.map((badge) => (
                     <span key={badge}>{badge}</span>
                   ))}
@@ -106,8 +106,8 @@ export function FunnelCone({ totals, currency }: { totals: FunnelTotals; currenc
                   }}
                 />
                 <div className="relative flex h-full flex-col items-center justify-center gap-0.5 px-2 text-center">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-[#A1A1AA]">{stage.label}</div>
-                  <div className="font-['JetBrains_Mono'] text-[17px] font-bold leading-none" style={{ color: stage.color }}>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ct-text-2)]">{stage.label}</div>
+                  <div className="font-[family-name:var(--font-geist-mono)] text-[17px] font-bold leading-none" style={{ color: stage.color }}>
                     {stage.value.toLocaleString('pt-BR')}
                   </div>
                 </div>
@@ -116,10 +116,10 @@ export function FunnelCone({ totals, currency }: { totals: FunnelTotals; currenc
           )
         })}
       </div>
-      <p className="mt-4 text-center font-['JetBrains_Mono'] text-[11px] text-[#A1A1AA]">
+      <p className="mt-4 text-center font-[family-name:var(--font-geist-mono)] text-[11px] text-[var(--ct-text-2)]">
         {stages[stages.length - 1].value.toLocaleString('pt-BR')} compras de{' '}
         {totals.impressions.toLocaleString('pt-BR')} impressões · conversão total{' '}
-        <span className="text-[#EDEDF0]">
+        <span className="text-[var(--ct-text)]">
           {totals.impressions > 0
             ? `${((stages[stages.length - 1].value / totals.impressions) * 100).toFixed(3)}%`
             : '—'}

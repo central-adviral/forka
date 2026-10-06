@@ -53,7 +53,7 @@ export function FunnelKpiCards({
       label: 'Receita líquida',
       hint: 'entrada + upsell',
       value: currency(totals.receitaLiquida),
-      spark: sparklines ? { values: sparklines.receitaLiquida, color: '#8B9BFF' } : undefined,
+      spark: sparklines ? { values: sparklines.receitaLiquida, color: 'var(--ct-accent)' } : undefined,
     },
     {
       label: 'Vendas de entrada',
@@ -62,11 +62,11 @@ export function FunnelKpiCards({
     },
     { label: 'CPA geral', value: totals.cpa !== null ? currency(totals.cpa) : '—', hint: 'todas as vendas de entrada' },
     { label: 'CPA de anúncio', value: totals.cpaAnuncio !== null ? currency(totals.cpaAnuncio) : '—', hint: 'só vendas que a UTM liga ao anúncio' },
-    { label: 'Resultado', value: currency(totals.resultado), color: totals.resultado >= 0 ? '#4ADE9B' : '#FF7A73' },
+    { label: 'Resultado', value: currency(totals.resultado), color: totals.resultado >= 0 ? 'var(--ct-ok)' : 'var(--ct-crit)' },
     {
       label: 'ROAS',
       value: totals.roas !== null ? `${totals.roas.toFixed(2)}x` : '—',
-      spark: sparklines ? { values: sparklines.roas, color: '#4ADE9B' } : undefined,
+      spark: sparklines ? { values: sparklines.roas, color: 'var(--ct-ok)' } : undefined,
     },
     { label: 'Ticket Médio', value: totals.ticketMedio !== null ? currency(totals.ticketMedio) : '—' },
   ]
@@ -75,16 +75,16 @@ export function FunnelKpiCards({
     <div
       // The headline numbers get their own lifted surface with a violet edge, so the band reads
       // as the summary of the page rather than as one more panel among the charts.
-      className="mb-6 grid grid-cols-2 divide-y divide-white/[0.06] rounded-2xl border border-[#8B9BFF]/25 bg-[#1A1A1F] sm:grid-cols-4 sm:divide-y-0 lg:grid-cols-8 lg:divide-x"
+      className="mb-6 grid grid-cols-2 divide-y divide-[var(--ct-line)] rounded-2xl border border-[var(--ct-accent)]/25 bg-[var(--ct-surface-3)] sm:grid-cols-4 sm:divide-y-0 lg:grid-cols-8 lg:divide-x"
       style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,.04), 0 10px 30px -18px rgba(124,111,240,.55)' }}
     >
       {cards.map((card) => (
         <div key={card.label} className="p-4">
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#A1A1AA]">{card.label}</div>
-          <div className="font-['JetBrains_Mono'] text-lg font-semibold" style={{ color: card.color ?? '#EDEDF0' }}>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--ct-text-2)]">{card.label}</div>
+          <div className="font-[family-name:var(--font-geist-mono)] text-lg font-semibold" style={{ color: card.color ?? 'var(--ct-text)' }}>
             {card.value}
           </div>
-          {card.hint && <div className="mt-0.5 text-[11px] text-[#A1A1AA]">{card.hint}</div>}
+          {card.hint && <div className="mt-0.5 text-[11px] text-[var(--ct-text-2)]">{card.hint}</div>}
           {card.spark && <Sparkline values={card.spark.values} color={card.spark.color} />}
         </div>
       ))}

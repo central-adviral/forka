@@ -31,13 +31,13 @@ export function SyncFunnelButton({
 
   return (
     <div className="flex items-center gap-2">
-      {error && <span className="text-[11px] text-[#FF7A73]">{error}</span>}
-      {justSynced && !isPending && <span className="text-[11px] text-[#4ADE9B]">Atualizado</span>}
+      {error && <span className="text-[11px] text-[var(--ct-crit)]">{error}</span>}
+      {justSynced && !isPending && <span className="text-[11px] text-[var(--ct-ok)]">Atualizado</span>}
       <button
         type="button"
         onClick={handleClick}
         disabled={isPending}
-        className="rounded-[9px] border border-white/[0.08] px-4 py-2.5 text-[13.5px] font-medium text-[#A1A1AA] disabled:opacity-60"
+        className="rounded-[9px] border border-[var(--ct-line)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ct-text-2)] disabled:opacity-60"
       >
         {isPending ? 'Atualizando...' : 'Atualizar agora'}
       </button>

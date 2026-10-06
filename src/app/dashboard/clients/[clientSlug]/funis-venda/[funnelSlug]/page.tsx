@@ -132,7 +132,7 @@ export default async function SalesFunnelPage({
     <div className="p-8">
       <a
         href={`/dashboard/clients/${client.slug}/funis-venda`}
-        className="mb-1 flex items-center gap-1 text-xs text-[#A1A1AA] hover:text-[#EDEDF0]"
+        className="mb-1 flex items-center gap-1 text-xs text-[var(--ct-text-2)] hover:text-[var(--ct-text)]"
       >
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
           <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -140,10 +140,10 @@ export default async function SalesFunnelPage({
         Funis de Venda
       </a>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="font-['Space_Grotesk'] text-xl font-semibold">{funnel.name}</h1>
+        <h1 className="font-[family-name:var(--font-sora)] text-xl font-semibold">{funnel.name}</h1>
         <div className="flex items-center gap-3">
           {rows.length > 0 && (
-            <span className="text-[12px] text-[#A1A1AA]" title="De onde vem o investimento deste projeto">
+            <span className="text-[12px] text-[var(--ct-text-2)]" title="De onde vem o investimento deste projeto">
               Investimento: {rows[0].spendSource === 'frentes' ? 'regras de campanha' : 'operação do LaunchOps'}
             </span>
           )}
@@ -151,13 +151,13 @@ export default async function SalesFunnelPage({
           <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
           <a
             href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`}
-            className="rounded-[9px] border border-white/[0.08] px-4 py-2.5 text-[13.5px] font-medium text-[#A1A1AA]"
+            className="rounded-[9px] border border-[var(--ct-line)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ct-text-2)]"
           >
             Regras de campanha
           </a>
           <a
             href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`}
-            className="rounded-[9px] border border-white/[0.08] px-4 py-2.5 text-[13.5px] font-medium text-[#A1A1AA]"
+            className="rounded-[9px] border border-[var(--ct-line)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ct-text-2)]"
           >
             Editar
           </a>
@@ -173,8 +173,8 @@ export default async function SalesFunnelPage({
               href={option.value === 'all' ? `?` : `?periodo=${option.value}`}
               className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
                 isActive
-                  ? 'border-[#8B9BFF] bg-[#8B9BFF]/15 text-[#8B9BFF]'
-                  : 'border-white/[0.08] text-[#A1A1AA] hover:text-[#EDEDF0]'
+                  ? 'border-[var(--ct-accent)] bg-[var(--ct-accent)]/15 text-[var(--ct-accent)]'
+                  : 'border-[var(--ct-line)] text-[var(--ct-text-2)] hover:text-[var(--ct-text)]'
               }`}
             >
               {option.label}
@@ -185,38 +185,38 @@ export default async function SalesFunnelPage({
           <summary
             className={`cursor-pointer list-none rounded-full border px-3 py-1.5 text-xs font-medium ${
               periodo === 'custom'
-                ? 'border-[#8B9BFF] bg-[#8B9BFF]/15 text-[#8B9BFF]'
-                : 'border-white/[0.08] text-[#A1A1AA] hover:text-[#EDEDF0]'
+                ? 'border-[var(--ct-accent)] bg-[var(--ct-accent)]/15 text-[var(--ct-accent)]'
+                : 'border-[var(--ct-line)] text-[var(--ct-text-2)] hover:text-[var(--ct-text)]'
             }`}
           >
             {periodo === 'custom' && desde && ate ? `${formatBr(desde)} - ${formatBr(ate)}` : 'Personalizado'}
           </summary>
           <form
             method="get"
-            className="absolute left-0 top-[calc(100%+6px)] z-10 flex flex-col gap-2 rounded-[10px] border border-white/[0.08] bg-[#0A0A0C] p-3 shadow-lg"
+            className="absolute left-0 top-[calc(100%+6px)] z-10 flex flex-col gap-2 rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface)] p-3 shadow-lg"
           >
             <input type="hidden" name="periodo" value="custom" />
-            <label className="flex flex-col gap-1 text-[11px] text-[#A1A1AA]">
+            <label className="flex flex-col gap-1 text-[11px] text-[var(--ct-text-2)]">
               De
               <input
                 type="date"
                 name="desde"
                 defaultValue={desde ?? ''}
                 required
-                className="rounded-[8px] border border-white/[0.08] bg-[#111114] px-2 py-1 text-xs text-[#EDEDF0]"
+                className="rounded-[8px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-2 py-1 text-xs text-[var(--ct-text)]"
               />
             </label>
-            <label className="flex flex-col gap-1 text-[11px] text-[#A1A1AA]">
+            <label className="flex flex-col gap-1 text-[11px] text-[var(--ct-text-2)]">
               Até
               <input
                 type="date"
                 name="ate"
                 defaultValue={ate ?? ''}
                 required
-                className="rounded-[8px] border border-white/[0.08] bg-[#111114] px-2 py-1 text-xs text-[#EDEDF0]"
+                className="rounded-[8px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-2 py-1 text-xs text-[var(--ct-text)]"
               />
             </label>
-            <button type="submit" className="rounded-[8px] bg-[#8B9BFF] px-3 py-1.5 text-xs font-semibold text-[#000000]">
+            <button type="submit" className="rounded-[8px] bg-[var(--ct-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--ct-on-accent)]">
               Aplicar
             </button>
           </form>
@@ -226,7 +226,7 @@ export default async function SalesFunnelPage({
       {/* Only speaks up when a sync actually failed. The healthy case is already covered by the
           pulse in the header, and printing "ok, última execução ..." on every load was noise. */}
       {hasSyncError && (
-        <div className="mb-6 rounded-2xl border border-[#FF7A73]/35 bg-[#FF7A73]/10 p-4 text-[13px] text-[#FF7A73]">
+        <div className="mb-6 rounded-2xl border border-[var(--ct-crit)]/35 bg-[var(--ct-crit)]/10 p-4 text-[13px] text-[var(--ct-crit)]">
           {health
             .filter((h) => h.lastResult === 'error')
             .map((h) => (
@@ -238,8 +238,8 @@ export default async function SalesFunnelPage({
       )}
 
       {partialToday?.dadosAte && (
-        <p className="mb-3 text-[12.5px] text-[#A1A1AA]" role="status">
-          <span className="mr-2 rounded-full bg-[#F2B866]/[0.12] px-2 py-0.5 text-[11px] text-[#F2B866]">hoje parcial</span>
+        <p className="mb-3 text-[12.5px] text-[var(--ct-text-2)]" role="status">
+          <span className="mr-2 rounded-full bg-[var(--ct-warn)]/[0.12] px-2 py-0.5 text-[11px] text-[var(--ct-warn)]">hoje parcial</span>
           Gasto do Meta até {timeBr(partialToday.dadosAte)}. As vendas de hoje entram até esse horário para o CPA comparar
           igual com igual
           {partialToday.vendasAposDados > 0
@@ -263,11 +263,11 @@ export default async function SalesFunnelPage({
         <div className="flex min-w-0 flex-col gap-5">
           <FunnelPaymentPie breakdown={paymentBreakdown} currency={currency} />
 
-          <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
-            <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Por produto</h2>
-            <p className="mb-4 text-[12px] text-[#A1A1AA]">Onde a receita do funil se concentra</p>
+          <div className="card-shadow rounded-2xl border border-[var(--ct-line)] p-5">
+            <h2 className="mb-1 font-[family-name:var(--font-sora)] text-base font-semibold">Por produto</h2>
+            <p className="mb-4 text-[12px] text-[var(--ct-text-2)]">Onde a receita do funil se concentra</p>
             {products.length === 0 ? (
-              <p className="text-[13px] text-[#A1A1AA]">Nenhuma venda no período.</p>
+              <p className="text-[13px] text-[var(--ct-text-2)]">Nenhuma venda no período.</p>
             ) : (
               <div className="flex flex-col gap-2.5">
                 {products.slice(0, 8).map((p) => {
@@ -278,13 +278,13 @@ export default async function SalesFunnelPage({
                         <span className="truncate" title={p.produto}>
                           {p.produto}
                         </span>
-                        <span className="flex-shrink-0 font-['JetBrains_Mono'] tabular-nums text-[#EDEDF0]">
+                        <span className="flex-shrink-0 font-[family-name:var(--font-geist-mono)] tabular-nums text-[var(--ct-text)]">
                           {currency(p.revenue)}
-                          <span className="ml-2 text-[11px] text-[#A1A1AA]">{p.sales_count} vendas</span>
+                          <span className="ml-2 text-[11px] text-[var(--ct-text-2)]">{p.sales_count} vendas</span>
                         </span>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-[#111114]">
-                        <div className="h-full rounded-full bg-[#8B9BFF]" style={{ width: `${Math.max(2, share)}%` }} />
+                      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--ct-surface-2)]">
+                        <div className="h-full rounded-full bg-[var(--ct-accent)]" style={{ width: `${Math.max(2, share)}%` }} />
                       </div>
                     </div>
                   )
@@ -293,9 +293,9 @@ export default async function SalesFunnelPage({
             )}
           </div>
 
-          <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
-            <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Vendas por horário</h2>
-            <p className="mb-4 text-[12px] text-[#A1A1AA]">Hora do dia (horário de Brasília)</p>
+          <div className="card-shadow rounded-2xl border border-[var(--ct-line)] p-5">
+            <h2 className="mb-1 font-[family-name:var(--font-sora)] text-base font-semibold">Vendas por horário</h2>
+            <p className="mb-4 text-[12px] text-[var(--ct-text-2)]">Hora do dia (horário de Brasília)</p>
             {/* Bare counts, not "N vendas": 24 bars in half a screen leaves no room for a word
                 above each one, and the panel title already says these are sales. */}
             <div className="overflow-x-auto">
@@ -308,17 +308,17 @@ export default async function SalesFunnelPage({
         </div>
       </div>
 
-      <div className="card-shadow mb-6 overflow-hidden rounded-2xl border border-white/[0.08]">
+      <div className="card-shadow mb-6 overflow-hidden rounded-2xl border border-[var(--ct-line)]">
         <div className="flex items-baseline justify-between px-4 pt-4">
-          <h2 className="font-['Space_Grotesk'] text-base font-semibold">Por criativo</h2>
-          <span className="text-[11.5px] text-[#A1A1AA]">
+          <h2 className="font-[family-name:var(--font-sora)] text-base font-semibold">Por criativo</h2>
+          <span className="text-[11.5px] text-[var(--ct-text-2)]">
             Cruza o gasto do anúncio com a venda que ele gerou
           </span>
         </div>
         <div className="overflow-x-auto">
           <table className="mt-3 w-full text-[13.5px]">
             <thead>
-              <tr className="border-b border-white/[0.08] text-left text-[#A1A1AA]">
+              <tr className="border-b border-[var(--ct-line)] text-left text-[var(--ct-text-2)]">
                 <th className="p-3">Anúncio</th>
                 <th className="p-3">Gasto</th>
                 <th className="p-3">Vendas</th>
@@ -330,7 +330,7 @@ export default async function SalesFunnelPage({
             <tbody>
               {creatives.length === 0 ? (
                 <tr>
-                  <td className="p-3 text-[#A1A1AA]" colSpan={6}>
+                  <td className="p-3 text-[var(--ct-text-2)]" colSpan={6}>
                     Nenhum criativo com gasto ou venda no período.
                   </td>
                 </tr>
@@ -339,16 +339,16 @@ export default async function SalesFunnelPage({
                   const roas = c.spend > 0 ? c.revenue / c.spend : null
                   const cpa = c.sales_count > 0 ? c.spend / c.sales_count : null
                   return (
-                    <tr key={`${c.ad_name}|${c.adset_name ?? ''}`} className="border-t border-white/[0.06]">
+                    <tr key={`${c.ad_name}|${c.adset_name ?? ''}`} className="border-t border-[var(--ct-line)]">
                       <td className="max-w-[280px] p-3" title={c.ad_name}>
                         <div className="truncate">{c.ad_name}</div>
                         {(c.adset_name || c.ad_count > 1) && (
-                          <div className="mt-0.5 truncate text-[11px] text-[#A1A1AA]">
+                          <div className="mt-0.5 truncate text-[11px] text-[var(--ct-text-2)]">
                             {c.adset_name}
                             {c.ad_count > 1 && (
                               <span
                                 title="Estes anúncios têm o mesmo nome e o mesmo conjunto. Nada na venda os separa, então a linha soma os dois em vez de creditar um deles no chute."
-                                className="ml-1.5 cursor-help rounded-full bg-[#F2B866]/[0.12] px-1.5 py-0.5 text-[10px] text-[#F2B866]"
+                                className="ml-1.5 cursor-help rounded-full bg-[var(--ct-warn)]/[0.12] px-1.5 py-0.5 text-[10px] text-[var(--ct-warn)]"
                               >
                                 {c.ad_count} anúncios somados
                               </span>
@@ -356,17 +356,17 @@ export default async function SalesFunnelPage({
                           </div>
                         )}
                       </td>
-                      <td className="p-3 font-['JetBrains_Mono'] tabular-nums">{currency(c.spend)}</td>
-                      <td className="p-3 font-['JetBrains_Mono'] tabular-nums">{c.sales_count}</td>
-                      <td className="p-3 font-['JetBrains_Mono'] tabular-nums">{currency(c.revenue)}</td>
+                      <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(c.spend)}</td>
+                      <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{c.sales_count}</td>
+                      <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(c.revenue)}</td>
                       <td
-                        className={`p-3 font-['JetBrains_Mono'] tabular-nums ${
-                          roas !== null && roas >= 1 ? 'text-[#4ADE9B]' : 'text-[#A1A1AA]'
+                        className={`p-3 font-[family-name:var(--font-geist-mono)] tabular-nums ${
+                          roas !== null && roas >= 1 ? 'text-[var(--ct-ok)]' : 'text-[var(--ct-text-2)]'
                         }`}
                       >
                         {roas !== null ? `${roas.toFixed(2)}x` : '—'}
                       </td>
-                      <td className="p-3 font-['JetBrains_Mono'] tabular-nums">{cpa !== null ? currency(cpa) : '—'}</td>
+                      <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{cpa !== null ? currency(cpa) : '—'}</td>
                     </tr>
                   )
                 })
@@ -376,10 +376,10 @@ export default async function SalesFunnelPage({
         </div>
       </div>
 
-      <div className="card-shadow overflow-hidden rounded-2xl border border-white/[0.08]">
+      <div className="card-shadow overflow-hidden rounded-2xl border border-[var(--ct-line)]">
         <table className="w-full text-[13.5px]">
           <thead>
-            <tr className="text-left text-[#A1A1AA]">
+            <tr className="text-left text-[var(--ct-text-2)]">
               <th className="p-3">Dia</th>
               <th className="p-3">Vendas</th>
               <th className="p-3">Receita bruta</th>
@@ -390,11 +390,11 @@ export default async function SalesFunnelPage({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.data} className="border-t border-white/[0.08]">
+              <tr key={row.data} className="border-t border-[var(--ct-line)]">
                 <td className="p-3">
                   {row.data}
                   {row.dadosAte && (
-                    <span className="ml-2 rounded-full bg-[#F2B866]/[0.12] px-2 py-0.5 text-[11px] text-[#F2B866]">
+                    <span className="ml-2 rounded-full bg-[var(--ct-warn)]/[0.12] px-2 py-0.5 text-[11px] text-[var(--ct-warn)]">
                       parcial · até {timeBr(row.dadosAte)}
                     </span>
                   )}

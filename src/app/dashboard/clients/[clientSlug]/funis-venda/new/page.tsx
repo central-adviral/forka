@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { createSalesFunnel } from '../actions'
 
 const inputClass =
-  'w-full rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 py-2.5 text-sm text-[#EDEDF0] placeholder:text-[#A1A1AA] outline-none focus:border-[#8B9BFF]'
+  'w-full rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-3.5 py-2.5 text-sm text-[var(--ct-text)] placeholder:text-[var(--ct-text-2)] outline-none focus:border-[var(--ct-accent)]'
 
 export default async function NewSalesFunnelPage({ params }: { params: Promise<{ clientSlug: string }> }) {
   const { clientSlug } = await params
@@ -17,14 +17,14 @@ export default async function NewSalesFunnelPage({ params }: { params: Promise<{
         action={createSalesFunnel.bind(null, { client_id: client.id, client_slug: client.slug })}
         className="max-w-xl space-y-4"
       >
-        <h1 className="font-['Space_Grotesk'] text-lg font-semibold">Novo funil de venda</h1>
+        <h1 className="font-[family-name:var(--font-sora)] text-lg font-semibold">Novo funil de venda</h1>
         <input required name="name" placeholder="Nome (ex: 1K LATAM)" className={inputClass} />
         <input required name="slug" placeholder="Slug (ex: 1k-latam)" className={inputClass} />
-        <p className="-mt-2 text-xs text-[#A1A1AA]">
+        <p className="-mt-2 text-xs text-[var(--ct-text-2)]">
           Vira parte da URL interna do funil — use letras minúsculas e hífen
         </p>
         <div>
-          <label className="mb-1 block text-xs text-[#A1A1AA]">IDs de operação (separados por vírgula)</label>
+          <label className="mb-1 block text-xs text-[var(--ct-text-2)]">IDs de operação (separados por vírgula)</label>
           <input
             name="launchops_operacao_ids"
             placeholder="09066a9d-419c-..., 15e25205-230b-..."
@@ -32,10 +32,10 @@ export default async function NewSalesFunnelPage({ params }: { params: Promise<{
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-[#A1A1AA]">Nomes de produto na Hubla (separados por vírgula)</label>
+          <label className="mb-1 block text-xs text-[var(--ct-text-2)]">Nomes de produto na Hubla (separados por vírgula)</label>
           <input name="launchops_produto_nomes" placeholder="1K Por Dia Latam" className={inputClass} />
         </div>
-        <button type="submit" className="rounded-[10px] bg-[#4ADE9B] px-4 py-2.5 text-sm font-semibold text-[#000000]">
+        <button type="submit" className="rounded-[10px] bg-[var(--ct-ok)] px-4 py-2.5 text-sm font-semibold text-[var(--ct-on-accent)]">
           Criar funil
         </button>
       </form>

@@ -144,7 +144,7 @@ export default async function CampaignRulesPage({
         </p>
       )}
       {erro && (
-        <p role="alert" className="rounded-[10px] bg-[rgba(255,122,115,0.12)] px-4 py-3 text-[13px] text-[#FF7A73]">
+        <p role="alert" className="rounded-[10px] bg-[var(--ct-crit-soft)] px-4 py-3 text-[13px] text-[var(--ct-crit)]">
           {erro}
         </p>
       )}
@@ -180,8 +180,8 @@ export default async function CampaignRulesPage({
       {(conflicts.length > 0 || orphans.length > 0) && (
         <div className="flex flex-col gap-3">
           {conflicts.length > 0 && (
-            <div className="rounded-[12px] bg-[rgba(255,122,115,0.12)] px-5 py-4 text-[13px] text-[var(--ct-text-2)]">
-              <b className="block text-[#FF7A73]">
+            <div className="rounded-[12px] bg-[var(--ct-crit-soft)] px-5 py-4 text-[13px] text-[var(--ct-text-2)]">
+              <b className="block text-[var(--ct-crit)]">
                 {conflicts.length} {conflicts.length === 1 ? 'campanha está' : 'campanhas estão'} em mais de uma frente
               </b>
               O nome bate com mais de uma frente, então nenhuma conta o gasto até alguém escolher. Fixe o dono na tabela
@@ -196,8 +196,8 @@ export default async function CampaignRulesPage({
             </div>
           )}
           {orphans.length > 0 && (
-            <div className="rounded-[12px] bg-[rgba(242,184,102,0.11)] px-5 py-4 text-[13px] text-[var(--ct-text-2)]">
-              <b className="block text-[#F2B866]">
+            <div className="rounded-[12px] bg-[var(--ct-warn-soft)] px-5 py-4 text-[13px] text-[var(--ct-text-2)]">
+              <b className="block text-[var(--ct-warn)]">
                 {orphans.length} campanhas com gasto e sem frente somam {currency(orphanSpend)}
               </b>
               Elas aparecem como Não classificado em todos os totais, até ganharem uma regra ou um dono fixado. As maiores:
@@ -254,7 +254,7 @@ export default async function CampaignRulesPage({
                   <span
                     key={rule.id}
                     className={`${mono} flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] ${
-                      rule.kind === 'include' ? 'bg-[var(--ct-an-soft)] text-[var(--ct-an)]' : 'bg-[rgba(255,122,115,0.12)] text-[#FF7A73]'
+                      rule.kind === 'include' ? 'bg-[var(--ct-an-soft)] text-[var(--ct-an)]' : 'bg-[var(--ct-crit-soft)] text-[var(--ct-crit)]'
                     }`}
                   >
                     {rule.kind === 'include' ? 'contém' : 'não contém'} {rule.value}
@@ -357,7 +357,7 @@ export default async function CampaignRulesPage({
                     <td className="px-5 py-2.5">
                       <div className="flex flex-wrap gap-1">
                         {campaign.front_ids.length === 0 && (
-                          <span className="text-[11.5px] text-[#F2B866]">
+                          <span className="text-[11.5px] text-[var(--ct-warn)]">
                             {campaign.suggested_front_ids.length > 1 ? 'em conflito' : 'não classificado'}
                           </span>
                         )}

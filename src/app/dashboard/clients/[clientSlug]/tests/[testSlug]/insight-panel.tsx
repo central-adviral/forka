@@ -40,29 +40,29 @@ export function InsightPanel({
   return (
     <div className="mx-6 mb-6">
       <div className="mb-2 mt-8 flex items-center gap-2">
-        <SparkleIcon className="text-[#8B9BFF]" />
-        <h2 className="font-['Space_Grotesk'] text-lg font-semibold">Insight com IA</h2>
+        <SparkleIcon className="text-[var(--ct-accent)]" />
+        <h2 className="font-[family-name:var(--font-sora)] text-lg font-semibold">Insight com IA</h2>
       </div>
 
-      <div className="rounded-[12px] border border-[#8B9BFF]/25 bg-gradient-to-br from-[#8B9BFF]/[0.08] to-transparent p-5">
+      <div className="rounded-[12px] border border-[var(--ct-accent)]/25 bg-gradient-to-br from-[var(--ct-accent)]/[0.08] to-transparent p-5">
         {isPending ? (
           <div className="flex items-center gap-3 py-1">
-            <SparkleIcon className="animate-pulse text-[#8B9BFF]" />
-            <p className="text-sm text-[#A1A1AA]">Analisando os dados do teste...</p>
+            <SparkleIcon className="animate-pulse text-[var(--ct-accent)]" />
+            <p className="text-sm text-[var(--ct-text-2)]">Analisando os dados do teste...</p>
           </div>
         ) : insight ? (
           <div>
             <div className="mb-2.5 flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#8B9BFF]/20 text-[#8B9BFF]">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--ct-accent)]/20 text-[var(--ct-accent)]">
                 <SparkleIcon />
               </span>
-              <span className="text-[11px] font-medium uppercase tracking-wide text-[#8B9BFF]">Insight gerado</span>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--ct-accent)]">Insight gerado</span>
             </div>
-            <p className="text-sm leading-relaxed text-[#EDEDF0]">{insight}</p>
+            <p className="text-sm leading-relaxed text-[var(--ct-text)]">{insight}</p>
             <button
               type="button"
               onClick={handleGenerate}
-              className="mt-4 text-xs font-medium text-[#A1A1AA] hover:text-[#EDEDF0]"
+              className="mt-4 text-xs font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]"
             >
               Gerar novamente
             </button>
@@ -70,8 +70,8 @@ export function InsightPanel({
         ) : (
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-[#EDEDF0]">Peça pra IA analisar esse teste</p>
-              <p className="mt-1 text-xs text-[#A1A1AA]">
+              <p className="text-sm font-medium text-[var(--ct-text)]">Peça pra IA analisar esse teste</p>
+              <p className="mt-1 text-xs text-[var(--ct-text-2)]">
                 Ela olha visitas, conversões e faturamento de cada variante e recomenda se já dá pra declarar uma
                 vencedora.
               </p>
@@ -79,14 +79,14 @@ export function InsightPanel({
             <button
               type="button"
               onClick={handleGenerate}
-              className="flex h-10 flex-shrink-0 items-center gap-2 rounded-[9px] bg-[#8B9BFF] px-4 text-[13px] font-medium text-white hover:bg-[#A5B2FF]"
+              className="flex h-10 flex-shrink-0 items-center gap-2 rounded-[9px] bg-[var(--ct-accent)] px-4 text-[13px] font-medium text-white hover:bg-[var(--ct-accent)]"
             >
               <SparkleIcon />
               Gerar insight
             </button>
           </div>
         )}
-        {error && <p className="mt-3 text-sm text-[#FF7A73]">{error}</p>}
+        {error && <p className="mt-3 text-sm text-[var(--ct-crit)]">{error}</p>}
       </div>
     </div>
   )

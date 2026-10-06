@@ -18,13 +18,13 @@ export function VerifyDomainButton({
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-[10px] border border-white/[0.08] px-4 py-2.5 text-sm font-medium text-[#A1A1AA] disabled:opacity-50"
+          className="rounded-[10px] border border-[var(--ct-line)] px-4 py-2.5 text-sm font-medium text-[var(--ct-text-2)] disabled:opacity-50"
         >
           {isPending ? 'Verificando...' : 'Verificar'}
         </button>
       </form>
       {result && !isPending && (
-        <p className={`mt-2 text-xs ${result.verified ? 'text-[#4ADE9B]' : 'text-[#F2B866]'}`}>
+        <p className={`mt-2 text-xs ${result.verified ? 'text-[var(--ct-ok)]' : 'text-[var(--ct-warn)]'}`}>
           {result.verified
             ? 'Domínio verificado!'
             : 'Ainda não encontrado — confira o registro CNAME e tente de novo em alguns minutos.'}

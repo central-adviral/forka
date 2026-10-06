@@ -64,7 +64,7 @@ export default async function MembersPage({
         </p>
       )}
       {erro && (
-        <p role="alert" className="rounded-[10px] bg-[rgba(255,122,115,0.12)] px-4 py-3 text-[13px] text-[#FF7A73]">
+        <p role="alert" className="rounded-[10px] bg-[var(--ct-crit-soft)] px-4 py-3 text-[13px] text-[var(--ct-crit)]">
           {erro}
         </p>
       )}

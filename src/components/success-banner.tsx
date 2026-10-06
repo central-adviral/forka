@@ -19,7 +19,7 @@ export function SuccessBanner({ param, message }: { param: string; message: stri
   if (!visible) return null
 
   return (
-    <div className="mb-4 flex items-center gap-2 rounded-[10px] border border-[#4ADE9B]/35 bg-[#4ADE9B]/10 px-3.5 py-2.5 text-sm text-[#4ADE9B]">
+    <div className="mb-4 flex items-center gap-2 rounded-[10px] border border-[var(--ct-ok)]/35 bg-[var(--ct-ok)]/10 px-3.5 py-2.5 text-sm text-[var(--ct-ok)]">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>

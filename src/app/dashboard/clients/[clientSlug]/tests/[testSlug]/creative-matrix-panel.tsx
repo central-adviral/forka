@@ -30,7 +30,7 @@ const METRICS: { key: MetricKey; label: string; format: (value: number) => strin
 ]
 
 const scoreColor = (score: number) =>
-  score >= 85 ? '#4ADE9B' : score >= 65 ? '#4F8EF7' : score >= 40 ? '#F2B866' : '#FF7A73'
+  score >= 85 ? 'var(--ct-ok)' : score >= 65 ? 'var(--ct-an)' : score >= 40 ? 'var(--ct-warn)' : 'var(--ct-crit)'
 
 export function CreativeMatrixPanel({ adRows, variants, assetLabel }: Props) {
   const variantIds = variants.map((v) => v.id)
@@ -80,17 +80,17 @@ export function CreativeMatrixPanel({ adRows, variants, assetLabel }: Props) {
   const hidden = ordered.length - VISIBLE_BLOCKS
 
   return (
-    <div className="mb-8 overflow-hidden rounded-2xl border border-white/[0.08]">
+    <div className="mb-8 overflow-hidden rounded-2xl border border-[var(--ct-line)]">
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
-        <h2 className="font-['Space_Grotesk'] text-lg font-semibold">Score de Criativos</h2>
-        <span className="rounded-full border border-dashed border-[#F2B866]/50 bg-[#F2B866]/[0.08] px-2.5 py-1 font-['JetBrains_Mono'] text-[10px] text-[#F2B866]">
+        <h2 className="font-[family-name:var(--font-sora)] text-lg font-semibold">Score de Criativos</h2>
+        <span className="rounded-full border border-dashed border-[var(--ct-warn)]/50 bg-[var(--ct-warn)]/[0.08] px-2.5 py-1 font-[family-name:var(--font-geist-mono)] text-[10px] text-[var(--ct-warn)]">
           Rascunho — critério em definição
         </span>
       </div>
-      <p className="max-w-[72ch] px-5 pb-4 pt-2 text-[12px] leading-relaxed text-[#A1A1AA]">
+      <p className="max-w-[72ch] px-5 pb-4 pt-2 text-[12px] leading-relaxed text-[var(--ct-text-2)]">
         {ordered.length} criativos, ordenados por score.
         {missingSpend ? (
-          <span className="text-[#F2B866]">
+          <span className="text-[var(--ct-warn)]">
             {' '}
             Sem gasto de anúncio vinculado: o score usa só a taxa de conversão.
           </span>
@@ -113,7 +113,7 @@ export function CreativeMatrixPanel({ adRows, variants, assetLabel }: Props) {
 
       {hidden > 0 && (
         <details className="group px-5 pb-5">
-          <summary className="flex cursor-pointer list-none items-center justify-center gap-2 rounded-lg border border-white/[0.08] p-3 text-[12px] font-semibold text-[#A1A1AA] transition-colors hover:bg-white/[0.03] hover:text-[#EDEDF0]">
+          <summary className="flex cursor-pointer list-none items-center justify-center gap-2 rounded-lg border border-[var(--ct-line)] p-3 text-[12px] font-semibold text-[var(--ct-text-2)] transition-colors hover:bg-[var(--ct-surface-2)] hover:text-[var(--ct-text)]">
             <svg
               className="transition-transform group-open:rotate-180"
               width="12"
@@ -166,33 +166,33 @@ function CreativeBlock({
   const columns = `minmax(110px, 158px) repeat(${variants.length}, minmax(0, 1fr)) 116px`
 
   return (
-    <div className="overflow-hidden rounded-[14px] border border-white/[0.08] bg-white/[0.02]">
-      <div className="flex flex-wrap items-center gap-3 border-b border-white/[0.08] px-4 py-3">
-        <span className="shrink-0 font-['JetBrains_Mono'] text-[10.5px] text-[#A1A1AA]">#{rank}</span>
+    <div className="overflow-hidden rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)]">
+      <div className="flex flex-wrap items-center gap-3 border-b border-[var(--ct-line)] px-4 py-3">
+        <span className="shrink-0 font-[family-name:var(--font-geist-mono)] text-[10.5px] text-[var(--ct-text-2)]">#{rank}</span>
         <span className="min-w-[160px] flex-1 truncate text-[13px] font-semibold" title={row.adName}>
           {row.adName}
         </span>
         {score?.hasThinData && (
           <span
             title="Poucos acessos ainda: o score deste criativo puxa para a média do teste até haver volume suficiente para confiar nos números dele."
-            className="shrink-0 cursor-help rounded-full bg-white/[0.06] px-2 py-0.5 text-[9.5px] text-[#A1A1AA]"
+            className="shrink-0 cursor-help rounded-full bg-[var(--ct-surface-2)] px-2 py-0.5 text-[9.5px] text-[var(--ct-text-2)]"
           >
             amostra pequena
           </span>
         )}
         {score?.score !== null && score !== undefined && (
           <span className="flex shrink-0 items-center gap-2">
-            <span className="font-['JetBrains_Mono'] text-[9.5px] uppercase tracking-wider text-[#A1A1AA]">
+            <span className="font-[family-name:var(--font-geist-mono)] text-[9.5px] uppercase tracking-wider text-[var(--ct-text-2)]">
               Score
             </span>
-            <span className="h-[5px] w-[46px] overflow-hidden rounded-full bg-white/[0.08]">
+            <span className="h-[5px] w-[46px] overflow-hidden rounded-full bg-[var(--ct-surface-2)]">
               <span
                 className="block h-full rounded-full"
                 style={{ width: `${score.score}%`, backgroundColor: scoreColor(score.score) }}
               />
             </span>
             <span
-              className="min-w-[26px] text-right font-['JetBrains_Mono'] text-[14px] font-bold tabular-nums"
+              className="min-w-[26px] text-right font-[family-name:var(--font-geist-mono)] text-[14px] font-bold tabular-nums"
               style={{ color: scoreColor(score.score) }}
             >
               {score.score}
@@ -207,24 +207,24 @@ function CreativeBlock({
         {variants.map((v) => (
           <HeadCell key={v.id}>{v.name}</HeadCell>
         ))}
-        <HeadCell className="border-l border-white/[0.08] bg-white/[0.015]">Total</HeadCell>
+        <HeadCell className="border-l border-[var(--ct-line)] bg-[var(--ct-surface-2)]">Total</HeadCell>
 
         {METRICS.map((metric, mi) => {
           const last = mi === METRICS.length - 1
-          const border = last ? '' : 'border-b border-white/[0.06]'
+          const border = last ? '' : 'border-b border-[var(--ct-line)]'
           return (
             <div key={metric.key} className="contents">
-              <div className={`px-4 py-2 text-[11.5px] text-[#A1A1AA] ${border}`}>{metric.label}</div>
+              <div className={`px-4 py-2 text-[11.5px] text-[var(--ct-text-2)] ${border}`}>{metric.label}</div>
               {variants.map((v) => {
                 const value = row.byVariantId[v.id]?.[metric.key] ?? null
                 const isWinner = row.winners[metric.key] === v.id
                 return (
                   <div key={v.id} className={`px-4 py-2 ${border}`}>
                     <div
-                      className={`rounded-md text-right font-['JetBrains_Mono'] text-[13px] tabular-nums ${
+                      className={`rounded-md text-right font-[family-name:var(--font-geist-mono)] text-[13px] tabular-nums ${
                         isWinner
-                          ? 'bg-[#4ADE9B]/10 px-2 font-bold text-[#4ADE9B] shadow-[inset_0_0_0_1px_rgba(45,212,168,0.32)]'
-                          : 'text-[#A1A1AA]'
+                          ? 'bg-[var(--ct-ok)]/10 px-2 font-bold text-[var(--ct-ok)] shadow-[inset_0_0_0_1px_rgba(45,212,168,0.32)]'
+                          : 'text-[var(--ct-text-2)]'
                       }`}
                     >
                       {value === null ? '—' : metric.format(value)}
@@ -232,8 +232,8 @@ function CreativeBlock({
                   </div>
                 )
               })}
-              <div className={`border-l border-white/[0.08] bg-white/[0.015] px-4 py-2 ${border}`}>
-                <div className="text-right font-['JetBrains_Mono'] text-[13px] font-semibold tabular-nums text-[#EDEDF0]">
+              <div className={`border-l border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-4 py-2 ${border}`}>
+                <div className="text-right font-[family-name:var(--font-geist-mono)] text-[13px] font-semibold tabular-nums text-[var(--ct-text)]">
                   {row.totals[metric.key] === null ? '—' : metric.format(row.totals[metric.key]!)}
                 </div>
               </div>
@@ -248,7 +248,7 @@ function CreativeBlock({
 function HeadCell({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div
-      className={`border-b border-white/[0.08] bg-white/[0.02] px-4 py-2 text-right font-['JetBrains_Mono'] text-[9.5px] uppercase tracking-wider text-[#A1A1AA] ${className}`}
+      className={`border-b border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-4 py-2 text-right font-[family-name:var(--font-geist-mono)] text-[9.5px] uppercase tracking-wider text-[var(--ct-text-2)] ${className}`}
     >
       {children}
     </div>
@@ -270,7 +270,7 @@ function Verdict({
   const rateWinner = row.winners.conversionRate
   if (!revenueWinner) {
     return (
-      <span className="shrink-0 rounded-full bg-white/[0.06] px-3 py-1 text-[11px] text-[#A1A1AA]">
+      <span className="shrink-0 rounded-full bg-[var(--ct-surface-2)] px-3 py-1 text-[11px] text-[var(--ct-text-2)]">
         Sem venda atribuída ainda
       </span>
     )
@@ -279,7 +279,7 @@ function Verdict({
   const unanimous = METRIC_KEYS.every((key) => row.winners[key] === revenueWinner)
   if (unanimous) {
     return (
-      <span className="shrink-0 rounded-full bg-[#4ADE9B]/[0.13] px-3 py-1 text-[11px] font-semibold text-[#4ADE9B]">
+      <span className="shrink-0 rounded-full bg-[var(--ct-ok)]/[0.13] px-3 py-1 text-[11px] font-semibold text-[var(--ct-ok)]">
         Melhor: {nameById.get(revenueWinner)}
       </span>
     )
@@ -293,7 +293,7 @@ function Verdict({
   return (
     <span
       title={`As métricas apontam ${assetLabel.toLowerCase()}s diferentes para este criativo.`}
-      className="shrink-0 rounded-full bg-[#F2B866]/[0.12] px-3 py-1 text-[11px] text-[#F2B866]"
+      className="shrink-0 rounded-full bg-[var(--ct-warn)]/[0.12] px-3 py-1 text-[11px] text-[var(--ct-warn)]"
     >
       {label}
     </span>

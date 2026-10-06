@@ -12,7 +12,7 @@ export function RefreshButton() {
       type="button"
       onClick={() => startTransition(() => router.refresh())}
       disabled={isPending}
-      className="flex h-9 items-center gap-1.5 rounded-[9px] border border-[#4ADE9B] bg-[#4ADE9B] px-4 text-[13px] font-medium text-[#000000] disabled:opacity-60"
+      className="flex h-9 items-center gap-1.5 rounded-[9px] border border-[var(--ct-ok)] bg-[var(--ct-ok)] px-4 text-[13px] font-medium text-[var(--ct-on-accent)] disabled:opacity-60"
     >
       <svg
         width="13"
