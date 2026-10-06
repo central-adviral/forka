@@ -17,7 +17,7 @@ export default async function EditSalesFunnelPage({
 
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, launchops_operacao_ids, launchops_produto_nomes, starts_on, ends_on')
+    .select('id, name, slug, launchops_operacao_ids, starts_on, ends_on')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
@@ -50,14 +50,6 @@ export default async function EditSalesFunnelPage({
           <input
             name="launchops_operacao_ids"
             defaultValue={(funnel.launchops_operacao_ids ?? []).join(', ')}
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-[var(--ct-text-2)]">Nomes de produto na Hubla (separados por vírgula)</label>
-          <input
-            name="launchops_produto_nomes"
-            defaultValue={(funnel.launchops_produto_nomes ?? []).join(', ')}
             className={inputClass}
           />
         </div>

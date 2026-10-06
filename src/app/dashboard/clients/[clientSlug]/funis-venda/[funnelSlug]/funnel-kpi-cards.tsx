@@ -9,6 +9,8 @@ interface KpiTotals {
   cpaAnuncio: number | null
   resultado: number
   roas: number | null
+  /** Front revenue plus the ascension product, over the same spend (0061). */
+  roasComAscensao: number | null
   ticketMedio: number | null
 }
 
@@ -51,7 +53,7 @@ export function FunnelKpiCards({
     { label: totals.comImposto ? 'Investimento c/ imposto' : 'Investimento (sem imposto)', value: currency(totals.investimento) },
     {
       label: 'Receita líquida',
-      hint: 'entrada + upsell',
+      hint: 'entrada + bump + upsell',
       value: currency(totals.receitaLiquida),
       spark: sparklines ? { values: sparklines.receitaLiquida, color: 'var(--ct-accent)' } : undefined,
     },
@@ -64,8 +66,9 @@ export function FunnelKpiCards({
     { label: 'CPA de anúncio', value: totals.cpaAnuncio !== null ? currency(totals.cpaAnuncio) : '—', hint: 'só vendas que a UTM liga ao anúncio' },
     { label: 'Resultado', value: currency(totals.resultado), color: totals.resultado >= 0 ? 'var(--ct-ok)' : 'var(--ct-crit)' },
     {
-      label: 'ROAS',
+      label: 'ROAS front',
       value: totals.roas !== null ? `${totals.roas.toFixed(2)}x` : '—',
+      hint: totals.roasComAscensao !== null ? `c/ ascensão ${totals.roasComAscensao.toFixed(2)}x` : undefined,
       spark: sparklines ? { values: sparklines.roas, color: 'var(--ct-ok)' } : undefined,
     },
     { label: 'Ticket Médio', value: totals.ticketMedio !== null ? currency(totals.ticketMedio) : '—' },

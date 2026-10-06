@@ -30,6 +30,9 @@ export interface DailyFunnelRow {
   dadosAte: string | null
   /** Today only: sales that arrived after that pull, left out of the day's CPA. */
   vendasAposDados: number
+  /** The high-ticket product sold later (0061): kept out of the front revenue, ROAS of its own. */
+  vendasAscensao: number
+  receitaAscensaoLiquida: number
 }
 
 export async function getDailyFunnel(
@@ -60,6 +63,8 @@ export async function getDailyFunnel(
     spend_source: 'frentes' | 'operacao'
     dados_ate: string | null
     vendas_apos_dados: number
+    vendas_ascensao: number
+    receita_ascensao_liquida: number
   }[]).map((row) => {
     const vendas = Number(row.vendas)
     const spendComImposto = Number(row.spend_com_imposto)
@@ -84,6 +89,8 @@ export async function getDailyFunnel(
       spendSource: row.spend_source,
       dadosAte: row.dados_ate,
       vendasAposDados: Number(row.vendas_apos_dados ?? 0),
+      vendasAscensao: Number(row.vendas_ascensao),
+      receitaAscensaoLiquida: Number(row.receita_ascensao_liquida),
     }
   })
 }

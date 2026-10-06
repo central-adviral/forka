@@ -153,3 +153,66 @@ describe('client day for the Hoje screen (0058)', () => {
     expect(Number(row.vendas)).toBe(2)
   })
 })
+
+describe('each project classifies its products (0061)', () => {
+  const day = '2026-09-20'
+  const next = '2026-09-21'
+
+  it('splits entry, bump and ascension sales, re-labels on a role change and keeps the sync list in step', async () => {
+    const { data: user } = await admin.auth.admin.createUser({ email: `products-${Date.now()}@example.com`, password: 'password123', email_confirm: true })
+    const { data: client } = await admin
+      .from('clients')
+      .insert({ owner_id: user!.user!.id, name: 'Products', slug: `products-${Date.now()}` })
+      .select()
+      .single()
+    const { data: funnel } = await admin.from('sales_funnels').insert({ client_id: client!.id, name: 'P', slug: 'p' }).select().single()
+    const funnelId = funnel!.id as string
+    await admin.from('project_products').insert([
+      { sales_funnel_id: funnelId, produto_nome: 'Entrada', papel: 'entrada' },
+      { sales_funnel_id: funnelId, produto_nome: 'Bump', papel: 'order_bump' },
+    ])
+    await admin.from('funnel_sync_state').insert({ sales_funnel_id: funnelId, entity: 'sales', cursor_updated_at: `${day}T00:00:00Z`, last_result: 'ok' })
+    const { error: productError } = await admin.from('project_products').insert({ sales_funnel_id: funnelId, produto_nome: 'Mentoria', papel: 'ascensao' })
+    expect(productError).toBeNull()
+
+    const sale = (externalId: string, produto: string, valor: number) => ({
+      sales_funnel_id: funnelId,
+      external_id: externalId,
+      data_venda: `${day}T15:00:00Z`,
+      status: 'aprovada',
+      produto,
+      valor_bruto: valor,
+      valor_liquido: valor,
+      is_upsell: false,
+    })
+    const { error: salesError } = await admin
+      .from('sales')
+      .insert([sale('e1', 'Entrada', 10), sale('e2', 'Entrada', 10), sale('b1', 'Bump', 5), sale('m1', 'Mentoria', 1000)])
+    expect(salesError).toBeNull()
+
+    const read = async () => {
+      const { data } = await admin.rpc('get_funnel_daily', { p_sales_funnel_id: funnelId, p_since: day, p_until: next })
+      return (data as (DayRow & { receita_liquida: number; vendas_ascensao: number; receita_ascensao_liquida: number })[])[0]
+    }
+    let row = await read()
+    expect([Number(row.vendas), Number(row.vendas_upsell), Number(row.vendas_ascensao)]).toEqual([2, 1, 1])
+    expect(Number(row.receita_liquida)).toBe(25)
+    expect(Number(row.receita_ascensao_liquida)).toBe(1000)
+
+    const { data: synced } = await admin.from('sales_funnels').select('launchops_produto_nomes').eq('id', funnelId).single()
+    expect(synced!.launchops_produto_nomes).toEqual(['Bump', 'Entrada', 'Mentoria'])
+    // A product entering the list re-reads the sales history.
+    const { data: cursor } = await admin.from('funnel_sync_state').select('entity').eq('sales_funnel_id', funnelId)
+    expect(cursor).toEqual([])
+
+    await admin.from('project_products').update({ papel: 'entrada' }).eq('sales_funnel_id', funnelId).eq('produto_nome', 'Bump')
+    row = await read()
+    expect([Number(row.vendas), Number(row.vendas_upsell)]).toEqual([3, 0])
+
+    await admin.from('project_products').delete().eq('sales_funnel_id', funnelId).eq('produto_nome', 'Mentoria')
+    row = await read()
+    expect(Number(row.vendas_ascensao)).toBe(0)
+    const { count } = await admin.from('sales').select('id', { count: 'exact', head: true }).eq('sales_funnel_id', funnelId)
+    expect(count).toBe(3)
+  })
+})

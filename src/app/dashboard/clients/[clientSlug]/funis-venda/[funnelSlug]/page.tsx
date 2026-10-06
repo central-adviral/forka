@@ -102,6 +102,7 @@ export default async function SalesFunnelPage({
       vendas: acc.vendas + row.vendas,
       vendasAnuncio: acc.vendasAnuncio + row.vendasAnuncio,
       vendasUpsell: acc.vendasUpsell + row.vendasUpsell,
+      receitaAscensao: acc.receitaAscensao + row.receitaAscensaoLiquida,
       impressions: acc.impressions + row.impressions,
       reach: acc.reach + row.reach,
       linkClicks: acc.linkClicks + row.linkClicks,
@@ -115,6 +116,7 @@ export default async function SalesFunnelPage({
       vendas: 0,
       vendasAnuncio: 0,
       vendasUpsell: 0,
+      receitaAscensao: 0,
       impressions: 0,
       reach: 0,
       linkClicks: 0,
@@ -134,6 +136,8 @@ export default async function SalesFunnelPage({
     cpaAnuncio: totals.vendasAnuncio > 0 ? totals.investimento / totals.vendasAnuncio : null,
     resultado: totals.receitaLiquida - totals.investimento,
     roas: totals.investimento > 0 ? totals.receitaLiquida / totals.investimento : null,
+    roasComAscensao:
+      totals.investimento > 0 && totals.receitaAscensao > 0 ? (totals.receitaLiquida + totals.receitaAscensao) / totals.investimento : null,
     ticketMedio: totals.vendas > 0 ? totals.receitaLiquida / totals.vendas : null,
   }
   const coneTotals = {
@@ -175,6 +179,12 @@ export default async function SalesFunnelPage({
           )}
           <SyncStatus lastRunAt={lastSyncAt} hasError={hasSyncError} />
           <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
+          <a
+            href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/produtos`}
+            className="rounded-[9px] border border-[var(--ct-line)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ct-text-2)]"
+          >
+            Produtos
+          </a>
           <a
             href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`}
             className="rounded-[9px] border border-[var(--ct-line)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ct-text-2)]"
