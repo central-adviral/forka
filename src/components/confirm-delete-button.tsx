@@ -18,7 +18,7 @@ export function ConfirmDeleteButton({
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="text-xs font-medium text-[#F76C6C] hover:text-[#ff8f8f]"
+        className="text-xs font-medium text-[#FF7A73] hover:text-[#ff8f8f]"
       >
         {label}
       </button>
@@ -27,13 +27,13 @@ export function ConfirmDeleteButton({
 
   return (
     <span className="flex items-center gap-2">
-      <span className="text-xs text-[#F76C6C]">{warning ?? 'Confirmar?'}</span>
+      <span className="text-xs text-[#FF7A73]">{warning ?? 'Confirmar?'}</span>
       <form action={action}>
-        <button type="submit" className="text-xs font-semibold text-[#F76C6C] underline">
+        <button type="submit" className="text-xs font-semibold text-[#FF7A73] underline">
           Sim
         </button>
       </form>
-      <button type="button" onClick={() => setConfirming(false)} className="text-xs text-[#8A90A6]">
+      <button type="button" onClick={() => setConfirming(false)} className="text-xs text-[#A1A1AA]">
         Não
       </button>
     </span>

@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
+import { assertClientRole } from '@/lib/repo/client-access-repo'
 import { createLaunchOpsClient } from '@/lib/launchops/client'
 import { syncOneFunnel } from '@/lib/launchops/sync-funnel'
 
@@ -159,9 +160,10 @@ export async function syncFunnelNow(context: { sales_funnel_id: string; client_s
     .select('id, client_id, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url)')
     .eq('id', context.sales_funnel_id)
     .single()
-  // This select runs on the user's session, so RLS is what proves they own the funnel. The
-  // service-role read below bypasses RLS and relies on that proof having already happened.
+  // This select runs on the user's session, so RLS proves they can see the funnel; seeing is not
+  // enough to write a sync with the service role, which bypasses RLS, so the role is checked too.
   if (error || !funnel) throw new Error('Funil não encontrado')
+  await assertClientRole(supabase, funnel.client_id, 'gestor')
 
   const sourceUrl = (funnel.clients as unknown as { funnel_source_url: string | null } | null)?.funnel_source_url
   const appDb = createServiceRoleClient()

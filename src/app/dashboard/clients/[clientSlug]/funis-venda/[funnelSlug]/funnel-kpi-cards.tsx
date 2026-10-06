@@ -48,15 +48,15 @@ export function FunnelKpiCards({
     {
       label: 'Receita Líquida',
       value: currency(totals.receitaLiquida),
-      spark: sparklines ? { values: sparklines.receitaLiquida, color: '#7C6FF0' } : undefined,
+      spark: sparklines ? { values: sparklines.receitaLiquida, color: '#8B9BFF' } : undefined,
     },
     { label: 'Vendas', value: totals.vendas.toLocaleString('pt-BR') },
     { label: 'CPA', value: totals.cpa !== null ? currency(totals.cpa) : '—' },
-    { label: 'Resultado', value: currency(totals.resultado), color: totals.resultado >= 0 ? '#2DD4A8' : '#F76C6C' },
+    { label: 'Resultado', value: currency(totals.resultado), color: totals.resultado >= 0 ? '#4ADE9B' : '#FF7A73' },
     {
       label: 'ROAS',
       value: totals.roas !== null ? `${totals.roas.toFixed(2)}x` : '—',
-      spark: sparklines ? { values: sparklines.roas, color: '#2DD4A8' } : undefined,
+      spark: sparklines ? { values: sparklines.roas, color: '#4ADE9B' } : undefined,
     },
     { label: 'Ticket Médio', value: totals.ticketMedio !== null ? currency(totals.ticketMedio) : '—' },
   ]
@@ -65,13 +65,13 @@ export function FunnelKpiCards({
     <div
       // The headline numbers get their own lifted surface with a violet edge, so the band reads
       // as the summary of the page rather than as one more panel among the charts.
-      className="mb-6 grid grid-cols-2 divide-y divide-white/[0.06] rounded-2xl border border-[#7C6FF0]/25 bg-[#171B2C] sm:grid-cols-4 sm:divide-y-0 lg:grid-cols-7 lg:divide-x"
+      className="mb-6 grid grid-cols-2 divide-y divide-white/[0.06] rounded-2xl border border-[#8B9BFF]/25 bg-[#1A1A1F] sm:grid-cols-4 sm:divide-y-0 lg:grid-cols-7 lg:divide-x"
       style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,.04), 0 10px 30px -18px rgba(124,111,240,.55)' }}
     >
       {cards.map((card) => (
         <div key={card.label} className="p-4">
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#8A90A6]">{card.label}</div>
-          <div className="font-['JetBrains_Mono'] text-lg font-semibold" style={{ color: card.color ?? '#E8EAF2' }}>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#A1A1AA]">{card.label}</div>
+          <div className="font-['JetBrains_Mono'] text-lg font-semibold" style={{ color: card.color ?? '#EDEDF0' }}>
             {card.value}
           </div>
           {card.spark && <Sparkline values={card.spark.values} color={card.spark.color} />}

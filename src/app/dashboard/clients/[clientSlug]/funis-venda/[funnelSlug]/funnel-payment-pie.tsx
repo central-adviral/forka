@@ -1,4 +1,4 @@
-const COLORS = ['#7C6FF0', '#4F8EF7', '#2DD4A8', '#F5B94D', '#F76C6C']
+const COLORS = ['#8B9BFF', '#4F8EF7', '#4ADE9B', '#F2B866', '#FF7A73']
 const LABELS: Record<string, string> = {
   pix: 'Pix',
   credit_card: 'Cartão de crédito',
@@ -33,10 +33,10 @@ export function FunnelPaymentPie({
   return (
     <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
       <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Receita por método</h2>
-      <p className="mb-5 text-[12px] text-[#8A90A6]">Como o cliente escolheu pagar</p>
+      <p className="mb-5 text-[12px] text-[#A1A1AA]">Como o cliente escolheu pagar</p>
       <div className="flex items-center gap-8">
         <svg width="120" height="120" viewBox="0 0 100 100" className="-rotate-90 flex-shrink-0">
-          <circle cx="50" cy="50" r={radius} fill="none" stroke="#1B2036" strokeWidth="16" />
+          <circle cx="50" cy="50" r={radius} fill="none" stroke="#111114" strokeWidth="16" />
           {segments.map((s) => (
             <circle
               key={s.metodo}
@@ -56,11 +56,11 @@ export function FunnelPaymentPie({
             <div key={s.metodo} className="flex items-center justify-between text-[13px]">
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
-                <span className="text-[#8A90A6]">{LABELS[s.metodo] ?? s.metodo}</span>
+                <span className="text-[#A1A1AA]">{LABELS[s.metodo] ?? s.metodo}</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="font-['JetBrains_Mono'] text-[#E8EAF2]">{(s.pct * 100).toFixed(0)}%</span>
-                <span className="font-['JetBrains_Mono'] text-[#8A90A6]">{currency(s.receita)}</span>
+                <span className="font-['JetBrains_Mono'] text-[#EDEDF0]">{(s.pct * 100).toFixed(0)}%</span>
+                <span className="font-['JetBrains_Mono'] text-[#A1A1AA]">{currency(s.receita)}</span>
               </div>
             </div>
           ))}

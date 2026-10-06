@@ -118,7 +118,7 @@ export default async function SalesFunnelPage({
     <div className="p-8">
       <a
         href={`/dashboard/clients/${client.slug}/funis-venda`}
-        className="mb-1 flex items-center gap-1 text-xs text-[#8A90A6] hover:text-[#E8EAF2]"
+        className="mb-1 flex items-center gap-1 text-xs text-[#A1A1AA] hover:text-[#EDEDF0]"
       >
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
           <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -132,7 +132,7 @@ export default async function SalesFunnelPage({
           <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
           <a
             href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`}
-            className="rounded-[9px] border border-white/[0.08] px-4 py-2.5 text-[13.5px] font-medium text-[#8A90A6]"
+            className="rounded-[9px] border border-white/[0.08] px-4 py-2.5 text-[13.5px] font-medium text-[#A1A1AA]"
           >
             Editar
           </a>
@@ -148,8 +148,8 @@ export default async function SalesFunnelPage({
               href={option.value === 'all' ? `?` : `?periodo=${option.value}`}
               className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
                 isActive
-                  ? 'border-[#7C6FF0] bg-[#7C6FF0]/15 text-[#7C6FF0]'
-                  : 'border-white/[0.08] text-[#8A90A6] hover:text-[#E8EAF2]'
+                  ? 'border-[#8B9BFF] bg-[#8B9BFF]/15 text-[#8B9BFF]'
+                  : 'border-white/[0.08] text-[#A1A1AA] hover:text-[#EDEDF0]'
               }`}
             >
               {option.label}
@@ -160,38 +160,38 @@ export default async function SalesFunnelPage({
           <summary
             className={`cursor-pointer list-none rounded-full border px-3 py-1.5 text-xs font-medium ${
               periodo === 'custom'
-                ? 'border-[#7C6FF0] bg-[#7C6FF0]/15 text-[#7C6FF0]'
-                : 'border-white/[0.08] text-[#8A90A6] hover:text-[#E8EAF2]'
+                ? 'border-[#8B9BFF] bg-[#8B9BFF]/15 text-[#8B9BFF]'
+                : 'border-white/[0.08] text-[#A1A1AA] hover:text-[#EDEDF0]'
             }`}
           >
             {periodo === 'custom' && desde && ate ? `${formatBr(desde)} - ${formatBr(ate)}` : 'Personalizado'}
           </summary>
           <form
             method="get"
-            className="absolute left-0 top-[calc(100%+6px)] z-10 flex flex-col gap-2 rounded-[10px] border border-white/[0.08] bg-[#141829] p-3 shadow-lg"
+            className="absolute left-0 top-[calc(100%+6px)] z-10 flex flex-col gap-2 rounded-[10px] border border-white/[0.08] bg-[#0A0A0C] p-3 shadow-lg"
           >
             <input type="hidden" name="periodo" value="custom" />
-            <label className="flex flex-col gap-1 text-[11px] text-[#8A90A6]">
+            <label className="flex flex-col gap-1 text-[11px] text-[#A1A1AA]">
               De
               <input
                 type="date"
                 name="desde"
                 defaultValue={desde ?? ''}
                 required
-                className="rounded-[8px] border border-white/[0.08] bg-[#1B2036] px-2 py-1 text-xs text-[#E8EAF2]"
+                className="rounded-[8px] border border-white/[0.08] bg-[#111114] px-2 py-1 text-xs text-[#EDEDF0]"
               />
             </label>
-            <label className="flex flex-col gap-1 text-[11px] text-[#8A90A6]">
+            <label className="flex flex-col gap-1 text-[11px] text-[#A1A1AA]">
               Até
               <input
                 type="date"
                 name="ate"
                 defaultValue={ate ?? ''}
                 required
-                className="rounded-[8px] border border-white/[0.08] bg-[#1B2036] px-2 py-1 text-xs text-[#E8EAF2]"
+                className="rounded-[8px] border border-white/[0.08] bg-[#111114] px-2 py-1 text-xs text-[#EDEDF0]"
               />
             </label>
-            <button type="submit" className="rounded-[8px] bg-[#7C6FF0] px-3 py-1.5 text-xs font-semibold text-[#0B0E1A]">
+            <button type="submit" className="rounded-[8px] bg-[#8B9BFF] px-3 py-1.5 text-xs font-semibold text-[#000000]">
               Aplicar
             </button>
           </form>
@@ -201,7 +201,7 @@ export default async function SalesFunnelPage({
       {/* Only speaks up when a sync actually failed. The healthy case is already covered by the
           pulse in the header, and printing "ok, última execução ..." on every load was noise. */}
       {hasSyncError && (
-        <div className="mb-6 rounded-2xl border border-[#F76C6C]/35 bg-[#F76C6C]/10 p-4 text-[13px] text-[#F76C6C]">
+        <div className="mb-6 rounded-2xl border border-[#FF7A73]/35 bg-[#FF7A73]/10 p-4 text-[13px] text-[#FF7A73]">
           {health
             .filter((h) => h.lastResult === 'error')
             .map((h) => (
@@ -228,9 +228,9 @@ export default async function SalesFunnelPage({
 
           <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
             <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Por produto</h2>
-            <p className="mb-4 text-[12px] text-[#8A90A6]">Onde a receita do funil se concentra</p>
+            <p className="mb-4 text-[12px] text-[#A1A1AA]">Onde a receita do funil se concentra</p>
             {products.length === 0 ? (
-              <p className="text-[13px] text-[#8A90A6]">Nenhuma venda no período.</p>
+              <p className="text-[13px] text-[#A1A1AA]">Nenhuma venda no período.</p>
             ) : (
               <div className="flex flex-col gap-2.5">
                 {products.slice(0, 8).map((p) => {
@@ -241,13 +241,13 @@ export default async function SalesFunnelPage({
                         <span className="truncate" title={p.produto}>
                           {p.produto}
                         </span>
-                        <span className="flex-shrink-0 font-['JetBrains_Mono'] tabular-nums text-[#E8EAF2]">
+                        <span className="flex-shrink-0 font-['JetBrains_Mono'] tabular-nums text-[#EDEDF0]">
                           {currency(p.revenue)}
-                          <span className="ml-2 text-[11px] text-[#8A90A6]">{p.sales_count} vendas</span>
+                          <span className="ml-2 text-[11px] text-[#A1A1AA]">{p.sales_count} vendas</span>
                         </span>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-[#1B2036]">
-                        <div className="h-full rounded-full bg-[#7C6FF0]" style={{ width: `${Math.max(2, share)}%` }} />
+                      <div className="h-1.5 overflow-hidden rounded-full bg-[#111114]">
+                        <div className="h-full rounded-full bg-[#8B9BFF]" style={{ width: `${Math.max(2, share)}%` }} />
                       </div>
                     </div>
                   )
@@ -258,13 +258,13 @@ export default async function SalesFunnelPage({
 
           <div className="card-shadow rounded-2xl border border-white/[0.08] p-5">
             <h2 className="mb-1 font-['Space_Grotesk'] text-base font-semibold">Vendas por horário</h2>
-            <p className="mb-4 text-[12px] text-[#8A90A6]">Hora do dia (horário de Brasília)</p>
+            <p className="mb-4 text-[12px] text-[#A1A1AA]">Hora do dia (horário de Brasília)</p>
             {/* Bare counts, not "N vendas": 24 bars in half a screen leaves no room for a word
                 above each one, and the panel title already says these are sales. */}
             <div className="overflow-x-auto">
               <MiniBarChart
                 data={salesByHour.map((h) => ({ label: `${String(h.hour).padStart(2, '0')}h`, value: h.sales_count }))}
-                barColor="#2DD4A8"
+                barColor="#4ADE9B"
               />
             </div>
           </div>
@@ -274,14 +274,14 @@ export default async function SalesFunnelPage({
       <div className="card-shadow mb-6 overflow-hidden rounded-2xl border border-white/[0.08]">
         <div className="flex items-baseline justify-between px-4 pt-4">
           <h2 className="font-['Space_Grotesk'] text-base font-semibold">Por criativo</h2>
-          <span className="text-[11.5px] text-[#8A90A6]">
+          <span className="text-[11.5px] text-[#A1A1AA]">
             Cruza o gasto do anúncio com a venda que ele gerou
           </span>
         </div>
         <div className="overflow-x-auto">
           <table className="mt-3 w-full text-[13.5px]">
             <thead>
-              <tr className="border-b border-white/[0.08] text-left text-[#8A90A6]">
+              <tr className="border-b border-white/[0.08] text-left text-[#A1A1AA]">
                 <th className="p-3">Anúncio</th>
                 <th className="p-3">Gasto</th>
                 <th className="p-3">Vendas</th>
@@ -293,7 +293,7 @@ export default async function SalesFunnelPage({
             <tbody>
               {creatives.length === 0 ? (
                 <tr>
-                  <td className="p-3 text-[#8A90A6]" colSpan={6}>
+                  <td className="p-3 text-[#A1A1AA]" colSpan={6}>
                     Nenhum criativo com gasto ou venda no período.
                   </td>
                 </tr>
@@ -306,12 +306,12 @@ export default async function SalesFunnelPage({
                       <td className="max-w-[280px] p-3" title={c.ad_name}>
                         <div className="truncate">{c.ad_name}</div>
                         {(c.adset_name || c.ad_count > 1) && (
-                          <div className="mt-0.5 truncate text-[11px] text-[#8A90A6]">
+                          <div className="mt-0.5 truncate text-[11px] text-[#A1A1AA]">
                             {c.adset_name}
                             {c.ad_count > 1 && (
                               <span
                                 title="Estes anúncios têm o mesmo nome e o mesmo conjunto. Nada na venda os separa, então a linha soma os dois em vez de creditar um deles no chute."
-                                className="ml-1.5 cursor-help rounded-full bg-[#F5B94D]/[0.12] px-1.5 py-0.5 text-[10px] text-[#F5B94D]"
+                                className="ml-1.5 cursor-help rounded-full bg-[#F2B866]/[0.12] px-1.5 py-0.5 text-[10px] text-[#F2B866]"
                               >
                                 {c.ad_count} anúncios somados
                               </span>
@@ -324,7 +324,7 @@ export default async function SalesFunnelPage({
                       <td className="p-3 font-['JetBrains_Mono'] tabular-nums">{currency(c.revenue)}</td>
                       <td
                         className={`p-3 font-['JetBrains_Mono'] tabular-nums ${
-                          roas !== null && roas >= 1 ? 'text-[#2DD4A8]' : 'text-[#8A90A6]'
+                          roas !== null && roas >= 1 ? 'text-[#4ADE9B]' : 'text-[#A1A1AA]'
                         }`}
                       >
                         {roas !== null ? `${roas.toFixed(2)}x` : '—'}
@@ -342,7 +342,7 @@ export default async function SalesFunnelPage({
       <div className="card-shadow overflow-hidden rounded-2xl border border-white/[0.08]">
         <table className="w-full text-[13.5px]">
           <thead>
-            <tr className="text-left text-[#8A90A6]">
+            <tr className="text-left text-[#A1A1AA]">
               <th className="p-3">Dia</th>
               <th className="p-3">Vendas</th>
               <th className="p-3">Receita bruta</th>

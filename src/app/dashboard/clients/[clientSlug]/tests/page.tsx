@@ -45,7 +45,7 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
         <div>
           <a
             href={`/dashboard/clients/${client.slug}`}
-            className="mb-1 flex items-center gap-1 text-xs text-[#8A90A6] hover:text-[#E8EAF2]"
+            className="mb-1 flex items-center gap-1 text-xs text-[#A1A1AA] hover:text-[#EDEDF0]"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -56,7 +56,7 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
         </div>
         <a
           href={`/dashboard/clients/${client.slug}/tests/new`}
-          className="rounded-[9px] bg-[#7C6FF0] px-4 py-2.5 text-[13.5px] font-semibold text-[#0B0E1A]"
+          className="rounded-[9px] bg-[#8B9BFF] px-4 py-2.5 text-[13.5px] font-semibold text-[#000000]"
         >
           Novo teste
         </a>
@@ -66,22 +66,22 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
         {(tests ?? []).map((test, index) => (
           <div
             key={test.id}
-            className={`flex items-center gap-5 bg-[#141829] px-6 py-5 hover:bg-[#1B2036] ${
+            className={`flex items-center gap-5 bg-[#0A0A0C] px-6 py-5 hover:bg-[#111114] ${
               index < (tests?.length ?? 0) - 1 ? 'border-b border-white/[0.08]' : ''
             } ${test.status === 'paused' ? 'opacity-70' : ''}`}
           >
             <a href={`/dashboard/clients/${client.slug}/tests/${test.slug}`} className="flex min-w-0 flex-1 items-center gap-5">
               <div className="min-w-0 flex-1">
                 <div className="font-['Space_Grotesk'] text-[15px] font-semibold">{test.name}</div>
-                <div className="font-['JetBrains_Mono'] text-xs text-[#8A90A6]">/{test.slug}</div>
+                <div className="font-['JetBrains_Mono'] text-xs text-[#A1A1AA]">/{test.slug}</div>
               </div>
               <div className="flex flex-col items-end">
                 <span className="font-['JetBrains_Mono'] text-[15px] font-medium">
                   {accessCountsError ? '—' : (accessesByTestId.get(test.id) ?? 0)}
                 </span>
-                <span className="text-[11px] text-[#8A90A6]">acessos totais</span>
+                <span className="text-[11px] text-[#A1A1AA]">acessos totais</span>
               </div>
-              <span className="rounded-full border border-white/[0.08] px-2.5 py-1 text-xs font-medium text-[#8A90A6]">
+              <span className="rounded-full border border-white/[0.08] px-2.5 py-1 text-xs font-medium text-[#A1A1AA]">
                 {test.test_type === 'checkout' ? 'Checkout' : 'Página'}
               </span>
             </a>
@@ -96,7 +96,7 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
             />
           </div>
         ))}
-        {(tests ?? []).length === 0 && <div className="px-6 py-8 text-sm text-[#8A90A6]">Nenhum teste ainda.</div>}
+        {(tests ?? []).length === 0 && <div className="px-6 py-8 text-sm text-[#A1A1AA]">Nenhum teste ainda.</div>}
       </div>
     </div>
   )

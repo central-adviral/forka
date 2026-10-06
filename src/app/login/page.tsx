@@ -23,39 +23,39 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#0B0E1A]">
-      <div className="w-[400px] rounded-2xl border border-white/[0.08] bg-[#141829] p-10">
-        <h1 className="mb-2 font-['Space_Grotesk'] text-2xl font-semibold text-[#E8EAF2]">Entrar</h1>
-        <p className="mb-7 text-sm leading-relaxed text-[#8A90A6]">
+    <main className="flex min-h-screen items-center justify-center bg-[#000000]">
+      <div className="w-[400px] rounded-2xl border border-white/[0.08] bg-[#0A0A0C] p-10">
+        <h1 className="mb-2 font-['Space_Grotesk'] text-2xl font-semibold text-[#EDEDF0]">Entrar</h1>
+        <p className="mb-7 text-sm leading-relaxed text-[#A1A1AA]">
           Acesse seus clientes, testes e relatórios de conversão.
         </p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <label htmlFor="email" className="text-[13px] font-medium text-[#8A90A6]">E-mail</label>
+            <label htmlFor="email" className="text-[13px] font-medium text-[#A1A1AA]">E-mail</label>
             <input
               id="email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-11 rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]"
+              className="h-11 rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 text-sm text-[#EDEDF0] outline-none focus:border-[#8B9BFF]"
             />
           </div>
           <div className="flex flex-col gap-2">
-            <label htmlFor="password" className="text-[13px] font-medium text-[#8A90A6]">Senha</label>
+            <label htmlFor="password" className="text-[13px] font-medium text-[#A1A1AA]">Senha</label>
             <input
               id="password"
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-11 rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 text-sm text-[#E8EAF2] outline-none focus:border-[#7C6FF0]"
+              className="h-11 rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 text-sm text-[#EDEDF0] outline-none focus:border-[#8B9BFF]"
             />
           </div>
-          {error && <p className="text-sm text-[#F76C6C]">{error}</p>}
+          {error && <p className="text-sm text-[#FF7A73]">{error}</p>}
           <button
             type="submit"
-            className="mt-1.5 h-[46px] rounded-[10px] bg-[#7C6FF0] text-sm font-semibold text-[#0B0E1A]"
+            className="mt-1.5 h-[46px] rounded-[10px] bg-[#8B9BFF] text-sm font-semibold text-[#000000]"
           >
             Entrar
           </button>

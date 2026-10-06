@@ -12,16 +12,16 @@ const ID_SLOTS = new Set(['utm_campaign', 'fb_ad_id', 'fb_adset_id', 'fb_campaig
 function MacroLine({ url }: { url: string }) {
   const [base, query] = url.split('?')
   return (
-    <p className="break-all font-['JetBrains_Mono'] text-xs leading-relaxed text-[#8A90A6]">
-      <span className="text-[#E8EAF2]">{base}</span>
+    <p className="break-all font-['JetBrains_Mono'] text-xs leading-relaxed text-[#A1A1AA]">
+      <span className="text-[#EDEDF0]">{base}</span>
       {query && '?'}
       {query?.split('&').map((pair, index) => {
         const [key, value] = pair.split('=')
         return (
           <span key={key}>
             {index > 0 && '&'}
-            <span className="text-[#8A90A6]">{key}</span>=
-            <span className={ID_SLOTS.has(key) ? 'text-[#F5B94D]' : 'text-[#9C90F5]'}>{value}</span>
+            <span className="text-[#A1A1AA]">{key}</span>=
+            <span className={ID_SLOTS.has(key) ? 'text-[#F2B866]' : 'text-[#A5B2FF]'}>{value}</span>
           </span>
         )
       })}
@@ -47,7 +47,7 @@ export default async function TestLinkPage({
     console.error('[test-link-fetch-failed]', { testSlug }, testError)
     return (
       <div className="p-8">
-        <p className="text-sm text-[#8A90A6]">
+        <p className="text-sm text-[#A1A1AA]">
           Não foi possível carregar este teste agora. Tente novamente em instantes.
         </p>
       </div>
@@ -85,7 +85,7 @@ export default async function TestLinkPage({
         <div>
           <a
             href={`/dashboard/clients/${clientSlug}/tests/${test.slug}`}
-            className="mb-1 flex items-center gap-1 text-xs text-[#8A90A6] hover:text-[#E8EAF2]"
+            className="mb-1 flex items-center gap-1 text-xs text-[#A1A1AA] hover:text-[#EDEDF0]"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path
@@ -104,7 +104,7 @@ export default async function TestLinkPage({
 
       <div className="mx-6 mb-6 mt-6">
         <h2 className="mb-1 font-['Space_Grotesk'] text-lg font-semibold">Link da campanha</h2>
-        <p className="mb-3 text-xs text-[#8A90A6]">
+        <p className="mb-3 text-xs text-[#A1A1AA]">
           Cole este endereço no campo <em>Site</em> do anúncio. As chaves duplas o Meta preenche no clique.
         </p>
         <div className="rounded-[10px] border border-white/[0.08] p-3">
@@ -116,14 +116,14 @@ export default async function TestLinkPage({
             {TRACKED_URL_PARAMS.map((key) => (
               <span
                 key={key}
-                className="rounded-md border border-[#2DD4A8]/30 bg-[#2DD4A8]/[0.09] px-2 py-1 font-['JetBrains_Mono'] text-[11px] text-[#2DD4A8]"
+                className="rounded-md border border-[#4ADE9B]/30 bg-[#4ADE9B]/[0.09] px-2 py-1 font-['JetBrains_Mono'] text-[11px] text-[#4ADE9B]"
               >
                 ✓ {key}
               </span>
             ))}
           </div>
-          <p className="mt-3 rounded-lg border-l-2 border-[#F5B94D] bg-[#F5B94D]/[0.07] px-3 py-2 text-xs text-[#8A90A6]">
-            <strong className="text-[#F5B94D]">A vaga do id é a utm_campaign.</strong> Quatro vagas carregam
+          <p className="mt-3 rounded-lg border-l-2 border-[#F2B866] bg-[#F2B866]/[0.07] px-3 py-2 text-xs text-[#A1A1AA]">
+            <strong className="text-[#F2B866]">A vaga do id é a utm_campaign.</strong> Quatro vagas carregam
             nome — o que uma pessoa lê, e que muda quando alguém renomeia. Uma carrega id, que a máquina cruza
             e que nunca muda. Um id basta: sabendo o anúncio, a tabela de gasto entrega conjunto e campanha.
           </p>
@@ -132,7 +132,7 @@ export default async function TestLinkPage({
 
       <div className="mx-6 mb-6">
         <h2 className="mb-1 font-['Space_Grotesk'] text-lg font-semibold">Link simples</h2>
-        <p className="mb-3 text-xs text-[#8A90A6]">
+        <p className="mb-3 text-xs text-[#A1A1AA]">
           Sem parâmetro nenhum. Serve pra bio, e-mail ou qualquer lugar onde não exista anúncio pra rastrear —
           o sorteio da variante funciona igual, só não dá pra dizer de onde veio.
         </p>
@@ -158,7 +158,7 @@ export default async function TestLinkPage({
               <p className="break-all font-['JetBrains_Mono'] text-xs text-[#4F8EF7]">{checkoutLinkUrl}</p>
               <CopyButton text={checkoutLinkUrl} />
             </div>
-            <p className="text-xs text-[#8A90A6]">
+            <p className="text-xs text-[#A1A1AA]">
               Cole este endereço no botão de comprar da página de vendas. Se a página tiver vários botões de
               compra, todos recebem o mesmo endereço. Trocar os checkouts ou os pesos depois não exige mexer na
               página de novo.
@@ -176,7 +176,7 @@ export default async function TestLinkPage({
             const isSafeUrl = variant.thank_you_url ? /^https?:\/\//i.test(variant.thank_you_url) : false
             return (
               <div key={variant.id} className="mb-4 rounded-[10px] border border-white/[0.08] p-3">
-                <p className="mb-2 text-sm text-[#8A90A6]">
+                <p className="mb-2 text-sm text-[#A1A1AA]">
                   {assetLabel} {variant.name}
                   {variant.thank_you_url && isSafeUrl ? (
                     <>
@@ -197,12 +197,12 @@ export default async function TestLinkPage({
                     <> — nenhuma URL de thank-you configurada para esta {assetLabel.toLowerCase()}</>
                   )}
                 </p>
-                <p className="mb-2 text-xs text-[#8A90A6]">
+                <p className="mb-2 text-xs text-[#A1A1AA]">
                   Importante: seu construtor de página/funil precisa estar configurado para repassar os
                   parâmetros da URL original no redirecionamento pra esta página, senão o pixel nunca recebe o
                   tracking id.
                 </p>
-                <pre className="overflow-x-auto rounded bg-[#1B2036] p-2 text-xs">
+                <pre className="overflow-x-auto rounded bg-[#111114] p-2 text-xs">
                   <code>{`<script>
   (function () {
     var params = new URLSearchParams(window.location.search);

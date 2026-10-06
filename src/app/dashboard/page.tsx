@@ -1,7 +1,9 @@
 import { Suspense } from 'react'
+import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { SuccessBanner } from '@/components/success-banner'
-import Link from 'next/link'
+import { resolvePeriodDateRange } from '@/lib/domain/report-period'
+import type { ClientRole } from '@/lib/repo/client-access-repo'
 
 interface UsageStats {
   total_clients: number
@@ -9,28 +11,157 @@ interface UsageStats {
   total_click_events: number
 }
 
+interface PortfolioRow {
+  client_id: string
+  spend: number
+  approved_sales: number
+  net_revenue: number
+  active_tests: number
+  last_sync_at: string | null
+}
+
+const ROLE_LABEL: Record<ClientRole, string> = {
+  owner: 'Owner',
+  gestor: 'Gestor',
+  analista: 'Analista',
+  cliente: 'Cliente',
+}
+
+const currency = (value: number) =>
+  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+
+function syncLabel(iso: string | null): string {
+  if (!iso) return 'nunca'
+  return new Date(iso).toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
-  const { data: clients } = await supabase.from('clients').select('id, name, slug').order('name')
-  const { data: usage } = (await supabase.rpc('get_usage_stats').single()) as { data: UsageStats | null }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const { since } = resolvePeriodDateRange('7d', undefined, undefined)
+  const [{ data: clients }, { data: summary }, { data: memberships }, { data: funnels }, { data: usage }] = await Promise.all([
+    supabase.from('clients').select('id, name, slug').order('name'),
+    supabase.rpc('get_portfolio_summary', { p_since: since }) as unknown as Promise<{ data: PortfolioRow[] | null }>,
+    supabase.from('memberships').select('client_id, role').eq('user_id', user?.id ?? ''),
+    supabase.from('sales_funnels').select('client_id'),
+    supabase.rpc('get_usage_stats').single() as unknown as Promise<{ data: UsageStats | null }>,
+  ])
+  const summaryByClient = new Map((summary ?? []).map((row) => [row.client_id, row]))
+  const roleByClient = new Map<string, ClientRole>((memberships ?? []).map((row) => [row.client_id, row.role]))
+  const projectsByClient = new Map<string, number>()
+  for (const row of funnels ?? []) projectsByClient.set(row.client_id, (projectsByClient.get(row.client_id) ?? 0) + 1)
+
+  const rows = (clients ?? []).map((client) => ({ ...client, summary: summaryByClient.get(client.id) }))
+  const totalSpend = rows.reduce((sum, row) => sum + Number(row.summary?.spend ?? 0), 0)
+  const totalSales = rows.reduce((sum, row) => sum + Number(row.summary?.approved_sales ?? 0), 0)
+  const totalTests = rows.reduce((sum, row) => sum + Number(row.summary?.active_tests ?? 0), 0)
 
   return (
-    <div className="p-8">
+    <div className="flex max-w-[1320px] flex-col gap-10 px-14 pb-24 pt-12">
       <Suspense fallback={null}>
         <SuccessBanner param="created" message="Cliente criado com sucesso." />
       </Suspense>
-      <h1 className="mb-1 font-['Space_Grotesk'] text-xl font-semibold">Clientes</h1>
-      <p className="mb-3 text-sm text-[#8A90A6]">Escolha um cliente na barra lateral para ver os testes.</p>
-      {usage && (
-        <p className="mb-6 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">
-          {usage.total_clients} clientes · {usage.total_tests} testes · {usage.total_click_events} cliques
-          registrados (Supabase free tier: 500MB de banco — fique de olho se isso crescer muito rápido)
-        </p>
-      )}
-      {(!clients || clients.length === 0) && (
-        <Link href="/dashboard/clients/new" className="text-sm font-medium text-[#7C6FF0] hover:text-[#9C90F5]">
-          + Criar seu primeiro cliente
+
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <span className="font-[family-name:var(--font-geist-mono)] text-[10.5px] font-medium uppercase tracking-[0.08em] text-[var(--ct-text-3)]">
+            Agência
+          </span>
+          <h1 className="mt-2.5 text-[30px] font-semibold tracking-[-0.04em]">Carteira</h1>
+          <p className="mt-2 text-sm text-[var(--ct-text-2)]">
+            Os clientes que você acompanha. Cada linha abre a Central daquele cliente.
+          </p>
+        </div>
+        <Link
+          href="/dashboard/clients/new"
+          className="ml-auto rounded-[10px] bg-[var(--ct-accent)] px-3.5 py-2 text-[12.5px] font-medium text-black hover:brightness-110"
+        >
+          + Novo cliente
         </Link>
+      </div>
+
+      <div className="grid grid-cols-2 gap-[18px] lg:grid-cols-4">
+        {[
+          { label: 'Clientes', value: String(rows.length), foot: 'que você acessa' },
+          { label: 'Investido', value: currency(totalSpend), foot: 'últimos 7 dias' },
+          { label: 'Vendas aprovadas', value: totalSales.toLocaleString('pt-BR'), foot: 'últimos 7 dias' },
+          { label: 'Testes A/B ativos', value: String(totalTests), foot: 'agora' },
+        ].map((kpi) => (
+          <div key={kpi.label} className="flex flex-col gap-1.5 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-[22px] py-5">
+            <span className="text-xs text-[var(--ct-text-3)]">{kpi.label}</span>
+            <span className="font-[family-name:var(--font-geist-mono)] text-2xl font-medium tracking-[-0.04em]">{kpi.value}</span>
+            <span className="text-xs text-[var(--ct-text-3)]">{kpi.foot}</span>
+          </div>
+        ))}
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="rounded-[14px] border border-dashed border-[var(--ct-line-2)] p-10 text-center">
+          <p className="text-sm text-[var(--ct-text-2)]">Você ainda não acompanha nenhum cliente.</p>
+          <Link href="/dashboard/clients/new" className="mt-3 inline-block text-sm font-medium text-[var(--ct-accent)]">
+            + Criar o primeiro cliente
+          </Link>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)]">
+          <table className="w-full border-collapse text-[13px]">
+            <thead>
+              <tr className="text-left font-[family-name:var(--font-geist-mono)] text-[10.5px] uppercase tracking-[0.06em] text-[var(--ct-text-3)]">
+                <th className="px-5 py-3.5 font-medium">Cliente</th>
+                <th className="px-5 py-3.5 font-medium">Seu papel</th>
+                <th className="px-5 py-3.5 text-right font-medium">Projetos</th>
+                <th className="px-5 py-3.5 text-right font-medium">Investido 7d</th>
+                <th className="px-5 py-3.5 text-right font-medium">Vendas 7d</th>
+                <th className="px-5 py-3.5 text-right font-medium">Receita líq. 7d</th>
+                <th className="px-5 py-3.5 text-right font-medium">Testes ativos</th>
+                <th className="px-5 py-3.5 text-right font-medium">Última sync</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const role = roleByClient.get(row.id)
+                return (
+                  <tr key={row.id} className="border-t border-[var(--ct-line)] hover:bg-[var(--ct-surface-2)]">
+                    <td className="px-5 py-3.5">
+                      <Link href={`/dashboard/clients/${row.slug}`} className="block">
+                        <b className="font-semibold">{row.name}</b>
+                        <span className="block text-[11.5px] text-[var(--ct-text-3)]">{row.slug}</span>
+                      </Link>
+                    </td>
+                    <td className="px-5 py-3.5 text-[var(--ct-text-2)]">{role ? ROLE_LABEL[role] : 'Staff'}</td>
+                    <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">{projectsByClient.get(row.id) ?? 0}</td>
+                    <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">{currency(Number(row.summary?.spend ?? 0))}</td>
+                    <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">
+                      {Number(row.summary?.approved_sales ?? 0).toLocaleString('pt-BR')}
+                    </td>
+                    <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">
+                      {currency(Number(row.summary?.net_revenue ?? 0))}
+                    </td>
+                    <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">{row.summary?.active_tests ?? 0}</td>
+                    <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)] text-[var(--ct-text-3)]">
+                      {syncLabel(row.summary?.last_sync_at ?? null)}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {usage && (
+        <p className="font-[family-name:var(--font-geist-mono)] text-[11px] text-[var(--ct-text-3)]">
+          {usage.total_clients} clientes · {usage.total_tests} testes · {usage.total_click_events} cliques registrados
+          (Supabase free tier: 500MB de banco — fique de olho se isso crescer muito rápido)
+        </p>
       )}
     </div>
   )

@@ -2,17 +2,17 @@
 
 :root {
   color-scheme: dark;
-  --background: #0b0e1a;
-  --foreground: #e8eaf2;
-  --surface: #141829;
-  --surface-2: #1b2036;
+  --background: #000000;
+  --foreground: #EDEDF0;
+  --surface: #0A0A0C;
+  --surface-2: #111114;
   --border-token: rgba(255, 255, 255, 0.08);
-  --text-dim: #8a90a6;
-  --violet: #7c6ff0;
+  --text-dim: #A1A1AA;
+  --violet: #8B9BFF;
   --blue: #4f8ef7;
-  --teal: #2dd4a8;
-  --amber: #f5b94d;
-  --rose: #f76c6c;
+  --teal: #4ADE9B;
+  --amber: #F2B866;
+  --rose: #FF7A73;
   --border-strong: rgba(255, 255, 255, 0.15);
   --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.5);
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -91,4 +91,24 @@ body {
     animation: none;
     stroke-dasharray: none;
   }
+}
+
+/* Central de Tráfego shell: the prototype's black console palette. One hue per tool. */
+:root {
+  --ct-bg: #000000;
+  --ct-surface: #0a0a0c;
+  --ct-surface-2: #111114;
+  --ct-surface-3: #1a1a1f;
+  --ct-line: rgba(255, 255, 255, 0.075);
+  --ct-line-2: rgba(255, 255, 255, 0.13);
+  --ct-text: #ededf0;
+  --ct-text-2: #a1a1aa;
+  --ct-text-3: #6b6b76;
+  --ct-accent: #8b9bff;
+  --ct-accent-soft: rgba(139, 155, 255, 0.12);
+  --ct-painel: #8b9bff;
+  --ct-an: #4fd1c5;
+  --ct-an-soft: rgba(79, 209, 197, 0.11);
+  --ct-ab: #f2b866;
+  --ct-ab-soft: rgba(242, 184, 102, 0.11);
 }

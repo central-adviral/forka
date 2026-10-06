@@ -39,7 +39,7 @@ export default async function SalesFunnelsListPage({
         <div>
           <a
             href={`/dashboard/clients/${client.slug}`}
-            className="mb-1 flex items-center gap-1 text-xs text-[#8A90A6] hover:text-[#E8EAF2]"
+            className="mb-1 flex items-center gap-1 text-xs text-[#A1A1AA] hover:text-[#EDEDF0]"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -50,7 +50,7 @@ export default async function SalesFunnelsListPage({
         </div>
         <a
           href={`/dashboard/clients/${client.slug}/funis-venda/new`}
-          className="rounded-[9px] bg-[#2DD4A8] px-4 py-2.5 text-[13.5px] font-semibold text-[#0B0E1A]"
+          className="rounded-[9px] bg-[#4ADE9B] px-4 py-2.5 text-[13.5px] font-semibold text-[#000000]"
         >
           + Novo funil
         </a>
@@ -60,7 +60,7 @@ export default async function SalesFunnelsListPage({
         {summaries.map((funnel, index) => (
           <div
             key={funnel.id}
-            className={`flex items-center gap-5 bg-[#141829] px-6 py-5 hover:bg-[#1B2036] ${
+            className={`flex items-center gap-5 bg-[#0A0A0C] px-6 py-5 hover:bg-[#111114] ${
               index < summaries.length - 1 ? 'border-b border-white/[0.08]' : ''
             } ${!funnel.is_active ? 'opacity-70' : ''}`}
           >
@@ -70,7 +70,7 @@ export default async function SalesFunnelsListPage({
             >
               <div className="min-w-0 flex-1">
                 <div className="font-['Space_Grotesk'] text-[15px] font-semibold">{funnel.name}</div>
-                <div className="font-['JetBrains_Mono'] text-xs text-[#8A90A6]">
+                <div className="font-['JetBrains_Mono'] text-xs text-[#A1A1AA]">
                   {(funnel.launchops_operacao_ids ?? []).length} operações, {(funnel.launchops_produto_nomes ?? []).length} produtos
                 </div>
               </div>
@@ -80,7 +80,7 @@ export default async function SalesFunnelsListPage({
             <ConfirmDeleteButton action={deleteSalesFunnel.bind(null, funnel.id, client.slug)} />
           </div>
         ))}
-        {summaries.length === 0 && <div className="px-6 py-8 text-sm text-[#8A90A6]">Nenhum funil de venda ainda.</div>}
+        {summaries.length === 0 && <div className="px-6 py-8 text-sm text-[#A1A1AA]">Nenhum funil de venda ainda.</div>}
       </div>
     </div>
   )
