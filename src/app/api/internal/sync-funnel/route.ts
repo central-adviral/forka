@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createLaunchOpsClient } from '@/lib/launchops/client'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { syncOneFunnel } from '@/lib/launchops/sync-funnel'
+import { syncOneFunnel, syncClientCampaigns } from '@/lib/launchops/sync-funnel'
 import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
 
 interface FunnelRow {
@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
   }
 
   let funnelsProcessed = 0
+  const campaignsSyncedFor = new Set<string>()
   for (const funnel of (funnels ?? []) as unknown as FunnelRow[]) {
     const sourceUrl = funnel.clients?.funnel_source_url
     if (!sourceUrl) continue
@@ -41,7 +42,12 @@ export async function GET(request: NextRequest) {
     const launchopsDb = createLaunchOpsClient({ url: sourceUrl, serviceRoleKey: funnelSourceServiceRoleKey })
     await syncOneFunnel(appDb, launchopsDb, funnel)
     funnelsProcessed++
+    // Campaigns belong to the client, not to one funnel: one read per client per run.
+    if (!campaignsSyncedFor.has(funnel.client_id)) {
+      campaignsSyncedFor.add(funnel.client_id)
+      await syncClientCampaigns(appDb, launchopsDb, funnel.client_id)
+    }
   }
 
-  return NextResponse.json({ ok: true, funnelsProcessed })
+  return NextResponse.json({ ok: true, funnelsProcessed, clientsWithCampaigns: campaignsSyncedFor.size })
 }

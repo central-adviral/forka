@@ -15,6 +15,7 @@ import {
   joinAdCreativeSpend,
   syncAdCreativeSpendForFunnel,
 } from './sync-ad-creative-spend'
+import { syncCampaignsForClient } from './sync-campaigns'
 
 export interface SyncableFunnel {
   id: string
@@ -52,6 +53,17 @@ function errorMessage(err: unknown): string {
     return (err as { message: string }).message
   }
   return String(err)
+}
+
+// A failure here is logged and swallowed like the per-entity syncs below: one bad read must not
+// stop the next client's sync, and the freshness of campaign_daily.synced_at shows it went stale.
+export async function syncClientCampaigns(appDb: SupabaseClient, launchopsDb: SupabaseClient, clientId: string) {
+  try {
+    const result = await syncCampaignsForClient(appDb, launchopsDb, clientId)
+    console.log('[sync-client-campaigns]', { clientId, ...result })
+  } catch (err) {
+    console.error('[sync-client-campaigns-failed]', { clientId }, err)
+  }
 }
 
 export async function syncOneFunnel(appDb: SupabaseClient, launchopsDb: SupabaseClient, funnel: SyncableFunnel) {

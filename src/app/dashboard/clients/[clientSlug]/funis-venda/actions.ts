@@ -8,7 +8,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
 import { assertClientRole } from '@/lib/repo/client-access-repo'
 import { createLaunchOpsClient } from '@/lib/launchops/client'
-import { syncOneFunnel } from '@/lib/launchops/sync-funnel'
+import { syncOneFunnel, syncClientCampaigns } from '@/lib/launchops/sync-funnel'
 
 async function assertNoDuplicateLaunchOpsMapping(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
@@ -174,6 +174,7 @@ export async function syncFunnelNow(context: { sales_funnel_id: string; client_s
 
   const launchopsDb = createLaunchOpsClient({ url: sourceUrl, serviceRoleKey: funnelSourceServiceRoleKey })
   await syncOneFunnel(appDb, launchopsDb, funnel)
+  await syncClientCampaigns(appDb, launchopsDb, funnel.client_id)
 
   revalidatePath(`/dashboard/clients/${context.client_slug}/funis-venda/${context.funnel_slug}`)
 }

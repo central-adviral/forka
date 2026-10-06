@@ -39,9 +39,13 @@ vi.mock('@/lib/launchops/sync-ad-creative-spend', () => ({
   joinAdCreativeSpend: vi.fn(() => []),
   syncAdCreativeSpendForFunnel: vi.fn(async () => ({ synced: 0 })),
 }))
+vi.mock('@/lib/launchops/sync-campaigns', () => ({
+  syncCampaignsForClient: vi.fn(async () => ({ since: '2026-09-01', campaignDays: 0 })),
+}))
 
 import { GET } from './route'
 import { createLaunchOpsClient } from '@/lib/launchops/client'
+import { syncCampaignsForClient } from '@/lib/launchops/sync-campaigns'
 import {
   fetchLaunchOpsAdSpendRows,
   fetchLaunchOpsAdSpendRowsForDays,
@@ -96,7 +100,7 @@ describe('GET /api/internal/sync-funnel', () => {
     })
     const response = await GET(request)
     const body = await response.json()
-    expect(body).toEqual({ ok: true, funnelsProcessed: 0 })
+    expect(body).toEqual({ ok: true, funnelsProcessed: 0, clientsWithCampaigns: 0 })
   })
 
   it('re-fetches and syncs the full day (not just the incrementally-fetched rows) when ad spend rows change', async () => {
@@ -185,7 +189,11 @@ describe('GET /api/internal/sync-funnel', () => {
     const response = await GET(request)
     const body = await response.json()
 
-    expect(body).toEqual({ ok: true, funnelsProcessed: 2 })
+    expect(body).toEqual({ ok: true, funnelsProcessed: 2, clientsWithCampaigns: 2 })
+    // Campaigns are read once per client, with that client's own LaunchOps connection.
+    expect(syncCampaignsForClient).toHaveBeenCalledTimes(2)
+    expect(syncCampaignsForClient).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'client-a')
+    expect(syncCampaignsForClient).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'client-b')
     expect(createLaunchOpsClient).toHaveBeenNthCalledWith(1, { url: 'https://client-a.example.com', serviceRoleKey: 'key-a' })
     expect(createLaunchOpsClient).toHaveBeenNthCalledWith(2, { url: 'https://client-b.example.com', serviceRoleKey: 'key-b' })
   })
