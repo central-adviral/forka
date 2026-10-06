@@ -5,6 +5,7 @@ import { getWatchers } from '@/lib/repo/watchers-repo'
 import { METRICS, formatMetric, thresholds, type WatcherMetric } from '@/lib/domain/watchers'
 import { WatcherStatusPill } from '@/components/watcher-status'
 import { createWatcher, deleteWatcher, evaluateNow, toggleWatcher } from './actions'
+import { ScopeMetricFields } from './scope-metric-fields'
 
 const mono = 'font-[family-name:var(--font-geist-mono)]'
 const field =
@@ -122,24 +123,24 @@ export default async function MetasPage({
 
       {canEdit && (
         <form action={createWatcher.bind(null, context)} className="card-shadow grid gap-4 rounded-[18px] border border-dashed border-[var(--ct-line-2)] px-6 py-5 md:grid-cols-3 xl:grid-cols-6">
-          <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)] xl:col-span-2">
-            Aplica em
-            <select name="scope" required defaultValue="" className={field}>
-              <option value="" disabled>escolher projeto ou frente</option>
-              {(funnels ?? []).map((funnel) => (
-                <optgroup key={funnel.id} label={funnel.name}>
-                  <option value={`${funnel.id}|`}>{funnel.name} inteiro · investimento + vendas (use para CPA)</option>
-                  {(fronts ?? [])
-                    .filter((front) => front.sales_funnel_id === funnel.id)
-                    .map((front) => (
-                      <option key={front.id} value={`${funnel.id}|${front.id}`}>
-                        Frente {front.name} · só investimento{ruleLabel(front) ? ` das campanhas com ${ruleLabel(front)}` : ''}
-                      </option>
-                    ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
+          <ScopeMetricFields
+            fieldClass={field}
+            groups={(funnels ?? []).map((funnel) => ({
+              funnelId: funnel.id as string,
+              funnelName: funnel.name as string,
+              fronts: (fronts ?? [])
+                .filter((front) => front.sales_funnel_id === funnel.id)
+                .map((front) => ({
+                  id: front.id as string,
+                  label: `Frente ${front.name} · só investimento${ruleLabel(front) ? ` das campanhas com ${ruleLabel(front)}` : ''}`,
+                })),
+            }))}
+            metrics={(Object.keys(METRICS) as WatcherMetric[]).map((metric) => ({
+              value: metric,
+              label: METRICS[metric].label,
+              projectOnly: METRICS[metric].projectOnly,
+            }))}
+          />
           <div className="rounded-[12px] bg-[var(--ct-surface-2)] px-4 py-3 text-xs leading-relaxed text-[var(--ct-text-2)] md:col-span-3 xl:order-last xl:col-span-6">
             <b className="text-[var(--ct-text)]">Projeto inteiro x frente</b>
             <ul className="mt-1.5 flex flex-col gap-1">
@@ -165,14 +166,6 @@ export default async function MetasPage({
               })}
             </ul>
           </div>
-          <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-            Métrica
-            <select name="metric" required className={field}>
-              {(Object.keys(METRICS) as WatcherMetric[]).map((metric) => (
-                <option key={metric} value={metric}>{METRICS[metric].label}{METRICS[metric].projectOnly ? ' (projeto)' : ''}</option>
-              ))}
-            </select>
-          </label>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Alvo
             <input name="target" required inputMode="decimal" placeholder="55,00 ou 75" className={`${field} ${mono}`} />

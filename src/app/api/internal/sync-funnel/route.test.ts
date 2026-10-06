@@ -103,6 +103,25 @@ describe('GET /api/internal/sync-funnel', () => {
     expect(body).toEqual({ ok: true, funnelsProcessed: 0, clientsWithCampaigns: 0 })
   })
 
+  it('syncs the client campaigns before the funnel, since the creative spend picks its ads from them', async () => {
+    listMock.mockReturnValue([
+      {
+        id: 'funnel-1',
+        client_id: 'client-1',
+        launchops_operacao_ids: ['op-1'],
+        launchops_produto_nomes: null,
+        clients: { funnel_source_url: 'https://launchops.example.com' },
+      },
+    ])
+    secretsByClientId['client-1'] = 'key'
+    await GET(new NextRequest('http://localhost/api/internal/sync-funnel', { headers: { authorization: 'Bearer test-secret' } }))
+    const campaignsAt = vi.mocked(syncCampaignsForClient).mock.invocationCallOrder[0]
+    const funnelAt = vi.mocked(fetchLaunchOpsAdSpendRows).mock.invocationCallOrder[0]
+    expect(campaignsAt).toBeDefined()
+    expect(funnelAt).toBeDefined()
+    expect(campaignsAt).toBeLessThan(funnelAt)
+  })
+
   it('re-fetches and syncs the full day (not just the incrementally-fetched rows) when ad spend rows change', async () => {
     listMock.mockReturnValue([
       {
