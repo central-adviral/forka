@@ -6,6 +6,7 @@ import {
   bracketTags,
   conflictingCampaigns,
   orphanCampaigns,
+  reconcileSpend,
   summarizeFronts,
   type ClassifiedCampaign,
 } from '@/lib/domain/campaign-rules'
@@ -169,6 +170,29 @@ export default async function CampaignRulesPage({
           </div>
         ))}
       </div>
+
+      {campaigns.length > 0 && (() => {
+        const check = reconcileSpend(campaigns)
+        const balanced = check.doubleCounted < 0.01
+        return (
+          <div
+            role={balanced ? 'status' : 'alert'}
+            className={`flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[14px] px-5 py-4 text-[13px] ${
+              balanced ? 'bg-[var(--ct-ok-soft)] text-[var(--ct-ok)]' : 'bg-[var(--ct-crit-soft)] text-[var(--ct-crit)]'
+            }`}
+          >
+            <b className="font-semibold">{balanced ? 'Conferência ok' : 'Conferência não fecha'}</b>
+            <span className={mono}>
+              gasto do Meta {currency(check.total)} = frentes {currency(check.classified)} + não classificado {currency(check.unclassified)}
+            </span>
+            {!balanced && (
+              <span>
+                {currency(check.doubleCounted)} contados duas vezes: campanha com mais de um dono. Fixe o dono na tabela abaixo.
+              </span>
+            )}
+          </div>
+        )
+      })()}
 
       {campaigns.length === 0 && (
         <p className="rounded-[14px] border border-dashed border-[var(--ct-line-2)] p-6 text-sm text-[var(--ct-text-2)]">
