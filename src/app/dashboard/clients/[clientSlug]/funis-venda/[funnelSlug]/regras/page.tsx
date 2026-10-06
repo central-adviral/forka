@@ -64,11 +64,11 @@ export default async function CampaignRulesPage({
   if (!funnel) notFound()
 
   const { since, until } = resolvePeriodDateRange(periodo, undefined, undefined)
-  const [{ data: canEdit }, { data: frontRows }, { data: campaignRows }, { data: lastSync }, { data: otherFunnels }] = await Promise.all([
+  const [{ data: canEdit }, { data: frontRows, error: frontsError }, { data: campaignRows }, { data: lastSync }, { data: otherFunnels }] = await Promise.all([
     supabase.rpc('has_client_role', { p_client_id: client.id, p_min_role: 'gestor' }),
     supabase
       .from('project_fronts')
-      .select('id, code, name, position, sales_funnel_id, source_sales_funnel_id, sales_funnels!inner(name, client_id), naming_rules(id, kind, value)')
+      .select('id, code, name, position, sales_funnel_id, source_sales_funnel_id, sales_funnels!project_fronts_sales_funnel_id_fkey!inner(name, client_id), naming_rules(id, kind, value)')
       .eq('sales_funnels.client_id', client.id)
       .order('position'),
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: since, p_until: until }),
@@ -76,6 +76,7 @@ export default async function CampaignRulesPage({
     supabase.from('sales_funnels').select('id, name').eq('client_id', client.id).neq('id', funnel.id).order('name'),
   ])
 
+  if (frontsError) throw frontsError
   const allFronts = (frontRows ?? []) as unknown as FrontRow[]
   const fronts = allFronts.filter((front) => front.sales_funnel_id === funnel.id)
   const frontById = new Map(allFronts.map((front) => [front.id, front]))
