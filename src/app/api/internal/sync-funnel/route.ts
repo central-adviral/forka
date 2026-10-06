@@ -40,13 +40,14 @@ export async function GET(request: NextRequest) {
     const { funnelSourceServiceRoleKey } = await getClientSecrets(appDb, funnel.client_id)
     if (!funnelSourceServiceRoleKey) continue
     const launchopsDb = createLaunchOpsClient({ url: sourceUrl, serviceRoleKey: funnelSourceServiceRoleKey })
-    await syncOneFunnel(appDb, launchopsDb, funnel)
-    funnelsProcessed++
-    // Campaigns belong to the client, not to one funnel: one read per client per run.
+    // Campaigns belong to the client, not to one funnel: one read per client per run. They go first
+    // because the creative spend of a project with fronts picks its ads from them.
     if (!campaignsSyncedFor.has(funnel.client_id)) {
       campaignsSyncedFor.add(funnel.client_id)
       await syncClientCampaigns(appDb, launchopsDb, funnel.client_id)
     }
+    await syncOneFunnel(appDb, launchopsDb, funnel)
+    funnelsProcessed++
   }
 
   return NextResponse.json({ ok: true, funnelsProcessed, clientsWithCampaigns: campaignsSyncedFor.size })

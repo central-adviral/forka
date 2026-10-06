@@ -186,8 +186,9 @@ export async function syncFunnelNow(context: { sales_funnel_id: string; client_s
   }
 
   const launchopsDb = createLaunchOpsClient({ url: sourceUrl, serviceRoleKey: funnelSourceServiceRoleKey })
-  await syncOneFunnel(appDb, launchopsDb, funnel)
+  // Campaigns first: the creative spend of a project with fronts picks its ads from them.
   await syncClientCampaigns(appDb, launchopsDb, funnel.client_id)
+  await syncOneFunnel(appDb, launchopsDb, funnel)
 
   revalidatePath(`/dashboard/clients/${context.client_slug}/funis-venda/${context.funnel_slug}`)
 }
