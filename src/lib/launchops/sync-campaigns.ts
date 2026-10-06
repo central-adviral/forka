@@ -224,6 +224,18 @@ export async function syncCampaignsForClient(
       fetchLaunchOpsAdDayRows(launchopsDb, { since }),
       fetchLaunchOpsCampaignLeads(launchopsDb, { since }),
     ])
+    // An empty read with no error would replace every day of the window with nothing and log a
+    // success. LaunchOps never forgets spend it already had, so when the Central holds spend inside
+    // the window and the read brings no row at all, the read is broken: stop before touching a day.
+    if (adRows.length === 0) {
+      const { count: windowCount, error: windowError } = await appDb
+        .from('campaign_daily')
+        .select('campaign_id', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .gte('data', since)
+      if (windowError) throw windowError
+      if ((windowCount ?? 0) > 0) throw new Error(`LaunchOps returned no ad rows since ${since}; kept the existing campaign days`)
+    }
     const days = aggregateAdDays(adRows, leadRows)
     const byDay = new Map<string, CampaignDay[]>()
     for (const day of days) byDay.set(day.data, [...(byDay.get(day.data) ?? []), day])
