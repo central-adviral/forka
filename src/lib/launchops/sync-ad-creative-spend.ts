@@ -68,24 +68,50 @@ export async function fetchLaunchOpsAdCreativesByAdIds(
   return creatives
 }
 
+// The project's ads once its campaigns are picked by fronts (0053, 0054): every ad of a campaign
+// whose owner front belongs to the project, whatever operation LaunchOps did or did not tag it with.
+export async function fetchLaunchOpsAdCreativesByCampaignIds(
+  launchopsDb: SupabaseClient,
+  campaignIds: string[]
+): Promise<LaunchOpsAdCreative[]> {
+  const creatives: LaunchOpsAdCreative[] = []
+  for (let i = 0; i < campaignIds.length; i += AD_ID_LOOKUP_CHUNK) {
+    const { data, error } = await launchopsDb
+      .from('anuncio')
+      .select('id, ad_id, ad_name, campaign_id, campaign_name, adset_id, adset_name')
+      .in('campaign_id', campaignIds.slice(i, i + AD_ID_LOOKUP_CHUNK))
+    if (error) throw error
+    creatives.push(...((data ?? []) as LaunchOpsAdCreative[]))
+  }
+  return creatives
+}
+
 export async function fetchLaunchOpsAdCreativeSpendRows(
   launchopsDb: SupabaseClient,
   params: { anuncioIds: string[]; since: string | null }
 ): Promise<LaunchOpsAdCreativeSpendRow[]> {
-  if (params.anuncioIds.length === 0) return []
-  // PostgREST caps a single response at ~1000 rows — a full-history first sync (since=null)
-  // that hits the cap would otherwise silently truncate and advance the cursor past
-  // everything still unsynced. Page through the full result, same fix as ad spend.
-  return fetchAllPages<LaunchOpsAdCreativeSpendRow>((from, to) => {
-    let query = launchopsDb
-      .from('anuncio_dia')
-      .select('anuncio_id, data_referencia, spend, impressions, link_clicks, updated_at')
-      .in('anuncio_id', params.anuncioIds)
-      .order('updated_at', { ascending: true })
-      .range(from, to)
-    if (params.since) query = query.gt('updated_at', params.since)
-    return query
-  })
+  const rows: LaunchOpsAdCreativeSpendRow[] = []
+  // Chunked: a project picked by fronts can hold more ads than one `in` filter fits in the URL.
+  for (let i = 0; i < params.anuncioIds.length; i += AD_ID_LOOKUP_CHUNK) {
+    const chunk = params.anuncioIds.slice(i, i + AD_ID_LOOKUP_CHUNK)
+    // PostgREST caps a single response at ~1000 rows — a full-history first sync (since=null)
+    // that hits the cap would otherwise silently truncate and advance the cursor past
+    // everything still unsynced. Page through the full result, same fix as ad spend.
+    rows.push(
+      ...(await fetchAllPages<LaunchOpsAdCreativeSpendRow>((from, to) => {
+        let query = launchopsDb
+          .from('anuncio_dia')
+          .select('anuncio_id, data_referencia, spend, impressions, link_clicks, updated_at')
+          .in('anuncio_id', chunk)
+          .order('updated_at', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to)
+        if (params.since) query = query.gt('updated_at', params.since)
+        return query
+      }))
+    )
+  }
+  return rows.sort((a, b) => (a.updated_at < b.updated_at ? -1 : a.updated_at > b.updated_at ? 1 : 0))
 }
 
 export function joinAdCreativeSpend(

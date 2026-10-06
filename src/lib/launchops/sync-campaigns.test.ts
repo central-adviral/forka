@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateAdDays, syncWindowStart, windowDays, type LaunchOpsAdDayRow } from './sync-campaigns'
+import { aggregateAdDays, countPaidLeads, syncWindowStart, windowDays, type LaunchOpsAdDayRow } from './sync-campaigns'
 
 function row(overrides: Partial<LaunchOpsAdDayRow> = {}, campaignId: string | null = 'c1', name = '01 - [MTV-T15][GER][CAPTACAO]'): LaunchOpsAdDayRow {
   return {
@@ -83,5 +83,21 @@ describe('syncWindowStart', () => {
 describe('windowDays', () => {
   it('lists every São Paulo day of the window, so a day with no rows is still replaced', () => {
     expect(windowDays('2026-10-03', new Date('2026-10-06T02:00:00Z'))).toEqual(['2026-10-03', '2026-10-04', '2026-10-05'])
+  })
+})
+
+describe('countPaidLeads', () => {
+  it('counts paid leads per São Paulo day and campaign, skipping leads with no campaign', () => {
+    expect(
+      countPaidLeads([
+        { data_captacao: '2026-09-27T02:30:00Z', captacao_campaign: '120256561707910538' },
+        { data_captacao: '2026-09-26T15:00:00Z', captacao_campaign: '120256561707910538' },
+        { data_captacao: '2026-09-27T15:00:00Z', captacao_campaign: '120256561707910538' },
+        { data_captacao: '2026-09-27T15:00:00Z', captacao_campaign: null },
+      ])
+    ).toEqual([
+      { data_referencia: '2026-09-26', campaign_id: '120256561707910538', leads_periodo: 2 },
+      { data_referencia: '2026-09-27', campaign_id: '120256561707910538', leads_periodo: 1 },
+    ])
   })
 })
