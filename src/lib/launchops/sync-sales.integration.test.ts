@@ -92,6 +92,31 @@ describe('syncSalesForFunnel (integration)', () => {
     expect(data!.valor_bruto).toBe(12)
   })
 
+  it('removes a sale from the Central when LaunchOps marks it refunded (0055)', async () => {
+    const saleRow = row()
+    await syncSalesForFunnel(db, salesFunnelId, [saleRow])
+    const result = await syncSalesForFunnel(db, salesFunnelId, [{ ...saleRow, status: 'reembolsada', updated_at: '2026-09-03T12:00:00Z' }])
+    expect(result).toEqual({ synced: 0, removed: 1, latestUpdatedAt: '2026-09-03T12:00:00Z' })
+    const { data } = await db.from('sales').select('id').eq('sales_funnel_id', salesFunnelId).eq('external_id', saleRow.id)
+    expect(data).toEqual([])
+  })
+
+  it('keeps the upsell flag and reads the origin from the UTM (0055)', async () => {
+    const ad = row({ utm_source: 'facebookads', utm_content: '120231234567890123' })
+    const bio = row({ utm_source: 'ig', utm_medium: 'social', utm_content: 'link_in_bio' })
+    const upsell = row({ is_upsell: true })
+    await syncSalesForFunnel(db, salesFunnelId, [ad, bio, upsell])
+    const { data } = await db
+      .from('sales')
+      .select('external_id, origem, is_upsell')
+      .eq('sales_funnel_id', salesFunnelId)
+      .in('external_id', [ad.id, bio.id, upsell.id])
+    const byId = new Map((data ?? []).map((sale) => [sale.external_id, sale]))
+    expect(byId.get(ad.id)).toMatchObject({ origem: 'anuncio', is_upsell: false })
+    expect(byId.get(bio.id)).toMatchObject({ origem: 'organico_bio', is_upsell: false })
+    expect(byId.get(upsell.id)).toMatchObject({ origem: 'sem_utm', is_upsell: true })
+  })
+
   it('links conversion_id when transaction_id_plataforma matches an existing conversion external_event_id', async () => {
     const saleRow = row({ transaction_id_plataforma: matchedExternalEventId })
     await syncSalesForFunnel(db, salesFunnelId, [saleRow])

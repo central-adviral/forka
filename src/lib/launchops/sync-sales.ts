@@ -17,7 +17,16 @@ export interface LaunchOpsSaleRow {
   utm_campaign?: string | null
   utm_term?: string | null
   utm_content?: string | null
+  is_upsell?: boolean | null
 }
+
+// Same row read twice is absorbed by the upsert; a row read zero times is lost for good. A long
+// LaunchOps backfill commits rows whose updated_at is older than the cursor already stored, so
+// every read starts this far behind it.
+export const CURSOR_OVERLAP_MS = 60 * 60 * 1000
+
+/** Only approved sales count. A row that left that status (refund, chargeback) leaves the Central. */
+export const APPROVED_STATUS = 'aprovada'
 
 export async function fetchLaunchOpsSalesRows(
   launchopsDb: SupabaseClient,
@@ -30,14 +39,17 @@ export async function fetchLaunchOpsSalesRows(
     let query = launchopsDb
       .from('vendas')
       .select(
-        'id, data_venda, produto_nome, status, valor_bruto, valor_liquido, metodo_pagamento, updated_at, transaction_id_plataforma, utm_source, utm_medium, utm_campaign, utm_term, utm_content'
+        'id, data_venda, produto_nome, status, valor_bruto, valor_liquido, metodo_pagamento, updated_at, transaction_id_plataforma, utm_source, utm_medium, utm_campaign, utm_term, utm_content, is_upsell'
       )
-      .eq('plataforma', 'hubla')
-      .eq('status', 'aprovada')
+      // No platform filter: the product names already pick the project's sales, and the same
+      // product is sold on more than one checkout (1K LATAM on Hubla and on Pagtrust).
+      // Every status, not only approved: a refund is the same row changing status, and filtering it
+      // out meant the Central never learned the sale was gone.
       .in('produto_nome', params.produtoNomes)
       .order('updated_at', { ascending: true })
+      .order('id', { ascending: true })
       .range(from, to)
-    if (params.since) query = query.gt('updated_at', params.since)
+    if (params.since) query = query.gte('updated_at', new Date(new Date(params.since).getTime() - CURSOR_OVERLAP_MS).toISOString())
     return query
   })
 }
@@ -114,16 +126,30 @@ export async function syncSalesForFunnel(
   appDb: SupabaseClient,
   salesFunnelId: string,
   rows: LaunchOpsSaleRow[]
-): Promise<{ synced: number; latestUpdatedAt: string | null }> {
-  if (rows.length === 0) return { synced: 0, latestUpdatedAt: null }
+): Promise<{ synced: number; removed: number; latestUpdatedAt: string | null }> {
+  if (rows.length === 0) return { synced: 0, removed: 0, latestUpdatedAt: null }
+  const latestUpdatedAt = rows.reduce((latest, row) => (row.updated_at > latest ? row.updated_at : latest), rows[0].updated_at)
+  const approved = rows.filter((row) => row.status === APPROVED_STATUS)
+  const removedIds = rows.filter((row) => row.status !== APPROVED_STATUS).map((row) => row.id)
+
+  for (let i = 0; i < removedIds.length; i += LOOKUP_CHUNK_SIZE) {
+    const { error } = await appDb
+      .from('sales')
+      .delete()
+      .eq('sales_funnel_id', salesFunnelId)
+      .eq('source', 'launchops_sync')
+      .in('external_id', removedIds.slice(i, i + LOOKUP_CHUNK_SIZE))
+    if (error) throw error
+  }
+  if (approved.length === 0) return { synced: 0, removed: removedIds.length, latestUpdatedAt }
 
   // Best-effort reconciliation: transaction_id_plataforma (LaunchOps) and conversions.external_event_id
   // (ab-test-tool) both hold the Hubla invoice id. Most sales won't have a match — that's expected,
   // not an error. One lookup for the whole batch, before it gets sliced into write batches below.
-  const transactionIds = [...new Set(rows.map((row) => row.transaction_id_plataforma).filter((id): id is string => Boolean(id)))]
+  const transactionIds = [...new Set(approved.map((row) => row.transaction_id_plataforma).filter((id): id is string => Boolean(id)))]
   const conversionIdByTransactionId = await findConversionIdsByExternalEventId(appDb, transactionIds)
 
-  const payload = rows.map((row) => ({
+  const payload = approved.map((row) => ({
     sales_funnel_id: salesFunnelId,
     source: 'launchops_sync',
     external_id: row.id,
@@ -143,6 +169,7 @@ export async function syncSalesForFunnel(
     utm_campaign: row.utm_campaign ?? null,
     utm_term: row.utm_term ?? null,
     utm_content: row.utm_content ?? null,
+    is_upsell: row.is_upsell ?? false,
   }))
 
   // A single upsert covering thousands of rows (e.g. a first full-history sync) risks
@@ -153,6 +180,5 @@ export async function syncSalesForFunnel(
     if (error) throw error
   }
 
-  const latestUpdatedAt = rows[rows.length - 1].updated_at
-  return { synced: rows.length, latestUpdatedAt }
+  return { synced: approved.length, removed: removedIds.length, latestUpdatedAt }
 }

@@ -1,0 +1,111 @@
+// The "Precisa da sua atenção" queue of the Hoje screen: one list, worst first, built only from
+// facts the Central already holds. Each item says what is wrong and where to fix it.
+
+export type AttentionSeverity = 'crit' | 'warn' | 'ok'
+
+export interface AttentionItem {
+  severity: AttentionSeverity
+  title: string
+  detail: string
+  tool: 'painel' | 'analises' | 'ab' | 'config'
+  href: string
+}
+
+export interface AttentionInput {
+  base: string
+  now: Date
+  /** Newest Meta updated_at among today's campaign rows; null when nothing arrived today. */
+  metaDataAt: string | null
+  lastRun: { finishedAt: string | null; error: string | null } | null
+  conflicts: { name: string; spend: number }[]
+  unclassified: { count: number; spend: number }
+  rulesHref: string | null
+  bestVariant: { testName: string; variantName: string; liftPct: number } | null
+  /** Open watcher alerts (0059), already worded. */
+  watcherAlerts?: { severity: 'warn' | 'crit'; title: string; detail: string }[]
+}
+
+const STALE_AFTER_MS = 2 * 60 * 60 * 1000
+const SEVERITY_ORDER: Record<AttentionSeverity, number> = { crit: 0, warn: 1, ok: 2 }
+
+function hourInSaoPaulo(now: Date): number {
+  return Number(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false })) % 24
+}
+
+const currency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+
+export function buildAttention(input: AttentionInput): AttentionItem[] {
+  const items: AttentionItem[] = []
+
+  if (input.lastRun?.error) {
+    items.push({
+      severity: 'crit',
+      title: 'A última leitura do LaunchOps falhou',
+      detail: input.lastRun.error,
+      tool: 'config',
+      href: `${input.base}/integrations`,
+    })
+  } else if (!input.lastRun) {
+    items.push({
+      severity: 'warn',
+      title: 'As campanhas deste cliente ainda não foram lidas',
+      detail: 'Use “Atualizar agora” num projeto para fazer a primeira leitura, que traz os últimos 60 dias.',
+      tool: 'analises',
+      href: `${input.base}/funis-venda`,
+    })
+  }
+
+  // Business hours only: at 3am no fresh Meta data is expected and an alert would be noise.
+  const hour = hourInSaoPaulo(input.now)
+  if (input.lastRun && hour >= 9 && hour < 23) {
+    const age = input.metaDataAt ? input.now.getTime() - new Date(input.metaDataAt).getTime() : Infinity
+    if (age > STALE_AFTER_MS) {
+      items.push({
+        severity: 'warn',
+        title: 'Dados do Meta parados',
+        detail: input.metaDataAt
+          ? `O último gasto chegou às ${new Date(input.metaDataAt).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}, há mais de 2 horas. Os números de hoje podem estar atrasados.`
+          : 'Nenhum gasto de hoje chegou ainda. Os números de hoje podem estar atrasados.',
+        tool: 'config',
+        href: `${input.base}/integrations`,
+      })
+    }
+  }
+
+  for (const alert of input.watcherAlerts ?? []) {
+    items.push({ severity: alert.severity, title: alert.title, detail: alert.detail, tool: 'painel', href: `${input.base}/painel` })
+  }
+
+  if (input.conflicts.length > 0) {
+    const spend = input.conflicts.reduce((sum, conflict) => sum + conflict.spend, 0)
+    items.push({
+      severity: 'warn',
+      title: `${input.conflicts.length} ${input.conflicts.length === 1 ? 'campanha disputada' : 'campanhas disputadas'} por duas frentes`,
+      detail: `${currency(spend)} que nenhuma frente conta até alguém escolher o dono. Ex.: ${input.conflicts[0].name}.`,
+      tool: 'config',
+      href: input.rulesHref ?? `${input.base}/funis-venda`,
+    })
+  }
+
+  if (input.unclassified.count > 0) {
+    items.push({
+      severity: 'warn',
+      title: 'Gasto sem frente',
+      detail: `${input.unclassified.count} ${input.unclassified.count === 1 ? 'campanha soma' : 'campanhas somam'} ${currency(input.unclassified.spend)} nos últimos 30 dias, em Não classificado.`,
+      tool: 'config',
+      href: input.rulesHref ?? `${input.base}/funis-venda`,
+    })
+  }
+
+  if (input.bestVariant && input.bestVariant.liftPct > 0) {
+    items.push({
+      severity: 'ok',
+      title: `${input.bestVariant.testName}: ${input.bestVariant.variantName} na frente`,
+      detail: `Converte ${input.bestVariant.liftPct.toFixed(0)}% acima do controle.`,
+      tool: 'ab',
+      href: `${input.base}/tests`,
+    })
+  }
+
+  return items.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
+}

@@ -1,17 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getDailyFunnel } from './funnel-repo'
+import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
 
 export interface BestVariant {
   testName: string
   variantName: string
   liftPct: number
-}
-
-export interface ClientHubKpis {
-  revenue: number
-  roas: number | null
-  activeTests: number
-  bestVariant: BestVariant | null
 }
 
 interface TestReportRow {
@@ -21,41 +14,15 @@ interface TestReportRow {
   conversions: number
 }
 
-export async function getClientHubKpis(
-  db: SupabaseClient,
-  clientId: string,
-  since: string,
-  until: string
-): Promise<ClientHubKpis> {
-  const [{ data: funnels }, { data: activeTestRows }] = await Promise.all([
-    db.from('sales_funnels').select('id').eq('client_id', clientId),
-    db.from('tests').select('id, name').eq('client_id', clientId).eq('status', 'active'),
-  ])
-
-  const funnelDays = await Promise.all(
-    (funnels ?? []).map((funnel) => getDailyFunnel(db, funnel.id, since, until))
-  )
-  const money = funnelDays.flat().reduce(
-    (acc, row) => ({ revenue: acc.revenue + row.receitaLiquida, spend: acc.spend + row.spend }),
-    { revenue: 0, spend: 0 }
-  )
-
-  return {
-    revenue: money.revenue,
-    roas: money.spend > 0 ? money.revenue / money.spend : null,
-    activeTests: (activeTestRows ?? []).length,
-    bestVariant: await findBestVariant(db, activeTestRows ?? [], since, until),
-  }
-}
-
-async function findBestVariant(
+export async function findBestVariant(
   db: SupabaseClient,
   tests: { id: string; name: string }[],
   since: string,
   until: string
 ): Promise<BestVariant | null> {
-  const sinceIso = new Date(`${since}T00:00:00`).toISOString()
-  const untilIso = new Date(`${until}T00:00:00`).toISOString()
+  // São Paulo midnights, not the server's: Vercel runs in UTC.
+  const sinceIso = brtDayBoundaryUtc(since)
+  const untilIso = brtDayBoundaryUtc(until)
 
   const perTest = await Promise.all(
     tests.map(async (test) => {

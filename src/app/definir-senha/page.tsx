@@ -47,35 +47,35 @@ export default function SetPasswordPage() {
   }
 
   const inputClass =
-    'h-11 rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 text-sm text-[#EDEDF0] outline-none focus:border-[#8B9BFF]'
+    'h-11 rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-3.5 text-sm text-[var(--ct-text)] outline-none focus:border-[var(--ct-accent)]'
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#000000]">
-      <div className="w-[400px] rounded-2xl border border-white/[0.08] bg-[#0A0A0C] p-10">
-        <h1 className="mb-2 text-2xl font-semibold text-[#EDEDF0]">Criar sua senha</h1>
-        {ready === 'checking' && <p className="text-sm text-[#A1A1AA]">Validando o convite…</p>}
+    <main className="flex min-h-screen items-center justify-center bg-[var(--ct-bg)]">
+      <div className="w-[400px] rounded-2xl border border-[var(--ct-line)] bg-[var(--ct-surface)] p-10">
+        <h1 className="mb-2 text-2xl font-semibold text-[var(--ct-text)]">Criar sua senha</h1>
+        {ready === 'checking' && <p className="text-sm text-[var(--ct-text-2)]">Validando o convite…</p>}
         {ready === 'invalid' && (
-          <p className="text-sm leading-relaxed text-[#A1A1AA]">
+          <p className="text-sm leading-relaxed text-[var(--ct-text-2)]">
             Este link de convite expirou ou já foi usado. Peça um novo convite a quem administra a Central, ou{' '}
-            <a href="/login" className="text-[#8B9BFF]">entre com sua senha</a>.
+            <a href="/login" className="text-[var(--ct-accent)]">entre com sua senha</a>.
           </p>
         )}
         {ready === 'ok' && (
           <>
-            <p className="mb-7 text-sm leading-relaxed text-[#A1A1AA]">
+            <p className="mb-7 text-sm leading-relaxed text-[var(--ct-text-2)]">
               Você foi convidado para a Central de Tráfego{email ? ` como ${email}` : ''}. Defina uma senha para entrar.
             </p>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
-                <label htmlFor="password" className="text-[13px] font-medium text-[#A1A1AA]">Senha</label>
+                <label htmlFor="password" className="text-[13px] font-medium text-[var(--ct-text-2)]">Senha</label>
                 <input id="password" type="password" required autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass} />
               </div>
               <div className="flex flex-col gap-2">
-                <label htmlFor="confirm" className="text-[13px] font-medium text-[#A1A1AA]">Repita a senha</label>
+                <label htmlFor="confirm" className="text-[13px] font-medium text-[var(--ct-text-2)]">Repita a senha</label>
                 <input id="confirm" type="password" required autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={inputClass} />
               </div>
-              {error && <p className="text-sm text-[#FF7A73]">{error}</p>}
-              <button type="submit" disabled={saving} className="mt-1.5 h-[46px] rounded-[10px] bg-[#8B9BFF] text-sm font-semibold text-[#000000] disabled:opacity-60">
+              {error && <p className="text-sm text-[var(--ct-crit)]">{error}</p>}
+              <button type="submit" disabled={saving} className="mt-1.5 h-[46px] rounded-[10px] bg-[var(--ct-accent)] text-sm font-semibold text-[var(--ct-on-accent)] disabled:opacity-60">
                 {saving ? 'Salvando…' : 'Salvar e entrar'}
               </button>
             </form>

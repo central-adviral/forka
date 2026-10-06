@@ -1,35 +1,42 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: dark;
-  --background: #000000;
-  --foreground: #EDEDF0;
-  --surface: #0A0A0C;
-  --surface-2: #111114;
-  --border-token: rgba(255, 255, 255, 0.08);
-  --text-dim: #A1A1AA;
-  --violet: #8B9BFF;
-  --blue: #4f8ef7;
-  --teal: #4ADE9B;
-  --amber: #F2B866;
-  --rose: #FF7A73;
-  --border-strong: rgba(255, 255, 255, 0.15);
-  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  --background: var(--ct-bg);
+  --foreground: var(--ct-text);
+  --surface: var(--ct-surface);
+  --surface-2: var(--ct-surface-2);
+  --border-token: var(--ct-line);
+  --text-dim: var(--ct-text-2);
+  --violet: var(--ct-accent);
+  --blue: var(--ct-an);
+  --teal: var(--ct-ok);
+  --amber: var(--ct-warn);
+  --rose: var(--ct-crit);
+  --border-strong: var(--ct-line-2);
+  --shadow-card: var(--ct-shadow);
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-jetbrains-mono);
-  --font-display: var(--font-space-grotesk);
+  --font-sans: var(--font-manrope);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-sora);
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(1100px 640px at 4% -12%, var(--ct-glow), transparent 62%),
+    radial-gradient(900px 640px at 100% 108%, color-mix(in srgb, var(--ct-an) 7%, transparent), transparent 62%),
+    var(--ct-bg);
+  background-attachment: fixed;
   color: var(--foreground);
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-manrope), system-ui, sans-serif;
+}
+h1, h2, h3 {
+  font-family: var(--font-sora), var(--font-manrope), sans-serif;
+  letter-spacing: -0.025em;
 }
 
 :focus-visible {
@@ -39,6 +46,7 @@ body {
 }
 
 .card-shadow {
+  background: var(--ct-surface);
   box-shadow: var(--shadow-card);
 }
 
@@ -93,22 +101,59 @@ body {
   }
 }
 
-/* Central de Tráfego shell: the prototype's black console palette. One hue per tool. */
+/* Central de Tráfego: the prototype's "Nebulosa refinada" look in the Safira palette. Dark is the
+   default; [data-mode="light"] on <html> switches every token. Components only ever read --ct-*. */
 :root {
-  --ct-bg: #000000;
-  --ct-surface: #0a0a0c;
-  --ct-surface-2: #111114;
-  --ct-surface-3: #1a1a1f;
+  color-scheme: dark;
+  --ct-bg: #07080b;
+  --ct-surface: #0e1016;
+  --ct-surface-2: #14161d;
+  --ct-surface-3: #1b1e27;
+  --ct-glass: rgba(14, 16, 22, 0.72);
   --ct-line: rgba(255, 255, 255, 0.075);
-  --ct-line-2: rgba(255, 255, 255, 0.13);
-  --ct-text: #ededf0;
-  --ct-text-2: #a1a1aa;
-  --ct-text-3: #6b6b76;
-  --ct-accent: #8b9bff;
-  --ct-accent-soft: rgba(139, 155, 255, 0.12);
-  --ct-painel: #8b9bff;
-  --ct-an: #4fd1c5;
-  --ct-an-soft: rgba(79, 209, 197, 0.11);
-  --ct-ab: #f2b866;
-  --ct-ab-soft: rgba(242, 184, 102, 0.11);
+  --ct-line-2: rgba(255, 255, 255, 0.14);
+  --ct-text: #f3f4f7;
+  --ct-text-2: #aeb3c0;
+  --ct-text-3: #737987;
+  --ct-accent: #7aa2ff;
+  --ct-on-accent: #07080b;
+  --ct-painel: #7aa2ff;
+  --ct-an: #5ed6f0;
+  --ct-ab: #b4a7ff;
+  --ct-ok: #5ee0a0;
+  --ct-warn: #f5c35c;
+  --ct-crit: #ff7a85;
+  --ct-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 24px 60px -40px rgba(0, 0, 0, 0.9);
+  --ct-glow: color-mix(in srgb, var(--ct-accent) 20%, transparent);
+}
+:root[data-mode="light"] {
+  color-scheme: light;
+  --ct-bg: #f4f5f9;
+  --ct-surface: #ffffff;
+  --ct-surface-2: #f1f3f8;
+  --ct-surface-3: #e7eaf1;
+  --ct-glass: rgba(255, 255, 255, 0.78);
+  --ct-line: rgba(15, 23, 42, 0.08);
+  --ct-line-2: rgba(15, 23, 42, 0.15);
+  --ct-text: #0e1320;
+  --ct-text-2: #4b5465;
+  --ct-text-3: #8a92a3;
+  --ct-accent: #2f5bea;
+  --ct-on-accent: #ffffff;
+  --ct-painel: #2f5bea;
+  --ct-an: #0e8fb3;
+  --ct-ab: #6d5ae6;
+  --ct-ok: #0e9f6e;
+  --ct-warn: #b7791f;
+  --ct-crit: #dc3545;
+  --ct-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 16px 40px -28px rgba(15, 23, 42, 0.25);
+  --ct-glow: color-mix(in srgb, var(--ct-accent) 14%, transparent);
+}
+:root {
+  --ct-accent-soft: color-mix(in srgb, var(--ct-accent) 14%, transparent);
+  --ct-an-soft: color-mix(in srgb, var(--ct-an) 13%, transparent);
+  --ct-ab-soft: color-mix(in srgb, var(--ct-ab) 13%, transparent);
+  --ct-ok-soft: color-mix(in srgb, var(--ct-ok) 13%, transparent);
+  --ct-warn-soft: color-mix(in srgb, var(--ct-warn) 13%, transparent);
+  --ct-crit-soft: color-mix(in srgb, var(--ct-crit) 13%, transparent);
 }

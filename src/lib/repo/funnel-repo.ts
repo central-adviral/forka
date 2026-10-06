@@ -1,18 +1,21 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
 
-// `since`/`until` are plain date strings (e.g. "2026-08-04"); querying data_venda against them
-// directly would compare with UTC midnight, not BRT midnight -- dayKey() below buckets by BRT
-// day, so the bound has to line up or a sale near midnight BRT falls outside a range its own day
-// is inside. This file had the app's only correct handling of that; the definition now lives in
-// report-period so every period in the app resolves against the same boundary.
+// `since`/`until` are plain date strings (e.g. "2026-08-04") read as São Paulo calendar days: the
+// SQL functions bound data_venda by BRT midnight and bucket each sale by its BRT day, so a sale
+// near midnight lands on the same day the report shows it under.
 
 export interface DailyFunnelRow {
   data: string
+  /** Entry sales of any origin: the CPA base of the project overview. */
   vendas: number
+  /** Entry sales the UTM ties to an ad: the CPA base of creatives, campaigns and tests. */
+  vendasAnuncio: number
+  vendasUpsell: number
   receitaBruta: number
   receitaLiquida: number
   spend: number
+  /** Spend with the client's Meta tax applied for that day (0055); equals spend when none is set. */
+  spendComImposto: number
   impressions: number
   clicks: number
   reach: number
@@ -21,6 +24,15 @@ export interface DailyFunnelRow {
   initiateCheckout: number
   roas: number | null
   cac: number | null
+  /** Where the spend came from: the project's campaign fronts, or the LaunchOps operation mapping. */
+  spendSource: 'frentes' | 'operacao'
+  /** Today only: the moment of the last Meta pull. Today's sales above are cut there (0057). */
+  dadosAte: string | null
+  /** Today only: sales that arrived after that pull, left out of the day's CPA. */
+  vendasAposDados: number
+  /** The high-ticket product sold later (0061): kept out of the front revenue, ROAS of its own. */
+  vendasAscensao: number
+  receitaAscensaoLiquida: number
 }
 
 export async function getDailyFunnel(
@@ -29,91 +41,76 @@ export async function getDailyFunnel(
   since: string,
   until: string
 ): Promise<DailyFunnelRow[]> {
-  const { data: salesRows, error: salesError } = await db
-    .from('sales')
-    .select('data_venda, valor_bruto, valor_liquido')
-    .eq('sales_funnel_id', salesFunnelId)
-    .gte('data_venda', brtDayBoundaryUtc(since))
-    .lt('data_venda', brtDayBoundaryUtc(until))
-  if (salesError) throw salesError
-
-  const { data: spendRows, error: spendError } = await db
-    .from('ad_spend_daily')
-    .select('data, spend, impressions, clicks, reach, link_clicks, landing_page_views, initiate_checkout')
-    .eq('sales_funnel_id', salesFunnelId)
-    .gte('data', since)
-    .lt('data', until)
-  if (spendError) throw spendError
-
-  const byDay = new Map<
-    string,
-    {
-      vendas: number
-      receitaBruta: number
-      receitaLiquida: number
-      spend: number
-      impressions: number
-      clicks: number
-      reach: number
-      linkClicks: number
-      landingPageViews: number
-      initiateCheckout: number
-    }
-  >()
-  // Sales timestamps are UTC; ad_spend_daily.data already arrives in the ad account's
-  // local timezone (America/Sao_Paulo), so bucket sales by the same BRT calendar day.
-  const dayKey = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(iso))
-  const emptyEntry = () => ({
-    vendas: 0,
-    receitaBruta: 0,
-    receitaLiquida: 0,
-    spend: 0,
-    impressions: 0,
-    clicks: 0,
-    reach: 0,
-    linkClicks: 0,
-    landingPageViews: 0,
-    initiateCheckout: 0,
-  })
-
-  for (const row of (salesRows ?? []) as { data_venda: string; valor_bruto: number | null; valor_liquido: number | null }[]) {
-    const key = dayKey(row.data_venda)
-    const entry = byDay.get(key) ?? emptyEntry()
-    entry.vendas += 1
-    entry.receitaBruta += row.valor_bruto ?? 0
-    entry.receitaLiquida += row.valor_liquido ?? 0
-    byDay.set(key, entry)
-  }
-
-  for (const row of (spendRows ?? []) as {
+  // Summed in the database (get_funnel_daily, 0053): reading the sales rows here capped at the
+  // API's 1000-row limit and undercounted every busy period without saying so.
+  const { data, error } = await db.rpc('get_funnel_daily', { p_sales_funnel_id: salesFunnelId, p_since: since, p_until: until })
+  if (error) throw error
+  return ((data ?? []) as {
     data: string
+    vendas: number
+    vendas_anuncio: number
+    vendas_upsell: number
+    receita_bruta: number
+    receita_liquida: number
     spend: number
+    spend_com_imposto: number
     impressions: number
     clicks: number
     reach: number
     link_clicks: number
     landing_page_views: number
     initiate_checkout: number
-  }[]) {
-    const entry = byDay.get(row.data) ?? emptyEntry()
-    entry.spend += row.spend
-    entry.impressions += row.impressions
-    entry.clicks += row.clicks
-    entry.reach += row.reach
-    entry.linkClicks += row.link_clicks
-    entry.landingPageViews += row.landing_page_views
-    entry.initiateCheckout += row.initiate_checkout
-    byDay.set(row.data, entry)
-  }
+    spend_source: 'frentes' | 'operacao'
+    dados_ate: string | null
+    vendas_apos_dados: number
+    vendas_ascensao: number
+    receita_ascensao_liquida: number
+  }[]).map((row) => {
+    const vendas = Number(row.vendas)
+    const spendComImposto = Number(row.spend_com_imposto)
+    const receitaBruta = Number(row.receita_bruta)
+    return {
+      data: row.data,
+      vendas,
+      vendasAnuncio: Number(row.vendas_anuncio),
+      vendasUpsell: Number(row.vendas_upsell),
+      receitaBruta,
+      receitaLiquida: Number(row.receita_liquida),
+      spend: Number(row.spend),
+      spendComImposto,
+      impressions: Number(row.impressions),
+      clicks: Number(row.clicks),
+      reach: Number(row.reach),
+      linkClicks: Number(row.link_clicks),
+      landingPageViews: Number(row.landing_page_views),
+      initiateCheckout: Number(row.initiate_checkout),
+      roas: spendComImposto > 0 ? receitaBruta / spendComImposto : null,
+      cac: vendas > 0 ? spendComImposto / vendas : null,
+      spendSource: row.spend_source,
+      dadosAte: row.dados_ate,
+      vendasAposDados: Number(row.vendas_apos_dados ?? 0),
+      vendasAscensao: Number(row.vendas_ascensao),
+      receitaAscensaoLiquida: Number(row.receita_ascensao_liquida),
+    }
+  })
+}
 
-  return [...byDay.entries()]
-    .map(([data, entry]) => ({
-      data,
-      ...entry,
-      roas: entry.spend > 0 ? entry.receitaBruta / entry.spend : null,
-      cac: entry.vendas > 0 ? entry.spend / entry.vendas : null,
-    }))
-    .sort((a, b) => a.data.localeCompare(b.data))
+export interface SalesByOrigin {
+  origem: string
+  vendas: number
+  vendasUpsell: number
+  receitaBruta: number
+}
+
+export async function getSalesByOrigin(db: SupabaseClient, salesFunnelId: string, since: string, until: string): Promise<SalesByOrigin[]> {
+  const { data, error } = await db.rpc('get_funnel_sales_by_origin', { p_sales_funnel_id: salesFunnelId, p_since: since, p_until: until })
+  if (error) throw error
+  return ((data ?? []) as { origem: string; vendas: number; vendas_upsell: number; receita_bruta: number }[]).map((row) => ({
+    origem: row.origem,
+    vendas: Number(row.vendas),
+    vendasUpsell: Number(row.vendas_upsell),
+    receitaBruta: Number(row.receita_bruta),
+  }))
 }
 
 export interface PaymentMethodBreakdown {
@@ -127,23 +124,13 @@ export async function getPaymentMethodBreakdown(
   since: string,
   until: string
 ): Promise<PaymentMethodBreakdown[]> {
-  const { data, error } = await db
-    .from('sales')
-    .select('metodo_pagamento, valor_bruto')
-    .eq('sales_funnel_id', salesFunnelId)
-    .gte('data_venda', brtDayBoundaryUtc(since))
-    .lt('data_venda', brtDayBoundaryUtc(until))
+  const { data, error } = await db.rpc('get_funnel_payment_breakdown', {
+    p_sales_funnel_id: salesFunnelId,
+    p_since: since,
+    p_until: until,
+  })
   if (error) throw error
-
-  const byMethod = new Map<string, number>()
-  for (const row of (data ?? []) as { metodo_pagamento: string | null; valor_bruto: number | null }[]) {
-    const key = row.metodo_pagamento ?? 'desconhecido'
-    byMethod.set(key, (byMethod.get(key) ?? 0) + (row.valor_bruto ?? 0))
-  }
-
-  return [...byMethod.entries()]
-    .map(([metodo, receita]) => ({ metodo, receita }))
-    .sort((a, b) => b.receita - a.receita)
+  return ((data ?? []) as { metodo: string; receita: number }[]).map((row) => ({ metodo: row.metodo, receita: Number(row.receita) }))
 }
 
 export interface SyncHealth {

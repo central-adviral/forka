@@ -8,7 +8,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
 import { assertClientRole } from '@/lib/repo/client-access-repo'
 import { createLaunchOpsClient } from '@/lib/launchops/client'
-import { syncOneFunnel } from '@/lib/launchops/sync-funnel'
+import { syncOneFunnel, syncClientCampaigns } from '@/lib/launchops/sync-funnel'
 
 async function assertNoDuplicateLaunchOpsMapping(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
@@ -59,18 +59,28 @@ export async function createSalesFunnel(context: { client_id: string; client_slu
 
   const supabase = await createServerSupabaseClient()
   await assertNoDuplicateLaunchOpsMapping(supabase, parsed.client_id, parsed.launchops_operacao_ids)
-  const { error } = await supabase.from('sales_funnels').insert({
-    client_id: parsed.client_id,
-    name: parsed.name,
-    slug: parsed.slug,
-    launchops_operacao_ids: parsed.launchops_operacao_ids,
-    launchops_produto_nomes: produtoNomes,
-  })
+  const { data: funnel, error } = await supabase
+    .from('sales_funnels')
+    .insert({
+      client_id: parsed.client_id,
+      name: parsed.name,
+      slug: parsed.slug,
+      launchops_operacao_ids: parsed.launchops_operacao_ids,
+    })
+    .select('id')
+    .single()
   if (error) {
     if (error.code === '23505') {
       throw new Error('Já existe um funil com esse slug neste cliente')
     }
     throw error
+  }
+  // The names typed here start as entry products; the Produtos screen classifies them (0061).
+  if (produtoNomes.length > 0) {
+    const { error: productsError } = await supabase
+      .from('project_products')
+      .insert(produtoNomes.map((produto_nome) => ({ sales_funnel_id: funnel.id, produto_nome, papel: 'entrada' })))
+    if (productsError) throw productsError
   }
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/funis-venda`)
   redirect(`/dashboard/clients/${parsed.client_slug}/funis-venda`)
@@ -114,8 +124,10 @@ const editSalesFunnelSchema = z.object({
     .string()
     .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean))
     .pipe(z.array(z.string().uuid('IDs de operação devem ser UUIDs válidos'))),
-  launchops_produto_nomes: z.string(),
-})
+  // The project's window: a front that reads another project only counts these days (0054).
+  starts_on: z.union([z.literal(''), z.iso.date()]).transform((value) => value || null),
+  ends_on: z.union([z.literal(''), z.iso.date()]).transform((value) => value || null),
+}).refine((value) => !value.starts_on || !value.ends_on || value.ends_on >= value.starts_on, 'o fim da janela vem depois do início')
 
 export async function editSalesFunnel(
   context: { sales_funnel_id: string; client_id: string; client_slug: string; funnel_slug: string },
@@ -128,13 +140,13 @@ export async function editSalesFunnel(
     funnel_slug: context.funnel_slug,
     name: formData.get('name'),
     launchops_operacao_ids: formData.get('launchops_operacao_ids'),
-    launchops_produto_nomes: formData.get('launchops_produto_nomes'),
+    starts_on: formData.get('starts_on') ?? '',
+    ends_on: formData.get('ends_on') ?? '',
   })
   if (!result.success) {
     throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
   }
   const parsed = result.data
-  const produtoNomes = parsed.launchops_produto_nomes.split(',').map((s) => s.trim()).filter(Boolean)
 
   const supabase = await createServerSupabaseClient()
   await assertNoDuplicateLaunchOpsMapping(supabase, parsed.client_id, parsed.launchops_operacao_ids, parsed.sales_funnel_id)
@@ -143,7 +155,8 @@ export async function editSalesFunnel(
     .update({
       name: parsed.name,
       launchops_operacao_ids: parsed.launchops_operacao_ids,
-      launchops_produto_nomes: produtoNomes,
+      starts_on: parsed.starts_on,
+      ends_on: parsed.ends_on,
       updated_at: new Date().toISOString(),
     })
     .eq('id', parsed.sales_funnel_id)
@@ -174,6 +187,7 @@ export async function syncFunnelNow(context: { sales_funnel_id: string; client_s
 
   const launchopsDb = createLaunchOpsClient({ url: sourceUrl, serviceRoleKey: funnelSourceServiceRoleKey })
   await syncOneFunnel(appDb, launchopsDb, funnel)
+  await syncClientCampaigns(appDb, launchopsDb, funnel.client_id)
 
   revalidatePath(`/dashboard/clients/${context.client_slug}/funis-venda/${context.funnel_slug}`)
 }

@@ -16,6 +16,7 @@ interface Client {
   name: string
   slug: string
   testsCount: number
+  openAlerts: number
   projects: ShellProject[]
   role: ClientRole
 }
@@ -45,6 +46,13 @@ const ICONS = {
     </>
   ),
   plus: <path d="M8 3v10M3 8h10" />,
+  rules: <path d="M2.5 4h11M4.5 8h7M6.5 12h3" />,
+  targets: (
+    <>
+      <circle cx="8" cy="8" r="5.5" />
+      <circle cx="8" cy="8" r="2.5" />
+    </>
+  ),
   members: (
     <>
       <circle cx="6" cy="5.5" r="2.5" />
@@ -68,13 +76,16 @@ function pageLabel(pathname: string, clientSlug: string | undefined): string {
   if (pathname === '/dashboard/clients/new') return 'Novo cliente'
   if (!clientSlug) return ''
   const rest = pathname.slice(`/dashboard/clients/${clientSlug}`.length).split('/').filter(Boolean)
-  if (rest.length === 0) return 'Visão geral'
+  if (rest.length === 0) return 'Hoje'
   const last = rest[rest.length - 1]
   if (last === 'new') return rest[0] === 'tests' ? 'Novo teste' : 'Novo projeto'
   if (last === 'edit') return 'Editar'
   if (last === 'link') return 'Link e rastreio'
+  if (last === 'regras') return 'Regras de campanha'
   if (rest[0] === 'integrations') return 'Integrações'
   if (rest[0] === 'membros') return 'Membros'
+  if (rest[0] === 'painel') return 'Painel de Controle'
+  if (rest[0] === 'metas') return 'Metas e alvos'
   if (rest[0] === 'tests') return rest.length === 1 ? 'Teste A/B' : 'Relatório'
   if (rest[0] === 'funis-venda') return 'Análises'
   return ''
@@ -125,6 +136,32 @@ function NavLink({
         </span>
       )}
     </Link>
+  )
+}
+
+// Dark by default; the choice lives in localStorage and is applied before paint by the root layout.
+function ThemeToggle() {
+  function toggle() {
+    const root = document.documentElement
+    const next = root.dataset.mode === 'light' ? 'dark' : 'light'
+    if (next === 'light') root.dataset.mode = 'light'
+    else delete root.dataset.mode
+    try {
+      localStorage.setItem('ct-mode', next)
+    } catch {}
+  }
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label="Alternar tema claro e escuro"
+      className="flex w-full items-center gap-2.5 rounded-[10px] bg-[var(--ct-surface-2)] px-2.5 py-2 text-[12.5px] text-[var(--ct-text-2)] hover:text-[var(--ct-text)]"
+    >
+      <Icon>
+        <path d="M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5Z" />
+      </Icon>
+      Tema claro / escuro
+    </button>
   )
 }
 
@@ -219,11 +256,14 @@ export function DashboardShell({
   const activeProjectSlug = activeClient ? pathname.match(new RegExp(`^${base}/funis-venda/([^/]+)`))?.[1] : undefined
   const activeProject = activeClient?.projects.find((project) => project.slug === activeProjectSlug)
   const canConfigure = activeClient?.role === 'owner'
+  const canEdit = activeClient?.role === 'owner' || activeClient?.role === 'gestor'
+  // Rules belong to a project: the open one, or the first one of the client.
+  const rulesProject = activeProject ?? activeClient?.projects[0]
   const page = pageLabel(pathname, activeClient?.slug)
 
   return (
-    <div className="flex h-screen bg-[var(--ct-bg)] font-[family-name:var(--font-geist)] text-[var(--ct-text)]">
-      <aside className="flex w-[248px] flex-none flex-col gap-[18px] overflow-y-auto border-r border-[var(--ct-line)] bg-[var(--ct-surface)] px-3 py-[18px]">
+    <div className="flex h-screen font-[family-name:var(--font-manrope)] text-[var(--ct-text)]">
+      <aside className="m-3.5 mr-0 flex w-[264px] flex-none flex-col gap-[18px] overflow-y-auto rounded-[22px] border border-[var(--ct-line)] bg-[var(--ct-glass)] px-3 py-[18px] shadow-[var(--ct-shadow)] backdrop-blur-xl">
         <Link href="/dashboard" className="flex items-center gap-2.5 px-2 py-0.5">
           <span
             className="grid h-[30px] w-[30px] flex-none place-items-center rounded-[9px]"
@@ -235,7 +275,7 @@ export function DashboardShell({
             </svg>
           </span>
           <span>
-            <b className="block text-sm font-semibold tracking-[-0.02em]">Central de Tráfego</b>
+            <b className="block font-[family-name:var(--font-sora)] text-sm font-semibold tracking-[-0.02em]">Central de Tráfego</b>
             <span className="block font-[family-name:var(--font-geist-mono)] text-[10.5px] text-[var(--ct-text-3)]">
               black sheep · v0.1
             </span>
@@ -280,18 +320,14 @@ export function DashboardShell({
             <>
               <NavLink href={base} active={pathname === base}>
                 <Icon>{ICONS.overview}</Icon>
-                Visão geral
+                Hoje
               </NavLink>
 
               <GroupLabel>Ferramentas</GroupLabel>
-              <span
-                className="flex cursor-default items-center gap-2.5 whitespace-nowrap rounded-[7px] px-2.5 py-[7px] text-[13.5px] font-medium text-[var(--ct-text-3)]"
-                title="Vigias, alertas e relatórios — Fase 3 do roadmap"
-              >
+              <NavLink href={`${base}/painel`} active={pathname.startsWith(`${base}/painel`)} count={activeClient.openAlerts || undefined}>
                 <Dot color="var(--ct-painel)" />
                 Painel de Controle
-                <span className="ml-auto rounded-full border border-dashed border-[var(--ct-line-2)] px-1.5 font-[family-name:var(--font-geist-mono)] text-[9.5px]">breve</span>
-              </span>
+              </NavLink>
               <NavLink href={`${base}/funis-venda`} active={pathname.startsWith(`${base}/funis-venda`)} count={activeClient.projects.length}>
                 <Dot color="var(--ct-an)" />
                 Análises
@@ -313,18 +349,33 @@ export function DashboardShell({
                 </div>
               )}
 
+              {(canConfigure || canEdit) && <GroupLabel>Configurar</GroupLabel>}
               {canConfigure && (
-                <>
-                  <GroupLabel>Configurar</GroupLabel>
-                  <NavLink href={`${base}/integrations`} active={pathname.startsWith(`${base}/integrations`)}>
-                    <Icon>{ICONS.integrations}</Icon>
-                    Integrações
-                  </NavLink>
-                  <NavLink href={`${base}/membros`} active={pathname.startsWith(`${base}/membros`)}>
-                    <Icon>{ICONS.members}</Icon>
-                    Membros
-                  </NavLink>
-                </>
+                <NavLink href={`${base}/integrations`} active={pathname.startsWith(`${base}/integrations`)}>
+                  <Icon>{ICONS.integrations}</Icon>
+                  Integrações
+                </NavLink>
+              )}
+              {canEdit && rulesProject && (
+                <NavLink
+                  href={`${base}/funis-venda/${rulesProject.slug}/regras`}
+                  active={pathname.endsWith('/regras')}
+                >
+                  <Icon>{ICONS.rules}</Icon>
+                  Regras de campanha
+                </NavLink>
+              )}
+              {canEdit && (
+                <NavLink href={`${base}/metas`} active={pathname.startsWith(`${base}/metas`)}>
+                  <Icon>{ICONS.targets}</Icon>
+                  Metas e alvos
+                </NavLink>
+              )}
+              {canConfigure && (
+                <NavLink href={`${base}/membros`} active={pathname.startsWith(`${base}/membros`)}>
+                  <Icon>{ICONS.members}</Icon>
+                  Membros
+                </NavLink>
               )}
             </>
           )}
@@ -340,7 +391,9 @@ export function DashboardShell({
           </NavLink>
         </nav>
 
-        <div className="mt-auto flex items-center gap-2.5 rounded-[10px] bg-[var(--ct-surface-2)] px-2.5 py-2">
+        <div className="mt-auto flex flex-col gap-2">
+        <ThemeToggle />
+        <div className="flex items-center gap-2.5 rounded-[10px] bg-[var(--ct-surface-2)] px-2.5 py-2">
           <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-[var(--ct-surface-3)] text-xs font-semibold text-[var(--ct-text-2)]">
             {userEmail[0]?.toUpperCase() ?? '?'}
           </span>
@@ -356,10 +409,11 @@ export function DashboardShell({
             Sair
           </button>
         </div>
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-none items-center gap-3 border-b border-[var(--ct-line)] bg-black/70 px-8 py-3 backdrop-blur-md">
+        <div className="mx-8 mt-3.5 flex flex-none items-center gap-3 rounded-full border border-[var(--ct-line)] bg-[var(--ct-glass)] px-6 py-3 shadow-[var(--ct-shadow)] backdrop-blur-md">
           <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-[13px] text-[var(--ct-text-3)]">
             <span>Black Sheep</span>
             {activeClient && (

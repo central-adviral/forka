@@ -14,7 +14,7 @@ interface VariantForm {
 }
 
 const inputClass =
-  'w-full rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 py-2.5 text-sm text-[#EDEDF0] placeholder:text-[#A1A1AA] outline-none focus:border-[#8B9BFF]'
+  'w-full rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-3.5 py-2.5 text-sm text-[var(--ct-text)] placeholder:text-[var(--ct-text-2)] outline-none focus:border-[var(--ct-accent)]'
 
 export default function NewTestPage() {
   const params = useParams<{ clientSlug: string }>()
@@ -107,7 +107,7 @@ export default function NewTestPage() {
   return (
     <div className="p-8">
       <form onSubmit={handleSubmit} className="max-w-xl space-y-4">
-        <h1 className="font-['Space_Grotesk'] text-lg font-semibold">Novo teste</h1>
+        <h1 className="font-[family-name:var(--font-sora)] text-lg font-semibold">Novo teste</h1>
         <input required placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
         <input
           required
@@ -116,7 +116,7 @@ export default function NewTestPage() {
           onChange={(e) => setSlug(e.target.value)}
           className={inputClass}
         />
-        <p className="-mt-2 text-xs text-[#A1A1AA]">
+        <p className="-mt-2 text-xs text-[var(--ct-text-2)]">
           Vira o link que você cola no anúncio: seudominio.com/r/slug — escolha algo curto e reconhecível
         </p>
         <input
@@ -125,7 +125,7 @@ export default function NewTestPage() {
           onChange={(e) => setFallbackUrl(e.target.value)}
           className={inputClass}
         />
-        <p className="-mt-2 text-xs text-[#A1A1AA]">
+        <p className="-mt-2 text-xs text-[var(--ct-text-2)]">
           Pra onde mandar o visitante se o teste for pausado (opcional)
         </p>
         <select
@@ -136,7 +136,7 @@ export default function NewTestPage() {
           <option value="page">Teste de página</option>
           <option value="checkout">Teste de checkout</option>
         </select>
-        <p className="-mt-2 text-xs text-[#A1A1AA]">
+        <p className="-mt-2 text-xs text-[var(--ct-text-2)]">
           Página: cada variante é uma página de vendas diferente. Checkout: mesma página pra todos, cada
           variante é um checkout diferente
         </p>
@@ -149,7 +149,7 @@ export default function NewTestPage() {
               onChange={(e) => setSalesPageUrl(e.target.value)}
               className={inputClass}
             />
-            <p className="-mt-2 text-xs text-[#A1A1AA]">A única página de vendas usada por todas as variantes</p>
+            <p className="-mt-2 text-xs text-[var(--ct-text-2)]">A única página de vendas usada por todas as variantes</p>
           </>
         )}
 
@@ -163,11 +163,11 @@ export default function NewTestPage() {
         </select>
 
         {variants.map((variant, index) => (
-          <fieldset key={index} className="space-y-2 rounded-[10px] border border-white/[0.08] p-3">
-            <legend className="flex items-center gap-2 px-1 text-sm font-medium text-[#A1A1AA]">
+          <fieldset key={index} className="space-y-2 rounded-[10px] border border-[var(--ct-line)] p-3">
+            <legend className="flex items-center gap-2 px-1 text-sm font-medium text-[var(--ct-text-2)]">
               Variante {variant.name}
               {index === 0 && (
-                <span className="rounded-full bg-[#8B9BFF]/15 px-2 py-0.5 text-[10.5px] font-medium text-[#8B9BFF]">
+                <span className="rounded-full bg-[var(--ct-accent)]/15 px-2 py-0.5 text-[10.5px] font-medium text-[var(--ct-accent)]">
                   controle
                 </span>
               )}
@@ -175,7 +175,7 @@ export default function NewTestPage() {
                 <button
                   type="button"
                   onClick={() => removeVariant(index)}
-                  className="text-xs font-medium text-[#FF7A73] hover:underline"
+                  className="text-xs font-medium text-[var(--ct-crit)] hover:underline"
                 >
                   Remover
                 </button>
@@ -187,7 +187,7 @@ export default function NewTestPage() {
               onChange={(e) => updateVariant(index, 'weight_pct', e.target.value)}
               className={inputClass}
             />
-            <p className="-mt-1 text-xs text-[#A1A1AA]">
+            <p className="-mt-1 text-xs text-[var(--ct-text-2)]">
               Porcentagem do tráfego pra essa variante — a soma de todas precisa dar 100%
             </p>
             <input
@@ -196,7 +196,7 @@ export default function NewTestPage() {
               onChange={(e) => updateVariant(index, 'destination_url', e.target.value)}
               className={inputClass}
             />
-            <p className="-mt-1 text-xs text-[#A1A1AA]">
+            <p className="-mt-1 text-xs text-[var(--ct-text-2)]">
               {testType === 'checkout'
                 ? 'Link de pagamento da Hubla pra essa variante'
                 : 'Página de vendas dessa variante'}
@@ -209,7 +209,7 @@ export default function NewTestPage() {
                   onChange={(e) => updateVariant(index, 'thank_you_url', e.target.value)}
                   className={inputClass}
                 />
-                <p className="-mt-1 text-xs text-[#A1A1AA]">
+                <p className="-mt-1 text-xs text-[var(--ct-text-2)]">
                   Página que o cliente vê depois de comprar — cole o snippet do pixel nela
                 </p>
               </>
@@ -222,19 +222,19 @@ export default function NewTestPage() {
           onClick={() =>
             setVariants((prev) => [...prev, { name: String.fromCharCode(65 + prev.length), weight_pct: '0', destination_url: '', thank_you_url: '' }])
           }
-          className="text-sm font-medium text-[#8B9BFF] hover:text-[#A5B2FF]"
+          className="text-sm font-medium text-[var(--ct-accent)] hover:text-[var(--ct-accent)]"
         >
           + Adicionar variante
         </button>
 
-        {!weightsValid && <p className="text-sm text-[#F2B866]">Os pesos devem somar 100%.</p>}
-        {clientLoading && <p className="text-sm text-[#A1A1AA]">Carregando...</p>}
-        {error && <p className="text-sm text-[#FF7A73]">{error}</p>}
+        {!weightsValid && <p className="text-sm text-[var(--ct-warn)]">Os pesos devem somar 100%.</p>}
+        {clientLoading && <p className="text-sm text-[var(--ct-text-2)]">Carregando...</p>}
+        {error && <p className="text-sm text-[var(--ct-crit)]">{error}</p>}
 
         <button
           type="submit"
           disabled={!clientId}
-          className="rounded-[10px] bg-[#8B9BFF] px-4 py-2.5 text-sm font-semibold text-[#000000] disabled:opacity-50"
+          className="rounded-[10px] bg-[var(--ct-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--ct-on-accent)] disabled:opacity-50"
         >
           Criar teste
         </button>

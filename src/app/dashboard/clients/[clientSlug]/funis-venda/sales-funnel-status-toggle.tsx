@@ -35,7 +35,7 @@ export function SalesFunnelStatusToggle({
         aria-pressed={isActive}
         aria-label={isActive ? 'Pausar funil' : 'Ativar funil'}
         className={`relative box-border h-6 w-11 flex-shrink-0 rounded-full border-0 p-0 transition-colors disabled:opacity-60 ${
-          isActive ? 'bg-[#4ADE9B]' : 'bg-white/[0.12]'
+          isActive ? 'bg-[var(--ct-ok)]' : 'bg-[var(--ct-surface-2)]'
         }`}
       >
         <span
@@ -44,7 +44,7 @@ export function SalesFunnelStatusToggle({
           }`}
         />
       </button>
-      {error && <span className="text-[11px] text-[#FF7A73]">{error}</span>}
+      {error && <span className="text-[11px] text-[var(--ct-crit)]">{error}</span>}
     </div>
   )
 }
