@@ -9,16 +9,33 @@ import { SyncFunnelButton } from './sync-funnel-button'
 import { SyncStatus } from '@/components/sync-status'
 import { MiniBarChart } from '@/components/mini-bar-chart'
 import { SalesOriginPanel } from './sales-origin-panel'
+import { FrontsPanel, type FrontDayRow, type FrontInfo } from './fronts-panel'
+
+const TABS = [
+  { value: 'visao', label: 'Visão geral' },
+  { value: 'frentes', label: 'Frentes' },
+  { value: 'criativos', label: 'Por criativo' },
+  { value: 'origem', label: 'Origem das vendas' },
+  { value: 'dias', label: 'Dia a dia' },
+] as const
+type Tab = (typeof TABS)[number]['value']
 
 export default async function SalesFunnelPage({
   params,
   searchParams,
 }: {
   params: Promise<{ clientSlug: string; funnelSlug: string }>
-  searchParams: Promise<{ periodo?: string; desde?: string; ate?: string }>
+  searchParams: Promise<{ periodo?: string; desde?: string; ate?: string; aba?: string }>
 }) {
   const { clientSlug, funnelSlug } = await params
-  const { periodo, desde, ate } = await searchParams
+  const { periodo, desde, ate, aba } = await searchParams
+  const tab: Tab = TABS.some((option) => option.value === aba) ? (aba as Tab) : 'visao'
+  // Links keep the period and the tab together, whichever one the user changes.
+  const withParams = (changes: Record<string, string | undefined>) => {
+    const merged = { periodo, desde, ate, aba: tab === 'visao' ? undefined : tab, ...changes }
+    const query = new URLSearchParams(Object.entries(merged).filter((entry): entry is [string, string] => Boolean(entry[1])))
+    return query.size > 0 ? `?${query}` : '?'
+  }
   const supabase = await createServerSupabaseClient()
   const { data: client } = await supabase.from('clients').select('id, name, slug').eq('slug', clientSlug).maybeSingle()
   if (!client) notFound()
@@ -32,7 +49,7 @@ export default async function SalesFunnelPage({
   if (!funnel) notFound()
 
   const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
-  const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }] = await Promise.all([
+  const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }, { data: frontRows }, { data: frontDays }] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
     getFunnelSyncHealth(supabase, funnel.id),
     getPaymentMethodBreakdown(supabase, funnel.id, since, until),
@@ -45,7 +62,16 @@ export default async function SalesFunnelPage({
     supabase.rpc('get_funnel_sales_by_hour', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
     getSalesByOrigin(supabase, funnel.id, since, until),
     supabase.from('client_tax_rates').select('valid_from', { count: 'exact', head: true }).eq('client_id', client.id),
+    supabase
+      .from('project_fronts')
+      .select('id, code, name, source:sales_funnels!project_fronts_source_sales_funnel_id_fkey(name)')
+      .eq('sales_funnel_id', funnel.id)
+      .order('position'),
+    supabase.rpc('get_project_front_daily', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
   ])
+  const fronts: FrontInfo[] = ((frontRows ?? []) as unknown as { id: string; code: string; name: string; source: { name: string } | null }[]).map(
+    (front) => ({ id: front.id, code: front.code, name: front.name, sourceName: front.source?.name ?? null })
+  )
   if (creativeResult.error) {
     console.error('[funnel-creative-report-failed]', { salesFunnelId: funnel.id }, creativeResult.error)
   }
@@ -170,7 +196,7 @@ export default async function SalesFunnelPage({
           return (
             <a
               key={option.value}
-              href={option.value === 'all' ? `?` : `?periodo=${option.value}`}
+              href={withParams({ periodo: option.value === 'all' ? undefined : option.value, desde: undefined, ate: undefined })}
               className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
                 isActive
                   ? 'border-[var(--ct-accent)] bg-[var(--ct-accent)]/15 text-[var(--ct-accent)]'
@@ -196,6 +222,7 @@ export default async function SalesFunnelPage({
             className="absolute left-0 top-[calc(100%+6px)] z-10 flex flex-col gap-2 rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface)] p-3 shadow-lg"
           >
             <input type="hidden" name="periodo" value="custom" />
+            {tab !== 'visao' && <input type="hidden" name="aba" value={tab} />}
             <label className="flex flex-col gap-1 text-[11px] text-[var(--ct-text-2)]">
               De
               <input
@@ -249,12 +276,38 @@ export default async function SalesFunnelPage({
       )}
       <FunnelKpiCards totals={kpiTotals} currency={currency} sparklines={kpiSparklines} />
 
-      <SalesOriginPanel origins={salesByOrigin} currency={currency} />
+      <nav className="mb-6 inline-flex max-w-full gap-0.5 overflow-x-auto rounded-full border border-[var(--ct-line)] bg-[var(--ct-surface-2)] p-1" aria-label="Abas da análise">
+        {TABS.map((option) => (
+          <a
+            key={option.value}
+            href={withParams({ aba: option.value === 'visao' ? undefined : option.value })}
+            aria-current={tab === option.value ? 'page' : undefined}
+            className={`whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-medium ${
+              tab === option.value ? 'bg-[var(--ct-surface)] text-[var(--ct-text)] shadow-[0_0_0_1px_var(--ct-line-2)]' : 'text-[var(--ct-text-2)] hover:text-[var(--ct-text)]'
+            }`}
+          >
+            {option.label}
+          </a>
+        ))}
+      </nav>
+
+      {tab === 'frentes' && (
+        <FrontsPanel
+          fronts={fronts}
+          rows={(frontDays ?? []) as FrontDayRow[]}
+          taxFactor={totals.investimento > 0 && rows.reduce((t, row) => t + row.spend, 0) > 0 ? totals.investimento / rows.reduce((t, row) => t + row.spend, 0) : 1}
+          rulesHref={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`}
+          currency={currency}
+        />
+      )}
+
+      {tab === 'origem' && <SalesOriginPanel origins={salesByOrigin} currency={currency} />}
 
       {/* Funnel on the left, the three read-outs stacked on the right: the funnel is one tall
           shape and the analyses are short ones, so side by side they fill each other's space. */}
       {/* minmax(0,1fr) on both halves, not plain 1fr: the 24-bar chart has a wide min-content
           and a plain fr column refuses to shrink below it, which squeezed the funnel to a sliver. */}
+      {tab === 'visao' && (
       <div className="mb-6 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="min-w-0">
           <FunnelCone totals={coneTotals} currency={currency} />
@@ -308,6 +361,9 @@ export default async function SalesFunnelPage({
         </div>
       </div>
 
+      )}
+
+      {tab === 'criativos' && (
       <div className="card-shadow mb-6 overflow-hidden rounded-2xl border border-[var(--ct-line)]">
         <div className="flex items-baseline justify-between px-4 pt-4">
           <h2 className="font-[family-name:var(--font-sora)] text-base font-semibold">Por criativo</h2>
@@ -376,16 +432,22 @@ export default async function SalesFunnelPage({
         </div>
       </div>
 
+      )}
+
+      {tab === 'dias' && (
       <div className="card-shadow overflow-hidden rounded-2xl border border-[var(--ct-line)]">
         <table className="w-full text-[13.5px]">
           <thead>
             <tr className="text-left text-[var(--ct-text-2)]">
               <th className="p-3">Dia</th>
-              <th className="p-3">Vendas</th>
+              <th className="p-3">Investimento</th>
+              <th className="p-3">Vendas de entrada</th>
+              <th className="p-3">De anúncio</th>
+              <th className="p-3">Upsell</th>
               <th className="p-3">Receita bruta</th>
-              <th className="p-3">Spend</th>
+              <th className="p-3">CPA geral</th>
+              <th className="p-3">CPA de anúncio</th>
               <th className="p-3">ROAS</th>
-              <th className="p-3">CAC</th>
             </tr>
           </thead>
           <tbody>
@@ -399,16 +461,22 @@ export default async function SalesFunnelPage({
                     </span>
                   )}
                 </td>
-                <td className="p-3">{row.vendas}</td>
-                <td className="p-3">{currency(row.receitaBruta)}</td>
-                <td className="p-3">{currency(row.spendComImposto)}</td>
-                <td className="p-3">{row.roas !== null ? row.roas.toFixed(2) : '—'}</td>
-                <td className="p-3">{row.cac !== null ? currency(row.cac) : '—'}</td>
+                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(row.spendComImposto)}</td>
+                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.vendas}</td>
+                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.vendasAnuncio}</td>
+                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.vendasUpsell}</td>
+                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(row.receitaBruta)}</td>
+                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.cac !== null ? currency(row.cac) : '—'}</td>
+                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">
+                  {row.vendasAnuncio > 0 ? currency(row.spendComImposto / row.vendasAnuncio) : '—'}
+                </td>
+                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.roas !== null ? `${row.roas.toFixed(2)}x` : '—'}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      )}
     </div>
   )
 }
