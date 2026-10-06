@@ -14,9 +14,9 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  unconfigured: '#8A90A6',
-  pending: '#F5B94D',
-  verified: '#2DD4A8',
+  unconfigured: '#A1A1AA',
+  pending: '#F2B866',
+  verified: '#4ADE9B',
 }
 
 export default async function IntegrationsPage({ params }: { params: Promise<{ clientSlug: string }> }) {
@@ -29,10 +29,12 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
     .maybeSingle()
 
   if (!client) notFound()
+  // Read-only members can see the client row, so seeing it no longer proves they may configure it.
+  const { data: isOwner } = await supabase.rpc('has_client_role', { p_client_id: client.id, p_min_role: 'owner' })
+  if (isOwner !== true) notFound()
 
-  // The secrets themselves never reach this component -- only whether each one is set. The row
-  // above is read on the user's session, which is what proves ownership before this
-  // service-role read.
+  // The secrets themselves never reach this component -- only whether each one is set. The owner
+  // check above, on the user's own session, is what clears this service-role read.
   const { hasHublaToken, hasFunnelSourceKey } = await getConfiguredSecrets(createServiceRoleClient(), client.id)
 
   const defaultDomain = process.env.NEXT_PUBLIC_REDIRECT_DOMAIN ?? ''
@@ -47,7 +49,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
       <div>
         <a
           href={`/dashboard/clients/${client.slug}`}
-          className="mb-1 flex items-center gap-1 text-xs text-[#8A90A6] hover:text-[#E8EAF2]"
+          className="mb-1 flex items-center gap-1 text-xs text-[#A1A1AA] hover:text-[#EDEDF0]"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
             <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -73,29 +75,29 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
             name="custom_domain"
             placeholder="ir.seudominio.com"
             defaultValue={client.custom_domain ?? ''}
-            className="flex-1 rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
+            className="flex-1 rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 py-2.5 text-sm text-[#EDEDF0] placeholder:text-[#A1A1AA] outline-none focus:border-[#8B9BFF]"
           />
           <button
             type="submit"
-            className="rounded-[10px] bg-[#7C6FF0] px-4 py-2.5 text-sm font-semibold text-[#0B0E1A]"
+            className="rounded-[10px] bg-[#8B9BFF] px-4 py-2.5 text-sm font-semibold text-[#000000]"
           >
             Salvar
           </button>
         </form>
-        <p className="-mt-2 text-xs text-[#8A90A6]">
+        <p className="-mt-2 text-xs text-[#A1A1AA]">
           Aparece nos links dos seus testes no lugar do domínio padrão
         </p>
 
         {client.custom_domain && (
           <>
-            <div className="rounded-[10px] border border-white/[0.08] bg-[#1B2036] p-3 font-['JetBrains_Mono'] text-xs text-[#8A90A6]">
+            <div className="rounded-[10px] border border-white/[0.08] bg-[#111114] p-3 font-['JetBrains_Mono'] text-xs text-[#A1A1AA]">
               Tipo: CNAME
               <br />
               Nome: {client.custom_domain}
               <br />
               Valor: cname.vercel-dns.com
             </div>
-            <p className="text-xs text-[#8A90A6]">
+            <p className="text-xs text-[#A1A1AA]">
               Alguns provedores de DNS pedem só a parte antes do seu domínio raiz (ex: só &quot;ir&quot; em vez do
               domínio completo) — se o campo &quot;Nome&quot; recusar o valor completo, use apenas o prefixo.
             </p>
@@ -112,21 +114,21 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
           <input
             name="hubla_webhook_token"
             placeholder={hasHublaToken ? 'token configurado · cole um novo pra substituir' : 'Token do webhook'}
-            className="flex-1 rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
+            className="flex-1 rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 py-2.5 text-sm text-[#EDEDF0] placeholder:text-[#A1A1AA] outline-none focus:border-[#8B9BFF]"
           />
           <button
             type="submit"
-            className="rounded-[10px] bg-[#7C6FF0] px-4 py-2.5 text-sm font-semibold text-[#0B0E1A]"
+            className="rounded-[10px] bg-[#8B9BFF] px-4 py-2.5 text-sm font-semibold text-[#000000]"
           >
             Salvar
           </button>
         </form>
-        <p className="-mt-2 text-xs text-[#8A90A6]">Copie da aba Autenticação do webhook, no painel da Hubla</p>
+        <p className="-mt-2 text-xs text-[#A1A1AA]">Copie da aba Autenticação do webhook, no painel da Hubla</p>
 
         <div>
-          <p className="mb-1 text-xs text-[#8A90A6]">Cole esta URL no painel da Hubla:</p>
+          <p className="mb-1 text-xs text-[#A1A1AA]">Cole esta URL no painel da Hubla:</p>
           <div className="flex items-center gap-2">
-            <p className="flex-1 break-all rounded-[10px] border border-white/[0.08] bg-[#1B2036] p-3 font-['JetBrains_Mono'] text-xs text-[#4F8EF7]">
+            <p className="flex-1 break-all rounded-[10px] border border-white/[0.08] bg-[#111114] p-3 font-['JetBrains_Mono'] text-xs text-[#4F8EF7]">
               {webhookUrl}
             </p>
             <CopyButton text={webhookUrl} />
@@ -139,33 +141,33 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
 
         <form action={saveFunnelDataSource.bind(null, { client_id: client.id, client_slug: client.slug })} className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs text-[#8A90A6]">URL</label>
+            <label className="mb-1 block text-xs text-[#A1A1AA]">URL</label>
             <input
               name="funnel_source_url"
               placeholder="https://xxxxx.supabase.co"
               defaultValue={client.funnel_source_url ?? ''}
-              className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
+              className="w-full rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 py-2.5 text-sm text-[#EDEDF0] placeholder:text-[#A1A1AA] outline-none focus:border-[#8B9BFF]"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-[#8A90A6]">Chave de acesso</label>
+            <label className="mb-1 block text-xs text-[#A1A1AA]">Chave de acesso</label>
             <input
               type="password"
               name="funnel_source_service_role_key"
               placeholder={
                 hasFunnelSourceKey ? 'chave configurada · cole uma nova pra substituir' : 'chave de acesso'
               }
-              className="w-full rounded-[10px] border border-white/[0.08] bg-[#1B2036] px-3.5 py-2.5 text-sm text-[#E8EAF2] placeholder:text-[#8A90A6] outline-none focus:border-[#7C6FF0]"
+              className="w-full rounded-[10px] border border-white/[0.08] bg-[#111114] px-3.5 py-2.5 text-sm text-[#EDEDF0] placeholder:text-[#A1A1AA] outline-none focus:border-[#8B9BFF]"
             />
           </div>
           <button
             type="submit"
-            className="rounded-[10px] bg-[#7C6FF0] px-4 py-2.5 text-sm font-semibold text-[#0B0E1A]"
+            className="rounded-[10px] bg-[#8B9BFF] px-4 py-2.5 text-sm font-semibold text-[#000000]"
           >
             Salvar
           </button>
         </form>
-        <p className="-mt-2 text-xs text-[#8A90A6]">
+        <p className="-mt-2 text-xs text-[#A1A1AA]">
           Usada pela sincronização automática de vendas e gasto de mídia dos funis deste cliente. Cada funil de
           venda tem seu próprio mapeamento de operação/produto, configurado na tela do funil.
         </p>
