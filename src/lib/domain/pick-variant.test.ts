@@ -44,4 +44,14 @@ describe('pickVariant', () => {
     expect(counts.b / 10000).toBeCloseTo(0.3, 1)
     expect(counts.c / 10000).toBeCloseTo(0.2, 1)
   })
+
+  it('never picks a variant parked at weight 0, even when the draw lands on the very end', () => {
+    const variants = [
+      { id: 'a', weightPct: 100 },
+      { id: 'parked', weightPct: 0 },
+    ]
+    expect(pickVariant(variants, () => 0)).toBe('a')
+    expect(pickVariant(variants, () => 0.999999)).toBe('a')
+    expect(pickVariant(variants, () => 1)).toBe('a')
+  })
 })

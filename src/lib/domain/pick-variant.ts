@@ -16,5 +16,7 @@ export function pickVariant(variants: WeightedVariant[], rand: () => number = Ma
       return variant.id
     }
   }
-  return variants[variants.length - 1].id
+  // Floating point can leave target equal to the total; fall back to the last variant that takes
+  // traffic, never to one parked at weight 0.
+  return [...variants].reverse().find((variant) => variant.weightPct > 0)?.id ?? variants[variants.length - 1].id
 }
