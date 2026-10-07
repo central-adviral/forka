@@ -9,6 +9,8 @@ import { PRODUCT_ROLES, PRODUCT_ROLE_HINT, PRODUCT_ROLE_LABEL, type ProductRole 
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { removeProduct, setProductRole } from './actions'
 import { canActAs } from '@/lib/view-as'
+import { saoPauloDay } from '@/lib/repo/today-repo'
+import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
 
 const LOOKBACK_DAYS = 30
 
@@ -40,11 +42,19 @@ export default async function ProjectProductsPage({
     .maybeSingle()
   if (!funnel) notFound()
 
-  const [{ data: canEdit }, { data: productRows, error: productsError }] = await Promise.all([
+  const since = brtDayBoundaryUtc(saoPauloDay(-LOOKBACK_DAYS))
+  const [{ data: canEdit }, { data: productRows, error: productsError }, { data: unattributedRows, error: unattributedError }] = await Promise.all([
     canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
     supabase.from('project_products').select('produto_nome, papel').eq('sales_funnel_id', funnel.id).order('produto_nome'),
+    // Sales of the client no project owns (0073): a product listed in several projects with no ad
+    // on the sale, or a product no project lists any more.
+    supabase.from('sales').select('produto, valor_liquido').eq('client_id', client.id).is('sales_funnel_id', null).gte('data_venda', since),
   ])
   if (productsError) throw productsError
+  if (unattributedError) throw unattributedError
+  const unattributed = (unattributedRows ?? []) as { produto: string | null; valor_liquido: number | null }[]
+  const unattributedRevenue = unattributed.reduce((sum, row) => sum + Number(row.valor_liquido ?? 0), 0)
+  const unattributedProducts = [...new Set(unattributed.map((row) => row.produto ?? '(sem produto)'))]
   const products = (productRows ?? []) as { produto_nome: string; papel: ProductRole }[]
 
   // The LaunchOps key is read with the service role, so only a gestor gets the catalog; RLS above
@@ -101,9 +111,19 @@ export default async function ProjectProductsPage({
         <p className="mt-2 max-w-[70ch] text-sm text-[var(--ct-text-2)]">
           Só as vendas dos produtos desta lista entram no projeto. O papel define a conta: o CPA divide o investimento
           pelas vendas de <strong>entrada</strong>; faturamento e ROAS front somam entrada, order bump e upsell; a{' '}
-          <strong>ascensão</strong> tem um ROAS próprio, ao lado. Tirar um produto tira as vendas dele do projeto.
+          <strong>ascensão</strong> tem um ROAS próprio, ao lado. Um produto listado em mais de um projeto vai para o projeto do anúncio da
+          venda. Tirar um produto não apaga vendas: elas passam para outro projeto que tenha o produto ou ficam sem atribuição.
         </p>
       </div>
+
+      {unattributed.length > 0 && (
+        <p className="rounded-[10px] bg-[var(--ct-warn-soft)] px-4 py-3 text-[13px] text-[var(--ct-warn)]">
+          {unattributed.length.toLocaleString('pt-BR')} {unattributed.length === 1 ? 'venda' : 'vendas'} deste cliente nos últimos {LOOKBACK_DAYS} dias
+          {' '}estão sem projeto ({currency(unattributedRevenue)}): {unattributedProducts.slice(0, 4).join(', ')}
+          {unattributedProducts.length > 4 ? '…' : ''}. Acontece quando o produto está em mais de um projeto e a venda não traz o anúncio, ou
+          quando nenhum projeto lista o produto.
+        </p>
+      )}
 
       {ok && (
         <p role="status" className="rounded-[10px] bg-[var(--ct-an-soft)] px-4 py-3 text-[13px] text-[var(--ct-an)]">
@@ -155,7 +175,7 @@ export default async function ProjectProductsPage({
                       <ConfirmDeleteButton
                         action={removeProduct.bind(null, { ...context, produto_nome: product.produto_nome })}
                         label="Remover"
-                        warning="Tirar o produto e as vendas dele?"
+                        warning="Tirar o produto deste projeto? As vendas dele ficam guardadas: vão para outro projeto que tenha o produto ou ficam sem atribuição."
                       />
                     )}
                   </td>
