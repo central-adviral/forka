@@ -9,6 +9,8 @@ import { buildAttention, type AttentionItem } from '@/lib/domain/attention'
 import { getAlerts, getWatchers } from '@/lib/repo/watchers-repo'
 import { METRICS, formatMetric, watcherScope } from '@/lib/domain/watchers'
 import { projectDay } from '@/lib/domain/day-pace'
+import { getPagesWithChecks } from '@/lib/repo/pages-repo'
+import { isOutage, pageHealth } from '@/lib/domain/page-probe'
 import { canActAs } from '@/lib/view-as'
 
 const PERIODS = [
@@ -83,11 +85,23 @@ export default async function TodayPage({
     supabase.from('tests').select('id, name').eq('client_id', client.id).eq('status', 'active'),
     canActAs(supabase, client.id, 'owner').then((data) => ({ data })),
   ])
-  const [bestVariant, watchers, alerts] = await Promise.all([
+  const [bestVariant, watchers, alerts, pages] = await Promise.all([
     findBestVariant(supabase, activeTests ?? [], monthSince, week.until).catch(() => null),
     getWatchers(supabase, client.id),
     getAlerts(supabase, client.id),
+    getPagesWithChecks(supabase, client.id, 2),
   ])
+  // A page the ads point to that is down or slow (0066) goes to the same queue as the watchers.
+  const pageAlerts = pages.flatMap((page) => {
+    const health = pageHealth(page.checks)
+    if (!page.isActive || health === 'ok' || health === 'sem_check') return []
+    const last = page.checks[0]
+    return [{
+      severity: (isOutage(page.checks) ? 'crit' : 'warn') as 'crit' | 'warn',
+      title: `${page.label} ${health === 'fora' ? 'fora do ar' : 'lenta'}`,
+      detail: health === 'fora' ? `${last.error ?? 'Não respondeu'} na última checagem.` : `${((last.ttfbMs ?? 0) / 1000).toFixed(1).replace('.', ',')}s para responder na última checagem.`,
+    }]
+  })
   const watcherById = new Map(watchers.map((watcher) => [watcher.id, watcher]))
   const watcherAlerts = alerts.flatMap((alert) => {
     const watcher = watcherById.get(alert.watcherId)
@@ -126,7 +140,7 @@ export default async function TodayPage({
     unclassified: { count: orphans.length, spend: orphans.reduce((total, c) => total + Number(c.spend), 0) },
     rulesHref: firstProject ? `${base}/funis-venda/${firstProject.slug}/regras` : null,
     bestVariant,
-    watcherAlerts,
+    watcherAlerts: [...watcherAlerts, ...pageAlerts],
   })
 
   // The day's target is the sum of the active projects' targets; the projection uses the sales up
