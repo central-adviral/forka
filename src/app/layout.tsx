@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
-import { Manrope, Sora, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin"],
-});
-
-const sora = Sora({
-  variable: "--font-sora",
+// The prototype sets every word in Geist and every number in Geist Mono. The old Manrope and Sora
+// variables are aliased to Geist in globals.css, so no component has to change its class.
+const geist = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
 });
 
@@ -30,7 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="pt-BR"
       suppressHydrationWarning
-      className={`${manrope.variable} ${sora.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geist.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />

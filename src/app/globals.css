@@ -25,18 +25,28 @@
   --font-display: var(--font-sora);
 }
 
+/* Prototype canvas: one soft glow at the top and a faint dot grid on the black. */
 body {
   background:
-    radial-gradient(1100px 640px at 4% -12%, var(--ct-glow), transparent 62%),
-    radial-gradient(900px 640px at 100% 108%, color-mix(in srgb, var(--ct-an) 7%, transparent), transparent 62%),
+    radial-gradient(900px 380px at 70% -120px, var(--ct-glow), transparent 70%),
+    radial-gradient(var(--ct-dot) 1px, transparent 1.2px),
     var(--ct-bg);
+  background-size: auto, 22px 22px, auto;
   background-attachment: fixed;
   color: var(--foreground);
-  font-family: var(--font-manrope), system-ui, sans-serif;
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
-h1, h2, h3 {
-  font-family: var(--font-sora), var(--font-manrope), sans-serif;
+:root {
+  --font-manrope: var(--font-geist-sans);
+  --font-sora: var(--font-geist-sans);
+}
+h1, h2, h3, h4 {
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 600;
   letter-spacing: -0.025em;
+  text-wrap: balance;
 }
 
 :focus-visible {
@@ -101,30 +111,33 @@ h1, h2, h3 {
   }
 }
 
-/* Central de Tráfego: the prototype's "Nebulosa refinada" look in the Safira palette. Dark is the
-   default; [data-mode="light"] on <html> switches every token. Components only ever read --ct-*. */
+/* Central de Tráfego: the prototype's black operations console. Three tools share one hue family:
+   Painel violet-blue, Análises teal, Testes amber. Dark is the default; [data-mode="light"] on
+   <html> switches every token. Components only ever read --ct-*. */
 :root {
   color-scheme: dark;
-  --ct-bg: #07080b;
-  --ct-surface: #0e1016;
-  --ct-surface-2: #14161d;
-  --ct-surface-3: #1b1e27;
-  --ct-glass: rgba(14, 16, 22, 0.72);
+  --ct-bg: #000000;
+  --ct-surface: #0a0a0c;
+  --ct-surface-2: #111114;
+  --ct-surface-3: #1a1a1f;
+  --ct-glass: rgba(0, 0, 0, 0.72);
   --ct-line: rgba(255, 255, 255, 0.075);
-  --ct-line-2: rgba(255, 255, 255, 0.14);
-  --ct-text: #f3f4f7;
-  --ct-text-2: #aeb3c0;
-  --ct-text-3: #737987;
-  --ct-accent: #7aa2ff;
-  --ct-on-accent: #07080b;
-  --ct-painel: #7aa2ff;
-  --ct-an: #5ed6f0;
-  --ct-ab: #b4a7ff;
-  --ct-ok: #5ee0a0;
-  --ct-warn: #f5c35c;
-  --ct-crit: #ff7a85;
-  --ct-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 24px 60px -40px rgba(0, 0, 0, 0.9);
-  --ct-glow: color-mix(in srgb, var(--ct-accent) 20%, transparent);
+  --ct-line-2: rgba(255, 255, 255, 0.13);
+  --ct-text: #ededf0;
+  --ct-text-2: #a1a1aa;
+  --ct-text-3: #6b6b76;
+  --ct-accent: #8b9bff;
+  --ct-on-accent: #000000;
+  --ct-painel: #8b9bff;
+  --ct-an: #4fd1c5;
+  --ct-ab: #f2b866;
+  --ct-ok: #4ade9b;
+  --ct-warn: #f2b866;
+  --ct-crit: #ff7a73;
+  --ct-bar: #24242b;
+  --ct-shadow: 0 1px 0 rgba(255, 255, 255, 0.035) inset;
+  --ct-glow: rgba(139, 155, 255, 0.07);
+  --ct-dot: rgba(255, 255, 255, 0.028);
 }
 :root[data-mode="light"] {
   color-scheme: light;
@@ -142,12 +155,14 @@ h1, h2, h3 {
   --ct-on-accent: #ffffff;
   --ct-painel: #2f5bea;
   --ct-an: #0e8fb3;
-  --ct-ab: #6d5ae6;
+  --ct-ab: #b26a00;
   --ct-ok: #0e9f6e;
   --ct-warn: #b7791f;
   --ct-crit: #dc3545;
+  --ct-bar: #e1e5ee;
   --ct-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 16px 40px -28px rgba(15, 23, 42, 0.25);
-  --ct-glow: color-mix(in srgb, var(--ct-accent) 14%, transparent);
+  --ct-glow: color-mix(in srgb, var(--ct-accent) 10%, transparent);
+  --ct-dot: rgba(15, 23, 42, 0.035);
 }
 :root {
   --ct-accent-soft: color-mix(in srgb, var(--ct-accent) 14%, transparent);
