@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getAlerts, getWatchers } from '@/lib/repo/watchers-repo'
-import { METRICS, formatMetric } from '@/lib/domain/watchers'
+import { METRICS, formatMetric, watcherScope } from '@/lib/domain/watchers'
+import { WatcherTrail, type TrailPoint } from './watcher-trail'
 import { WatcherStatusPill } from '@/components/watcher-status'
 
 const mono = 'font-[family-name:var(--font-geist-mono)]'
@@ -17,6 +18,23 @@ export default async function PainelPage({ params }: { params: Promise<{ clientS
   if (!client) notFound()
 
   const [watchers, alerts] = await Promise.all([getWatchers(supabase, client.id), getAlerts(supabase, client.id)])
+  // The last 14 closed days of every active watcher, from the same function the alerts use (0065).
+  const TRAIL_DAYS = 14
+  const trails = await Promise.all(
+    watchers.map((watcher) =>
+      watcher.isActive ? supabase.rpc('watcher_series', { p_watcher_id: watcher.id, p_days: TRAIL_DAYS }) : Promise.resolve({ data: null })
+    )
+  )
+  const trailById = new Map(
+    watchers.map((watcher, index) => [
+      watcher.id,
+      ((trails[index].data ?? []) as { day: string; value: number | null; status: TrailPoint['status'] }[]).map((point) => ({
+        day: point.day,
+        value: point.value === null ? null : Number(point.value),
+        status: point.status,
+      })),
+    ])
+  )
   const watcherById = new Map(watchers.map((watcher) => [watcher.id, watcher]))
   const open = alerts.filter((alert) => !alert.closedAt)
   const closed = alerts.filter((alert) => alert.closedAt)
@@ -64,7 +82,7 @@ export default async function PainelPage({ params }: { params: Promise<{ clientS
                   </span>
                   <div className="min-w-0">
                     <b className="text-[14px] font-semibold">
-                      {watcher.projectName}{watcher.frontName ? ` · ${watcher.frontName}` : ''} · {METRICS[watcher.metric].label} {alert.severity === 'crit' ? 'crítico' : 'em atenção'}
+                      {watcher.projectName} · {watcherScope(watcher)} · {METRICS[watcher.metric].label} {alert.severity === 'crit' ? 'crítico' : 'em atenção'}
                     </b>
                     <p className="mt-1 text-[12.5px] text-[var(--ct-text-2)]">
                       <span className={mono}>{formatMetric(watcher.metric, alert.value)}</span> contra alvo de{' '}
@@ -95,13 +113,18 @@ export default async function PainelPage({ params }: { params: Promise<{ clientS
               <Link href={`${base}/funis-venda/${list[0].projectSlug}`} className="text-[12.5px] text-[var(--ct-accent)]">Análises →</Link>
             </div>
             {list.map((watcher) => (
-              <div key={watcher.id} className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-5 border-b border-[var(--ct-line)] px-6 py-4 last:border-b-0 ${watcher.isActive ? '' : 'opacity-50'}`}>
+              <div key={watcher.id} className={`grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-5 border-b border-[var(--ct-line)] px-6 py-4 last:border-b-0 ${watcher.isActive ? '' : 'opacity-50'}`}>
                 <div className="min-w-0">
                   <strong className="block text-[13.5px] font-semibold">
-                    {METRICS[watcher.metric].label} · {watcher.frontName ?? 'projeto inteiro'}
+                    {METRICS[watcher.metric].label} · {watcherScope(watcher)}
                   </strong>
                   <span className="block text-xs text-[var(--ct-text-3)]">{METRICS[watcher.metric].hint}</span>
                 </div>
+                {watcher.isActive ? (
+                  <WatcherTrail points={trailById.get(watcher.id) ?? []} metric={watcher.metric} target={watcher.target} warnPct={watcher.warnPct} critPct={watcher.critPct} />
+                ) : (
+                  <span />
+                )}
                 <div className="text-right text-[11px] text-[var(--ct-text-3)]">
                   <b className={`${mono} block text-[15px] font-medium text-[var(--ct-text)]`}>{formatMetric(watcher.metric, watcher.lastValue)}</b>
                   alvo {formatMetric(watcher.metric, watcher.target)}
@@ -127,7 +150,7 @@ export default async function PainelPage({ params }: { params: Promise<{ clientS
                   if (!watcher) return null
                   return (
                     <tr key={alert.id} className="border-t border-[var(--ct-line)] first:border-t-0">
-                      <td className="px-6 py-3">{watcher.projectName}{watcher.frontName ? ` · ${watcher.frontName}` : ''} · {METRICS[watcher.metric].label}</td>
+                      <td className="px-6 py-3">{watcher.projectName} · {watcherScope(watcher)} · {METRICS[watcher.metric].label}</td>
                       <td className={`${mono} px-6 py-3 text-right`}>{formatMetric(watcher.metric, alert.value)}</td>
                       <td className={`${mono} whitespace-nowrap px-6 py-3 text-right text-[var(--ct-text-3)]`}>
                         {when(alert.openedAt)} → {when(alert.closedAt!)}

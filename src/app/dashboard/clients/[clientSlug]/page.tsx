@@ -7,7 +7,7 @@ import { findBestVariant } from '@/lib/repo/client-hub-repo'
 import { getClientDaily, saoPauloDay, type ClientDay } from '@/lib/repo/today-repo'
 import { buildAttention, type AttentionItem } from '@/lib/domain/attention'
 import { getAlerts, getWatchers } from '@/lib/repo/watchers-repo'
-import { METRICS, formatMetric } from '@/lib/domain/watchers'
+import { METRICS, formatMetric, watcherScope } from '@/lib/domain/watchers'
 import { projectDay } from '@/lib/domain/day-pace'
 
 const PERIODS = [
@@ -91,7 +91,7 @@ export default async function TodayPage({
   const watcherAlerts = alerts.flatMap((alert) => {
     const watcher = watcherById.get(alert.watcherId)
     if (alert.closedAt || !watcher) return []
-    const scope = `${watcher.projectName}${watcher.frontName ? ` · ${watcher.frontName}` : ''}`
+    const scope = `${watcher.projectName} · ${watcherScope(watcher)}`
     return [{
       severity: alert.severity,
       title: `${scope} · ${METRICS[watcher.metric].label} ${alert.severity === 'crit' ? 'crítico' : 'em atenção'}`,

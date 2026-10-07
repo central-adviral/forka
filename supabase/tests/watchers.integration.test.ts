@@ -76,3 +76,36 @@ describe('watchers and alerts (0059)', () => {
     expect(error).not.toBeNull()
   })
 })
+
+describe('watchers on a slice of campaigns, frequency and the 14-day trail (0065)', () => {
+  const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+
+  it('narrows a watcher to the campaigns whose name contains the slice, measures frequency and returns 14 closed days', async () => {
+    const { data: user } = await admin.auth.admin.createUser({ email: `slice-${Date.now()}@example.com`, password: 'password123', email_confirm: true })
+    const { data: client } = await admin.from('clients').insert({ owner_id: user!.user!.id, name: 'Slice', slug: `slice-${Date.now()}` }).select().single()
+    const { data: funnel } = await admin.from('sales_funnels').insert({ client_id: client!.id, name: 'P', slug: 'p' }).select().single()
+    await admin.from('campaign_daily').insert([
+      { client_id: client!.id, data: yesterday, campaign_id: 'e', campaign_name: '[1K] Escala', spend: 300, impressions: 30000, reach: 10000 },
+      { client_id: client!.id, data: yesterday, campaign_id: 'r', campaign_name: '[1K] RMK', spend: 100, impressions: 5000, reach: 1000 },
+    ])
+    const { data: slice } = await admin
+      .from('watchers')
+      .insert({ client_id: client!.id, sales_funnel_id: funnel!.id, name_filter: 'rmk', metric: 'frequencia', target: 3, warn_pct: 20, crit_pct: 40 })
+      .select()
+      .single()
+
+    const { data: day } = await admin.rpc('watcher_day', { p_watcher_id: slice!.id, p_day: yesterday })
+    // Only the RMK campaign: 5000 impressions over 1000 people = 5, 67% over a target of 3.
+    expect(day[0]).toMatchObject({ spend: 100, value: 5, status: 'crit' })
+
+    const { data: series } = await admin.rpc('watcher_series', { p_watcher_id: slice!.id, p_days: 14 })
+    expect(series).toHaveLength(14)
+    expect(series.at(-1)).toMatchObject({ day: yesterday, status: 'crit' })
+    expect(series[0].status).toBe('sem_dado')
+
+    const { error } = await admin
+      .from('watchers')
+      .insert({ client_id: client!.id, sales_funnel_id: funnel!.id, name_filter: 'rmk', metric: 'cpa_geral', target: 30 })
+    expect(error).not.toBeNull()
+  })
+})
