@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { PageHeader } from '@/components/page-header'
 import { notFound } from 'next/navigation'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { deleteSalesFunnel } from './actions'
@@ -34,27 +35,21 @@ export default async function SalesFunnelsListPage({
   )
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
+    <div className="flex max-w-[1240px] flex-col gap-9 px-14 pb-24 pt-12">
+      <PageHeader
+        tool="an"
+        eyebrow={client.name}
+        title="Análises"
+        description="Os projetos do cliente. Cada um lê as próprias campanhas, produtos e alvos."
+        actions={
           <a
-            href={`/dashboard/clients/${client.slug}`}
-            className="mb-1 flex items-center gap-1 text-xs text-[var(--ct-text-2)] hover:text-[var(--ct-text)]"
+            href={`/dashboard/clients/${client.slug}/funis-venda/new`}
+            className="rounded-full bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110"
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {client.name}
+            + Novo projeto
           </a>
-          <h1 className="font-[family-name:var(--font-sora)] text-xl font-semibold">Funis de Venda</h1>
-        </div>
-        <a
-          href={`/dashboard/clients/${client.slug}/funis-venda/new`}
-          className="rounded-[9px] bg-[var(--ct-ok)] px-4 py-2.5 text-[13.5px] font-semibold text-[var(--ct-on-accent)]"
-        >
-          + Novo funil
-        </a>
-      </div>
+        }
+      />
 
       <div className="card-shadow overflow-hidden rounded-2xl border border-[var(--ct-line)]">
         {summaries.map((funnel, index) => (

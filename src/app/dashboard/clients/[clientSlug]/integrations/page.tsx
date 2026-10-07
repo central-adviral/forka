@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { PageHeader } from '@/components/page-header'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { getConfiguredSecrets } from '@/lib/repo/client-secrets-repo'
 import { notFound } from 'next/navigation'
@@ -25,7 +26,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
   const supabase = await createServerSupabaseClient()
   const { data: client } = await supabase
     .from('clients')
-    .select('id, slug, custom_domain, domain_status, funnel_source_url')
+    .select('id, name, slug, custom_domain, domain_status, funnel_source_url')
     .eq('slug', clientSlug)
     .maybeSingle()
 
@@ -51,19 +52,13 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
     .order('valid_from', { ascending: false })
 
   return (
-    <div className="max-w-xl space-y-8 p-8">
-      <div>
-        <a
-          href={`/dashboard/clients/${client.slug}`}
-          className="mb-1 flex items-center gap-1 text-xs text-[var(--ct-text-2)] hover:text-[var(--ct-text)]"
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Testes
-        </a>
-        <h1 className="font-[family-name:var(--font-sora)] text-xl font-semibold">Integrações</h1>
-      </div>
+    <div className="flex max-w-[860px] flex-col gap-8 px-14 pb-24 pt-12">
+      <PageHeader
+        tool="config"
+        eyebrow={client.name}
+        title="Integrações"
+        description="Domínio dos links, fonte de dados do LaunchOps, imposto do Meta e as chaves que a Central usa para ler os números."
+      />
 
       <section className="space-y-4 rounded-2xl border border-[var(--ct-line)] p-5">
         <div className="flex items-center justify-between">

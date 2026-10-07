@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { PageHeader } from '@/components/page-header'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { SuccessBanner } from '@/components/success-banner'
@@ -54,29 +55,25 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
   )
 
   return (
-    <div className="p-8">
+    <div className="flex max-w-[1240px] flex-col px-14 pb-24 pt-12">
       <Suspense fallback={null}>
         <SuccessBanner param="created" message="Teste criado com sucesso." />
       </Suspense>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <a
-            href={`/dashboard/clients/${client.slug}`}
-            className="mb-1 flex items-center gap-1 text-xs text-[var(--ct-text-2)] hover:text-[var(--ct-text)]"
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {client.name}
-          </a>
-          <h1 className="font-[family-name:var(--font-sora)] text-xl font-semibold">Funis de Teste</h1>
-        </div>
-        <a
-          href={`/dashboard/clients/${client.slug}/tests/new`}
-          className="rounded-[9px] bg-[var(--ct-accent)] px-4 py-2.5 text-[13.5px] font-semibold text-[var(--ct-on-accent)]"
-        >
-          Novo teste
-        </a>
+      <div className="mb-9">
+        <PageHeader
+          tool="ab"
+          eyebrow={client.name}
+          title="Testes A/B de link"
+          description="Cada teste divide o tráfego de um link /r entre as variantes e mede por pessoa quem compra mais."
+          actions={
+            <a
+              href={`/dashboard/clients/${client.slug}/tests/new`}
+              className="rounded-full bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110"
+            >
+              Novo teste
+            </a>
+          }
+        />
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-[var(--ct-line)]">
