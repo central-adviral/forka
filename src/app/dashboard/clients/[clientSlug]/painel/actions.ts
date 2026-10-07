@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { assertClientRole } from '@/lib/repo/client-access-repo'
-import { isSafeProbeUrl } from '@/lib/domain/page-probe'
+import { MAX_PAGES_PER_CLIENT, isSafeProbeUrl } from '@/lib/domain/page-probe'
 import { probeClientPages } from '@/lib/pages/probe'
 
 interface PainelContext {
@@ -30,6 +30,8 @@ export async function addPage(context: PainelContext, formData: FormData) {
   const result = pageSchema.safeParse({ label: formData.get('label'), url: formData.get('url') })
   if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '))
   const supabase = await createServerSupabaseClient()
+  const { count } = await supabase.from('pages').select('id', { count: 'exact', head: true }).eq('client_id', context.client_id).eq('is_active', true)
+  if ((count ?? 0) >= MAX_PAGES_PER_CLIENT) back(context, 'erro', `A sonda acompanha até ${MAX_PAGES_PER_CLIENT} páginas por cliente. Remova uma para cadastrar outra.`)
   const { error } = await supabase.from('pages').insert({ client_id: context.client_id, ...result.data })
   if (error) back(context, 'erro', error.code === '23505' ? 'Essa página já está na sonda.' : error.code === '42501' ? 'Só gestor ou owner pode cadastrar páginas.' : error.message)
   revalidatePath(`/dashboard/clients/${context.client_slug}/painel`)
