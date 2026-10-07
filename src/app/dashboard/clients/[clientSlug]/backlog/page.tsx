@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { canActAs } from '@/lib/view-as'
 import { getBacklog, type BacklogItem } from '@/lib/repo/backlog-repo'
-import { COLUMNS, METHODS, STAGES, readRules, type Method } from '@/lib/domain/backlog'
+import { COLUMNS, METHODS, STAGES, nextCode, readRules, type Method } from '@/lib/domain/backlog'
+import { NewHypothesisWizard } from './new-hypothesis-wizard'
 import { daysRunningSince } from '@/lib/domain/report-period'
 import { readLinkTest, readMetaTest, readoutSummary, type CreativeRow, type LinkRow, type Verdict } from '@/lib/domain/backlog-readout'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
@@ -203,57 +204,13 @@ export default async function BacklogPage({
           </div>
 
           {nova === '1' && canEdit && (
-            <form action={createItem.bind(null, context)} className="card-shadow grid gap-4 rounded-[18px] border border-dashed border-[var(--ct-line-2)] px-6 py-5 md:grid-cols-2">
-              <b className="text-[15px] md:col-span-2">Nova hipótese</b>
-              <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)] md:col-span-2">
-                Título
-                <input name="title" required maxLength={120} placeholder="ex.: Prova social acima da dobra" className={field} />
-              </label>
-              <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)] md:col-span-2">
-                Hipótese
-                <textarea name="hypothesis" rows={3} maxLength={1000} placeholder="Se mudarmos X, Y melhora porque Z." className={field} />
-              </label>
-              <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-                Etapa do funil
-                <select name="stage" className={field} defaultValue="pagina">
-                  {Object.entries(STAGES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-                Método
-                <select name="method" className={field} defaultValue="meta">
-                  {Object.entries(METHODS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-              </label>
-              <div className="grid grid-cols-3 gap-3 md:col-span-2">
-                {[
-                  { name: 'impact', label: 'Impacto (1–10)' },
-                  { name: 'confidence', label: 'Confiança (1–10)' },
-                  { name: 'ease', label: 'Facilidade (1–10)' },
-                ].map((score) => (
-                  <label key={score.name} className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-                    {score.label}
-                    <input name={score.name} type="number" min={1} max={10} defaultValue={5} required className={`${field} ${mono}`} />
-                  </label>
-                ))}
-              </div>
-              <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-                Métrica que decide
-                <input name="metric" maxLength={120} placeholder="ex.: CTR, depois CPA de anúncio" className={field} />
-              </label>
-              <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-                Dono
-                <input name="owner" maxLength={60} placeholder="quem toca o teste" className={field} />
-              </label>
-              <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)] md:col-span-2">
-                Variantes, uma por linha (a primeira é o controle; viram A, B, C…)
-                <textarea name="variants" rows={3} required placeholder={'Página atual\nPrints de loja na dobra 1'} className={field} />
-              </label>
-              <div className="flex items-center gap-3 md:col-span-2">
-                <button type="submit" className="rounded-full bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)]">Criar na fila</button>
-                <Link href={href('')} className="text-[13px] text-[var(--ct-text-2)]">Cancelar</Link>
-              </div>
-            </form>
+            <NewHypothesisWizard
+              action={createItem.bind(null, context)}
+              cancelHref={href('')}
+              nextCode={nextCode(items.map((item) => item.code))}
+              stages={Object.entries(STAGES).map(([value, label]) => ({ value, label }))}
+              methods={Object.entries(METHODS).map(([value, label]) => ({ value, label }))}
+            />
           )}
 
           <div className="grid gap-3 overflow-x-auto pb-2 [grid-template-columns:repeat(4,minmax(220px,1fr))]">
