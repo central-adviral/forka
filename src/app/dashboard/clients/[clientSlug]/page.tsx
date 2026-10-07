@@ -5,6 +5,7 @@ import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { deleteClient } from '../actions'
 import { findBestVariant } from '@/lib/repo/client-hub-repo'
 import { getClientDaily, saoPauloDay, type ClientDay } from '@/lib/repo/today-repo'
+import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
 import { buildAttention, type AttentionItem } from '@/lib/domain/attention'
 import { getAlerts, getWatchers } from '@/lib/repo/watchers-repo'
 import { METRICS, formatMetric, watcherScope } from '@/lib/domain/watchers'
@@ -91,12 +92,15 @@ export default async function TodayPage({
   const campaigns = campaignsResult.data
   const lastRun = lastRunResult.data
   const funnels = funnelsResult.data
-  const [bestVariant, watchers, alerts, pages] = await Promise.all([
+  const [bestVariant, watchers, alerts, pages, unattributedResult] = await Promise.all([
     findBestVariant(supabase, activeTests ?? [], monthSince, week.until).catch(() => null),
     getWatchers(supabase, client.id),
     getAlerts(supabase, client.id),
     getPagesWithChecks(supabase, client.id, 2),
+    supabase.from('sales').select('valor_liquido').eq('client_id', client.id).is('sales_funnel_id', null).gte('data_venda', brtDayBoundaryUtc(week.since)),
   ])
+  if (unattributedResult.error) throw unattributedResult.error
+  const unattributedSales = (unattributedResult.data ?? []) as { valor_liquido: number | null }[]
   // A page the ads point to that is down or slow (0066) goes to the same queue as the watchers.
   const pageAlerts = pages.flatMap((page) => {
     const health = pageHealth(page.checks)
@@ -146,6 +150,7 @@ export default async function TodayPage({
     unclassified: { count: orphans.length, spend: orphans.reduce((total, c) => total + Number(c.spend), 0) },
     rulesHref: firstProject ? `${base}/funis-venda/${firstProject.slug}/regras` : null,
     bestVariant,
+    unattributed: { count: unattributedSales.length, revenue: unattributedSales.reduce((sum, sale) => sum + Number(sale.valor_liquido ?? 0), 0) },
     watcherAlerts: [...watcherAlerts, ...pageAlerts],
   })
 

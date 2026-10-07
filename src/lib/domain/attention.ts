@@ -21,6 +21,8 @@ export interface AttentionInput {
   unclassified: { count: number; spend: number }
   rulesHref: string | null
   bestVariant: { testName: string; variantName: string; liftPct: number } | null
+  /** Sales of the last days no project owns (0073): a product in several projects with no ad, or in none. */
+  unattributed?: { count: number; revenue: number }
   /** Open watcher alerts (0059), already worded. */
   watcherAlerts?: { severity: 'warn' | 'crit'; title: string; detail: string }[]
 }
@@ -94,6 +96,16 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
       detail: `${input.unclassified.count} ${input.unclassified.count === 1 ? 'campanha soma' : 'campanhas somam'} ${currency(input.unclassified.spend)} nos últimos 30 dias, em Não classificado.`,
       tool: 'config',
       href: input.rulesHref ?? `${input.base}/funis-venda`,
+    })
+  }
+
+  if (input.unattributed && input.unattributed.count > 0) {
+    items.push({
+      severity: 'warn',
+      title: 'Vendas sem projeto',
+      detail: `${input.unattributed.count} ${input.unattributed.count === 1 ? 'venda' : 'vendas'} (${currency(input.unattributed.revenue)}) nos últimos 7 dias não entraram em nenhum projeto: o produto está em mais de um projeto e a venda não traz o anúncio, ou nenhum projeto lista o produto.`,
+      tool: 'config',
+      href: `${input.base}/funis-venda`,
     })
   }
 

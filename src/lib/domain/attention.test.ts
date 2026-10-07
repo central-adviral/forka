@@ -65,4 +65,12 @@ describe('buildAttention with watcher alerts', () => {
     expect(items[0]).toMatchObject({ severity: 'crit', tool: 'painel', href: '/dashboard/clients/voe/painel' })
     expect(items[1].tool).toBe('config')
   })
+
+  it('warns about sales no project owns, and stays quiet when there are none', () => {
+    const items = buildAttention(input({ unattributed: { count: 3, revenue: 591 } }))
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({ severity: 'warn', title: 'Vendas sem projeto', tool: 'config' })
+    expect(items[0].detail).toMatch(/^3 vendas \(R\$\s?591\)/)
+    expect(buildAttention(input({ unattributed: { count: 0, revenue: 0 } }))).toEqual([])
+  })
 })
