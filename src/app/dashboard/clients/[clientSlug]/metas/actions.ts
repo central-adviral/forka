@@ -50,6 +50,10 @@ export async function createWatcher(context: MetasContext, formData: FormData) {
   if (frontId && METRICS[result.data.metric].projectOnly)
     back(context, 'erro', `${METRICS[result.data.metric].label} vale para todas as frentes do projeto: as vendas não são de uma frente.`)
   const supabase = await createServerSupabaseClient()
+  if (METRICS[result.data.metric].salesOnly) {
+    const { data: funnel } = await supabase.from('sales_funnels').select('resultado').eq('id', funnelId).maybeSingle()
+    if (funnel?.resultado === 'lead') back(context, 'erro', `${METRICS[result.data.metric].label} precisa de vendas, e este projeto mede leads. Use CPL.`)
+  }
   const { error } = await supabase.from('watchers').insert({
     client_id: context.client_id,
     sales_funnel_id: funnelId,

@@ -10,18 +10,20 @@ interface MetricInfo {
   /** sobe = higher is worse (costs); cai = lower is worse (rates, investment pace). */
   bad: 'sobe' | 'cai'
   projectOnly: boolean
+  /** Needs sales, so a lead project (0071) does not offer it. */
+  salesOnly: boolean
   hint: string
 }
 
 export const METRICS: Record<WatcherMetric, MetricInfo> = {
-  cpa_geral: { label: 'CPA geral', unit: 'brl', bad: 'sobe', projectOnly: true, hint: 'investimento ÷ todas as vendas de entrada' },
-  cpa_anuncio: { label: 'CPA de anúncio', unit: 'brl', bad: 'sobe', projectOnly: true, hint: 'investimento ÷ vendas que a UTM liga ao anúncio' },
-  cpl: { label: 'CPL', unit: 'brl', bad: 'sobe', projectOnly: false, hint: 'investimento ÷ leads pagos' },
-  cpm: { label: 'CPM', unit: 'brl', bad: 'sobe', projectOnly: false, hint: 'custo por mil impressões' },
-  ctr: { label: 'CTR', unit: 'pct', bad: 'cai', projectOnly: false, hint: 'cliques no link ÷ impressões' },
-  connect_rate: { label: 'Connect rate', unit: 'pct', bad: 'cai', projectOnly: false, hint: 'view page ÷ cliques no link' },
-  investimento: { label: 'Investimento no dia', unit: 'brl', bad: 'cai', projectOnly: false, hint: 'gasto com imposto do dia' },
-  frequencia: { label: 'Frequência', unit: 'x', bad: 'sobe', projectOnly: false, hint: 'impressões ÷ alcance (aproximada)' },
+  cpa_geral: { label: 'CPA geral', unit: 'brl', bad: 'sobe', projectOnly: true, salesOnly: true, hint: 'investimento ÷ todas as vendas de entrada' },
+  cpa_anuncio: { label: 'CPA de anúncio', unit: 'brl', bad: 'sobe', projectOnly: true, salesOnly: true, hint: 'investimento ÷ vendas que a UTM liga ao anúncio' },
+  cpl: { label: 'CPL', unit: 'brl', bad: 'sobe', projectOnly: false, salesOnly: false, hint: 'investimento ÷ leads pagos' },
+  cpm: { label: 'CPM', unit: 'brl', bad: 'sobe', projectOnly: false, salesOnly: false, hint: 'custo por mil impressões' },
+  ctr: { label: 'CTR', unit: 'pct', bad: 'cai', projectOnly: false, salesOnly: false, hint: 'cliques no link ÷ impressões' },
+  connect_rate: { label: 'Connect rate', unit: 'pct', bad: 'cai', projectOnly: false, salesOnly: false, hint: 'view page ÷ cliques no link' },
+  investimento: { label: 'Investimento no dia', unit: 'brl', bad: 'cai', projectOnly: false, salesOnly: false, hint: 'gasto com imposto do dia' },
+  frequencia: { label: 'Frequência', unit: 'x', bad: 'sobe', projectOnly: false, salesOnly: false, hint: 'impressões ÷ alcance (aproximada)' },
 }
 
 export const STATUS_LABEL: Record<WatcherStatus, string> = {
