@@ -14,6 +14,13 @@ interface KpiTotals {
   ticketMedio: number | null
 }
 
+/** A lead project reads its campaigns' paid leads instead of sales (0071). */
+interface LeadTotals {
+  leads: number
+  linkClicks: number
+  landingPageViews: number
+}
+
 interface KpiSparklines {
   receitaLiquida: number[]
   roas: number[]
@@ -44,12 +51,26 @@ export function FunnelKpiCards({
   totals,
   currency,
   sparklines,
+  lead,
 }: {
   totals: KpiTotals
   currency: (value: number) => string
   sparklines?: KpiSparklines
+  lead?: LeadTotals
 }) {
-  const cards: { label: string; value: string; color?: string; hint?: string; spark?: { values: number[]; color: string } }[] = [
+  const percent = (part: number, whole: number) => (whole > 0 ? `${((part / whole) * 100).toFixed(1).replace('.', ',')}%` : '—')
+  const leadCards: { label: string; value: string; color?: string; hint?: string; spark?: { values: number[]; color: string } }[] = lead
+    ? [
+        { label: totals.comImposto ? 'Investimento c/ imposto' : 'Investimento (sem imposto)', value: currency(totals.investimento) },
+        { label: 'Leads pagos', value: lead.leads.toLocaleString('pt-BR'), hint: 'das campanhas do projeto, sem duplicata' },
+        { label: 'CPL', value: lead.leads > 0 ? currency(totals.investimento / lead.leads) : '—', hint: 'investimento ÷ leads pagos' },
+        { label: 'Cliques no link', value: lead.linkClicks.toLocaleString('pt-BR') },
+        { label: 'Custo por clique', value: lead.linkClicks > 0 ? currency(totals.investimento / lead.linkClicks) : '—' },
+        { label: 'View page', value: lead.landingPageViews.toLocaleString('pt-BR'), hint: `${percent(lead.landingPageViews, lead.linkClicks)} dos cliques` },
+        { label: 'Conversão da página', value: percent(lead.leads, lead.landingPageViews), hint: 'leads ÷ view page' },
+      ]
+    : []
+  const cards: { label: string; value: string; color?: string; hint?: string; spark?: { values: number[]; color: string } }[] = lead ? leadCards : [
     { label: totals.comImposto ? 'Investimento c/ imposto' : 'Investimento (sem imposto)', value: currency(totals.investimento) },
     {
       label: 'Receita líquida',

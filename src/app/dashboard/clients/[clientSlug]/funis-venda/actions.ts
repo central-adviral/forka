@@ -127,10 +127,6 @@ const editSalesFunnelSchema = z.object({
   // The project's window: a front that reads another project only counts these days (0054).
   starts_on: z.union([z.literal(''), z.iso.date()]).transform((value) => value || null),
   ends_on: z.union([z.literal(''), z.iso.date()]).transform((value) => value || null),
-  // Entry sales per day the project aims at; "Hoje" projects the day against it (0063).
-  daily_sales_target: z
-    .union([z.literal(''), z.coerce.number().int('a meta diária é um número inteiro de vendas').positive('a meta diária precisa ser maior que zero')])
-    .transform((value) => (value === '' ? null : value)),
 }).refine((value) => !value.starts_on || !value.ends_on || value.ends_on >= value.starts_on, 'o fim da janela vem depois do início')
 
 export async function editSalesFunnel(
@@ -146,7 +142,6 @@ export async function editSalesFunnel(
     launchops_operacao_ids: formData.get('launchops_operacao_ids'),
     starts_on: formData.get('starts_on') ?? '',
     ends_on: formData.get('ends_on') ?? '',
-    daily_sales_target: formData.get('daily_sales_target') ?? '',
   })
   if (!result.success) {
     throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
@@ -162,7 +157,6 @@ export async function editSalesFunnel(
       launchops_operacao_ids: parsed.launchops_operacao_ids,
       starts_on: parsed.starts_on,
       ends_on: parsed.ends_on,
-      daily_sales_target: parsed.daily_sales_target,
       updated_at: new Date().toISOString(),
     })
     .eq('id', parsed.sales_funnel_id)

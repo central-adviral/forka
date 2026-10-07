@@ -89,6 +89,7 @@ function pageLabel(pathname: string, clientSlug: string | undefined): string {
   if (last === 'edit') return 'Editar'
   if (last === 'link') return 'Link e rastreio'
   if (last === 'regras') return 'Regras de campanha'
+  if (last === 'plano') return 'Plano do projeto'
   if (rest[0] === 'integrations') return 'Integrações'
   if (rest[0] === 'membros') return 'Membros'
   if (rest[0] === 'painel') return 'Painel de Controle'
