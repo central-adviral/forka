@@ -93,7 +93,8 @@ function pageLabel(pathname: string, clientSlug: string | undefined): string {
   if (rest[0] === 'membros') return 'Membros'
   if (rest[0] === 'painel') return 'Painel de Controle'
   if (rest[0] === 'metas') return 'Metas e alvos'
-  if (rest[0] === 'tests') return rest.length === 1 ? 'Teste A/B' : 'Relatório'
+  if (rest[0] === 'backlog') return 'Testes'
+  if (rest[0] === 'tests') return rest.length === 1 ? 'Funis de teste' : 'Relatório'
   if (rest[0] === 'funis-venda') return 'Análises'
   return ''
 }
@@ -285,7 +286,8 @@ export function DashboardShell({
           { label: 'Hoje', group: 'tela', href: base },
           { label: 'Painel de Controle', group: 'tela', href: `${base}/painel` },
           { label: 'Análises', group: 'tela', href: `${base}/funis-venda` },
-          { label: 'Teste A/B', group: 'tela', href: `${base}/tests` },
+          { label: 'Testes (backlog)', group: 'tela', href: `${base}/backlog` },
+          { label: 'Funis de teste (A/B de link)', group: 'tela', href: `${base}/tests` },
           ...(canEdit
             ? [
                 { label: 'Metas e alvos', group: 'tela', href: `${base}/metas` },
@@ -378,9 +380,13 @@ export function DashboardShell({
                 <Dot color="var(--ct-an)" />
                 Análises
               </NavLink>
-              <NavLink href={`${base}/tests`} active={pathname === `${base}/tests` || pathname === `${base}/tests/new`} count={activeClient.testsCount}>
+              <NavLink
+                href={`${base}/backlog`}
+                active={pathname.startsWith(`${base}/backlog`) || pathname === `${base}/tests` || pathname === `${base}/tests/new`}
+                count={activeClient.testsCount}
+              >
                 <Dot color="var(--ct-ab)" />
-                Teste A/B
+                Testes
               </NavLink>
               {activeTestSlug && activeTestSlug !== 'new' && (
                 <div className="ml-[19px] flex flex-col gap-px border-l border-[var(--ct-line)] pl-3">
