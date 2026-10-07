@@ -39,10 +39,9 @@ export function formatMetric(metric: WatcherMetric, value: number | null): strin
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
-/** What a watcher looks at, in words: a slice by name, a front, or the whole project. */
-export function watcherScope(watcher: { frontName: string | null; nameFilter: string | null }): string {
-  if (watcher.nameFilter) return `campanhas com "${watcher.nameFilter}"`
-  return watcher.frontName ?? 'projeto inteiro'
+/** What a watcher looks at, in words: one front, or every front of its project. */
+export function watcherScope(watcher: { frontName: string | null }): string {
+  return watcher.frontName ?? 'todas as frentes'
 }
 
 /** The values where the band turns into atenção and into crítico, in the metric's bad direction. */
