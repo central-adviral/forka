@@ -6,6 +6,7 @@ import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
 import { saveDomain, verifyDomain, saveHublaToken, saveFunnelDataSource, saveMetaTax } from './actions'
 import { VerifyDomainButton } from './verify-domain-button'
+import { canActAs } from '@/lib/view-as'
 
 const STATUS_LABEL: Record<string, string> = {
   unconfigured: 'Não configurado',
@@ -30,7 +31,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
 
   if (!client) notFound()
   // Read-only members can see the client row, so seeing it no longer proves they may configure it.
-  const { data: isOwner } = await supabase.rpc('has_client_role', { p_client_id: client.id, p_min_role: 'owner' })
+  const isOwner = await canActAs(supabase, client.id, 'owner')
   if (isOwner !== true) notFound()
 
   // The secrets themselves never reach this component -- only whether each one is set. The owner

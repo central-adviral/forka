@@ -6,6 +6,7 @@ import { METRICS, formatMetric, thresholds, type WatcherMetric } from '@/lib/dom
 import { WatcherStatusPill } from '@/components/watcher-status'
 import { createWatcher, deleteWatcher, evaluateNow, toggleWatcher } from './actions'
 import { ScopeMetricFields } from './scope-metric-fields'
+import { canActAs } from '@/lib/view-as'
 
 const mono = 'font-[family-name:var(--font-geist-mono)]'
 const field =
@@ -28,7 +29,7 @@ export default async function MetasPage({
     getWatchers(supabase, client.id),
     supabase.from('sales_funnels').select('id, name').eq('client_id', client.id).order('name'),
     supabase.from('project_fronts').select('id, name, sales_funnel_id, naming_rules(kind, value), sales_funnels!project_fronts_sales_funnel_id_fkey!inner(client_id)').eq('sales_funnels.client_id', client.id).order('position'),
-    supabase.rpc('has_client_role', { p_client_id: client.id, p_min_role: 'gestor' }),
+    canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
   ])
   const context = { client_id: client.id as string, client_slug: client.slug as string }
   const ruleLabel = (front: { naming_rules: { kind: string; value: string }[] | null }) =>
