@@ -161,6 +161,19 @@ export async function togglePublished(context: BacklogContext & { item_id: strin
   back(context, 'ok', context.published ? `${context.code} aparece para o cliente quando estiver rodando ou decidido.` : `${context.code} saiu da visão do cliente.`, `&item=${context.code}`)
 }
 
+export async function linkAbTest(context: BacklogContext & { item_id: string; code: string }, formData: FormData) {
+  const testId = String(formData.get('ab_test_id') ?? '')
+  const supabase = await createServerSupabaseClient()
+  if (testId) {
+    const { data: test } = await supabase.from('tests').select('id').eq('id', testId).eq('client_id', context.client_id).maybeSingle()
+    if (!test) back(context, 'erro', 'Teste A/B não encontrado neste cliente.', `&item=${context.code}`)
+  }
+  const { data, error } = await supabase.from('backlog_items').update({ ab_test_id: testId || null }).eq('id', context.item_id).select('id')
+  if (error || !data?.length) back(context, 'erro', 'Só gestor ou owner pode vincular o teste A/B.', `&item=${context.code}`)
+  revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
+  back(context, 'ok', testId ? `${context.code} agora é medido pelo teste A/B vinculado.` : `${context.code} ficou sem teste A/B vinculado.`, `&item=${context.code}`)
+}
+
 export async function deleteItem(context: BacklogContext & { item_id: string; code: string }) {
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase.from('backlog_items').delete().eq('id', context.item_id).select('id')
