@@ -1,10 +1,11 @@
 'use client'
 
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CommandPalette, type CommandItem } from './command-palette'
 import { createBrowserSupabaseClient } from '@/lib/supabase/browser'
 import type { ClientRole } from '@/lib/repo/client-access-repo'
+import { ANALYSIS_TABS, readAnalysisTab } from '@/lib/domain/analysis-tabs'
 
 export interface ShellProject {
   name: string
@@ -184,6 +185,18 @@ function Dot({ color }: { color: string }) {
   return <span className="mx-[4.5px] h-[7px] w-[7px] flex-none rounded-full" style={{ background: color }} />
 }
 
+function SubNav({ items }: { items: { href: string; label: string; active?: boolean }[] }) {
+  return (
+    <div className="mb-1 ml-[19px] flex flex-col gap-px border-l border-[var(--ct-line)] pl-3">
+      {items.map((item) => (
+        <NavLink key={item.href} href={item.href} active={item.active ?? false}>
+          <span className="text-[12.5px]">{item.label}</span>
+        </NavLink>
+      ))}
+    </div>
+  )
+}
+
 function GroupLabel({ children }: { children: React.ReactNode }) {
   return (
     <span className="px-2.5 pb-[5px] pt-2.5 font-[family-name:var(--font-geist-mono)] text-[10.5px] font-medium uppercase tracking-[0.08em] text-[var(--ct-text-3)]">
@@ -258,6 +271,7 @@ export function DashboardShell({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   async function signOut() {
     await createBrowserSupabaseClient().auth.signOut()
@@ -314,6 +328,19 @@ export function DashboardShell({
   ]
   // Rules belong to a project: the open one, or the first one of the client.
   const rulesProject = activeProject ?? activeClient?.projects[0]
+  const inPainel = pathname.startsWith(`${base}/painel`)
+  const inAnalyses = pathname.startsWith(`${base}/funis-venda`)
+  const onAnalysisTabs = activeProject !== undefined && pathname === `${base}/funis-venda/${activeProject.slug}`
+  const analysisTab = readAnalysisTab(searchParams.get('aba'))
+  // Switching tabs from the menu keeps the period and front, like the tabs on the page do.
+  function analysisHref(projectSlug: string, tab: string) {
+    const query = new URLSearchParams(onAnalysisTabs ? searchParams.toString() : '')
+    if (tab === 'visao') query.delete('aba')
+    else query.set('aba', tab)
+    const search = query.toString()
+    return `${base}/funis-venda/${projectSlug}${search ? `?${search}` : ''}`
+  }
+  const inTests = pathname.startsWith(`${base}/backlog`) || pathname.startsWith(`${base}/tests`)
   const page = pageLabel(pathname, activeClient?.slug)
 
   return (
@@ -383,21 +410,42 @@ export function DashboardShell({
                 <Dot color="var(--ct-painel)" />
                 Painel de Controle
               </NavLink>
-              <NavLink href={`${base}/funis-venda`} active={pathname.startsWith(`${base}/funis-venda`)}>
+              {inPainel && (
+                <SubNav
+                  items={[
+                    { href: `${base}/painel#atencao`, label: 'Precisa de atenção' },
+                    { href: `${base}/painel#vigias`, label: 'Vigias por projeto' },
+                    { href: `${base}/painel#paginas`, label: 'Páginas' },
+                  ]}
+                />
+              )}
+              <NavLink href={`${base}/funis-venda`} active={inAnalyses && !onAnalysisTabs && !pathname.endsWith('/regras')}>
                 <Dot color="var(--ct-an)" />
                 Análises
               </NavLink>
-              <NavLink
-                href={`${base}/backlog`}
-                active={pathname.startsWith(`${base}/backlog`) || pathname === `${base}/tests` || pathname === `${base}/tests/new`}
-                count={activeClient.testsCount}
-                tone="ab"
-              >
+              {inAnalyses && activeProject && (
+                <SubNav
+                  items={ANALYSIS_TABS.map((option) => ({
+                    href: analysisHref(activeProject.slug, option.value),
+                    label: option.label,
+                    active: onAnalysisTabs && analysisTab === option.value,
+                  }))}
+                />
+              )}
+              <NavLink href={`${base}/backlog`} active={false} count={activeClient.testsCount} tone="ab">
                 <Dot color="var(--ct-ab)" />
                 Testes
               </NavLink>
+              {inTests && (
+                <SubNav
+                  items={[
+                    { href: `${base}/backlog`, label: 'Backlog de hipóteses', active: pathname.startsWith(`${base}/backlog`) },
+                    { href: `${base}/tests`, label: 'Testes A/B de link', active: pathname === `${base}/tests` || pathname === `${base}/tests/new` },
+                  ]}
+                />
+              )}
               {activeTestSlug && activeTestSlug !== 'new' && (
-                <div className="ml-[19px] flex flex-col gap-px border-l border-[var(--ct-line)] pl-3">
+                <div className="ml-[38px] flex flex-col gap-px border-l border-[var(--ct-line)] pl-3">
                   {[
                     { href: `${base}/tests/${activeTestSlug}`, label: 'Relatório' },
                     { href: `${base}/tests/${activeTestSlug}/link`, label: 'Link e rastreio' },
