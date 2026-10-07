@@ -15,6 +15,7 @@ import { SyncFunnelButton } from './sync-funnel-button'
 import { SyncStatus } from '@/components/sync-status'
 import { MiniBarChart } from '@/components/mini-bar-chart'
 import { SalesOriginPanel } from './sales-origin-panel'
+import { PageHeader, headerAction } from '@/components/page-header'
 import { FrontsPanel, type FrontDayRow, type FrontInfo } from './fronts-panel'
 
 const TABS = [
@@ -175,51 +176,44 @@ export default async function SalesFunnelPage({
   const hasSyncError = health.some((h) => h.lastResult === 'error')
 
   return (
-    <div className="p-8">
-      <a
-        href={`/dashboard/clients/${client.slug}/funis-venda`}
-        className="mb-1 flex items-center gap-1 text-xs text-[var(--ct-text-2)] hover:text-[var(--ct-text)]"
-      >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-          <path d="M6.5 2L3 5L6.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Funis de Venda
-      </a>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="font-[family-name:var(--font-sora)] text-xl font-semibold">{funnel.name}</h1>
-        <div className="flex items-center gap-3">
-          {rows.length > 0 && (
-            <span className="text-[12px] text-[var(--ct-text-2)]" title="De onde vem o investimento deste projeto">
-              Investimento: {rows[0].spendSource === 'frentes' ? 'regras de campanha' : 'operação do LaunchOps'}
-            </span>
-          )}
-          <SyncStatus lastRunAt={lastSyncAt} hasError={hasSyncError} />
-          <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
-          <a
-            href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/plano`}
-            className="rounded-[9px] border border-[var(--ct-accent)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ct-accent)]"
-          >
-            Plano
-          </a>
-          <a
-            href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/produtos`}
-            className="rounded-[9px] border border-[var(--ct-line)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ct-text-2)]"
-          >
-            Produtos
-          </a>
-          <a
-            href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`}
-            className="rounded-[9px] border border-[var(--ct-line)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ct-text-2)]"
-          >
-            Regras de campanha
-          </a>
-          <a
-            href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`}
-            className="rounded-[9px] border border-[var(--ct-line)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ct-text-2)]"
-          >
-            Editar
-          </a>
-        </div>
+    <div className="flex max-w-[1440px] flex-col px-14 pb-24 pt-12">
+      <div className="mb-9">
+        <PageHeader
+          tool="an"
+          eyebrow={
+            <>
+              {funnel.resultado === 'lead' ? 'projeto de lead' : 'projeto de compra'}
+              {rows.length > 0 ? ` · investimento das ${rows[0].spendSource === 'frentes' ? 'regras de campanha' : 'operações do LaunchOps'}` : ''}
+            </>
+          }
+          title={funnel.name}
+          description={
+            funnel.resultado === 'lead'
+              ? 'Gasto, leads e criativos das campanhas do projeto.'
+              : 'Gasto, vendas, receita e criativos do projeto, lidos das regras de campanha e dos produtos.'
+          }
+          actions={
+            <>
+              <SyncStatus lastRunAt={lastSyncAt} hasError={hasSyncError} />
+              <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
+              <a
+                href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/plano`}
+                className="rounded-full border border-[var(--ct-accent)] bg-[var(--ct-accent-soft)] px-4 py-2 text-[13px] font-medium text-[var(--ct-accent)]"
+              >
+                Plano
+              </a>
+              <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/produtos`} className={headerAction}>
+                Produtos
+              </a>
+              <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`} className={headerAction}>
+                Regras de campanha
+              </a>
+              <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`} className={headerAction}>
+                Editar
+              </a>
+            </>
+          }
+        />
       </div>
 
       <div className="mb-6 flex gap-1.5">
