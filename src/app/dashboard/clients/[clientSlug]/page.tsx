@@ -81,7 +81,7 @@ export default async function TodayPage({
     getClientDaily(supabase, client.id, week.since, week.until),
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: monthSince, p_until: week.until }),
     supabase.from('sync_runs').select('finished_at, error').eq('client_id', client.id).not('finished_at', 'is', null).order('started_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('sales_funnels').select('slug, name, is_active, daily_sales_target').eq('client_id', client.id).order('name'),
+    supabase.from('sales_funnels').select('slug, name, is_active, daily_sales_target, resultado').eq('client_id', client.id).order('name'),
     supabase.from('tests').select('id, name').eq('client_id', client.id).eq('status', 'active'),
     canActAs(supabase, client.id, 'owner').then((data) => ({ data })),
   ])
@@ -151,7 +151,8 @@ export default async function TodayPage({
 
   // The day's target is the sum of the active projects' targets; the projection uses the sales up
   // to the last Meta pull, the same cut the partial CPA uses.
-  const dailyTarget = (funnels ?? []).filter((funnel) => funnel.is_active).reduce((total, funnel) => total + (funnel.daily_sales_target ?? 0), 0)
+  // The day's pace counts entry sales, so only purchase projects add to the target (0071).
+  const dailyTarget = (funnels ?? []).filter((funnel) => funnel.is_active && funnel.resultado !== 'lead').reduce((total, funnel) => total + (funnel.daily_sales_target ?? 0), 0)
   const projected = period === 'hoje' ? projectDay(vendas, metaDataAt ? new Date(metaDataAt) : new Date()) : null
   const salesFoot =
     dailyTarget > 0 && period !== '7d'

@@ -49,7 +49,7 @@ export default async function SalesFunnelPage({
 
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug')
+    .select('id, name, slug, resultado')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
@@ -189,6 +189,12 @@ export default async function SalesFunnelPage({
           <SyncStatus lastRunAt={lastSyncAt} hasError={hasSyncError} />
           <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
           <a
+            href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/plano`}
+            className="rounded-[9px] border border-[var(--ct-accent)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ct-accent)]"
+          >
+            Plano
+          </a>
+          <a
             href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/produtos`}
             className="rounded-[9px] border border-[var(--ct-line)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ct-text-2)]"
           >
@@ -293,7 +299,20 @@ export default async function SalesFunnelPage({
             : '.'}
         </p>
       )}
-      <FunnelKpiCards totals={kpiTotals} currency={currency} sparklines={kpiSparklines} />
+      <FunnelKpiCards
+        totals={kpiTotals}
+        currency={currency}
+        sparklines={kpiSparklines}
+        lead={
+          funnel.resultado === 'lead'
+            ? {
+                leads: ((frontDays ?? []) as FrontDayRow[]).reduce((sum, row) => sum + Number(row.leads ?? 0), 0),
+                linkClicks: totals.linkClicks,
+                landingPageViews: totals.landingPageViews,
+              }
+            : undefined
+        }
+      />
 
       <nav className="mb-6 inline-flex max-w-full gap-0.5 overflow-x-auto rounded-full border border-[var(--ct-line)] bg-[var(--ct-surface-2)] p-1" aria-label="Abas da análise">
         {TABS.map((option) => (

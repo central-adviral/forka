@@ -17,7 +17,7 @@ export default async function EditSalesFunnelPage({
 
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, launchops_operacao_ids, starts_on, ends_on, daily_sales_target')
+    .select('id, name, slug, launchops_operacao_ids, starts_on, ends_on')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
@@ -63,19 +63,6 @@ export default async function EditSalesFunnelPage({
             <input type="date" name="ends_on" defaultValue={funnel.ends_on ?? ''} className={`${inputClass} mt-1`} />
           </label>
         </div>
-        <label className="block text-xs text-[var(--ct-text-2)]">
-          Meta diária de vendas de entrada
-          <input
-            type="number"
-            name="daily_sales_target"
-            min={1}
-            step={1}
-            defaultValue={funnel.daily_sales_target ?? ''}
-            placeholder="ex.: 80"
-            className={`${inputClass} mt-1`}
-          />
-          <span className="mt-1 block text-[11px] text-[var(--ct-text-3)]">A tela Hoje compara o ritmo do dia com esta meta. Deixe vazio se o projeto não tem meta diária.</span>
-        </label>
         <p className="text-xs text-[var(--ct-text-2)]">
           Opcional. Uma frente que lê outro projeto (ex.: a Captação Paga do lançamento lendo o perpétuo) só conta os dias
           dentro desta janela. Vazio = sem limite.
