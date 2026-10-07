@@ -122,27 +122,33 @@ function NavLink({
   active,
   children,
   count,
+  tone = 'soft',
 }: {
   href: string
   active: boolean
   children: React.ReactNode
   count?: number
+  /** crit = something to fix (open alerts), ab = the Testes hue, soft = a plain tally. */
+  tone?: 'crit' | 'ab' | 'soft'
 }) {
+  const toneClass = {
+    crit: 'bg-[var(--ct-crit-soft)] text-[var(--ct-crit)]',
+    ab: 'bg-[var(--ct-ab-soft)] text-[var(--ct-ab)]',
+    soft: 'bg-[var(--ct-surface-3)] text-[var(--ct-text-3)]',
+  }[tone]
   return (
     <Link
       href={href}
       aria-current={active ? 'page' : undefined}
-      className={`flex items-center gap-2.5 rounded-[7px] px-2.5 py-[7px] text-[13.5px] font-medium transition-colors ${
+      className={`flex items-center gap-2.5 rounded-[12px] px-2.5 py-[7px] text-[13.5px] font-medium transition-colors ${
         active
-          ? 'bg-[var(--ct-surface-3)] text-[var(--ct-text)]'
+          ? 'bg-[var(--ct-accent-soft)] text-[var(--ct-text)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--ct-accent)_22%,transparent)]'
           : 'text-[var(--ct-text-2)] hover:bg-[var(--ct-surface-2)] hover:text-[var(--ct-text)]'
       }`}
     >
       {children}
       {count !== undefined && (
-        <span className="ml-auto rounded-full bg-[var(--ct-surface-3)] px-[7px] py-px font-[family-name:var(--font-geist-mono)] text-[10.5px] text-[var(--ct-text-3)]">
-          {count}
-        </span>
+        <span className={`ml-auto rounded-full px-[7px] py-px font-[family-name:var(--font-geist-mono)] text-[10.5px] ${toneClass}`}>{count}</span>
       )}
     </Link>
   )
@@ -201,7 +207,7 @@ function Picker({
 }) {
   return (
     <details className="group relative">
-      <summary className="flex w-full cursor-pointer list-none items-center gap-2.5 rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-2.5 py-2 text-left hover:border-[var(--ct-line-2)] [&::-webkit-details-marker]:hidden">
+      <summary className="flex w-full cursor-pointer list-none items-center gap-2.5 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-2.5 py-2 text-left hover:border-[var(--ct-line-2)] [&::-webkit-details-marker]:hidden">
         <span
           className={`grid h-6 w-6 flex-none place-items-center rounded-[7px] font-[family-name:var(--font-geist-mono)] text-[10.5px] font-medium ${
             badgeTone === 'an' ? 'bg-[var(--ct-an-soft)] text-[var(--ct-an)]' : 'bg-[var(--ct-surface-3)] text-[var(--ct-text)]'
@@ -312,7 +318,7 @@ export function DashboardShell({
 
   return (
     <div className="flex h-screen font-[family-name:var(--font-manrope)] text-[var(--ct-text)]">
-      <aside className="m-3.5 mr-0 flex w-[264px] flex-none flex-col gap-[18px] overflow-y-auto rounded-[22px] border border-[var(--ct-line)] bg-[var(--ct-glass)] px-3 py-[18px] shadow-[var(--ct-shadow)] backdrop-blur-xl">
+      <aside className="m-3.5 mr-0 flex w-[276px] flex-none flex-col gap-[18px] overflow-y-auto rounded-[24px] border border-[var(--ct-line)] bg-[var(--ct-glass)] px-3 py-[18px] shadow-[var(--ct-shadow)] backdrop-blur-xl">
         <Link href="/dashboard" className="flex items-center gap-2.5 px-2 py-0.5">
           <span
             className="grid h-[30px] w-[30px] flex-none place-items-center rounded-[9px]"
@@ -373,11 +379,11 @@ export function DashboardShell({
               </NavLink>
 
               <GroupLabel>Ferramentas</GroupLabel>
-              <NavLink href={`${base}/painel`} active={pathname.startsWith(`${base}/painel`)} count={activeClient.openAlerts || undefined}>
+              <NavLink href={`${base}/painel`} active={pathname.startsWith(`${base}/painel`)} count={activeClient.openAlerts || undefined} tone="crit">
                 <Dot color="var(--ct-painel)" />
                 Painel de Controle
               </NavLink>
-              <NavLink href={`${base}/funis-venda`} active={pathname.startsWith(`${base}/funis-venda`)} count={activeClient.projects.length}>
+              <NavLink href={`${base}/funis-venda`} active={pathname.startsWith(`${base}/funis-venda`)}>
                 <Dot color="var(--ct-an)" />
                 Análises
               </NavLink>
@@ -385,6 +391,7 @@ export function DashboardShell({
                 href={`${base}/backlog`}
                 active={pathname.startsWith(`${base}/backlog`) || pathname === `${base}/tests` || pathname === `${base}/tests/new`}
                 count={activeClient.testsCount}
+                tone="ab"
               >
                 <Dot color="var(--ct-ab)" />
                 Testes
@@ -448,11 +455,21 @@ export function DashboardShell({
         {canPreview && (
           <button
             type="button"
+            role="switch"
+            aria-checked={previewing}
             onClick={() => setPreview(!previewing)}
-            className="flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[12.5px] text-[var(--ct-text-2)] hover:bg-[var(--ct-surface-3)] hover:text-[var(--ct-text)]"
+            className="flex items-center gap-2.5 rounded-[14px] bg-[var(--ct-surface-2)] px-2.5 py-2 text-left text-[12.5px] text-[var(--ct-text-2)] hover:text-[var(--ct-text)]"
           >
             <Icon>{ICONS.eye}</Icon>
-            {previewing ? 'Sair da visão do cliente' : 'Ver como cliente'}
+            Ver como cliente
+            <span
+              aria-hidden="true"
+              className={`relative ml-auto h-[18px] w-[30px] flex-none rounded-full border border-[var(--ct-line-2)] transition-colors ${previewing ? 'bg-[var(--ct-accent)]' : 'bg-[var(--ct-surface-3)]'}`}
+            >
+              <span
+                className={`absolute top-[2px] h-3 w-3 rounded-full transition-[left] ${previewing ? 'left-[14px] bg-[var(--ct-on-accent)]' : 'left-[2px] bg-[var(--ct-text-3)]'}`}
+              />
+            </span>
           </button>
         )}
         <ThemeToggle />
@@ -499,23 +516,24 @@ export function DashboardShell({
             )}
           </div>
           <span className="ml-auto flex items-center gap-2">
-            {previewing ? (
-              <button
-                type="button"
-                onClick={() => setPreview(false)}
-                className="rounded-full bg-[var(--ct-warn-soft)] px-2.5 py-1 text-[12px] font-medium text-[var(--ct-warn)]"
-              >
-                Visualizando como cliente · sair
-              </button>
-            ) : (
-              activeClient &&
-              !canPreview && (
-                <span className="rounded-full bg-[var(--ct-accent-soft)] px-2.5 py-1 text-[12px] font-medium text-[var(--ct-accent)]">Somente leitura</span>
-              )
+            {activeClient && !canPreview && (
+              <span className="rounded-full bg-[var(--ct-accent-soft)] px-2.5 py-1 text-[12px] font-medium text-[var(--ct-accent)]">Somente leitura</span>
             )}
             <CommandPalette items={commandItems} />
           </span>
         </div>
+        {previewing && (
+          <div
+            role="status"
+            className="mx-8 mt-4 flex flex-none items-center gap-2.5 rounded-[14px] border border-[color-mix(in_srgb,var(--ct-accent)_30%,transparent)] bg-[var(--ct-accent-soft)] px-4 py-2.5 text-[13px] font-medium text-[var(--ct-accent)]"
+          >
+            <Icon>{ICONS.eye}</Icon>
+            Você está vendo a Central como o cliente vê: sem configuração, sem ações de edição.
+            <button type="button" onClick={() => setPreview(false)} className="ml-auto rounded-full px-2.5 py-0.5 text-[12px] underline-offset-2 hover:underline">
+              Sair da visão do cliente
+            </button>
+          </div>
+        )}
         <main className="min-w-0 flex-1 overflow-auto">{children}</main>
       </div>
     </div>

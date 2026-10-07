@@ -102,7 +102,7 @@ const METRIC_INFO = {
 function InfoTooltip({ text }: { text: string }) {
   return (
     <span className="group relative ml-1 inline-flex cursor-help align-middle">
-      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-white/20 text-[9px] font-bold normal-case text-[var(--ct-text-2)]">
+      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[var(--ct-line-2)] text-[9px] font-bold normal-case text-[var(--ct-text-2)]">
         !
       </span>
       <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 w-48 -translate-x-1/2 rounded-md border border-[var(--ct-line)] bg-[var(--ct-surface-2)] p-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-[var(--ct-text)] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
@@ -526,7 +526,7 @@ export default async function TestReportPage({
             className={`ml-auto rounded-full border px-3 py-1.5 text-xs font-medium ${
               comparar === '1'
                 ? 'border-[var(--ct-accent)] bg-[var(--ct-accent)]/15 text-[var(--ct-accent)]'
-                : 'border-dashed border-white/20 text-[var(--ct-text-2)] hover:text-[var(--ct-text)]'
+                : 'border-dashed border-[var(--ct-line-2)] text-[var(--ct-text-2)] hover:text-[var(--ct-text)]'
             }`}
           >
             vs {previousLabel}

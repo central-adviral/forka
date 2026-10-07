@@ -37,7 +37,7 @@ export function SyncFunnelButton({
         type="button"
         onClick={handleClick}
         disabled={isPending}
-        className="rounded-[9px] border border-[var(--ct-line)] px-4 py-2.5 text-[13.5px] font-medium text-[var(--ct-text-2)] disabled:opacity-60"
+        className="rounded-full border border-[var(--ct-line-2)] px-4 py-2 text-[13px] font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)] disabled:opacity-60"
       >
         {isPending ? 'Atualizando...' : 'Atualizar agora'}
       </button>
