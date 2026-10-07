@@ -7,7 +7,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { COLUMNS, METHODS, RULE_LIMITS, STAGES, blockedMove, defaultGates, nextCode, type BacklogStatus, type Method, type TestRules } from '@/lib/domain/backlog'
 
 // Writes go through the user's session: the 0068 policies only let a gestor or owner change the
-// backlog, so a refused write comes back as an error message on the board.
+// backlog. A write RLS refuses touches no row without raising, so every write selects what it
+// changed and an empty result is reported as refused.
 
 interface BacklogContext {
   client_id: string
@@ -93,30 +94,34 @@ export async function moveItem(context: BacklogContext & { item_id: string; code
   const to = formData.get('to') as BacklogStatus
   if (!COLUMNS.some((column) => column.status === to)) back(context, 'erro', 'Coluna inválida.')
   const supabase = await createServerSupabaseClient()
-  const { data: item } = await supabase
+  const { data: item, error: readError } = await supabase
     .from('backlog_items')
     .select('learning, started_at, backlog_gates(done_at)')
     .eq('id', context.item_id)
-    .single()
+    .maybeSingle()
+  if (readError || !item) back(context, 'erro', 'Não foi possível ler o teste para movê-lo.', `&item=${context.code}`)
   const gatesOpen = ((item?.backlog_gates ?? []) as { done_at: string | null }[]).filter((gate) => !gate.done_at).length
   const blocked = blockedMove(to, { gatesOpen, hasLearning: Boolean(item?.learning) })
   if (blocked) back(context, 'erro', blocked, `&item=${context.code}`)
-  const { error } = await supabase
+  // Leaving Rodando clears the start, so a test that goes live again is measured from the new start.
+  const { data: moved, error } = await supabase
     .from('backlog_items')
-    .update({ status: to, started_at: to === 'running' ? (item?.started_at ?? new Date().toISOString()) : item?.started_at ?? null })
+    .update({ status: to, started_at: to === 'running' ? (item.started_at ?? new Date().toISOString()) : null })
     .eq('id', context.item_id)
-  if (error) back(context, 'erro', error.message, `&item=${context.code}`)
+    .select('id')
+  if (error || !moved?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode mover hipóteses.', `&item=${context.code}`)
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
   back(context, 'ok', `${context.code} foi para ${COLUMNS.find((column) => column.status === to)!.label}.`, `&item=${context.code}`)
 }
 
 export async function toggleGate(context: BacklogContext & { gate_id: string; done: boolean; code: string }) {
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('backlog_gates')
     .update({ done_at: context.done ? new Date().toISOString() : null })
     .eq('id', context.gate_id)
-  if (error) back(context, 'erro', error.message, `&item=${context.code}`)
+    .select('id')
+  if (error || !data?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode marcar pré-requisitos.', `&item=${context.code}`)
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
   redirect(boardPath(context, `&item=${context.code}`))
 }
@@ -135,19 +140,28 @@ export async function decideItem(context: BacklogContext & { item_id: string; co
   })
   if (!parsed.success) back(context, 'erro', parsed.error.issues.map((issue) => issue.message).join('; '), `&item=${context.code}`)
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase
+  const winnerKey = parsed.data.winner_key || null
+  if (winnerKey) {
+    const { data: variant } = await supabase.from('backlog_variants').select('id').eq('item_id', context.item_id).eq('key', winnerKey).maybeSingle()
+    if (!variant) back(context, 'erro', `A variante ${winnerKey} não existe neste teste.`, `&item=${context.code}`)
+  }
+  const { data: decided, error } = await supabase
     .from('backlog_items')
     .update({
       status: 'decided',
       decided_at: new Date().toISOString(),
-      winner_key: parsed.data.winner_key || null,
+      winner_key: winnerKey,
       result: parsed.data.result || null,
       learning: parsed.data.learning,
     })
     .eq('id', context.item_id)
-  if (error) back(context, 'erro', error.message, `&item=${context.code}`)
-  if (parsed.data.winner_key) {
-    await supabase.from('backlog_variants').update({ status: 'winner' }).eq('item_id', context.item_id).eq('key', parsed.data.winner_key)
+    .select('id')
+  if (error || !decided?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode decidir testes.', `&item=${context.code}`)
+  const { error: resetError } = await supabase.from('backlog_variants').update({ status: 'active' }).eq('item_id', context.item_id).eq('status', 'winner')
+  if (resetError) back(context, 'erro', resetError.message, `&item=${context.code}`)
+  if (winnerKey) {
+    const { error: winnerError } = await supabase.from('backlog_variants').update({ status: 'winner' }).eq('item_id', context.item_id).eq('key', winnerKey)
+    if (winnerError) back(context, 'erro', winnerError.message, `&item=${context.code}`)
   }
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
   back(context, 'ok', `${context.code} decidido. O aprendizado fica no card.`, `&item=${context.code}`)
@@ -155,8 +169,8 @@ export async function decideItem(context: BacklogContext & { item_id: string; co
 
 export async function togglePublished(context: BacklogContext & { item_id: string; code: string; published: boolean }) {
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('backlog_items').update({ published: context.published }).eq('id', context.item_id)
-  if (error) back(context, 'erro', error.message, `&item=${context.code}`)
+  const { data, error } = await supabase.from('backlog_items').update({ published: context.published }).eq('id', context.item_id).select('id')
+  if (error || !data?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode publicar para o cliente.', `&item=${context.code}`)
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
   back(context, 'ok', context.published ? `${context.code} aparece para o cliente quando estiver rodando ou decidido.` : `${context.code} saiu da visão do cliente.`, `&item=${context.code}`)
 }

@@ -19,13 +19,13 @@ describe('backlog readout', () => {
 
   it('cuts a variant that spent mult × teto with no sale and crowns one under the teto with enough purchases', () => {
     const rows = [
-      { ad_name: 'Video [T4-A]', spend: 300, sales_count: 6 },
-      { ad_name: 'Video copia [T4-A]', spend: 100, sales_count: 4 },
-      { ad_name: 'Estático [T4-B]', spend: 75, sales_count: 0 },
+      { ad_name: 'Video [T4-A]', spend: 330, sales_count: 6 },
+      { ad_name: 'Video copia [T4-A]', spend: 110, sales_count: 4 },
+      { ad_name: 'Estático [T4-B]', spend: 82.5, sales_count: 0 },
       { ad_name: 'Carrossel [T4-C]', spend: 20, sales_count: 0 },
       { ad_name: 'Outro teste [T5-B]', spend: 999, sales_count: 0 },
     ]
-    const read = readMetaTest('T4', ['A', 'B', 'C', 'D'], rows, DEFAULT_RULES, 1.1)
+    const read = readMetaTest('T4', ['A', 'B', 'C', 'D'], rows, DEFAULT_RULES)
     expect(read.map((v) => v.verdict)).toEqual(['win', 'cut', 'measuring', 'no_data'])
     expect(read[0]).toMatchObject({ ads: 2, sales: 10 })
     expect(read[0].spend).toBeCloseTo(440)

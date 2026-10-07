@@ -26,11 +26,11 @@ export function tagKey(adName: string, code: string): string | null {
   return match ? match[1].toUpperCase() : null
 }
 
-/** Spend (with tax) and ad purchases per variant of a Meta creative test, with the rules' verdict. */
-export function readMetaTest(code: string, keys: string[], creatives: CreativeRow[], rules: TestRules, taxFactor: number): MetaVariantRead[] {
+/** Spend and entry purchases per variant of a Meta creative test (the creative report already carries the tax), with the rules' verdict. */
+export function readMetaTest(code: string, keys: string[], creatives: CreativeRow[], rules: TestRules): MetaVariantRead[] {
   return keys.map((key) => {
     const tagged = creatives.filter((row) => tagKey(row.ad_name ?? '', code) === key)
-    const spend = tagged.reduce((sum, row) => sum + Number(row.spend ?? 0), 0) * taxFactor
+    const spend = tagged.reduce((sum, row) => sum + Number(row.spend ?? 0), 0)
     const sales = tagged.reduce((sum, row) => sum + Number(row.sales_count ?? 0), 0)
     const cpa = sales > 0 ? spend / sales : null
     let verdict: Verdict = 'measuring'

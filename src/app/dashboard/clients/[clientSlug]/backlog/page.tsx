@@ -38,7 +38,8 @@ interface Readout {
 }
 
 // Meta tests read every tagged ad of the project's creative report since the earliest running
-// start; tags are unique per project, so an older window cannot leak another test's ads.
+// start; tags are unique per project, so an older window cannot leak another test's ads. A linked
+// A/B test is read from the card's own start, not the test's whole life.
 async function loadReadouts(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   clientId: string,
@@ -53,22 +54,20 @@ async function loadReadouts(
     .map((item) => (item.startedAt ? new Date(item.startedAt).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) : null))
     .filter((day): day is string => Boolean(day))
     .sort()[0] ?? null
-  const [creativeResult, { data: taxRows }, linkReports, { data: controls }] = await Promise.all([
+  const [creativeResult, linkReports, { data: controls }] = await Promise.all([
     meta.length > 0
       ? supabase.rpc('get_funnel_report_by_creative', { p_sales_funnel_id: salesFunnelId, p_since: since, p_until: null })
       : Promise.resolve({ data: [], error: null }),
-    supabase.from('client_tax_rates').select('factor').eq('client_id', clientId).lte('valid_from', new Date().toISOString().slice(0, 10)).order('valid_from', { ascending: false }).limit(1),
-    Promise.all(link.map((item) => supabase.rpc('get_test_report', { p_test_id: item.abTestId, p_since: null, p_until: null }))),
+    Promise.all(link.map((item) => supabase.rpc('get_test_report', { p_test_id: item.abTestId, p_since: item.startedAt, p_until: null }))),
     link.length > 0
       ? supabase.from('variants').select('id, test_id').eq('is_control', true).in('test_id', link.map((item) => item.abTestId!))
       : Promise.resolve({ data: [] }),
   ])
   if (creativeResult.error) console.error('[backlog-creative-readout-failed]', { salesFunnelId }, creativeResult.error)
   const creatives = (creativeResult.data ?? []) as CreativeRow[]
-  const taxFactor = Number(taxRows?.[0]?.factor ?? 1)
   const readouts = new Map<string, Readout>()
   for (const item of meta) {
-    const read = readMetaTest(item.code, item.variants.map((variant) => variant.key), creatives, rules, taxFactor)
+    const read = readMetaTest(item.code, item.variants.map((variant) => variant.key), creatives, rules)
     const days = item.startedAt ? daysRunningSince(item.startedAt) : 1
     readouts.set(item.id, { meta: read, summary: readoutSummary(read.map((v) => ({ label: v.key, verdict: v.verdict })), days, rules, 'meta') })
   }
@@ -392,7 +391,7 @@ export default async function BacklogPage({
                     ))}
                   </div>
                   <p className="mt-2.5 text-[11.5px] text-[var(--ct-text-3)]">
-                    Gasto com imposto. Corta com {brl(rules.teto * rules.mult)} sem venda; vence com CPA até {brl(rules.teto)} e {rules.min}+ compras. É sugestão: a decisão é sua.
+                    Gasto com imposto, compras de entrada. Corta com {brl(rules.teto * rules.mult)} sem venda; vence com CPA até {brl(rules.teto)} e {rules.min}+ compras. É sugestão: a decisão é sua.
                   </p>
                 </div>
               )}

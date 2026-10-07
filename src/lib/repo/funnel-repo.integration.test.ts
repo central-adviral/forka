@@ -53,7 +53,7 @@ describe('funnel-repo', () => {
     const rows = await getDailyFunnel(db, salesFunnelId, '2026-09-01', '2026-09-02')
     const day = rows.find((r) => r.data === '2026-09-01')
     expect(day?.spend).toBe(12)
-    expect(day?.roas).toBeCloseTo(70 / 12)
+    expect(day?.roas).toBeCloseTo(63 / 12)
   })
 
   it('reports sync health for a funnel', async () => {

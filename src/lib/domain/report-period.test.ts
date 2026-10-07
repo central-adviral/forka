@@ -29,14 +29,12 @@ describe('resolvePeriodSince', () => {
     expect(resolvePeriodSince('yesterday', NOW)?.toISOString()).toBe('2026-08-29T03:00:00.000Z')
   })
 
-  it('returns 7 days before now for "7d"', () => {
-    const since = resolvePeriodSince('7d', NOW)
-    expect(since?.getTime()).toBe(NOW.getTime() - 7 * 24 * 60 * 60 * 1000)
+  it('starts "7d" at the Brazilian midnight six days back, so the window is seven dates counting today', () => {
+    expect(resolvePeriodSince('7d', NOW)?.toISOString()).toBe('2026-08-24T03:00:00.000Z')
   })
 
-  it('returns 30 days before now for "30d"', () => {
-    const since = resolvePeriodSince('30d', NOW)
-    expect(since?.getTime()).toBe(NOW.getTime() - 30 * 24 * 60 * 60 * 1000)
+  it('starts "30d" at the Brazilian midnight 29 days back', () => {
+    expect(resolvePeriodSince('30d', NOW)?.toISOString()).toBe('2026-08-01T03:00:00.000Z')
   })
 
   it('returns the first Brazilian day of the current month for "month"', () => {
@@ -98,7 +96,7 @@ describe('resolveDateRange', () => {
 describe('resolvePeriodDateRange', () => {
   it('resolves "7d" to a plain date-only since/until pair, until being tomorrow', () => {
     const { since, until } = resolvePeriodDateRange('7d', undefined, undefined, NOW)
-    expect(since).toBe('2026-08-23')
+    expect(since).toBe('2026-08-24')
     expect(until).toBe('2026-08-31')
   })
 
@@ -149,11 +147,11 @@ describe('resolvePreviousWindow', () => {
   // A Tuesday, 15:00 in Brazil.
   const now = new Date('2026-09-08T18:00:00.000Z')
 
-  it('shifts a 7-day window back by exactly 7 days', () => {
+  it('shifts a 7-day window back by its own duration', () => {
     const since = resolvePeriodSince('7d', now)!
     const previous = resolvePreviousWindow(since, resolvePeriodUntil('7d', now), now)!
     expect(previous.until.toISOString()).toBe(since.toISOString())
-    expect(previous.since.toISOString()).toBe(new Date(since.getTime() - 7 * 86400000).toISOString())
+    expect(previous.since.toISOString()).toBe(new Date(since.getTime() - (now.getTime() - since.getTime())).toISOString())
   })
 
   it('compares today against yesterday, on Brazilian calendar days', () => {
