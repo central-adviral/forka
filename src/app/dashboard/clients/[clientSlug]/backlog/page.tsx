@@ -45,7 +45,8 @@ async function loadReadouts(
   clientId: string,
   salesFunnelId: string,
   items: BacklogItem[],
-  rules: ReturnType<typeof readRules>
+  rules: ReturnType<typeof readRules>,
+  resultado: string
 ): Promise<Map<string, Readout>> {
   const running = items.filter((item) => item.status === 'running')
   const meta = running.filter((item) => item.method === 'meta')
@@ -64,7 +65,10 @@ async function loadReadouts(
       : Promise.resolve({ data: [] }),
   ])
   if (creativeResult.error) console.error('[backlog-creative-readout-failed]', { salesFunnelId }, creativeResult.error)
-  const creatives = (creativeResult.data ?? []) as CreativeRow[]
+  // A lead project (0071) measures its creatives by paid leads: they take the purchases' place.
+  const creatives = ((creativeResult.data ?? []) as (CreativeRow & { leads: number })[]).map((row) =>
+    resultado === 'lead' ? { ...row, sales_count: Number(row.leads ?? 0) } : row
+  )
   const readouts = new Map<string, Readout>()
   for (const item of meta) {
     const read = readMetaTest(item.code, item.variants.map((variant) => variant.key), creatives, rules)
@@ -105,7 +109,7 @@ export default async function BacklogPage({
   if (!client) notFound()
   const { data: funnels } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, is_active, test_rules')
+    .select('id, name, slug, is_active, test_rules, resultado')
     .eq('client_id', client.id)
     .order('name')
   const funnel = (funnels ?? []).find((row) => row.slug === projeto) ?? (funnels ?? []).find((row) => row.is_active) ?? (funnels ?? [])[0]
@@ -121,7 +125,7 @@ export default async function BacklogPage({
   const [items, canEdit] = await Promise.all([getBacklog(supabase, funnel.id), canActAs(supabase, client.id, 'gestor')])
   const rules = readRules(funnel.test_rules)
   const [readouts, { data: abTests }] = await Promise.all([
-    loadReadouts(supabase, client.id, funnel.id, items, rules),
+    loadReadouts(supabase, client.id, funnel.id, items, rules, funnel.resultado),
     supabase.from('tests').select('id, name').eq('client_id', client.id).order('name'),
   ])
   const tab = aba === 'regras' && canEdit ? 'regras' : 'backlog'

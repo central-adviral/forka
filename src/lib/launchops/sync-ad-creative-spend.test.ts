@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { joinAdCreativeSpend, type LaunchOpsAdCreative, type LaunchOpsAdCreativeSpendRow } from './sync-ad-creative-spend'
+import { joinAdCreativeSpend, mergeAdLeads, type LaunchOpsAdCreative, type LaunchOpsAdCreativeSpendRow } from './sync-ad-creative-spend'
 
 describe('joinAdCreativeSpend', () => {
   it('attaches ad_id/ad_name/campaign_id/campaign_name/adset_id/adset_name to each spend row via anuncio_id, and drops rows with no matching creative', () => {
@@ -47,5 +47,19 @@ describe('joinAdCreativeSpend', () => {
     expect(result[0].campaign_name).toBeNull()
     expect(result[0].adset_id).toBeNull()
     expect(result[0].adset_name).toBeNull()
+  })
+})
+
+describe('mergeAdLeads', () => {
+  const creative: LaunchOpsAdCreative = { id: 'a1', ad_id: '120001', ad_name: 'Video [T4-A]', campaign_id: 'c1', campaign_name: 'GER', adset_id: 's1', adset_name: 'Aberto' }
+  const row = { ad_id: '120001', ad_name: 'Video [T4-A]', campaign_id: 'c1', campaign_name: 'GER', adset_id: 's1', adset_name: 'Aberto', data: '2026-10-01', spend: 50, impressions: 1000, link_clicks: 20 }
+
+  it('puts the leads on the same ad and day, keeps zero elsewhere, and adds a zero-spend row for a day without spend', () => {
+    const merged = mergeAdLeads([row, { ...row, data: '2026-10-02' }], [creative], new Map([['2026-10-01|120001', 7], ['2026-10-03|120001', 2], ['2026-10-01|999', 4]]))
+    expect(merged.map((r) => [r.data, r.spend, r.leads])).toEqual([
+      ['2026-10-01', 50, 7],
+      ['2026-10-02', 50, 0],
+      ['2026-10-03', 0, 2],
+    ])
   })
 })

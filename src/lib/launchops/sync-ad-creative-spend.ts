@@ -31,6 +31,8 @@ export interface JoinedAdCreativeSpendRow {
   spend: number
   impressions: number
   link_clicks: number
+  /** Unique paid leads the ad brought that day (0072); absent on the operation path. */
+  leads?: number
 }
 
 export async function fetchLaunchOpsAdCreatives(
@@ -139,6 +141,71 @@ export function joinAdCreativeSpend(
   return joined
 }
 
+/**
+ * Unique paid leads per ad and São Paulo day, keyed "day|ad_id". A paid lead carries the ad id in
+ * captacao_content (the same leads the campaign sync counts per campaign); duplicates are left out.
+ */
+export async function fetchLaunchOpsAdLeads(launchopsDb: SupabaseClient, adIds: string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>()
+  for (let i = 0; i < adIds.length; i += AD_ID_LOOKUP_CHUNK) {
+    const chunk = adIds.slice(i, i + AD_ID_LOOKUP_CHUNK)
+    const rows = await fetchAllPages<{ data_captacao: string; captacao_content: string }>((from, to) =>
+      launchopsDb
+        .from('leads')
+        .select('data_captacao, captacao_content')
+        .eq('captacao_medium', 'paid')
+        .not('is_duplicata', 'is', true)
+        .in('captacao_content', chunk)
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
+    for (const row of rows) {
+      const day = new Date(new Date(row.data_captacao).getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      const key = `${day}|${row.captacao_content}`
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+  }
+  return counts
+}
+/**
+ * Puts each ad's leads on its spend row of the same day. A day with leads and no spend row (the
+ * lead came in after the ad stopped spending) gets a zero-spend row, so no lead is dropped.
+ */
+export function mergeAdLeads(
+  joined: JoinedAdCreativeSpendRow[],
+  creatives: LaunchOpsAdCreative[],
+  leadsByDayAd: Map<string, number>
+): JoinedAdCreativeSpendRow[] {
+  const remaining = new Map(leadsByDayAd)
+  const merged = joined.map((row) => {
+    const key = `${row.data}|${row.ad_id}`
+    const leads = row.ad_id ? remaining.get(key) : undefined
+    if (leads === undefined) return { ...row, leads: 0 }
+    remaining.delete(key)
+    return { ...row, leads }
+  })
+  const creativeByAdId = new Map(creatives.filter((creative) => creative.ad_id).map((creative) => [creative.ad_id as string, creative]))
+  for (const [key, leads] of remaining) {
+    const [day, adId] = key.split('|')
+    const creative = creativeByAdId.get(adId)
+    if (!creative) continue
+    merged.push({
+      ad_id: creative.ad_id,
+      ad_name: creative.ad_name,
+      campaign_id: creative.campaign_id,
+      campaign_name: creative.campaign_name,
+      adset_id: creative.adset_id,
+      adset_name: creative.adset_name,
+      data: day,
+      spend: 0,
+      impressions: 0,
+      link_clicks: 0,
+      leads,
+    })
+  }
+  return merged
+}
+
 export async function syncAdCreativeSpendForFunnel(
   appDb: SupabaseClient,
   salesFunnelId: string,
@@ -159,6 +226,7 @@ export async function syncAdCreativeSpendForFunnel(
     spend: row.spend,
     impressions: row.impressions,
     link_clicks: row.link_clicks,
+    leads: row.leads ?? 0,
     updated_at: new Date().toISOString(),
   }))
 
