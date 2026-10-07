@@ -44,6 +44,7 @@ vi.mock('@/lib/launchops/sync-campaigns', () => ({
 }))
 
 import { GET } from './route'
+import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
 import { createLaunchOpsClient } from '@/lib/launchops/client'
 import { syncCampaignsForClient } from '@/lib/launchops/sync-campaigns'
 import {
@@ -100,7 +101,7 @@ describe('GET /api/internal/sync-funnel', () => {
     })
     const response = await GET(request)
     const body = await response.json()
-    expect(body).toEqual({ ok: true, funnelsProcessed: 0, clientsWithCampaigns: 0 })
+    expect(body).toEqual({ ok: true, funnelsProcessed: 0, funnelsFailed: 0, clientsWithCampaigns: 0 })
   })
 
   it('syncs the client campaigns before the funnel, since the creative spend picks its ads from them', async () => {
@@ -183,6 +184,22 @@ describe('GET /api/internal/sync-funnel', () => {
     expect(syncAdSpendForFunnel).toHaveBeenCalledWith(expect.anything(), 'funnel-1', [{ ...fullDayAggregated[0], initiateCheckout: 0 }])
   })
 
+  it('keeps syncing the next clients when one client fails before its sync starts', async () => {
+    listMock.mockReturnValue([
+      { id: 'funnel-a', client_id: 'client-a', launchops_operacao_ids: null, launchops_produto_nomes: null, clients: { funnel_source_url: 'https://client-a.example.com' } },
+      { id: 'funnel-b', client_id: 'client-b', launchops_operacao_ids: null, launchops_produto_nomes: null, clients: { funnel_source_url: 'https://client-b.example.com' } },
+    ])
+    secretsByClientId['client-b'] = 'key-b'
+    vi.mocked(getClientSecrets).mockRejectedValueOnce(new Error('vault unavailable'))
+    const request = new NextRequest('https://app.example.com/api/internal/sync-funnel', {
+      headers: { authorization: 'Bearer test-secret' },
+    })
+    const body = await (await GET(request)).json()
+
+    expect(body).toEqual({ ok: true, funnelsProcessed: 1, funnelsFailed: 1, clientsWithCampaigns: 1 })
+    expect(syncCampaignsForClient).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'client-b')
+  })
+
   it('builds a separate LaunchOps client per funnel using that funnel own client credential, never mixing them up', async () => {
     listMock.mockReturnValue([
       {
@@ -208,7 +225,7 @@ describe('GET /api/internal/sync-funnel', () => {
     const response = await GET(request)
     const body = await response.json()
 
-    expect(body).toEqual({ ok: true, funnelsProcessed: 2, clientsWithCampaigns: 2 })
+    expect(body).toEqual({ ok: true, funnelsProcessed: 2, funnelsFailed: 0, clientsWithCampaigns: 2 })
     // Campaigns are read once per client, with that client's own LaunchOps connection.
     expect(syncCampaignsForClient).toHaveBeenCalledTimes(2)
     expect(syncCampaignsForClient).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'client-a')

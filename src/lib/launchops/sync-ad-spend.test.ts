@@ -52,8 +52,18 @@ describe('fetchAllPages', () => {
     expect(fetchPage).toHaveBeenCalledTimes(3)
   })
 
-  it('throws if any page reports an error', async () => {
-    const fetchPage = vi.fn().mockResolvedValueOnce({ data: null, error: new Error('boom') })
-    await expect(fetchAllPages(fetchPage, 10)).rejects.toThrow('boom')
+  it('throws if a page still reports an error after one retry', async () => {
+    const fetchPage = vi.fn().mockResolvedValue({ data: null, error: new Error('boom') })
+    await expect(fetchAllPages(fetchPage, 10, 0)).rejects.toThrow('boom')
+    expect(fetchPage).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries a failed page once and keeps going when the retry works', async () => {
+    const fetchPage = vi
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: new Error('timeout') })
+      .mockResolvedValueOnce({ data: [1, 2], error: null })
+    await expect(fetchAllPages(fetchPage, 10, 0)).resolves.toEqual([1, 2])
+    expect(fetchPage).toHaveBeenNthCalledWith(2, 0, 9)
   })
 })
