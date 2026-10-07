@@ -9,8 +9,8 @@ export async function viewingAsClient(): Promise<boolean> {
   return (await cookies()).get(VIEW_AS_COOKIE)?.value === 'cliente'
 }
 
-/** has_client_role for what a page shows: false for any editing role while previewing as the client. */
-export async function canActAs(db: SupabaseClient, clientId: string, minRole: 'owner' | 'gestor'): Promise<boolean> {
+/** has_client_role for what a page shows: false for any role above cliente while previewing as the client. */
+export async function canActAs(db: SupabaseClient, clientId: string, minRole: 'owner' | 'gestor' | 'analista'): Promise<boolean> {
   if (await viewingAsClient()) return false
   const { data } = await db.rpc('has_client_role', { p_client_id: clientId, p_min_role: minRole })
   return data === true
