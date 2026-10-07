@@ -99,13 +99,21 @@ export function FunnelKpiCards({
     <div
       // The headline numbers get their own lifted surface with a violet edge, so the band reads
       // as the summary of the page rather than as one more panel among the charts.
-      className="mb-6 grid grid-cols-2 divide-y divide-[var(--ct-line)] rounded-2xl border border-[var(--ct-accent)]/25 bg-[var(--ct-surface-3)] sm:grid-cols-4 sm:divide-y-0 lg:grid-cols-8 lg:divide-x"
-      style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,.04), 0 10px 30px -18px rgba(124,111,240,.55)' }}
+      // One gap-px grid on a line-colored ground draws the dividers in any row count: 4 columns until
+      // the screen is wide enough for 8 without a value spilling into its neighbor.
+      className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-[22px] border border-[color-mix(in_srgb,var(--ct-accent)_25%,var(--ct-line))] bg-[var(--ct-line)] sm:grid-cols-4 2xl:grid-cols-8"
+      style={{ boxShadow: 'var(--ct-shadow)' }}
     >
       {cards.map((card) => (
-        <div key={card.label} className="p-4">
-          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--ct-text-2)]">{card.label}</div>
-          <div className="font-[family-name:var(--font-geist-mono)] text-lg font-semibold" style={{ color: card.color ?? 'var(--ct-text)' }}>
+        <div key={card.label} className="flex min-w-0 flex-col bg-[var(--ct-surface-3)] px-4 py-4">
+          <div className="mb-1.5 truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--ct-text-2)]" title={card.label}>
+            {card.label}
+          </div>
+          <div
+            className="truncate font-[family-name:var(--font-geist-mono)] text-[19px] font-semibold tabular-nums tracking-[-0.02em]"
+            style={{ color: card.color ?? 'var(--ct-text)' }}
+            title={card.value}
+          >
             {card.value}
           </div>
           {card.hint && <div className="mt-0.5 text-[11px] text-[var(--ct-text-2)]">{card.hint}</div>}

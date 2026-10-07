@@ -164,7 +164,7 @@ export default async function SalesFunnelPage({
     linkClicks: totals.linkClicks,
     landingPageViews: totals.landingPageViews,
     initiateCheckout: totals.initiateCheckout,
-    vendas: totals.vendas,
+    vendas: totals.vendasAnuncio,
   }
   const kpiSparklines = {
     receitaLiquida: rows.map((row) => row.receitaLiquida),
