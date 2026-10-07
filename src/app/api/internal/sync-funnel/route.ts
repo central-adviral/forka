@@ -5,6 +5,9 @@ import { syncOneFunnel, syncClientCampaigns } from '@/lib/launchops/sync-funnel'
 import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
 import { probeClientPages } from '@/lib/pages/probe'
 
+// Under LEASE_SECONDS (sync-campaigns.ts), so a run the platform kills never outlives its lease.
+export const maxDuration = 240
+
 interface FunnelRow {
   id: string
   client_id: string
@@ -28,6 +31,7 @@ export async function GET(request: NextRequest) {
     .from('sales_funnels')
     .select('id, client_id, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url)')
     .eq('is_active', true)
+    .order('created_at')
   if (funnelsError) {
     console.error('[sync-funnel-funnels-failed]', funnelsError)
     return NextResponse.json({ ok: false, error: 'failed to list funnels' }, { status: 500 })

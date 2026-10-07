@@ -52,13 +52,15 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser()
   const { since } = resolvePeriodDateRange('7d', undefined, undefined)
-  const [{ data: clients }, { data: summary }, { data: memberships }, { data: funnels }, { data: usage }] = await Promise.all([
+  const [{ data: clients }, { data: summary, error: summaryError }, { data: memberships }, { data: funnels }, { data: usage }] = await Promise.all([
     supabase.from('clients').select('id, name, slug').order('name'),
-    supabase.rpc('get_portfolio_summary', { p_since: since }) as unknown as Promise<{ data: PortfolioRow[] | null }>,
+    supabase.rpc('get_portfolio_summary', { p_since: since }) as unknown as Promise<{ data: PortfolioRow[] | null; error: unknown }>,
     supabase.from('memberships').select('client_id, role').eq('user_id', user?.id ?? ''),
     supabase.from('sales_funnels').select('client_id'),
     supabase.rpc('get_usage_stats').single() as unknown as Promise<{ data: UsageStats | null }>,
   ])
+  // Without the summary every client would read R$ 0 and 0 sales; better an error than a calm lie.
+  if (summaryError) throw summaryError
   const summaryByClient = new Map((summary ?? []).map((row) => [row.client_id, row]))
   const roleByClient = new Map<string, ClientRole>((memberships ?? []).map((row) => [row.client_id, row.role]))
   const projectsByClient = new Map<string, number>()

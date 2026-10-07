@@ -174,7 +174,18 @@ async function syncAdCreativeSpendEntity(appDb: SupabaseClient, launchopsDb: Sup
       since: campaignIds ? null : cursor,
     })
     const joined = joinAdCreativeSpend(creatives, spendRows)
+    const rewriteStartedAt = new Date().toISOString()
     await syncAdCreativeSpendForFunnel(appDb, funnel.id, joined)
+    // A full re-read rewrote every row the project still owns; whatever it did not touch is a renamed
+    // ad's old name or a campaign that left the fronts. An empty read keeps everything.
+    if (campaignIds && joined.length > 0) {
+      const { error: pruneError } = await appDb
+        .from('ad_creative_spend_daily')
+        .delete()
+        .eq('sales_funnel_id', funnel.id)
+        .lt('updated_at', rewriteStartedAt)
+      if (pruneError) throw pruneError
+    }
     const latestUpdatedAt = spendRows.length > 0 ? spendRows[spendRows.length - 1].updated_at : undefined
     await recordSyncResult(appDb, { salesFunnelId: funnel.id, entity: 'ad_creative_spend_daily', result: 'ok', newCursor: latestUpdatedAt })
   } catch (err) {

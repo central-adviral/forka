@@ -69,13 +69,14 @@ export async function getDailyFunnel(
     const vendas = Number(row.vendas)
     const spendComImposto = Number(row.spend_com_imposto)
     const receitaBruta = Number(row.receita_bruta)
+    const receitaLiquida = Number(row.receita_liquida)
     return {
       data: row.data,
       vendas,
       vendasAnuncio: Number(row.vendas_anuncio),
       vendasUpsell: Number(row.vendas_upsell),
       receitaBruta,
-      receitaLiquida: Number(row.receita_liquida),
+      receitaLiquida,
       spend: Number(row.spend),
       spendComImposto,
       impressions: Number(row.impressions),
@@ -84,7 +85,8 @@ export async function getDailyFunnel(
       linkClicks: Number(row.link_clicks),
       landingPageViews: Number(row.landing_page_views),
       initiateCheckout: Number(row.initiate_checkout),
-      roas: spendComImposto > 0 ? receitaBruta / spendComImposto : null,
+      // Net, like the KPI card and every other ROAS in the Central.
+      roas: spendComImposto > 0 ? receitaLiquida / spendComImposto : null,
       cac: vendas > 0 ? spendComImposto / vendas : null,
       spendSource: row.spend_source,
       dadosAte: row.dados_ate,

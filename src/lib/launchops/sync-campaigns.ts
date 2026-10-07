@@ -265,6 +265,17 @@ export async function syncCampaignsForClient(
       if (windowError) throw windowError
       if ((windowCount ?? 0) > 0) throw new Error(`LaunchOps returned no ad rows since ${since}; kept the existing campaign days`)
     }
+    // Same guard for leads: spend arriving with no lead at all would zero every CPL of the window.
+    if (leadRows.length === 0) {
+      const { count: leadDays, error: leadError } = await appDb
+        .from('campaign_daily')
+        .select('campaign_id', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .gte('data', since)
+        .gt('leads', 0)
+      if (leadError) throw leadError
+      if ((leadDays ?? 0) > 0) throw new Error(`LaunchOps returned no leads since ${since}; kept the existing campaign days`)
+    }
     const days = aggregateAdDays(adRows, leadRows)
     const byDay = new Map<string, CampaignDay[]>()
     for (const day of days) byDay.set(day.data, [...(byDay.get(day.data) ?? []), day])

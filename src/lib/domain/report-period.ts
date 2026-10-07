@@ -39,10 +39,11 @@ export function resolvePeriodSince(period: string | undefined, now: Date = new D
       return startOfDay(now)
     case 'yesterday':
       return new Date(startOfDay(now).getTime() - DAY_MS)
+    // N calendar days counting today, like the Hoje page: "7 dias" never spans eight dates.
     case '7d':
-      return new Date(now.getTime() - 7 * DAY_MS)
+      return new Date(startOfDay(now).getTime() - 6 * DAY_MS)
     case '30d':
-      return new Date(now.getTime() - 30 * DAY_MS)
+      return new Date(startOfDay(now).getTime() - 29 * DAY_MS)
     case 'month':
       return new Date(brtDayBoundaryUtc(`${toDateOnly(now).slice(0, 7)}-01`))
     default:

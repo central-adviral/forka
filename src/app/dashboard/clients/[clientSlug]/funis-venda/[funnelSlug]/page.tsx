@@ -94,6 +94,8 @@ export default async function SalesFunnelPage({
     sales_count: number
     revenue: number
   }[]
+  // Sales no ad could be tied to are listed in the table but never ranked as a creative.
+  const rankable = creatives.filter((c) => c.ad_name !== '(sem anúncio)')
   if (productResult.error) console.error('[funnel-product-report-failed]', { salesFunnelId: funnel.id }, productResult.error)
   if (hourResult.error) console.error('[funnel-hour-report-failed]', { salesFunnelId: funnel.id }, hourResult.error)
   const products = (productResult.data ?? []) as { produto: string; sales_count: number; revenue: number }[]
@@ -439,8 +441,8 @@ export default async function SalesFunnelPage({
       {tab === 'criativos' && creatives.length > 0 && (
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         {[
-          { title: 'Top 10 por compras', hint: 'quem mais vendeu no período', rows: topBySales(creatives).map((c) => ({ c, value: `${c.sales_count} ${c.sales_count === 1 ? 'venda' : 'vendas'}`, sub: `CPA ${currency(c.spend / c.sales_count)}` })) },
-          { title: 'Top 10 por CPA', hint: `menor custo por venda, com ${MIN_SALES_FOR_CPA}+ vendas`, rows: topByCpa(creatives).map((c) => ({ c, value: currency(c.cpa), sub: `${c.sales_count} vendas` })) },
+          { title: 'Top 10 por compras', hint: 'quem mais vendeu no período', rows: topBySales(rankable).map((c) => ({ c, value: `${c.sales_count} ${c.sales_count === 1 ? 'venda' : 'vendas'}`, sub: c.spend > 0 && c.sales_count >= MIN_SALES_FOR_CPA ? `CPA ${currency(c.spend / c.sales_count)}` : 'CPA —' })) },
+          { title: 'Top 10 por CPA', hint: `menor custo por venda, com ${MIN_SALES_FOR_CPA}+ vendas`, rows: topByCpa(rankable).map((c) => ({ c, value: currency(c.cpa), sub: `${c.sales_count} vendas` })) },
         ].map((block) => (
           <div key={block.title} className="card-shadow rounded-2xl border border-[var(--ct-line)] p-4">
             <div className="mb-3 flex items-baseline justify-between gap-3">
@@ -473,7 +475,7 @@ export default async function SalesFunnelPage({
         <div className="flex items-baseline justify-between px-4 pt-4">
           <h2 className="font-[family-name:var(--font-sora)] text-base font-semibold">Por criativo</h2>
           <span className="text-[11.5px] text-[var(--ct-text-2)]">
-            Cruza o gasto do anúncio com a venda que ele gerou
+            Gasto com imposto · vendas de entrada · receita líquida sem ascensão
           </span>
         </div>
         <div className="overflow-x-auto">

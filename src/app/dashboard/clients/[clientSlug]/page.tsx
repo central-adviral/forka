@@ -77,7 +77,7 @@ export default async function TodayPage({
   const monthSince = saoPauloDay(-29)
   const base = `/dashboard/clients/${client.slug}`
 
-  const [weekDays, { data: campaigns }, { data: lastRun }, { data: funnels }, { data: activeTests }, { data: isOwner }] = await Promise.all([
+  const [weekDays, campaignsResult, lastRunResult, funnelsResult, { data: activeTests }, { data: isOwner }] = await Promise.all([
     getClientDaily(supabase, client.id, week.since, week.until),
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: monthSince, p_until: week.until }),
     supabase.from('sync_runs').select('finished_at, error').eq('client_id', client.id).not('finished_at', 'is', null).order('started_at', { ascending: false }).limit(1).maybeSingle(),
@@ -85,6 +85,12 @@ export default async function TodayPage({
     supabase.from('tests').select('id, name').eq('client_id', client.id).eq('status', 'active'),
     canActAs(supabase, client.id, 'owner').then((data) => ({ data })),
   ])
+  // A failed read must not pass for a quiet day: no conflicts, no unclassified spend, no sync.
+  const readError = campaignsResult.error ?? lastRunResult.error ?? funnelsResult.error
+  if (readError) throw readError
+  const campaigns = campaignsResult.data
+  const lastRun = lastRunResult.data
+  const funnels = funnelsResult.data
   const [bestVariant, watchers, alerts, pages] = await Promise.all([
     findBestVariant(supabase, activeTests ?? [], monthSince, week.until).catch(() => null),
     getWatchers(supabase, client.id),
