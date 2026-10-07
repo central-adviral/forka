@@ -9,6 +9,7 @@ import { buildAttention, type AttentionItem } from '@/lib/domain/attention'
 import { getAlerts, getWatchers } from '@/lib/repo/watchers-repo'
 import { METRICS, formatMetric, watcherScope } from '@/lib/domain/watchers'
 import { projectDay } from '@/lib/domain/day-pace'
+import { canActAs } from '@/lib/view-as'
 
 const PERIODS = [
   { value: 'hoje', label: 'Hoje' },
@@ -80,7 +81,7 @@ export default async function TodayPage({
     supabase.from('sync_runs').select('finished_at, error').eq('client_id', client.id).not('finished_at', 'is', null).order('started_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('sales_funnels').select('slug, name, is_active, daily_sales_target').eq('client_id', client.id).order('name'),
     supabase.from('tests').select('id, name').eq('client_id', client.id).eq('status', 'active'),
-    supabase.rpc('has_client_role', { p_client_id: client.id, p_min_role: 'owner' }),
+    canActAs(supabase, client.id, 'owner').then((data) => ({ data })),
   ])
   const [bestVariant, watchers, alerts] = await Promise.all([
     findBestVariant(supabase, activeTests ?? [], monthSince, week.until).catch(() => null),

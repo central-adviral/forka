@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { CommandPalette, type CommandItem } from './command-palette'
 import { createBrowserSupabaseClient } from '@/lib/supabase/browser'
 import type { ClientRole } from '@/lib/repo/client-access-repo'
 
@@ -30,6 +31,12 @@ const ROLE_LABEL: Record<ClientRole, string> = {
 
 // Inlined glyphs: a handful of icons at one size don't justify pulling in an icon package.
 const ICONS = {
+  eye: (
+    <>
+      <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8Z" />
+      <circle cx="8" cy="8" r="2" />
+    </>
+  ),
   overview: (
     <>
       <circle cx="8" cy="8" r="5.5" />
@@ -233,10 +240,13 @@ function PickerItem({ href, active, children }: { href: string; active: boolean;
 export function DashboardShell({
   clients,
   userEmail,
+  viewAsClient = false,
   children,
 }: {
   clients: Client[]
   userEmail: string
+  /** "Ver como cliente" is on (cookie read by the layout). */
+  viewAsClient?: boolean
   children: React.ReactNode
 }) {
   const pathname = usePathname()
@@ -255,8 +265,44 @@ export function DashboardShell({
   const activeTestSlug = activeClient ? pathname.match(new RegExp(`^${base}/tests/([^/]+)`))?.[1] : undefined
   const activeProjectSlug = activeClient ? pathname.match(new RegExp(`^${base}/funis-venda/([^/]+)`))?.[1] : undefined
   const activeProject = activeClient?.projects.find((project) => project.slug === activeProjectSlug)
-  const canConfigure = activeClient?.role === 'owner'
-  const canEdit = activeClient?.role === 'owner' || activeClient?.role === 'gestor'
+  const realRole = activeClient?.role
+  const canPreview = realRole === 'owner' || realRole === 'gestor'
+  // While previewing, the shell shows what a client user would see; nothing else changes.
+  const previewing = viewAsClient && canPreview
+  const role = previewing ? 'cliente' : realRole
+  const canConfigure = role === 'owner'
+  const canEdit = role === 'owner' || role === 'gestor'
+  function setPreview(on: boolean) {
+    document.cookie = on ? 'ct-view-as=cliente; path=/; max-age=86400; samesite=lax' : 'ct-view-as=; path=/; max-age=0; samesite=lax'
+    router.refresh()
+  }
+  const commandItems: CommandItem[] = [
+    ...clients.map((client) => ({ label: client.name, group: 'cliente', href: `/dashboard/clients/${client.slug}` })),
+    ...(activeClient
+      ? [
+          ...activeClient.projects.map((project) => ({ label: project.name, group: 'projeto', href: `${base}/funis-venda/${project.slug}` })),
+          ...activeClient.projects.map((project) => ({ label: `${project.name} · Tráfego`, group: 'projeto', href: `${base}/funis-venda/${project.slug}?aba=trafego` })),
+          { label: 'Hoje', group: 'tela', href: base },
+          { label: 'Painel de Controle', group: 'tela', href: `${base}/painel` },
+          { label: 'Análises', group: 'tela', href: `${base}/funis-venda` },
+          { label: 'Teste A/B', group: 'tela', href: `${base}/tests` },
+          ...(canEdit
+            ? [
+                { label: 'Metas e alvos', group: 'tela', href: `${base}/metas` },
+                ...((activeProject ?? activeClient.projects[0]) ? [{ label: 'Regras de campanha', group: 'tela', href: `${base}/funis-venda/${(activeProject ?? activeClient.projects[0]).slug}/regras` }] : []),
+              ]
+            : []),
+          ...(canConfigure
+            ? [
+                { label: 'Integrações', group: 'tela', href: `${base}/integrations` },
+                { label: 'Membros', group: 'tela', href: `${base}/membros` },
+              ]
+            : []),
+        ]
+      : []),
+    { label: 'Carteira', group: 'agência', href: '/dashboard' },
+    { label: 'Novo cliente', group: 'agência', href: '/dashboard/clients/new' },
+  ]
   // Rules belong to a project: the open one, or the first one of the client.
   const rulesProject = activeProject ?? activeClient?.projects[0]
   const page = pageLabel(pathname, activeClient?.slug)
@@ -392,6 +438,16 @@ export function DashboardShell({
         </nav>
 
         <div className="mt-auto flex flex-col gap-2">
+        {canPreview && (
+          <button
+            type="button"
+            onClick={() => setPreview(!previewing)}
+            className="flex items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[12.5px] text-[var(--ct-text-2)] hover:bg-[var(--ct-surface-3)] hover:text-[var(--ct-text)]"
+          >
+            <Icon>{ICONS.eye}</Icon>
+            {previewing ? 'Sair da visão do cliente' : 'Ver como cliente'}
+          </button>
+        )}
         <ThemeToggle />
         <div className="flex items-center gap-2.5 rounded-[10px] bg-[var(--ct-surface-2)] px-2.5 py-2">
           <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-[var(--ct-surface-3)] text-xs font-semibold text-[var(--ct-text-2)]">
@@ -399,7 +455,7 @@ export function DashboardShell({
           </span>
           <span className="flex min-w-0 flex-col leading-tight">
             <span className="truncate font-[family-name:var(--font-geist-mono)] text-[11.5px] text-[var(--ct-text-2)]">{userEmail}</span>
-            {activeClient && <span className="text-[11px] text-[var(--ct-text-3)]">{ROLE_LABEL[activeClient.role]}</span>}
+            {activeClient && role && <span className="text-[11px] text-[var(--ct-text-3)]">{ROLE_LABEL[role]}</span>}
           </span>
           <button
             type="button"
@@ -435,11 +491,23 @@ export function DashboardShell({
               </>
             )}
           </div>
-          {activeClient && activeClient.role !== 'owner' && activeClient.role !== 'gestor' && (
-            <span className="ml-auto rounded-full bg-[var(--ct-accent-soft)] px-2.5 py-1 text-[12px] font-medium text-[var(--ct-accent)]">
-              Somente leitura
-            </span>
-          )}
+          <span className="ml-auto flex items-center gap-2">
+            {previewing ? (
+              <button
+                type="button"
+                onClick={() => setPreview(false)}
+                className="rounded-full bg-[var(--ct-warn-soft)] px-2.5 py-1 text-[12px] font-medium text-[var(--ct-warn)]"
+              >
+                Visualizando como cliente · sair
+              </button>
+            ) : (
+              activeClient &&
+              !canPreview && (
+                <span className="rounded-full bg-[var(--ct-accent-soft)] px-2.5 py-1 text-[12px] font-medium text-[var(--ct-accent)]">Somente leitura</span>
+              )
+            )}
+            <CommandPalette items={commandItems} />
+          </span>
         </div>
         <main className="min-w-0 flex-1 overflow-auto">{children}</main>
       </div>

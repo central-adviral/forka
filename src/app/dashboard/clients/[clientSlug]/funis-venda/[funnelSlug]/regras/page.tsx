@@ -12,6 +12,7 @@ import {
 } from '@/lib/domain/campaign-rules'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { addRule, createFront, deleteFront, pinCampaign, removeRule, unpinCampaign } from './actions'
+import { canActAs } from '@/lib/view-as'
 
 interface FrontRow {
   id: string
@@ -66,7 +67,7 @@ export default async function CampaignRulesPage({
 
   const { since, until } = resolvePeriodDateRange(periodo, undefined, undefined)
   const [{ data: canEdit }, { data: frontRows, error: frontsError }, { data: campaignRows }, { data: lastSync }, { data: otherFunnels }] = await Promise.all([
-    supabase.rpc('has_client_role', { p_client_id: client.id, p_min_role: 'gestor' }),
+    canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
     supabase
       .from('project_fronts')
       .select('id, code, name, position, sales_funnel_id, source_sales_funnel_id, sales_funnels!project_fronts_sales_funnel_id_fkey!inner(name, client_id), naming_rules(id, kind, value)')

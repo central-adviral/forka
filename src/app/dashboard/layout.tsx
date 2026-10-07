@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { DashboardShell, type ShellProject } from '@/components/dashboard-shell'
 import type { ClientRole } from '@/lib/repo/client-access-repo'
+import { viewingAsClient } from '@/lib/view-as'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient()
@@ -41,6 +42,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         role: roleByClient.get(client.id) ?? (isStaffAdmin ? 'owner' : 'cliente'),
       }))}
       userEmail={user?.email ?? ''}
+      viewAsClient={await viewingAsClient()}
     >
       {children}
     </DashboardShell>

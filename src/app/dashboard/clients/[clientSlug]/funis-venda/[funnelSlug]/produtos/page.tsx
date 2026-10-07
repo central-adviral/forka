@@ -8,6 +8,7 @@ import { fetchLaunchOpsProducts, type LaunchOpsProduct } from '@/lib/launchops/p
 import { PRODUCT_ROLES, PRODUCT_ROLE_HINT, PRODUCT_ROLE_LABEL, type ProductRole } from '@/lib/domain/product-roles'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { removeProduct, setProductRole } from './actions'
+import { canActAs } from '@/lib/view-as'
 
 const LOOKBACK_DAYS = 30
 
@@ -40,7 +41,7 @@ export default async function ProjectProductsPage({
   if (!funnel) notFound()
 
   const [{ data: canEdit }, { data: productRows, error: productsError }] = await Promise.all([
-    supabase.rpc('has_client_role', { p_client_id: client.id, p_min_role: 'gestor' }),
+    canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
     supabase.from('project_products').select('produto_nome, papel').eq('sales_funnel_id', funnel.id).order('produto_nome'),
   ])
   if (productsError) throw productsError
