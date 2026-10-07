@@ -4,6 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { syncOneFunnel, syncClientCampaigns } from '@/lib/launchops/sync-funnel'
 import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
 import { probeClientPages } from '@/lib/pages/probe'
+import { purgeOldClickIps } from '@/lib/repo/redirect-repo'
 
 // Under LEASE_SECONDS (sync-campaigns.ts), so a run the platform kills never outlives its lease.
 export const maxDuration = 240
@@ -66,6 +67,13 @@ export async function GET(request: NextRequest) {
       funnelsFailed++
       console.error('[sync-funnel-client-failed]', { salesFunnelId: funnel.id, clientId: funnel.client_id }, err)
     }
+  }
+
+  // Housekeeping rides on the hourly run; a failure here must not fail the sync it follows.
+  try {
+    await purgeOldClickIps(appDb)
+  } catch (err) {
+    console.error('[click-ip-purge-failed]', err)
   }
 
   return NextResponse.json({ ok: true, funnelsProcessed, funnelsFailed, clientsWithCampaigns: campaignsSyncedFor.size })
