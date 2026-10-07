@@ -13,11 +13,16 @@ interface UsageStats {
 
 interface PortfolioRow {
   client_id: string
+  /** With tax, from the client's campaigns (0064). */
   spend: number
-  approved_sales: number
+  spend_today: number
+  entry_sales: number
   net_revenue: number
   active_tests: number
   last_sync_at: string | null
+  alerts_crit: number
+  alerts_warn: number
+  responsaveis: string | null
 }
 
 const ROLE_LABEL: Record<ClientRole, string> = {
@@ -61,8 +66,10 @@ export default async function DashboardPage() {
 
   const rows = (clients ?? []).map((client) => ({ ...client, summary: summaryByClient.get(client.id) }))
   const totalSpend = rows.reduce((sum, row) => sum + Number(row.summary?.spend ?? 0), 0)
-  const totalSales = rows.reduce((sum, row) => sum + Number(row.summary?.approved_sales ?? 0), 0)
-  const totalTests = rows.reduce((sum, row) => sum + Number(row.summary?.active_tests ?? 0), 0)
+  const totalToday = rows.reduce((sum, row) => sum + Number(row.summary?.spend_today ?? 0), 0)
+  const totalSales = rows.reduce((sum, row) => sum + Number(row.summary?.entry_sales ?? 0), 0)
+  const totalCrit = rows.reduce((sum, row) => sum + Number(row.summary?.alerts_crit ?? 0), 0)
+  const totalWarn = rows.reduce((sum, row) => sum + Number(row.summary?.alerts_warn ?? 0), 0)
 
   return (
     <div className="flex max-w-[1320px] flex-col gap-10 px-14 pb-24 pt-12">
@@ -88,12 +95,13 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-[18px] lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-[18px] lg:grid-cols-5">
         {[
           { label: 'Clientes', value: String(rows.length), foot: 'que você acessa' },
-          { label: 'Investido', value: currency(totalSpend), foot: 'últimos 7 dias' },
-          { label: 'Vendas aprovadas', value: totalSales.toLocaleString('pt-BR'), foot: 'últimos 7 dias' },
-          { label: 'Testes A/B ativos', value: String(totalTests), foot: 'agora' },
+          { label: 'Investido hoje', value: currency(totalToday), foot: 'com imposto · parcial' },
+          { label: 'Investido', value: currency(totalSpend), foot: 'últimos 7 dias · com imposto' },
+          { label: 'Vendas de entrada', value: totalSales.toLocaleString('pt-BR'), foot: 'últimos 7 dias' },
+          { label: 'Alertas abertos', value: String(totalCrit + totalWarn), foot: totalCrit > 0 ? `${totalCrit} críticos` : 'nenhum crítico' },
         ].map((kpi) => (
           <div key={kpi.label} className="flex flex-col gap-1.5 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-[22px] py-5">
             <span className="text-xs text-[var(--ct-text-3)]">{kpi.label}</span>
@@ -116,12 +124,13 @@ export default async function DashboardPage() {
             <thead>
               <tr className="text-left font-[family-name:var(--font-geist-mono)] text-[10.5px] uppercase tracking-[0.06em] text-[var(--ct-text-3)]">
                 <th className="px-5 py-3.5 font-medium">Cliente</th>
-                <th className="px-5 py-3.5 font-medium">Seu papel</th>
-                <th className="px-5 py-3.5 text-right font-medium">Projetos</th>
+                <th className="px-5 py-3.5 font-medium">Responsável</th>
+                <th className="px-5 py-3.5 font-medium">Alertas</th>
+                <th className="px-5 py-3.5 text-right font-medium">Investido hoje</th>
                 <th className="px-5 py-3.5 text-right font-medium">Investido 7d</th>
                 <th className="px-5 py-3.5 text-right font-medium">Vendas 7d</th>
                 <th className="px-5 py-3.5 text-right font-medium">Receita líq. 7d</th>
-                <th className="px-5 py-3.5 text-right font-medium">Testes ativos</th>
+                <th className="px-5 py-3.5 text-right font-medium">Projetos · testes</th>
                 <th className="px-5 py-3.5 text-right font-medium">Última sync</th>
               </tr>
             </thead>
@@ -136,16 +145,39 @@ export default async function DashboardPage() {
                         <span className="block text-[11.5px] text-[var(--ct-text-3)]">{row.slug}</span>
                       </Link>
                     </td>
-                    <td className="px-5 py-3.5 text-[var(--ct-text-2)]">{role ? ROLE_LABEL[role] : 'Staff'}</td>
-                    <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">{projectsByClient.get(row.id) ?? 0}</td>
+                    <td className="px-5 py-3.5 text-[var(--ct-text-2)]">
+                      {row.summary?.responsaveis ?? '—'}
+                      <span className="block text-[11.5px] text-[var(--ct-text-3)]">você: {role ? ROLE_LABEL[role] : 'Staff'}</span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      {Number(row.summary?.alerts_crit ?? 0) + Number(row.summary?.alerts_warn ?? 0) === 0 ? (
+                        <span className="text-[var(--ct-text-3)]">—</span>
+                      ) : (
+                        <Link href={`/dashboard/clients/${row.slug}/painel`} className="flex flex-wrap gap-1.5">
+                          {Number(row.summary?.alerts_crit ?? 0) > 0 && (
+                            <span className="rounded-full bg-[var(--ct-crit-soft)] px-2 py-0.5 text-[11.5px] font-semibold text-[var(--ct-crit)]">
+                              {row.summary?.alerts_crit} crítico{Number(row.summary?.alerts_crit) > 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {Number(row.summary?.alerts_warn ?? 0) > 0 && (
+                            <span className="rounded-full bg-[var(--ct-warn-soft)] px-2 py-0.5 text-[11.5px] font-semibold text-[var(--ct-warn)]">
+                              {row.summary?.alerts_warn} atenção
+                            </span>
+                          )}
+                        </Link>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">{currency(Number(row.summary?.spend_today ?? 0))}</td>
                     <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">{currency(Number(row.summary?.spend ?? 0))}</td>
                     <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">
-                      {Number(row.summary?.approved_sales ?? 0).toLocaleString('pt-BR')}
+                      {Number(row.summary?.entry_sales ?? 0).toLocaleString('pt-BR')}
                     </td>
                     <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">
                       {currency(Number(row.summary?.net_revenue ?? 0))}
                     </td>
-                    <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">{row.summary?.active_tests ?? 0}</td>
+                    <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">
+                      {projectsByClient.get(row.id) ?? 0} · {row.summary?.active_tests ?? 0}
+                    </td>
                     <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)] text-[var(--ct-text-3)]">
                       {syncLabel(row.summary?.last_sync_at ?? null)}
                     </td>
