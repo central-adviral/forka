@@ -23,9 +23,8 @@ describe('formatMetric', () => {
 
 describe('slice and frequency (0065)', () => {
   it('names what the watcher looks at: a slice by name first, then the front, then the project', () => {
-    expect(watcherScope({ frontName: 'Perpétuo', nameFilter: 'RMK' })).toBe('campanhas com "RMK"')
-    expect(watcherScope({ frontName: 'Perpétuo', nameFilter: null })).toBe('Perpétuo')
-    expect(watcherScope({ frontName: null, nameFilter: null })).toBe('projeto inteiro')
+    expect(watcherScope({ frontName: 'Perpétuo' })).toBe('Perpétuo')
+    expect(watcherScope({ frontName: null })).toBe('todas as frentes')
   })
 
   it('formats frequency as times, and a rising frequency is the bad side', () => {

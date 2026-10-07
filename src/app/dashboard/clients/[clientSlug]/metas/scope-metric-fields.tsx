@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 
-interface ScopeGroup {
+interface ProjectOption {
   funnelId: string
   funnelName: string
-  fronts: { id: string; label: string }[]
+  rulesHref: string
+  fronts: { id: string; name: string; rule: string }[]
 }
 
 interface MetricOption {
@@ -22,37 +23,58 @@ export function availableMetrics<T extends MetricOption>(scope: string, metrics:
   return isFrontScope(scope) ? metrics.filter((option) => !option.projectOnly) : metrics
 }
 
-export function ScopeMetricFields({ groups, metrics, fieldClass }: { groups: ScopeGroup[]; metrics: MetricOption[]; fieldClass: string }) {
-  const [scope, setScope] = useState('')
+export function ScopeMetricFields({ projects, metrics, fieldClass }: { projects: ProjectOption[]; metrics: MetricOption[]; fieldClass: string }) {
+  const [funnelId, setFunnelId] = useState(projects.length === 1 ? projects[0].funnelId : '')
+  const [frontId, setFrontId] = useState('')
   const [metric, setMetric] = useState(metrics[0]?.value ?? '')
-  const isFront = isFrontScope(scope)
+  const project = projects.find((option) => option.funnelId === funnelId)
+  const scope = funnelId ? `${funnelId}|${frontId}` : ''
   const available = availableMetrics(scope, metrics)
 
-  function pickScope(next: string) {
-    setScope(next)
-    const offered = availableMetrics(next, metrics)
+  function pick(nextFunnel: string, nextFront: string) {
+    setFunnelId(nextFunnel)
+    setFrontId(nextFront)
+    const offered = availableMetrics(nextFunnel ? `${nextFunnel}|${nextFront}` : '', metrics)
     if (!offered.some((option) => option.value === metric)) setMetric(offered[0]?.value ?? '')
   }
 
   return (
     <>
+      <input type="hidden" name="scope" value={scope} />
       <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)] xl:col-span-2">
-        Aplica em
-        <select name="scope" required value={scope} onChange={(event) => pickScope(event.target.value)} className={fieldClass}>
+        Projeto
+        <select required value={funnelId} onChange={(event) => pick(event.target.value, '')} className={fieldClass}>
           <option value="" disabled>
-            escolher projeto ou frente
+            escolher projeto
           </option>
-          {groups.map((group) => (
-            <optgroup key={group.funnelId} label={group.funnelName}>
-              <option value={`${group.funnelId}|`}>{group.funnelName} inteiro · investimento + vendas (use para CPA)</option>
-              {group.fronts.map((front) => (
-                <option key={front.id} value={`${group.funnelId}|${front.id}`}>
-                  {front.label}
-                </option>
-              ))}
-            </optgroup>
+          {projects.map((option) => (
+            <option key={option.funnelId} value={option.funnelId}>
+              {option.funnelName}
+            </option>
           ))}
         </select>
+        {project && (
+          <span className="text-[11px]">
+            Campanhas do projeto pelas{' '}
+            <a href={project.rulesHref} className="text-[var(--ct-accent)] hover:underline">
+              Regras de campanha
+            </a>
+            , as mesmas das Análises.
+          </span>
+        )}
+      </label>
+      <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)] xl:col-span-2">
+        Frente (opcional)
+        <select value={frontId} disabled={!project} onChange={(event) => pick(funnelId, event.target.value)} className={fieldClass}>
+          <option value="">todas as frentes · investimento + vendas</option>
+          {(project?.fronts ?? []).map((front) => (
+            <option key={front.id} value={front.id}>
+              {front.name}
+              {front.rule ? ` · campanhas com ${front.rule}` : ''}
+            </option>
+          ))}
+        </select>
+        <span className="text-[11px]">{frontId ? 'Só mídia: as vendas são do projeto, não de uma frente.' : 'Com vendas: vale para CPA.'}</span>
       </label>
       <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
         Métrica
@@ -60,11 +82,9 @@ export function ScopeMetricFields({ groups, metrics, fieldClass }: { groups: Sco
           {available.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
-              {option.projectOnly ? ' (projeto)' : ''}
             </option>
           ))}
         </select>
-        {isFront && <span className="text-[11px] text-[var(--ct-text-3)]">CPA não aparece em frente: as vendas são do projeto.</span>}
       </label>
     </>
   )

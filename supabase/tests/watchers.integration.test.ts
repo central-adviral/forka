@@ -77,20 +77,26 @@ describe('watchers and alerts (0059)', () => {
   })
 })
 
-describe('watchers on a slice of campaigns, frequency and the 14-day trail (0065)', () => {
+describe('watchers on a front, frequency and the 14-day trail (0065, 0070)', () => {
   const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
 
-  it('narrows a watcher to the campaigns whose name contains the slice, measures frequency and returns 14 closed days', async () => {
+  it('narrows a watcher to the campaigns the front rules give it, measures frequency and returns 14 closed days', async () => {
     const { data: user } = await admin.auth.admin.createUser({ email: `slice-${Date.now()}@example.com`, password: 'password123', email_confirm: true })
     const { data: client } = await admin.from('clients').insert({ owner_id: user!.user!.id, name: 'Slice', slug: `slice-${Date.now()}` }).select().single()
     const { data: funnel } = await admin.from('sales_funnels').insert({ client_id: client!.id, name: 'P', slug: 'p' }).select().single()
+    const { data: escala } = await admin.from('project_fronts').insert({ sales_funnel_id: funnel!.id, code: 'ESC', name: 'Escala' }).select().single()
+    const { data: rmk } = await admin.from('project_fronts').insert({ sales_funnel_id: funnel!.id, code: 'RMK', name: 'Remarketing' }).select().single()
+    await admin.from('naming_rules').insert([
+      { front_id: escala!.id, kind: 'include', value: 'Escala' },
+      { front_id: rmk!.id, kind: 'include', value: 'RMK' },
+    ])
     await admin.from('campaign_daily').insert([
       { client_id: client!.id, data: yesterday, campaign_id: 'e', campaign_name: '[1K] Escala', spend: 300, impressions: 30000, reach: 10000 },
       { client_id: client!.id, data: yesterday, campaign_id: 'r', campaign_name: '[1K] RMK', spend: 100, impressions: 5000, reach: 1000 },
     ])
     const { data: slice } = await admin
       .from('watchers')
-      .insert({ client_id: client!.id, sales_funnel_id: funnel!.id, name_filter: 'rmk', metric: 'frequencia', target: 3, warn_pct: 20, crit_pct: 40 })
+      .insert({ client_id: client!.id, sales_funnel_id: funnel!.id, front_id: rmk!.id, metric: 'frequencia', target: 3, warn_pct: 20, crit_pct: 40 })
       .select()
       .single()
 
@@ -105,7 +111,7 @@ describe('watchers on a slice of campaigns, frequency and the 14-day trail (0065
 
     const { error } = await admin
       .from('watchers')
-      .insert({ client_id: client!.id, sales_funnel_id: funnel!.id, name_filter: 'rmk', metric: 'cpa_geral', target: 30 })
+      .insert({ client_id: client!.id, sales_funnel_id: funnel!.id, front_id: rmk!.id, metric: 'cpa_geral', target: 30 })
     expect(error).not.toBeNull()
   })
 })
