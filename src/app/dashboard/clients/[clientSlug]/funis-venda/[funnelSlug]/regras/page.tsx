@@ -336,7 +336,7 @@ export default async function CampaignRulesPage({
                 ))}
               </select>
             </label>
-            <button type="submit" className="rounded-[8px] bg-[var(--ct-accent)] px-3.5 py-1.5 text-[12.5px] font-semibold text-black hover:brightness-110">
+            <button type="submit" className="rounded-[8px] bg-[var(--ct-accent)] px-3.5 py-1.5 text-[12.5px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110">
               + Nova frente
             </button>
           </form>

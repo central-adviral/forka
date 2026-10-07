@@ -73,14 +73,14 @@ h1, h2, h3 {
   animation: pulse-rose 2.2s infinite;
 }
 @keyframes pulse-teal {
-  0% { box-shadow: 0 0 0 0 rgba(45, 212, 168, 0.45); }
-  70% { box-shadow: 0 0 0 7px rgba(45, 212, 168, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(45, 212, 168, 0); }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ct-ok) 45%, transparent); }
+  70% { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 @keyframes pulse-rose {
-  0% { box-shadow: 0 0 0 0 rgba(247, 108, 108, 0.45); }
-  70% { box-shadow: 0 0 0 7px rgba(247, 108, 108, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(247, 108, 108, 0); }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ct-crit) 45%, transparent); }
+  70% { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 /* Traffic edges on the report canvas: a dotted stroke drifting toward the variant, so the
    canvas reads as flow rather than as a static diagram. */
@@ -109,7 +109,7 @@ h1, h2, h3 {
   --ct-surface: #0e1016;
   --ct-surface-2: #14161d;
   --ct-surface-3: #1b1e27;
-  --ct-glass: rgba(14, 16, 22, 0.72);
+  --ct-glass: rgba(14, 16, 22, 0.62);
   --ct-line: rgba(255, 255, 255, 0.075);
   --ct-line-2: rgba(255, 255, 255, 0.14);
   --ct-text: #f3f4f7;
@@ -125,6 +125,7 @@ h1, h2, h3 {
   --ct-crit: #ff7a85;
   --ct-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 24px 60px -40px rgba(0, 0, 0, 0.9);
   --ct-glow: color-mix(in srgb, var(--ct-accent) 20%, transparent);
+  --ct-bar: rgba(255, 255, 255, 0.09);
 }
 :root[data-mode="light"] {
   color-scheme: light;
@@ -132,7 +133,7 @@ h1, h2, h3 {
   --ct-surface: #ffffff;
   --ct-surface-2: #f1f3f8;
   --ct-surface-3: #e7eaf1;
-  --ct-glass: rgba(255, 255, 255, 0.78);
+  --ct-glass: rgba(255, 255, 255, 0.72);
   --ct-line: rgba(15, 23, 42, 0.08);
   --ct-line-2: rgba(15, 23, 42, 0.15);
   --ct-text: #0e1320;
@@ -148,9 +149,15 @@ h1, h2, h3 {
   --ct-crit: #dc3545;
   --ct-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 16px 40px -28px rgba(15, 23, 42, 0.25);
   --ct-glow: color-mix(in srgb, var(--ct-accent) 14%, transparent);
+  --ct-bar: rgba(15, 23, 42, 0.1);
 }
 :root {
-  --ct-accent-soft: color-mix(in srgb, var(--ct-accent) 14%, transparent);
+  --ct-accent-soft: color-mix(in srgb, var(--ct-accent) 15%, transparent);
+  --ct-painel-soft: color-mix(in srgb, var(--ct-painel) 14%, transparent);
+  /* Prototype radii: cards 22, controls and pickers 14, small controls 10. */
+  --ct-r-lg: 22px;
+  --ct-r-md: 14px;
+  --ct-r-sm: 10px;
   --ct-an-soft: color-mix(in srgb, var(--ct-an) 13%, transparent);
   --ct-ab-soft: color-mix(in srgb, var(--ct-ab) 13%, transparent);
   --ct-ok-soft: color-mix(in srgb, var(--ct-ok) 13%, transparent);

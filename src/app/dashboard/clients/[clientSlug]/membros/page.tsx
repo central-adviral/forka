@@ -88,7 +88,7 @@ export default async function MembersPage({
           </label>
           <button
             type="submit"
-            className="rounded-[10px] bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-black hover:brightness-110"
+            className="rounded-[10px] bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110"
           >
             Adicionar
           </button>

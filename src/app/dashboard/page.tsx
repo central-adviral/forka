@@ -91,7 +91,7 @@ export default async function DashboardPage() {
         </div>
         <Link
           href="/dashboard/clients/new"
-          className="ml-auto rounded-[10px] bg-[var(--ct-accent)] px-3.5 py-2 text-[12.5px] font-medium text-black hover:brightness-110"
+          className="ml-auto rounded-[10px] bg-[var(--ct-accent)] px-3.5 py-2 text-[12.5px] font-medium text-[var(--ct-on-accent)] hover:brightness-110"
         >
           + Novo cliente
         </Link>
