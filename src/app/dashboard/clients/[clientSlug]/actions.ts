@@ -7,7 +7,8 @@ import { httpUrl } from '@/lib/domain/http-url-schema'
 
 const variantSchema = z.object({
   name: z.string().min(1),
-  weight_pct: z.coerce.number().gt(0).lte(100),
+  // 0 parks a variant: kept in the test, no new traffic (0067).
+        weight_pct: z.coerce.number().gte(0).lte(100),
   destination_url: httpUrl,
   thank_you_url: httpUrl.optional().or(z.literal('')),
 })
