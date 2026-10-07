@@ -5,6 +5,8 @@ import { REPORT_PERIODS, resolvePeriodDateRange, formatBr } from '@/lib/domain/r
 import { FunnelCone } from './funnel-cone'
 import { FunnelKpiCards } from './funnel-kpi-cards'
 import { MIN_SALES_FOR_CPA, topByCpa, topBySales } from '@/lib/domain/creative-ranking'
+import { buildTrafficDays } from '@/lib/domain/traffic-days'
+import { TrafficPanel } from './traffic-panel'
 import { FunnelPaymentPie } from './funnel-payment-pie'
 import { SyncFunnelButton } from './sync-funnel-button'
 import { SyncStatus } from '@/components/sync-status'
@@ -14,6 +16,7 @@ import { FrontsPanel, type FrontDayRow, type FrontInfo } from './fronts-panel'
 
 const TABS = [
   { value: 'visao', label: 'Visão geral' },
+  { value: 'trafego', label: 'Tráfego' },
   { value: 'frentes', label: 'Frentes' },
   { value: 'criativos', label: 'Por criativo' },
   { value: 'origem', label: 'Origem das vendas' },
@@ -26,14 +29,14 @@ export default async function SalesFunnelPage({
   searchParams,
 }: {
   params: Promise<{ clientSlug: string; funnelSlug: string }>
-  searchParams: Promise<{ periodo?: string; desde?: string; ate?: string; aba?: string }>
+  searchParams: Promise<{ periodo?: string; desde?: string; ate?: string; aba?: string; frente?: string }>
 }) {
   const { clientSlug, funnelSlug } = await params
-  const { periodo, desde, ate, aba } = await searchParams
+  const { periodo, desde, ate, aba, frente } = await searchParams
   const tab: Tab = TABS.some((option) => option.value === aba) ? (aba as Tab) : 'visao'
-  // Links keep the period and the tab together, whichever one the user changes.
+  // Links keep the period, the tab and the front together, whichever one the user changes.
   const withParams = (changes: Record<string, string | undefined>) => {
-    const merged = { periodo, desde, ate, aba: tab === 'visao' ? undefined : tab, ...changes }
+    const merged = { periodo, desde, ate, aba: tab === 'visao' ? undefined : tab, frente, ...changes }
     const query = new URLSearchParams(Object.entries(merged).filter((entry): entry is [string, string] => Boolean(entry[1])))
     return query.size > 0 ? `?${query}` : '?'
   }
@@ -311,6 +314,36 @@ export default async function SalesFunnelPage({
           currency={currency}
         />
       )}
+
+      {tab === 'trafego' && (() => {
+        // The project scope takes its spend and sales from the project's day; a front only has its
+        // own media, carried to "with tax" by the same day's factor the project uses.
+        const frontDayRows = (frontDays ?? []) as (FrontDayRow & { data: string })[]
+        const selectedFront = fronts.find((front) => front.id === frente) ?? null
+        const days = rows.map((row) => {
+          const factor = row.spend > 0 ? row.spendComImposto / row.spend : 1
+          const ofDay = frontDayRows.filter((front) => front.data === row.data && (!selectedFront || front.front_id === selectedFront.id))
+          const add = (key: 'spend' | 'impressions' | 'link_clicks' | 'landing_page_views' | 'initiate_checkout' | 'leads') =>
+            ofDay.reduce((total, front) => total + Number(front[key]), 0)
+          return selectedFront
+            ? { data: row.data, spend: add('spend') * factor, impressions: add('impressions'), linkClicks: add('link_clicks'), landingPageViews: add('landing_page_views'), initiateCheckout: add('initiate_checkout'), leads: add('leads'), vendas: null }
+            : { data: row.data, spend: row.spendComImposto, impressions: row.impressions, linkClicks: row.linkClicks, landingPageViews: row.landingPageViews, initiateCheckout: row.initiateCheckout, leads: add('leads'), vendas: row.vendas }
+        })
+        const traffic = buildTrafficDays(days)
+        return (
+          <TrafficPanel
+            days={traffic.days}
+            total={traffic.total}
+            isFront={selectedFront !== null}
+            costKey={!selectedFront && (traffic.total.vendas ?? 0) > 0 ? 'cpa' : traffic.total.leads > 0 ? 'cpl' : 'cpm'}
+            money={currency}
+            scopes={[
+              { label: `${funnel.name} inteiro`, href: withParams({ frente: undefined }), active: !selectedFront },
+              ...fronts.map((front) => ({ label: `Frente ${front.name}`, href: withParams({ frente: front.id }), active: selectedFront?.id === front.id })),
+            ]}
+          />
+        )
+      })()}
 
       {tab === 'origem' && <SalesOriginPanel origins={salesByOrigin} currency={currency} />}
 
