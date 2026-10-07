@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -5,8 +6,9 @@ import { canActAs } from '@/lib/view-as'
 import { getBacklog, type BacklogItem } from '@/lib/repo/backlog-repo'
 import { COLUMNS, METHODS, STAGES, readRules, type Method } from '@/lib/domain/backlog'
 import { daysRunningSince } from '@/lib/domain/report-period'
+import { readLinkTest, readMetaTest, readoutSummary, type CreativeRow, type LinkRow, type Verdict } from '@/lib/domain/backlog-readout'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { createItem, decideItem, deleteItem, moveItem, saveRules, toggleGate, togglePublished } from './actions'
+import { createItem, decideItem, deleteItem, linkAbTest, moveItem, saveRules, toggleGate, togglePublished } from './actions'
 
 const mono = 'font-[family-name:var(--font-geist-mono)]'
 const field =
@@ -20,6 +22,64 @@ const RULE_FIELDS = [
   { key: 'minVisits', label: 'A/B de link: mínimo de visitantes por variante', hint: 'Sem esse piso, uma chance alta com pouca gente não vale como vitória.', step: '50' },
   { key: 'sat', label: 'Janela de saturação de criativo (dias)', hint: 'Criativo rodando há mais tempo que isso pede decisão.', step: '1' },
 ] as const
+
+const VERDICT: Record<Verdict, { text: string; tone: string }> = {
+  win: { text: 'vence', tone: 'text-[var(--ct-ok)]' },
+  cut: { text: 'cortar', tone: 'text-[var(--ct-crit)]' },
+  measuring: { text: 'medindo', tone: 'text-[var(--ct-text-3)]' },
+  no_data: { text: 'sem dados', tone: 'text-[var(--ct-text-3)]' },
+}
+const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+interface Readout {
+  summary: string | null
+  meta?: ReturnType<typeof readMetaTest>
+  link?: ReturnType<typeof readLinkTest>
+}
+
+// Meta tests read every tagged ad of the project's creative report since the earliest running
+// start; tags are unique per project, so an older window cannot leak another test's ads.
+async function loadReadouts(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  clientId: string,
+  salesFunnelId: string,
+  items: BacklogItem[],
+  rules: ReturnType<typeof readRules>
+): Promise<Map<string, Readout>> {
+  const running = items.filter((item) => item.status === 'running')
+  const meta = running.filter((item) => item.method === 'meta')
+  const link = running.filter((item) => item.method === 'link' && item.abTestId)
+  const since = meta
+    .map((item) => (item.startedAt ? new Date(item.startedAt).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) : null))
+    .filter((day): day is string => Boolean(day))
+    .sort()[0] ?? null
+  const [creativeResult, { data: taxRows }, linkReports, { data: controls }] = await Promise.all([
+    meta.length > 0
+      ? supabase.rpc('get_funnel_report_by_creative', { p_sales_funnel_id: salesFunnelId, p_since: since, p_until: null })
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from('client_tax_rates').select('factor').eq('client_id', clientId).lte('valid_from', new Date().toISOString().slice(0, 10)).order('valid_from', { ascending: false }).limit(1),
+    Promise.all(link.map((item) => supabase.rpc('get_test_report', { p_test_id: item.abTestId, p_since: null, p_until: null }))),
+    link.length > 0
+      ? supabase.from('variants').select('id, test_id').eq('is_control', true).in('test_id', link.map((item) => item.abTestId!))
+      : Promise.resolve({ data: [] }),
+  ])
+  if (creativeResult.error) console.error('[backlog-creative-readout-failed]', { salesFunnelId }, creativeResult.error)
+  const creatives = (creativeResult.data ?? []) as CreativeRow[]
+  const taxFactor = Number(taxRows?.[0]?.factor ?? 1)
+  const readouts = new Map<string, Readout>()
+  for (const item of meta) {
+    const read = readMetaTest(item.code, item.variants.map((variant) => variant.key), creatives, rules, taxFactor)
+    const days = item.startedAt ? daysRunningSince(item.startedAt) : 1
+    readouts.set(item.id, { meta: read, summary: readoutSummary(read.map((v) => ({ label: v.key, verdict: v.verdict })), days, rules, 'meta') })
+  }
+  link.forEach((item, index) => {
+    const controlId = (controls ?? []).find((row) => row.test_id === item.abTestId)?.id
+    const read = readLinkTest((linkReports[index].data ?? []) as LinkRow[], controlId, rules)
+    const days = item.startedAt ? daysRunningSince(item.startedAt) : 1
+    readouts.set(item.id, { link: read, summary: readoutSummary(read.map((v) => ({ label: v.name, verdict: v.verdict })), days, rules, 'link') })
+  })
+  return readouts
+}
 
 function cardStatus(item: BacklogItem): { text: string; tone: string } {
   const open = item.gates.filter((gate) => !gate.doneAt).length
@@ -61,8 +121,13 @@ export default async function BacklogPage({
 
   const [items, canEdit] = await Promise.all([getBacklog(supabase, funnel.id), canActAs(supabase, client.id, 'gestor')])
   const rules = readRules(funnel.test_rules)
+  const [readouts, { data: abTests }] = await Promise.all([
+    loadReadouts(supabase, client.id, funnel.id, items, rules),
+    supabase.from('tests').select('id, name').eq('client_id', client.id).order('name'),
+  ])
   const tab = aba === 'regras' && canEdit ? 'regras' : 'backlog'
   const selected = items.find((item) => item.code === itemCode) ?? null
+  const selectedReadout = selected ? readouts.get(selected.id) : undefined
   const context = { client_id: client.id as string, client_slug: client.slug as string, sales_funnel_id: funnel.id as string, funnel_slug: funnel.slug as string }
   const href = (extra: string) => `${base}?projeto=${funnel.slug}${extra}`
   const running = items.filter((item) => item.status === 'running').length
@@ -218,6 +283,9 @@ export default async function BacklogPage({
                           {STAGES[item.stage]}{item.owner ? ` · ${item.owner}` : ''}{item.published ? ' · publicado' : ''}
                         </span>
                         <span className={`text-[11.5px] ${status.tone}`}>{status.text}</span>
+                        {readouts.get(item.id)?.summary && (
+                          <span className="rounded-[8px] bg-[var(--ct-warn-soft)] px-2 py-1 text-[11.5px] font-medium text-[var(--ct-warn)]">{readouts.get(item.id)!.summary}</span>
+                        )}
                       </Link>
                     )
                   })}
@@ -300,9 +368,74 @@ export default async function BacklogPage({
                   </div>
                 ))}
                 {selected.method === 'meta' && selected.status !== 'decided' && (
-                  <p className="mt-2 text-[11.5px] text-[var(--ct-text-3)]">Coloque a tag no nome do anúncio de cada variante. A medição automática por tag entra na próxima etapa.</p>
+                  <p className="mt-2 text-[11.5px] text-[var(--ct-text-3)]">Coloque a tag no nome do anúncio de cada variante. Com o teste em Rodando, a Central mede cada tag sozinha.</p>
                 )}
               </div>
+
+              {selectedReadout?.meta && (
+                <div className="flex flex-col rounded-[14px] border border-[var(--ct-line)] px-4 py-3">
+                  <span className="text-[12.5px] font-semibold">Medição por tag · desde o início do teste</span>
+                  <div className={`${mono} mt-2 grid grid-cols-[28px_1fr_1fr_1fr_70px] gap-x-2 gap-y-1.5 text-[12px]`}>
+                    <span className="text-[var(--ct-text-3)]" />
+                    <span className="text-[var(--ct-text-3)]">gasto</span>
+                    <span className="text-[var(--ct-text-3)]">compras</span>
+                    <span className="text-[var(--ct-text-3)]">CPA</span>
+                    <span />
+                    {selectedReadout.meta.map((variant) => (
+                      <Fragment key={variant.key}>
+                        <span className="text-[var(--ct-text-3)]">{variant.key}</span>
+                        <span>{variant.ads > 0 ? brl(variant.spend) : '—'}</span>
+                        <span>{variant.ads > 0 ? variant.sales : '—'}</span>
+                        <span>{variant.cpa !== null ? brl(variant.cpa) : '—'}</span>
+                        <span className={VERDICT[variant.verdict].tone}>{VERDICT[variant.verdict].text}</span>
+                      </Fragment>
+                    ))}
+                  </div>
+                  <p className="mt-2.5 text-[11.5px] text-[var(--ct-text-3)]">
+                    Gasto com imposto. Corta com {brl(rules.teto * rules.mult)} sem venda; vence com CPA até {brl(rules.teto)} e {rules.min}+ compras. É sugestão: a decisão é sua.
+                  </p>
+                </div>
+              )}
+
+              {selected.method === 'link' && selected.status !== 'decided' && (
+                <div className="flex flex-col gap-2 rounded-[14px] border border-[var(--ct-line)] px-4 py-3">
+                  <span className="text-[12.5px] font-semibold">Teste A/B que mede este card</span>
+                  {canEdit ? (
+                    <form action={linkAbTest.bind(null, { ...context, item_id: selected.id, code: selected.code })} className="flex items-center gap-2">
+                      <select name="ab_test_id" defaultValue={selected.abTestId ?? ''} className={`${field} flex-1 py-1.5 text-[12.5px]`} aria-label="Teste A/B vinculado">
+                        <option value="">nenhum</option>
+                        {(abTests ?? []).map((test) => <option key={test.id} value={test.id}>{test.name}</option>)}
+                      </select>
+                      <button type="submit" className="rounded-full border border-[var(--ct-line-2)] px-3 py-1.5 text-[12.5px]">Vincular</button>
+                    </form>
+                  ) : (
+                    <span className="text-[12.5px] text-[var(--ct-text-2)]">{(abTests ?? []).find((test) => test.id === selected.abTestId)?.name ?? 'nenhum'}</span>
+                  )}
+                  {selectedReadout?.link && (
+                    <div className={`${mono} mt-1 grid grid-cols-[1fr_70px_70px_60px_70px] gap-x-2 gap-y-1.5 text-[12px]`}>
+                      <span className="text-[var(--ct-text-3)]" />
+                      <span className="text-[var(--ct-text-3)]">pessoas</span>
+                      <span className="text-[var(--ct-text-3)]">conv.</span>
+                      <span className="text-[var(--ct-text-3)]">chance</span>
+                      <span />
+                      {selectedReadout.link.map((variant) => (
+                        <Fragment key={variant.name}>
+                          <span className="truncate font-[family-name:var(--font-geist-sans)]">{variant.name}{variant.isControl ? ' (controle)' : ''}</span>
+                          <span>{variant.visits.toLocaleString('pt-BR')}</span>
+                          <span>{variant.conversions.toLocaleString('pt-BR')}</span>
+                          <span>{variant.chance !== null ? `${Math.round(variant.chance * 100)}%` : '—'}</span>
+                          <span className={VERDICT[variant.verdict].tone}>{variant.isControl ? '' : VERDICT[variant.verdict].text}</span>
+                        </Fragment>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11.5px] text-[var(--ct-text-3)]">
+                    {selected.status === 'running'
+                      ? `Vence com ${rules.conf}%+ de chance e ${rules.minVisits.toLocaleString('pt-BR')}+ pessoas em cada lado. É sugestão: a decisão é sua.`
+                      : 'A medição começa quando o card for para Rodando.'}
+                  </p>
+                </div>
+              )}
 
               {selected.status !== 'decided' && (
                 <div className="flex flex-col rounded-[14px] border border-[var(--ct-line)] px-4 py-3">

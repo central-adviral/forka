@@ -34,6 +34,7 @@ export interface BacklogItem {
   winnerKey: string | null
   learning: string | null
   published: boolean
+  abTestId: string | null
   variants: BacklogVariant[]
   gates: BacklogGate[]
 }
@@ -43,7 +44,7 @@ export async function getBacklog(db: SupabaseClient, salesFunnelId: string): Pro
   const { data, error } = await db
     .from('backlog_items')
     .select(
-      'id, code, title, hypothesis, stage, method, status, impact, confidence, ease, ice, metric, owner, started_at, decided_at, result, winner_key, learning, published, backlog_variants(id, key, name, status, position), backlog_gates(id, label, done_at, position)'
+      'id, code, title, hypothesis, stage, method, status, impact, confidence, ease, ice, metric, owner, started_at, decided_at, result, winner_key, learning, published, ab_test_id, backlog_variants(id, key, name, status, position), backlog_gates(id, label, done_at, position)'
     )
     .eq('sales_funnel_id', salesFunnelId)
     .order('ice', { ascending: false })
@@ -68,6 +69,7 @@ export async function getBacklog(db: SupabaseClient, salesFunnelId: string): Pro
     winner_key: string | null
     learning: string | null
     published: boolean
+    ab_test_id: string | null
     backlog_variants: { id: string; key: string; name: string; status: BacklogVariant['status']; position: number }[]
     backlog_gates: { id: string; label: string; done_at: string | null; position: number }[]
   }[]).map((row) => ({
@@ -90,6 +92,7 @@ export async function getBacklog(db: SupabaseClient, salesFunnelId: string): Pro
     winnerKey: row.winner_key,
     learning: row.learning,
     published: row.published,
+    abTestId: row.ab_test_id,
     variants: [...(row.backlog_variants ?? [])].sort((a, b) => a.position - b.position).map(({ id, key, name, status }) => ({ id, key, name, status })),
     gates: [...(row.backlog_gates ?? [])].sort((a, b) => a.position - b.position).map((gate) => ({ id: gate.id, label: gate.label, doneAt: gate.done_at })),
   }))
