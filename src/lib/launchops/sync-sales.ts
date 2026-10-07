@@ -132,11 +132,19 @@ export async function syncSalesForFunnel(
   const approved = rows.filter((row) => row.status === APPROVED_STATUS)
   const removedIds = rows.filter((row) => row.status !== APPROVED_STATUS).map((row) => row.id)
 
+  // A sale is stored once per client (0073) and may sit in another project or in none, so a refund
+  // removes it by client, wherever the attribution put it.
+  let clientId: string | null = null
+  if (removedIds.length > 0) {
+    const { data: funnel, error: funnelError } = await appDb.from('sales_funnels').select('client_id').eq('id', salesFunnelId).single()
+    if (funnelError) throw funnelError
+    clientId = funnel.client_id as string
+  }
   for (let i = 0; i < removedIds.length; i += LOOKUP_CHUNK_SIZE) {
     const { error } = await appDb
       .from('sales')
       .delete()
-      .eq('sales_funnel_id', salesFunnelId)
+      .eq('client_id', clientId)
       .eq('source', 'launchops_sync')
       .in('external_id', removedIds.slice(i, i + LOOKUP_CHUNK_SIZE))
     if (error) throw error
@@ -149,6 +157,8 @@ export async function syncSalesForFunnel(
   const transactionIds = [...new Set(approved.map((row) => row.transaction_id_plataforma).filter((id): id is string => Boolean(id)))]
   const conversionIdByTransactionId = await findConversionIdsByExternalEventId(appDb, transactionIds)
 
+  // sales_funnel_id is a hint: the sales_attribute trigger (0073) picks the project from the
+  // products and the ad, and fills client_id from it.
   const payload = approved.map((row) => ({
     sales_funnel_id: salesFunnelId,
     source: 'launchops_sync',
@@ -176,7 +186,7 @@ export async function syncSalesForFunnel(
   // hitting a request-size or statement-timeout limit. Write in bounded batches instead.
   for (let i = 0; i < payload.length; i += UPSERT_BATCH_SIZE) {
     const batch = payload.slice(i, i + UPSERT_BATCH_SIZE)
-    const { error } = await appDb.from('sales').upsert(batch, { onConflict: 'sales_funnel_id,source,external_id' })
+    const { error } = await appDb.from('sales').upsert(batch, { onConflict: 'client_id,source,external_id' })
     if (error) throw error
   }
 

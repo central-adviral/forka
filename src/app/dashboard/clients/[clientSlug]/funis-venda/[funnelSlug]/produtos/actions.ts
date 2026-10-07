@@ -52,5 +52,5 @@ export async function removeProduct(context: ProductsContext & { produto_nome: s
   if (error) back(context, 'erro', error.message)
   if (!data || data.length === 0) back(context, 'erro', 'Só gestor ou owner pode remover produtos.')
   revalidatePath(productsPath(context))
-  back(context, 'ok', `${context.produto_nome} saiu do projeto, com as vendas dele.`)
+  back(context, 'ok', `${context.produto_nome} saiu do projeto. As vendas dele foram para outro projeto que tem o produto, ou ficaram sem atribuição.`)
 }
