@@ -7,6 +7,9 @@ import { FunnelKpiCards } from './funnel-kpi-cards'
 import { MIN_SALES_FOR_CPA, topByCpa, topBySales } from '@/lib/domain/creative-ranking'
 import { buildTrafficDays } from '@/lib/domain/traffic-days'
 import { TrafficPanel } from './traffic-panel'
+import { PatternsPanel } from './patterns-panel'
+import { analyzePatterns } from '@/lib/domain/patterns'
+import { saoPauloDay } from '@/lib/repo/today-repo'
 import { FunnelPaymentPie } from './funnel-payment-pie'
 import { SyncFunnelButton } from './sync-funnel-button'
 import { SyncStatus } from '@/components/sync-status'
@@ -330,18 +333,44 @@ export default async function SalesFunnelPage({
             : { data: row.data, spend: row.spendComImposto, impressions: row.impressions, linkClicks: row.linkClicks, landingPageViews: row.landingPageViews, initiateCheckout: row.initiateCheckout, leads: add('leads'), vendas: row.vendas }
         })
         const traffic = buildTrafficDays(days)
+        const costKey = !selectedFront && (traffic.total.vendas ?? 0) > 0 ? 'cpa' : traffic.total.leads > 0 ? 'cpl' : 'cpm'
+        // Patterns read only closed days: today is partial and would always look like an outlier.
+        const today = saoPauloDay(0)
+        const patterns = analyzePatterns(
+          traffic.days
+            .filter((day) => day.data !== today)
+            .map((day) => ({
+              data: day.data,
+              spend: day.spend,
+              cost: day[costKey],
+              metrics: {
+                cpm: day.cpm,
+                ctr: day.ctr,
+                connectRate: day.connectRate,
+                pvToIc: day.pvToIc,
+                // The page's own conversion: sales per visit for the project, leads per visit for a capture.
+                conv:
+                  day.landingPageViews > 0 && costKey !== 'cpm'
+                    ? ((costKey === 'cpa' ? (day.vendas ?? 0) : day.leads) / day.landingPageViews) * 100
+                    : null,
+              },
+            }))
+        )
         return (
-          <TrafficPanel
-            days={traffic.days}
-            total={traffic.total}
-            isFront={selectedFront !== null}
-            costKey={!selectedFront && (traffic.total.vendas ?? 0) > 0 ? 'cpa' : traffic.total.leads > 0 ? 'cpl' : 'cpm'}
-            money={currency}
-            scopes={[
-              { label: `${funnel.name} inteiro`, href: withParams({ frente: undefined }), active: !selectedFront },
-              ...fronts.map((front) => ({ label: `Frente ${front.name}`, href: withParams({ frente: front.id }), active: selectedFront?.id === front.id })),
-            ]}
-          />
+          <>
+            <TrafficPanel
+              days={traffic.days}
+              total={traffic.total}
+              isFront={selectedFront !== null}
+              costKey={costKey}
+              money={currency}
+              scopes={[
+                { label: `${funnel.name} inteiro`, href: withParams({ frente: undefined }), active: !selectedFront },
+                ...fronts.map((front) => ({ label: `Frente ${front.name}`, href: withParams({ frente: front.id }), active: selectedFront?.id === front.id })),
+              ]}
+            />
+            <PatternsPanel report={patterns} costLabel={costKey === 'cpa' ? 'CPA geral' : costKey === 'cpl' ? 'CPL' : 'CPM'} money={currency} />
+          </>
         )
       })()}
 
