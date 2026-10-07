@@ -3,6 +3,7 @@ import { createLaunchOpsClient } from '@/lib/launchops/client'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { syncOneFunnel, syncClientCampaigns } from '@/lib/launchops/sync-funnel'
 import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
+import { probeClientPages } from '@/lib/pages/probe'
 
 interface FunnelRow {
   id: string
@@ -45,6 +46,12 @@ export async function GET(request: NextRequest) {
     if (!campaignsSyncedFor.has(funnel.client_id)) {
       campaignsSyncedFor.add(funnel.client_id)
       await syncClientCampaigns(appDb, launchopsDb, funnel.client_id)
+      // The page probe (0066) rides on the same hourly run; a failure here must not stop the sync.
+      try {
+        await probeClientPages(appDb, funnel.client_id)
+      } catch (err) {
+        console.error('[page-probe-failed]', { clientId: funnel.client_id }, err)
+      }
     }
     await syncOneFunnel(appDb, launchopsDb, funnel)
     funnelsProcessed++
