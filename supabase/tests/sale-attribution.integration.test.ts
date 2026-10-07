@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
+import { reconcileUnmatchedSales } from '@/lib/launchops/sync-sales'
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321'
 const admin = createClient(URL, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -70,5 +71,46 @@ describe('sale attribution: ad, then product, then no project (0073)', () => {
     const { error: again } = await admin.from('sales').upsert(sale('bump', 'Bump', null), { onConflict: 'client_id,source,external_id' })
     expect(again).toBeNull()
     expect(Object.keys(await owners())).toHaveLength(4)
+  })
+
+  it('keeps the sales of a deleted project, unattributed, and still links them to their click (0075)', async () => {
+    const { data: user } = await admin.auth.admin.createUser({ email: `attr-del-${Date.now()}@example.com`, password: 'password123', email_confirm: true })
+    const { data: client } = await admin.from('clients').insert({ owner_id: user!.user!.id, name: 'AttrDel', slug: `attr-del-${Date.now()}` }).select().single()
+    const clientId = client!.id as string
+    const transactionId = `tx-late-${Date.now()}`
+    const { data: funnel } = await admin.from('sales_funnels').insert({ client_id: clientId, name: 'Velho', slug: 'velho' }).select().single()
+    await admin.from('project_products').insert({ sales_funnel_id: funnel!.id, produto_nome: 'Curso', papel: 'entrada' })
+    const { error: saleError } = await admin.from('sales').insert({
+      sales_funnel_id: funnel!.id,
+      external_id: 'late-1',
+      data_venda: new Date().toISOString(),
+      status: 'aprovada',
+      produto: 'Curso',
+      transaction_id_plataforma: transactionId,
+    })
+    expect(saleError).toBeNull()
+
+    const { error: deleteError } = await admin.from('sales_funnels').delete().eq('id', funnel!.id)
+    expect(deleteError).toBeNull()
+    const { data: kept } = await admin.from('sales').select('sales_funnel_id, atribuicao').eq('client_id', clientId)
+    expect(kept).toEqual([{ sales_funnel_id: null, atribuicao: 'sem_atribuicao' }])
+
+    // The conversion lands after the sale was stored: the reconciliation pass links it by client.
+    const { data: test } = await admin.from('tests').insert({ client_id: clientId, name: 'oferta', slug: `oferta-${Date.now()}`, conversion_method: 'thank_you_page' }).select().single()
+    const { data: variant } = await admin.from('variants').insert({ test_id: test!.id, name: 'A', weight_pct: 100, destination_url: 'https://exemplo.com.br/a', is_control: true }).select().single()
+    const { data: click } = await admin
+      .from('click_events')
+      .insert({ test_id: test!.id, variant_id: variant!.id, visitor_id: 'v-late', tracking_id: crypto.randomUUID(), source_utms: {} })
+      .select()
+      .single()
+    const { data: conversion, error: conversionError } = await admin
+      .from('conversions')
+      .insert({ click_event_id: click!.id, source: 'hubla_webhook', external_event_id: transactionId })
+      .select()
+      .single()
+    expect(conversionError).toBeNull()
+    expect(await reconcileUnmatchedSales(admin, clientId)).toEqual({ reconciled: 1 })
+    const { data: linked } = await admin.from('sales').select('conversion_id').eq('client_id', clientId).single()
+    expect(linked!.conversion_id).toBe(conversion!.id)
   })
 })

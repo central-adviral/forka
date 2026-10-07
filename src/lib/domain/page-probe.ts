@@ -25,7 +25,8 @@ export function isSafeProbeUrl(raw: string): boolean {
   } catch {
     return false
   }
-  if (url.protocol !== 'https:' || url.username || url.password) return false
+  // Only the standard https port: another port is another service on the same host.
+  if (url.protocol !== 'https:' || url.username || url.password || (url.port !== '' && url.port !== '443')) return false
   const host = url.hostname.toLowerCase()
   if (!host.includes('.') || host === 'localhost' || /\.(local|localhost|internal|lan|home|test)$/.test(host)) return false
   if (/^[\d.]+$/.test(host) || host.startsWith('[')) return false
