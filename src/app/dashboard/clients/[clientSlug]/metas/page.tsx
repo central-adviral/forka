@@ -84,7 +84,11 @@ export default async function MetasPage({
                   <td className="px-5 py-3">
                     {watcher.projectName}
                     <span className="block text-[11.5px] text-[var(--ct-text-3)]">
-                      {watcher.frontName ? `frente ${watcher.frontName} · só mídia` : 'projeto inteiro · todas as frentes + vendas'}
+                      {watcher.nameFilter
+                        ? `campanhas com "${watcher.nameFilter}" · só mídia`
+                        : watcher.frontName
+                          ? `frente ${watcher.frontName} · só mídia`
+                          : 'projeto inteiro · todas as frentes + vendas'}
                     </span>
                   </td>
                   <td className="px-5 py-3 text-[var(--ct-text-2)]">{METRICS[watcher.metric].bad}</td>
@@ -122,7 +126,7 @@ export default async function MetasPage({
       </div>
 
       {canEdit && (
-        <form action={createWatcher.bind(null, context)} className="card-shadow grid gap-4 rounded-[18px] border border-dashed border-[var(--ct-line-2)] px-6 py-5 md:grid-cols-3 xl:grid-cols-6">
+        <form action={createWatcher.bind(null, context)} className="card-shadow grid gap-4 rounded-[18px] border border-dashed border-[var(--ct-line-2)] px-6 py-5 md:grid-cols-3 xl:grid-cols-7">
           <ScopeMetricFields
             fieldClass={field}
             groups={(funnels ?? []).map((funnel) => ({
@@ -141,7 +145,7 @@ export default async function MetasPage({
               projectOnly: METRICS[metric].projectOnly,
             }))}
           />
-          <div className="rounded-[12px] bg-[var(--ct-surface-2)] px-4 py-3 text-xs leading-relaxed text-[var(--ct-text-2)] md:col-span-3 xl:order-last xl:col-span-6">
+          <div className="rounded-[12px] bg-[var(--ct-surface-2)] px-4 py-3 text-xs leading-relaxed text-[var(--ct-text-2)] md:col-span-3 xl:order-last xl:col-span-7">
             <b className="text-[var(--ct-text)]">Projeto inteiro x frente</b>
             <ul className="mt-1.5 flex flex-col gap-1">
               <li>
@@ -178,10 +182,15 @@ export default async function MetasPage({
             </span>
           </label>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+            Recorte por nome (opcional)
+            <input name="name_filter" maxLength={60} placeholder="ex.: Escala ou [RMK]" className={field} />
+            <span className="text-[11px]">só as campanhas cujo nome contém o texto · sem CPA</span>
+          </label>
+          <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Gasto mínimo no dia
             <input name="min_spend" inputMode="decimal" placeholder="300" className={`${field} ${mono}`} />
           </label>
-          <div className="flex items-end md:col-span-3 xl:col-span-6">
+          <div className="flex items-end md:col-span-3 xl:col-span-7">
             <p className="mr-auto max-w-[70ch] text-xs text-[var(--ct-text-3)]">
               Custos (CPA, CPL, CPM) ficam ruins quando sobem; CTR, connect rate e investimento, quando caem. Abaixo do gasto
               mínimo o número balança sozinho e o vigia fica calado.

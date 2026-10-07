@@ -33,6 +33,8 @@ const watcherSchema = z
     warn_pct: decimal.pipe(z.number().min(0)),
     crit_pct: decimal.pipe(z.number().min(0)),
     min_spend: decimal.pipe(z.number().min(0)),
+    // A slice of the client's campaigns by name (0065); empty means the whole project or front.
+    name_filter: z.string().trim().max(60, 'o recorte tem no máximo 60 caracteres').transform((value) => value || null),
   })
   .refine((value) => value.crit_pct >= value.warn_pct, 'o crítico precisa ser maior ou igual à atenção')
 
@@ -44,10 +46,12 @@ export async function createWatcher(context: MetasContext, formData: FormData) {
     warn_pct: formData.get('warn_pct') || '20',
     crit_pct: formData.get('crit_pct') || '40',
     min_spend: formData.get('min_spend') || '0',
+    name_filter: formData.get('name_filter') ?? '',
   })
   if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '))
   const [funnelId, frontId] = result.data.scope.split('|')
-  if (frontId && METRICS[result.data.metric].projectOnly) back(context, 'erro', `${METRICS[result.data.metric].label} vale para o projeto inteiro: as vendas não são de uma frente.`)
+  if ((frontId || result.data.name_filter) && METRICS[result.data.metric].projectOnly)
+    back(context, 'erro', `${METRICS[result.data.metric].label} vale para o projeto inteiro: as vendas não são de uma frente nem de um recorte.`)
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('watchers').insert({
     client_id: context.client_id,
@@ -58,6 +62,7 @@ export async function createWatcher(context: MetasContext, formData: FormData) {
     warn_pct: result.data.warn_pct,
     crit_pct: result.data.crit_pct,
     min_spend: result.data.min_spend,
+    name_filter: result.data.name_filter,
   })
   if (error) back(context, 'erro', error.code === '42501' ? 'Só gestor ou owner pode criar vigias.' : error.message)
   revalidatePath(metasPath(context))
