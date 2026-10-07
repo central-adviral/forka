@@ -90,7 +90,7 @@ export default async function PainelPage({
         </Link>
       </div>
 
-      <section className="flex flex-col gap-4">
+      <section id="atencao" className="flex flex-col gap-4 scroll-mt-6">
         <header>
           <h2 className="text-[19px] font-semibold">Precisa da sua atenção</h2>
           <p className="mt-1 text-[13px] text-[var(--ct-text-3)]">Alertas abertos agora, do pior para o mais leve.</p>
@@ -123,7 +123,7 @@ export default async function PainelPage({
         </div>
       </section>
 
-      <section className="flex flex-col gap-4">
+      <section id="vigias" className="flex flex-col gap-4 scroll-mt-6">
         <header>
           <h2 className="text-[19px] font-semibold">Vigias por projeto</h2>
           <p className="mt-1 text-[13px] text-[var(--ct-text-3)]">Cada vigia cuida de uma métrica num recorte, com alvo próprio.</p>
@@ -163,7 +163,7 @@ export default async function PainelPage({
         ))}
       </section>
 
-      <section id="paginas" className="flex flex-col gap-4">
+      <section id="paginas" className="flex flex-col gap-4 scroll-mt-6">
         <header className="flex flex-wrap items-end gap-3">
           <div>
             <h2 className="text-[19px] font-semibold">Páginas</h2>
@@ -238,7 +238,7 @@ export default async function PainelPage({
       </section>
 
       {closed.length > 0 && (
-        <section className="flex flex-col gap-4">
+        <section id="historico" className="flex flex-col gap-4 scroll-mt-6">
           <header>
             <h2 className="text-[19px] font-semibold">Histórico</h2>
             <p className="mt-1 text-[13px] text-[var(--ct-text-3)]">Alertas que já fecharam: quando abriu, quando voltou para a faixa.</p>

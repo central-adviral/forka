@@ -17,16 +17,7 @@ import { MiniBarChart } from '@/components/mini-bar-chart'
 import { SalesOriginPanel } from './sales-origin-panel'
 import { PageHeader, headerAction } from '@/components/page-header'
 import { FrontsPanel, type FrontDayRow, type FrontInfo } from './fronts-panel'
-
-const TABS = [
-  { value: 'visao', label: 'Visão geral' },
-  { value: 'trafego', label: 'Tráfego' },
-  { value: 'frentes', label: 'Frentes' },
-  { value: 'criativos', label: 'Por criativo' },
-  { value: 'origem', label: 'Origem das vendas' },
-  { value: 'dias', label: 'Dia a dia' },
-] as const
-type Tab = (typeof TABS)[number]['value']
+import { ANALYSIS_TABS, readAnalysisTab } from '@/lib/domain/analysis-tabs'
 
 export default async function SalesFunnelPage({
   params,
@@ -37,7 +28,7 @@ export default async function SalesFunnelPage({
 }) {
   const { clientSlug, funnelSlug } = await params
   const { periodo, desde, ate, aba, frente } = await searchParams
-  const tab: Tab = TABS.some((option) => option.value === aba) ? (aba as Tab) : 'visao'
+  const tab = readAnalysisTab(aba)
   // Links keep the period, the tab and the front together, whichever one the user changes.
   const withParams = (changes: Record<string, string | undefined>) => {
     const merged = { periodo, desde, ate, aba: tab === 'visao' ? undefined : tab, frente, ...changes }
@@ -316,7 +307,7 @@ export default async function SalesFunnelPage({
       />
 
       <nav className="mb-6 inline-flex max-w-full gap-0.5 overflow-x-auto rounded-full border border-[var(--ct-line)] bg-[var(--ct-surface-2)] p-1" aria-label="Abas da análise">
-        {TABS.map((option) => (
+        {ANALYSIS_TABS.map((option) => (
           <a
             key={option.value}
             href={withParams({ aba: option.value === 'visao' ? undefined : option.value })}
