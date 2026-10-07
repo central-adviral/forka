@@ -27,7 +27,7 @@ export default async function MetasPage({
 
   const [watchers, { data: funnels }, { data: fronts }, { data: canEdit }] = await Promise.all([
     getWatchers(supabase, client.id),
-    supabase.from('sales_funnels').select('id, name, slug').eq('client_id', client.id).order('name'),
+    supabase.from('sales_funnels').select('id, name, slug, resultado').eq('client_id', client.id).order('name'),
     supabase.from('project_fronts').select('id, name, sales_funnel_id, naming_rules(kind, value), sales_funnels!project_fronts_sales_funnel_id_fkey!inner(client_id)').eq('sales_funnels.client_id', client.id).order('position'),
     canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
   ])
@@ -131,6 +131,7 @@ export default async function MetasPage({
               funnelId: funnel.id as string,
               funnelName: funnel.name as string,
               rulesHref: `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`,
+              resultado: funnel.resultado === 'lead' ? 'lead' : 'compra',
               fronts: (fronts ?? [])
                 .filter((front) => front.sales_funnel_id === funnel.id)
                 .map((front) => ({ id: front.id as string, name: front.name as string, rule: ruleLabel(front) })),
@@ -139,6 +140,7 @@ export default async function MetasPage({
               value: metric,
               label: METRICS[metric].label,
               projectOnly: METRICS[metric].projectOnly,
+              salesOnly: METRICS[metric].salesOnly,
             }))}
           />
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">

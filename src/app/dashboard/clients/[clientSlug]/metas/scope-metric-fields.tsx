@@ -6,6 +6,7 @@ interface ProjectOption {
   funnelId: string
   funnelName: string
   rulesHref: string
+  resultado: 'compra' | 'lead'
   fronts: { id: string; name: string; rule: string }[]
 }
 
@@ -13,14 +14,16 @@ interface MetricOption {
   value: string
   label: string
   projectOnly: boolean
+  salesOnly: boolean
 }
 
 const isFrontScope = (scope: string) => scope !== '' && !scope.endsWith('|')
 
-// Sales belong to the project, not to a front, so a front only offers the media metrics. The
-// server action refuses the combination too; this keeps it from being picked in the first place.
-export function availableMetrics<T extends MetricOption>(scope: string, metrics: T[]): T[] {
-  return isFrontScope(scope) ? metrics.filter((option) => !option.projectOnly) : metrics
+// Sales belong to the project, not to a front, so a front only offers the media metrics; and a
+// lead project has no sales at all, so it never offers a CPA. The server action refuses both too;
+// this keeps them from being picked in the first place.
+export function availableMetrics<T extends MetricOption>(scope: string, metrics: T[], resultado: 'compra' | 'lead' = 'compra'): T[] {
+  return metrics.filter((option) => !(isFrontScope(scope) && option.projectOnly) && !(resultado === 'lead' && option.salesOnly))
 }
 
 export function ScopeMetricFields({ projects, metrics, fieldClass }: { projects: ProjectOption[]; metrics: MetricOption[]; fieldClass: string }) {
@@ -29,12 +32,12 @@ export function ScopeMetricFields({ projects, metrics, fieldClass }: { projects:
   const [metric, setMetric] = useState(metrics[0]?.value ?? '')
   const project = projects.find((option) => option.funnelId === funnelId)
   const scope = funnelId ? `${funnelId}|${frontId}` : ''
-  const available = availableMetrics(scope, metrics)
+  const available = availableMetrics(scope, metrics, project?.resultado)
 
   function pick(nextFunnel: string, nextFront: string) {
     setFunnelId(nextFunnel)
     setFrontId(nextFront)
-    const offered = availableMetrics(nextFunnel ? `${nextFunnel}|${nextFront}` : '', metrics)
+    const offered = availableMetrics(nextFunnel ? `${nextFunnel}|${nextFront}` : '', metrics, projects.find((option) => option.funnelId === nextFunnel)?.resultado)
     if (!offered.some((option) => option.value === metric)) setMetric(offered[0]?.value ?? '')
   }
 

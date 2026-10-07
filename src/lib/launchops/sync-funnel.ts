@@ -14,6 +14,8 @@ import {
   fetchLaunchOpsAdCreativesByCampaignIds,
   fetchLaunchOpsAdCreativeSpendRows,
   joinAdCreativeSpend,
+  mergeAdLeads,
+  fetchLaunchOpsAdLeads,
   syncAdCreativeSpendForFunnel,
 } from './sync-ad-creative-spend'
 import { syncCampaignsForClient } from './sync-campaigns'
@@ -173,7 +175,12 @@ async function syncAdCreativeSpendEntity(appDb: SupabaseClient, launchopsDb: Sup
       anuncioIds: creatives.map((c) => c.id),
       since: campaignIds ? null : cursor,
     })
-    const joined = joinAdCreativeSpend(creatives, spendRows)
+    // Leads per ad ride on the full re-read of a project picked by fronts, the only path a lead
+    // project uses; the operation path keeps leads at zero.
+    const spendJoined = joinAdCreativeSpend(creatives, spendRows)
+    const joined = campaignIds
+      ? mergeAdLeads(spendJoined, creatives, await fetchLaunchOpsAdLeads(launchopsDb, [...new Set(creatives.map((c) => c.ad_id).filter((id): id is string => Boolean(id)))]))
+      : spendJoined
     const rewriteStartedAt = new Date().toISOString()
     await syncAdCreativeSpendForFunnel(appDb, funnel.id, joined)
     // A full re-read rewrote every row the project still owns; whatever it did not touch is a renamed

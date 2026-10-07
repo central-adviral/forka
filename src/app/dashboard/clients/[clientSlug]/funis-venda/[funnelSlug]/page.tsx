@@ -93,9 +93,16 @@ export default async function SalesFunnelPage({
     link_clicks: number
     sales_count: number
     revenue: number
+    leads: number
   }[]
   // Sales no ad could be tied to are listed in the table but never ranked as a creative.
-  const rankable = creatives.filter((c) => c.ad_name !== '(sem anúncio)')
+  // A lead project ranks and prices its creatives by paid leads (0072); the ranking helpers count
+  // whatever sits in sales_count, so the lead count takes that place.
+  const isLead = funnel.resultado === 'lead'
+  const rankable = creatives
+    .filter((c) => c.ad_name !== '(sem anúncio)')
+    .map((c) => (isLead ? { ...c, sales_count: Number(c.leads ?? 0) } : c))
+  const unit = isLead ? { one: 'lead', many: 'leads', cost: 'CPL' } : { one: 'venda', many: 'vendas', cost: 'CPA' }
   if (productResult.error) console.error('[funnel-product-report-failed]', { salesFunnelId: funnel.id }, productResult.error)
   if (hourResult.error) console.error('[funnel-hour-report-failed]', { salesFunnelId: funnel.id }, hourResult.error)
   const products = (productResult.data ?? []) as { produto: string; sales_count: number; revenue: number }[]
@@ -460,8 +467,8 @@ export default async function SalesFunnelPage({
       {tab === 'criativos' && creatives.length > 0 && (
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         {[
-          { title: 'Top 10 por compras', hint: 'quem mais vendeu no período', rows: topBySales(rankable).map((c) => ({ c, value: `${c.sales_count} ${c.sales_count === 1 ? 'venda' : 'vendas'}`, sub: c.spend > 0 && c.sales_count >= MIN_SALES_FOR_CPA ? `CPA ${currency(c.spend / c.sales_count)}` : 'CPA —' })) },
-          { title: 'Top 10 por CPA', hint: `menor custo por venda, com ${MIN_SALES_FOR_CPA}+ vendas`, rows: topByCpa(rankable).map((c) => ({ c, value: currency(c.cpa), sub: `${c.sales_count} vendas` })) },
+          { title: isLead ? 'Top 10 por leads' : 'Top 10 por compras', hint: isLead ? 'quem mais trouxe leads no período' : 'quem mais vendeu no período', rows: topBySales(rankable).map((c) => ({ c, value: `${c.sales_count} ${c.sales_count === 1 ? unit.one : unit.many}`, sub: c.spend > 0 && c.sales_count >= MIN_SALES_FOR_CPA ? `${unit.cost} ${currency(c.spend / c.sales_count)}` : `${unit.cost} —` })) },
+          { title: `Top 10 por ${unit.cost}`, hint: `menor custo por ${unit.one}, com ${MIN_SALES_FOR_CPA}+ ${unit.many}`, rows: topByCpa(rankable).map((c) => ({ c, value: currency(c.cpa), sub: `${c.sales_count} ${unit.many}` })) },
         ].map((block) => (
           <div key={block.title} className="card-shadow rounded-2xl border border-[var(--ct-line)] p-4">
             <div className="mb-3 flex items-baseline justify-between gap-3">
@@ -469,7 +476,7 @@ export default async function SalesFunnelPage({
               <span className="text-[11.5px] text-[var(--ct-text-2)]">{block.hint}</span>
             </div>
             {block.rows.length === 0 ? (
-              <p className="text-[12.5px] text-[var(--ct-text-2)]">Nenhum anúncio com vendas suficientes no período.</p>
+              <p className="text-[12.5px] text-[var(--ct-text-2)]">Nenhum anúncio com {unit.many} suficientes no período.</p>
             ) : (
               <ol className="flex flex-col gap-1.5">
                 {block.rows.map(({ c, value, sub }, index) => (
@@ -494,7 +501,7 @@ export default async function SalesFunnelPage({
         <div className="flex items-baseline justify-between px-4 pt-4">
           <h2 className="font-[family-name:var(--font-sora)] text-base font-semibold">Por criativo</h2>
           <span className="text-[11.5px] text-[var(--ct-text-2)]">
-            Gasto com imposto · vendas de entrada · receita líquida sem ascensão
+            {isLead ? 'Gasto com imposto · leads pagos únicos do anúncio' : 'Gasto com imposto · vendas de entrada · receita líquida sem ascensão'}
           </span>
         </div>
         <div className="overflow-x-auto">
@@ -503,17 +510,28 @@ export default async function SalesFunnelPage({
               <tr className="border-b border-[var(--ct-line)] text-left text-[var(--ct-text-2)]">
                 <th className="p-3">Anúncio</th>
                 <th className="p-3">Gasto</th>
-                <th className="p-3">Vendas</th>
-                <th className="p-3">Receita</th>
-                <th className="p-3">ROAS</th>
-                <th className="p-3">CPA</th>
+                {isLead ? (
+                  <>
+                    <th className="p-3">Leads</th>
+                    <th className="p-3">CPL</th>
+                    <th className="p-3">Cliques</th>
+                    <th className="p-3">Lead por clique</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="p-3">Vendas</th>
+                    <th className="p-3">Receita</th>
+                    <th className="p-3">ROAS</th>
+                    <th className="p-3">CPA</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
               {creatives.length === 0 ? (
                 <tr>
                   <td className="p-3 text-[var(--ct-text-2)]" colSpan={6}>
-                    Nenhum criativo com gasto ou venda no período.
+                    Nenhum criativo com gasto ou {unit.one} no período.
                   </td>
                 </tr>
               ) : (
@@ -539,6 +557,17 @@ export default async function SalesFunnelPage({
                         )}
                       </td>
                       <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(c.spend)}</td>
+                      {isLead ? (
+                        <>
+                          <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{Number(c.leads ?? 0)}</td>
+                          <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{Number(c.leads) > 0 ? currency(c.spend / Number(c.leads)) : '—'}</td>
+                          <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{Number(c.link_clicks ?? 0).toLocaleString('pt-BR')}</td>
+                          <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">
+                            {Number(c.link_clicks) > 0 ? `${((Number(c.leads ?? 0) / Number(c.link_clicks)) * 100).toFixed(1).replace('.', ',')}%` : '—'}
+                          </td>
+                        </>
+                      ) : (
+                        <>
                       <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{c.sales_count}</td>
                       <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(c.revenue)}</td>
                       <td
@@ -549,6 +578,8 @@ export default async function SalesFunnelPage({
                         {roas !== null ? `${roas.toFixed(2)}x` : '—'}
                       </td>
                       <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{cpa !== null ? currency(cpa) : '—'}</td>
+                        </>
+                      )}
                     </tr>
                   )
                 })
