@@ -16,6 +16,8 @@ describe('isSafeProbeUrl', () => {
     expect(isSafeProbeUrl('https://localhost:3000')).toBe(false)
     expect(isSafeProbeUrl('https://db.internal/')).toBe(false)
     expect(isSafeProbeUrl('https://user:pass@exemplo.com')).toBe(false)
+    expect(isSafeProbeUrl('https://www.exemplo.com.br:8443/oferta')).toBe(false)
+    expect(isSafeProbeUrl('https://www.exemplo.com.br:443/oferta')).toBe(true)
     expect(isSafeProbeUrl('não é url')).toBe(false)
   })
 })

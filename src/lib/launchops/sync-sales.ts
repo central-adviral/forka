@@ -84,10 +84,11 @@ const RECONCILE_ROW_LIMIT = 500
 
 // A sale that syncs before its conversion exists (webhook lands late, or the sale is synced
 // first) stays with conversion_id null forever: the incremental sync only revisits rows whose
-// updated_at moved. This second pass re-checks recent unmatched sales on every sync.
+// updated_at moved. This second pass re-checks recent unmatched sales on every sync -- by client, so
+// a sale no project owns (0073) is linked to its click as well.
 export async function reconcileUnmatchedSales(
   appDb: SupabaseClient,
-  salesFunnelId: string,
+  clientId: string,
   now: Date = new Date()
 ): Promise<{ reconciled: number }> {
   const since = new Date(now.getTime() - RECONCILE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
@@ -95,7 +96,7 @@ export async function reconcileUnmatchedSales(
   const { data: pending, error } = await appDb
     .from('sales')
     .select('id, transaction_id_plataforma')
-    .eq('sales_funnel_id', salesFunnelId)
+    .eq('client_id', clientId)
     .is('conversion_id', null)
     .not('transaction_id_plataforma', 'is', null)
     .gte('data_venda', since)
