@@ -114,7 +114,7 @@ h1, h2, h3 {
   --ct-line-2: rgba(255, 255, 255, 0.14);
   --ct-text: #f3f4f7;
   --ct-text-2: #aeb3c0;
-  --ct-text-3: #737987;
+  --ct-text-3: #8a90a0; /* 4.5:1+ on every dark surface */
   --ct-accent: #7aa2ff;
   --ct-on-accent: #07080b;
   --ct-painel: #7aa2ff;
@@ -138,7 +138,7 @@ h1, h2, h3 {
   --ct-line-2: rgba(15, 23, 42, 0.15);
   --ct-text: #0e1320;
   --ct-text-2: #4b5465;
-  --ct-text-3: #8a92a3;
+  --ct-text-3: #5d6575; /* 4.5:1+ on white and surface-2 */
   --ct-accent: #2f5bea;
   --ct-on-accent: #ffffff;
   --ct-painel: #2f5bea;
