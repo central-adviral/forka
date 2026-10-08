@@ -1,9 +1,9 @@
 import { PROJECT_RESULTS, readResult, resultUsesSales } from './project-plan'
 
-// The five steps that make a project's numbers trustworthy, in the order each one uses the previous.
-// Built only from facts the Central already stores; nothing here writes.
+// The eight steps that make a project's numbers trustworthy, in the order each one uses the previous
+// (Arquitetura dos Números, "Como configurar"). Built only from facts the Central already stores.
 
-export type SetupStepId = 'integracoes' | 'produtos' | 'regras' | 'plano' | 'metas'
+export type SetupStepId = 'integracoes' | 'projeto' | 'produtos' | 'regras' | 'paginas' | 'plano' | 'metas' | 'conferir'
 
 export interface SetupFacts {
   /** LaunchOps source URL and its key are set for the client. */
@@ -24,6 +24,14 @@ export interface SetupFacts {
   costTarget: number | null
   /** Watchers of the project other than the project-wide cost one. */
   extraWatchers: number
+  /** The project's window; both empty is a perpetual project. */
+  startsOn: string | null
+  endsOn: string | null
+  /** Active pages of the project, and the names of its own fronts with none. */
+  activePages: number
+  frontsWithoutPage: string[]
+  /** What the quality seals still flag on the project (0092). */
+  openSeals: string[]
 }
 
 export interface SetupStep {
@@ -59,12 +67,22 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
           ]
             .filter(Boolean)
             .join('; ') + '.'
+  const objective = PROJECT_RESULTS[readResult(facts.resultado)]
+  const day = (iso: string) => iso.split('-').reverse().slice(0, 2).join('/')
+  const window = facts.startsOn || facts.endsOn ? `${facts.startsOn ? `de ${day(facts.startsOn)}` : ''}${facts.endsOn ? ` até ${day(facts.endsOn)}` : ''}`.trim() : 'sem datas (perpétuo)'
+  const pagesDone = facts.ownFronts > 0 && facts.frontsWithoutPage.length === 0
   const steps: SetupStep[] = [
     {
       id: 'integracoes',
       label: 'Integrações',
       done: integrations,
       text: integrations ? 'LaunchOps e Hubla conectados.' : `Falta conectar ${missingSources}.`,
+    },
+    {
+      id: 'projeto',
+      label: 'Projeto',
+      done: true,
+      text: `Objetivo ${objective.label.toLowerCase()} (${objective.cost}), ${window}.`,
     },
     {
       id: 'produtos',
@@ -80,9 +98,20 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
     },
     {
       id: 'regras',
-      label: 'Regras de campanha',
+      label: 'Frentes e regras',
       done: rulesDone,
       text: rulesText,
+    },
+    {
+      id: 'paginas',
+      label: 'Páginas',
+      done: pagesDone,
+      text:
+        facts.ownFronts === 0
+          ? 'Sem frente própria: as páginas ficam ligadas a uma frente.'
+          : facts.frontsWithoutPage.length > 0
+            ? `Sem página vigiada: ${facts.frontsWithoutPage.join(', ')}. Se a página cair, ninguém avisa.`
+            : `${plural(facts.activePages, 'página vigiada', 'páginas vigiadas')}, toda frente com a sua.`,
     },
     {
       id: 'plano',
@@ -92,10 +121,22 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
     },
     {
       id: 'metas',
-      label: 'Metas',
+      label: 'Vigias',
       done: facts.extraWatchers > 0,
       text: facts.extraWatchers > 0 ? `${plural(facts.extraWatchers, 'vigia', 'vigias')} além do de custo.` : 'Só o vigia de custo: nada avisa quando CTR, CPM ou frequência saem da faixa.',
     },
   ]
+  const pendingBefore = steps.filter((step) => !step.done).length
+  steps.push({
+    id: 'conferir',
+    label: 'Conferir',
+    done: pendingBefore === 0 && facts.openSeals.length === 0,
+    text:
+      facts.openSeals.length > 0
+        ? `Falta resolver: ${facts.openSeals.join('; ')}.`
+        : pendingBefore > 0
+          ? 'Conclua os passos acima; o mapa abaixo mostra o que entra em cada número.'
+          : 'Tudo certo: cada número do projeto mostra de onde vem.',
+  })
   return { steps, done: steps.filter((step) => step.done).length }
 }

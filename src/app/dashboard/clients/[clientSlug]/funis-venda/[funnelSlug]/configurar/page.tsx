@@ -10,7 +10,7 @@ import type { ProjectQualityRow } from '@/lib/domain/project-quality'
 import { saoPauloDay } from '@/lib/repo/today-repo'
 import { ProjectMap, type MapFront } from './project-map'
 
-// Projeto › Visão geral: the five setup steps as cards, in order. Read-only; each card links to the
+// Projeto › Visão geral: the setup steps as cards, in order. Read-only; each card links to the
 // screen that already edits that step.
 
 const mono = 'font-[family-name:var(--font-geist-mono)]'
@@ -41,10 +41,13 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
   const stepHref: Record<SetupStepId, string | null> = {
     // Integrações is owner-only; other roles see the step but not a link to it.
     integracoes: isOwner ? `${base}/integrations` : null,
+    projeto: `${base}/funis-venda/${funnel.slug}/edit`,
     produtos: `${base}/funis-venda/${funnel.slug}/produtos`,
     regras: `${base}/funis-venda/${funnel.slug}/regras`,
+    paginas: `${base}/paginas`,
     plano: `${base}/funis-venda/${funnel.slug}/plano`,
     metas: `${base}/metas`,
+    conferir: '#mapa',
   }
   const spendByFront = new Map<string, number>()
   for (const day of (frontDays ?? []) as { front_id: string; spend: number }[]) spendByFront.set(day.front_id, (spendByFront.get(day.front_id) ?? 0) + Number(day.spend))
@@ -68,7 +71,7 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
       <PageHeader
         note={
           missing === 0
-            ? `${funnel.name} está pronto: os cinco passos estão configurados.`
+            ? `${funnel.name} está pronto: todos os passos estão configurados.`
             : `${funnel.name}: ${status.done} de ${status.steps.length} passos prontos. ${missing === 1 ? 'Falta 1 passo' : `Faltam ${missing} passos`} para os números do projeto ficarem confiáveis.`
         }
         actions={
@@ -111,7 +114,7 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
                     step.done ? 'border border-[var(--ct-line-2)] text-[var(--ct-text)] hover:bg-[var(--ct-surface-2)]' : 'bg-[var(--ct-accent)] text-[var(--ct-on-accent)] hover:brightness-110'
                   }`}
                 >
-                  {step.done ? 'Revisar' : 'Configurar agora'}
+                  {step.id === 'conferir' ? 'Ver o mapa' : step.done ? 'Revisar' : 'Configurar agora'}
                 </Link>
               ) : (
                 <span className="mt-auto text-[12px] text-[var(--ct-text-3)]">Só o owner do cliente configura as integrações.</span>
@@ -121,6 +124,7 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
         })}
       </ol>
 
+      <div id="mapa" className="scroll-mt-24" />
       <ProjectMap fronts={mapFronts} products={mapProducts} quality={((qualityRows ?? []) as ProjectQualityRow[])[0] ?? null} resultado={funnel.resultado ?? 'compra'} />
     </div>
   )

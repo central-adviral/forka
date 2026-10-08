@@ -27,9 +27,9 @@ describe('getProjectSetupStatus against the database', () => {
     const project = projects!.find((row) => row.slug === 'perpetuo')!
     const other = projects!.find((row) => row.slug === 'outro')!
 
-    // Nothing set yet: 0/5 (resultado has a default, but there is no cost target).
+    // Nothing set yet: only Projeto (it exists, with the default objective).
     const empty = await getProjectSetupStatus(owner, admin, client!.id, project.id)
-    expect(empty!.done).toBe(0)
+    expect(empty!.done).toBe(1)
 
     await saveClientSecrets(admin, client!.id, { funnelSourceServiceRoleKey: 'k', hublaWebhookToken: 't' })
     await admin.from('project_products').insert({ sales_funnel_id: project.id, produto_nome: 'Curso', papel: 'entrada' })
@@ -50,14 +50,20 @@ describe('getProjectSetupStatus against the database', () => {
       { client_id: client!.id, sales_funnel_id: project.id, metric: 'cpa_geral', target: 60 },
       { client_id: client!.id, sales_funnel_id: project.id, metric: 'ctr', target: 1.2 },
     ])
+    await admin.from('pages').insert({
+      client_id: client!.id, label: 'Vendas', url: `https://example.com/setup-${Date.now()}`, sales_funnel_id: project.id, front_id: fronts!.find((row) => row.sales_funnel_id === project.id)!.id,
+    })
     const ready = await getProjectSetupStatus(owner, admin, client!.id, project.id)
     expect(ready!.steps.map((step) => [step.id, step.done])).toEqual([
       ['integracoes', true],
+      ['projeto', true],
       ['produtos', true],
       ['regras', true],
+      ['paginas', true],
       ['plano', true],
       ['metas', true],
+      ['conferir', true],
     ])
-    expect(ready!.done).toBe(5)
+    expect(ready!.done).toBe(8)
   })
 })

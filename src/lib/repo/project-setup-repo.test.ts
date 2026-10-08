@@ -11,7 +11,9 @@ interface Fixture {
   entryProducts: number
   namingRules: number
   watchers: { metric: string; front_id: string | null; target: number }[]
-  fronts: { source_sales_funnel_id: string | null; naming_rules: { kind: string }[] }[]
+  fronts: { id?: string; name?: string; source_sales_funnel_id: string | null; naming_rules: { kind: string }[] }[]
+  pages?: { front_id: string | null }[]
+  quality?: Record<string, number> | null
 }
 
 function fakeDb(fixture: Fixture): SupabaseClient {
@@ -23,8 +25,10 @@ function fakeDb(fixture: Fixture): SupabaseClient {
     naming_rules: () => ({ count: fixture.namingRules }),
     watchers: () => ({ data: fixture.watchers }),
     project_fronts: () => ({ data: fixture.fronts }),
+    pages: () => ({ data: fixture.pages ?? [{ front_id: 'f1' }] }),
   }
   return {
+    rpc: async () => ({ data: fixture.quality === null ? null : [fixture.quality ?? {}], error: null }),
     from(table: string) {
       const result = { error: null, data: null, count: null, ...answer[table]() }
       const chain: Record<string, unknown> = {
@@ -46,19 +50,20 @@ const READY: Fixture = {
     { metric: 'cpa_geral', front_id: null, target: 60 },
     { metric: 'ctr', front_id: 'f1', target: 1.2 },
   ],
-  fronts: [{ source_sales_funnel_id: null, naming_rules: [{ kind: 'include' }, { kind: 'exclude' }] }],
+  fronts: [{ id: 'f1', name: 'Captação', source_sales_funnel_id: null, naming_rules: [{ kind: 'include' }, { kind: 'exclude' }] }],
 }
 
 async function status(overrides: Partial<Fixture>) {
   const db = fakeDb({ ...READY, ...overrides })
   return getProjectSetupStatus(db, db, 'client-1', 'project-1')
 }
-const pending = (result: Awaited<ReturnType<typeof status>>) => result!.steps.filter((step) => !step.done).map((step) => step.id)
+// Conferir is pending whenever another step is: these cases look at the step that causes it.
+const pending = (result: Awaited<ReturnType<typeof status>>) => result!.steps.filter((step) => !step.done && step.id !== 'conferir').map((step) => step.id)
 
 describe('getProjectSetupStatus', () => {
-  it('is 5/5 when every step is set', async () => {
+  it('is 8/8 when every step is set', async () => {
     const result = await status({})
-    expect(result!.done).toBe(5)
+    expect(result!.done).toBe(8)
     expect(pending(result)).toEqual([])
   })
 
@@ -72,7 +77,7 @@ describe('getProjectSetupStatus', () => {
   it('2. Produtos: needs at least one product with the entry role', async () => {
     const result = await status({ entryProducts: 0 })
     expect(pending(result)).toEqual(['produtos'])
-    expect(result!.done).toBe(4)
+    expect(result!.done).toBe(6)
   })
 
   it('2. Produtos: a lead project counts leads, so it needs no entry product', async () => {
@@ -82,12 +87,14 @@ describe('getProjectSetupStatus', () => {
   })
 
   it('3. Regras de campanha: every own front needs a "contém" rule; a mirror front needs none', async () => {
-    expect(pending(await status({ fronts: [] }))).toEqual(['regras'])
-    const excludeOnly = await status({ fronts: [{ source_sales_funnel_id: null, naming_rules: [{ kind: 'exclude' }] }] })
+    // No front at all: no rules, and no front to hang a page on.
+    expect(pending(await status({ fronts: [] }))).toEqual(['regras', 'paginas'])
+    const excludeOnly = await status({ fronts: [{ id: 'f1', name: 'Captação', source_sales_funnel_id: null, naming_rules: [{ kind: 'exclude' }] }] })
     expect(pending(excludeOnly)).toEqual(['regras'])
     expect(excludeOnly!.steps.find((step) => step.id === 'regras')!.text).toContain('não pega nenhuma campanha')
     const mirror = await status({ namingRules: 0, fronts: [{ source_sales_funnel_id: 'other', naming_rules: [] }] })
-    expect(pending(mirror)).toEqual([])
+    // Rules are fine; pages are not, since a mirror front owns no page.
+    expect(pending(mirror)).toEqual(['paginas'])
     expect(mirror!.steps.find((step) => step.id === 'regras')!.text).toBe('1 frente lê outro projeto.')
   })
 
@@ -107,5 +114,19 @@ describe('getProjectSetupStatus', () => {
   it('returns null for a project the session cannot see', async () => {
     expect(await status({ project: null })).toBeNull()
     expect(await status({ client: null })).toBeNull()
+  })
+
+  it('Páginas: every own front needs an active page', async () => {
+    const result = await status({ pages: [] })
+    expect(pending(result)).toEqual(['paginas'])
+    expect(result!.steps.find((step) => step.id === 'paginas')!.text).toContain('Captação')
+  })
+
+  it('Conferir: done only with every step done and no quality seal open', async () => {
+    const sealed = await status({ quality: { cliente_campanhas_em_disputa: 1 } })
+    const check = sealed!.steps.find((step) => step.id === 'conferir')!
+    expect(check.done).toBe(false)
+    expect(check.text).toContain('1 campanha em disputa')
+    expect((await status({}))!.steps.find((step) => step.id === 'conferir')!.done).toBe(true)
   })
 })
