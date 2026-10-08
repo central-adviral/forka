@@ -16,6 +16,8 @@ export interface ClientDay {
   spendLeadComImposto: number
   spendSemFrenteComImposto: number
   vendasSemProjeto: number
+  /** Refunds dated on this day (0099); receitaLiquida is already net of them. */
+  reembolsos: number
 }
 
 export async function getClientDaily(db: SupabaseClient, clientId: string, since: string, until: string): Promise<ClientDay[]> {
@@ -35,6 +37,7 @@ export async function getClientDaily(db: SupabaseClient, clientId: string, since
     spend_lead_com_imposto: number
     spend_sem_frente_com_imposto: number
     vendas_sem_projeto: number
+    reembolsos: number
   }[]).map((row) => ({
     data: row.data,
     spend: Number(row.spend),
@@ -49,6 +52,7 @@ export async function getClientDaily(db: SupabaseClient, clientId: string, since
     spendLeadComImposto: Number(row.spend_lead_com_imposto),
     spendSemFrenteComImposto: Number(row.spend_sem_frente_com_imposto),
     vendasSemProjeto: Number(row.vendas_sem_projeto),
+    reembolsos: Number(row.reembolsos),
   }))
 }
 

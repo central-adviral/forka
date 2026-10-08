@@ -33,6 +33,9 @@ export interface DailyFunnelRow {
   /** The high-ticket product sold later (0061): kept out of the front revenue, ROAS of its own. */
   vendasAscensao: number
   receitaAscensaoLiquida: number
+  /** Sales refunded on this day, whatever day they were sold (0099); receitaLiquida is already net of them. */
+  reembolsos: number
+  receitaReembolsadaLiquida: number
 }
 
 export async function getDailyFunnel(
@@ -65,6 +68,8 @@ export async function getDailyFunnel(
     vendas_apos_dados: number
     vendas_ascensao: number
     receita_ascensao_liquida: number
+    reembolsos: number
+    receita_reembolsada_liquida: number
   }[]).map((row) => {
     const vendas = Number(row.vendas)
     const spendComImposto = Number(row.spend_com_imposto)
@@ -93,6 +98,8 @@ export async function getDailyFunnel(
       vendasAposDados: Number(row.vendas_apos_dados ?? 0),
       vendasAscensao: Number(row.vendas_ascensao),
       receitaAscensaoLiquida: Number(row.receita_ascensao_liquida),
+      reembolsos: Number(row.reembolsos),
+      receitaReembolsadaLiquida: Number(row.receita_reembolsada_liquida),
     }
   })
 }

@@ -52,7 +52,7 @@ export async function loadTodayAttention(supabase: SupabaseClient, client: { id:
     getWatchers(supabase, client.id),
     getAlerts(supabase, client.id),
     getPagesWithChecks(supabase, client.id, { checksPerPage: 2 }),
-    supabase.from('sales').select('valor_liquido').eq('client_id', client.id).is('sales_funnel_id', null).gte('data_venda', brtDayBoundaryUtc(week.since)),
+    supabase.from('sales').select('valor_liquido').eq('client_id', client.id).is('sales_funnel_id', null).is('reembolsado_em', null).gte('data_venda', brtDayBoundaryUtc(week.since)),
     // A failed verdict read only drops these items; the rest of the queue still stands.
     loadBacklogAttention(supabase, (funnels ?? []).filter((funnel) => funnel.is_active)).catch((error) => {
       console.error('[today-test-verdicts-failed]', { clientId: client.id }, error)
