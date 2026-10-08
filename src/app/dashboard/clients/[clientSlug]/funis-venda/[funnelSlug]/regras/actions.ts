@@ -65,6 +65,22 @@ export async function createFront(context: RulesContext, formData: FormData) {
   )
 }
 
+// Code and name only: a front's source decides who owns its campaigns, so changing it is remove and create.
+export async function updateFront(context: RulesContext & { front_id: string }, formData: FormData) {
+  const result = frontSchema.pick({ code: true, name: true }).safeParse({ code: formData.get('code'), name: formData.get('name') })
+  if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '))
+  const supabase = await createServerSupabaseClient()
+  const { data, error } = await supabase
+    .from('project_fronts')
+    .update({ code: result.data.code, name: result.data.name })
+    .eq('id', context.front_id)
+    .select('id')
+  if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste projeto.`))
+  if (!data || data.length === 0) back(context, 'erro', 'Só gestor ou owner pode editar frentes.')
+  revalidatePath(rulesPath(context))
+  back(context, 'ok', `Frente ${result.data.code} atualizada.`)
+}
+
 const pinSchema = z.object({ campaign_id: z.string().min(1), front_id: z.string().uuid('escolha a frente dona da campanha') })
 
 // A pin by hand wins over the name rules and survives a rule change; the 0054 trigger refuses a
