@@ -17,7 +17,7 @@ describe('resolveActive: the active section and subsection come from the URL onl
     expect(resolveActive(base, '', '#ritmo', slug)).toEqual({ section: 'hoje', sub: 'ritmo' })
     expect(resolveActive(`${base}/painel`, '', '', slug)).toEqual({ section: 'alertas', sub: 'abertos' })
     expect(resolveActive(`${base}/painel`, '', '#vigias', slug)).toEqual({ section: 'alertas', sub: 'vigias' })
-    expect(resolveActive(`${base}/painel`, '', '#paginas', slug)).toEqual({ section: 'alertas', sub: 'paginas' })
+    expect(resolveActive(`${base}/paginas`, '', '', slug)).toEqual({ section: 'alertas', sub: 'paginas' })
     expect(resolveActive(`${base}/funis-venda/1k`, '', '', slug)).toEqual({ section: 'desempenho', sub: 'visao' })
     expect(resolveActive(`${base}/funis-venda/1k`, 'periodo=30d&aba=criativos', '', slug)).toEqual({ section: 'desempenho', sub: 'criativos' })
     expect(resolveActive(`${base}/funis-venda/1k`, 'aba=nada', '', slug)).toEqual({ section: 'desempenho', sub: 'visao' })

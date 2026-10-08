@@ -8,7 +8,7 @@ import { detectSampleRatioMismatch } from '@/lib/domain/srm-check'
 import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
 import { buildAttention, type AttentionItem } from '@/lib/domain/attention'
 import { METRICS, formatMetric, watcherScope } from '@/lib/domain/watchers'
-import { isOutage, pageHealth } from '@/lib/domain/page-probe'
+import { checkFindings, isSilenced, pageStatus } from '@/lib/domain/page-probe'
 
 export interface TodayAttention {
   attention: AttentionItem[]
@@ -51,7 +51,7 @@ export async function loadTodayAttention(supabase: SupabaseClient, client: { id:
     findBestVariant(supabase, activeTests ?? [], monthSince, week.until).catch(() => null),
     getWatchers(supabase, client.id),
     getAlerts(supabase, client.id),
-    getPagesWithChecks(supabase, client.id, 2),
+    getPagesWithChecks(supabase, client.id, { checksPerPage: 2 }),
     supabase.from('sales').select('valor_liquido').eq('client_id', client.id).is('sales_funnel_id', null).gte('data_venda', brtDayBoundaryUtc(week.since)),
     // A failed verdict read only drops these items; the rest of the queue still stands.
     loadBacklogAttention(supabase, (funnels ?? []).filter((funnel) => funnel.is_active)).catch((error) => {
@@ -72,15 +72,22 @@ export async function loadTodayAttention(supabase: SupabaseClient, client: { id:
   })
   if (unattributedResult.error) throw unattributedResult.error
   const unattributedSales = (unattributedResult.data ?? []) as { valor_liquido: number | null }[]
-  // A page the ads point to that is down or slow (0066) goes to the same queue as the watchers.
+  // A page the ads point to that is down or failing a check (0066, 0089) goes to the same queue as
+  // the watchers; a page silenced for maintenance stays out until then.
+  const now = new Date()
   const pageAlerts = pages.flatMap((page) => {
-    const health = pageHealth(page.checks)
-    if (!page.isActive || health === 'ok' || health === 'sem_check') return []
-    const last = page.checks[0]
+    if (!page.isActive || isSilenced(page.silencedUntil, now)) return []
+    const status = pageStatus(page.checks, page.watch, now)
+    if (status !== 'critico' && status !== 'atencao') return []
+    const failed = checkFindings(page.checks[0], page.watch, now).find((finding) => !finding.ok)
     return [{
-      severity: (isOutage(page.checks) ? 'crit' : 'warn') as 'crit' | 'warn',
-      title: `${page.label} ${health === 'fora' ? 'fora do ar' : 'lenta'}`,
-      detail: health === 'fora' ? `${last.error ?? 'Não respondeu'} na última checagem.` : `${((last.ttfbMs ?? 0) / 1000).toFixed(1).replace('.', ',')}s para responder na última checagem.`,
+      severity: (status === 'critico' ? 'crit' : 'warn') as 'crit' | 'warn',
+      title:
+        status === 'critico' ? `${page.label} fora do ar`
+        : failed?.id === 'abre' ? `${page.label} não abriu (confirmando)`
+        : `${page.label}: ${failed?.label.toLowerCase() ?? 'atenção'}`,
+      detail: failed ? `${failed.detail[0].toUpperCase()}${failed.detail.slice(1)} na última checagem.` : 'Veja a sonda.',
+      href: `${base}/paginas#pagina-${page.id}`,
     }]
   })
   const watcherById = new Map(watchers.map((watcher) => [watcher.id, watcher]))
