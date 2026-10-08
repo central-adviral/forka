@@ -8,6 +8,8 @@ import type { AttentionItem } from '@/lib/domain/attention'
 import { loadTodayAttention } from '@/lib/repo/today-attention-repo'
 import { projectDay } from '@/lib/domain/day-pace'
 import { canActAs } from '@/lib/view-as'
+import { testIntegrations } from './integrations/actions'
+import { TestIntegrationsButton } from './integrations/test-integrations-button'
 import { PageHeader } from '@/components/page-header'
 import { resultUsesSales } from '@/lib/domain/project-plan'
 
@@ -211,6 +213,11 @@ export default async function TodayPage({
                       {item.action ?? 'Resolver'}
                     </Link>
                   </div>
+                  {item.tool === 'config' && (
+                    <div className="mt-2">
+                      <TestIntegrationsButton testAction={testIntegrations.bind(null, { client_id: client.id })} />
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
