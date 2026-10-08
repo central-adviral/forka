@@ -74,7 +74,7 @@ export function qualitySeals(row: ProjectQualityRow, links: { regras: string; pr
 }
 
 /** The CPA geral and CPA de anúncio, spelled out: what counts and what is left out. */
-export function cpaSources(row: ProjectQualityRow): SourceLine[] {
+export function cpaSources(row: ProjectQualityRow, cross?: { geradas_para_outro: number; vindas_de_outro: number }): SourceLine[] {
   const entries = Number(row.vendas_entrada)
   const fromAds = Number(row.vendas_anuncio)
   const lines: SourceLine[] = [
@@ -89,5 +89,8 @@ export function cpaSources(row: ProjectQualityRow): SourceLine[] {
   ].filter(Boolean)
   if (entries > fromAds && outside.length > 0) lines.push({ label: 'fora do CPA de anúncio', value: outside.join(' · ') })
   if (Number(row.cliente_vendas_sem_projeto) > 0) lines.push({ label: 'do cliente, sem projeto (fora deste CPA)', value: n(row.cliente_vendas_sem_projeto) })
+  // A product only another project sells stays there; the ad that brought the buyer is still shown (0095).
+  if (cross && Number(cross.vindas_de_outro) > 0) lines.push({ label: 'vieram de anúncio de outro projeto (contam aqui)', value: n(cross.vindas_de_outro) })
+  if (cross && Number(cross.geradas_para_outro) > 0) lines.push({ label: 'geradas para outro projeto (contam lá)', value: n(cross.geradas_para_outro) })
   return lines
 }

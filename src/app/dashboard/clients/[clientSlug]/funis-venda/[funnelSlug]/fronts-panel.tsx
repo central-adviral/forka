@@ -32,9 +32,12 @@ export function FrontsPanel({
   taxFactor,
   rulesHref,
   currency,
+  sales,
 }: {
   fronts: FrontInfo[]
   rows: FrontDayRow[]
+  /** Entry sales and net revenue per own front (0095); null when the objective counts no sales. */
+  sales: Map<string, { vendas: number; receita: number }> | null
   /** Investment with tax ÷ without, over the period: the front numbers come without tax. */
   taxFactor: number
   rulesHref: string
@@ -59,6 +62,8 @@ export function FrontsPanel({
       lpv: add('landing_page_views'),
       leads: add('leads'),
       ic: add('initiate_checkout'),
+      // A mirror front only reads spend: its sales belong to the project it reads.
+      sold: sales && !front.sourceName ? (sales.get(front.id) ?? { vendas: 0, receita: 0 }) : null,
     }
   })
   const projectSpend = totals.reduce((total, front) => total + front.spend, 0)
@@ -77,7 +82,7 @@ export function FrontsPanel({
               </span>
             </div>
             <span className="text-xs text-[var(--ct-text-3)]">
-              do investimento{front.front.sourceName ? ` · lê ${front.front.sourceName} na janela` : ''}
+              do investimento{front.front.sourceName ? ` · espelho de ${front.front.sourceName}: só gasto, na janela` : ''}
             </span>
             <div className="mt-3 grid grid-cols-3 gap-x-3.5 gap-y-4 border-t border-[var(--ct-line)] pt-4">
               {[
@@ -85,8 +90,16 @@ export function FrontsPanel({
                 ['CPM', money(ratio(front.spend, front.impressions / 1000))],
                 ['CTR', pct(ratio(front.linkClicks, front.impressions))],
                 ['Connect', pct(ratio(front.lpv, front.linkClicks))],
-                ['Leads', front.leads.toLocaleString('pt-BR')],
-                ['CPL', money(ratio(front.spend, front.leads))],
+                ...(front.sold
+                  ? [
+                      ['Vendas de anúncio', front.sold.vendas.toLocaleString('pt-BR')],
+                      ['CPA de anúncio', money(ratio(front.spend, front.sold.vendas))],
+                      ['ROAS', front.spend > 0 ? `${(front.sold.receita / front.spend).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}x` : '—'],
+                    ]
+                  : [
+                      ['Leads', front.leads.toLocaleString('pt-BR')],
+                      ['CPL', money(ratio(front.spend, front.leads))],
+                    ]),
               ].map(([label, value]) => (
                 <div key={label}>
                   <small className="block text-[11px] text-[var(--ct-text-3)]">{label}</small>
@@ -103,7 +116,7 @@ export function FrontsPanel({
           <thead>
             <tr className={`${mono} text-left text-[10.5px] uppercase tracking-[0.06em] text-[var(--ct-text-3)]`}>
               <th className="px-5 py-3 font-medium">Frente</th>
-              {['Investimento', 'Impressões', 'CPM', 'Cliques no link', 'CTR', 'View page', 'Connect', 'Initiate checkout', 'Leads', 'CPL'].map((head) => (
+              {['Investimento', 'Impressões', 'CPM', 'Cliques no link', 'CTR', 'View page', 'Connect', 'Initiate checkout', 'Leads', 'CPL', ...(sales ? ['Vendas de anúncio', 'CPA de anúncio', 'ROAS'] : [])].map((head) => (
                 <th key={head} className="px-5 py-3 text-right font-medium">{head}</th>
               ))}
             </tr>
@@ -126,6 +139,15 @@ export function FrontsPanel({
                   front.ic.toLocaleString('pt-BR'),
                   front.leads.toLocaleString('pt-BR'),
                   money(ratio(front.spend, front.leads)),
+                  ...(sales
+                    ? front.sold
+                      ? [
+                          front.sold.vendas.toLocaleString('pt-BR'),
+                          money(ratio(front.spend, front.sold.vendas)),
+                          front.spend > 0 ? `${(front.sold.receita / front.spend).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}x` : '—',
+                        ]
+                      : ['só gasto', '—', '—']
+                    : []),
                 ].map((value, i) => (
                   <td key={i} className={`${mono} whitespace-nowrap px-5 py-3 text-right tabular-nums`}>{value}</td>
                 ))}
@@ -134,7 +156,7 @@ export function FrontsPanel({
           </tbody>
         </table>
         <p className="border-t border-[var(--ct-line)] px-5 py-3 text-[11.5px] text-[var(--ct-text-3)]">
-          Investimento com o imposto do cliente. Gasto sem dono fica fora das frentes, em Não classificado:{' '}
+          Investimento com o imposto do cliente. Vendas de anúncio da frente: as que trazem o id de um anúncio das campanhas dela. Gasto sem dono fica fora das frentes, em Não classificado:{' '}
           <Link href={rulesHref} className="text-[var(--ct-accent)]">ver em Regras de campanha</Link>.
         </p>
       </div>
