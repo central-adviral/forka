@@ -6,7 +6,8 @@ import { getConfiguredSecrets } from '@/lib/repo/client-secrets-repo'
 import { notFound } from 'next/navigation'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
-import { saveDomain, verifyDomain, saveHublaToken, saveFunnelDataSource, saveMetaTax } from './actions'
+import { saveDomain, verifyDomain, saveHublaToken, saveFunnelDataSource, saveMetaTax, testIntegrations } from './actions'
+import { TestIntegrationsButton } from './test-integrations-button'
 import { VerifyDomainButton } from './verify-domain-button'
 import { canActAs } from '@/lib/view-as'
 
@@ -159,6 +160,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
         title="Integrações"
         description={`Conectadas uma vez por cliente. Todos os projetos da ${client.name} usam estas fontes.`}
       />
+      <TestIntegrationsButton testAction={testIntegrations.bind(null, { client_id: client.id })} />
 
       <div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
         <IntegrationCard

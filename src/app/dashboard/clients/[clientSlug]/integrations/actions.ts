@@ -7,7 +7,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { isCnameVerified } from '@/lib/domain/redirect-domain'
 import { addProjectDomain, removeProjectDomain } from '@/lib/vercel/domains'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { saveClientSecrets } from '@/lib/repo/client-secrets-repo'
+import { getClientSecrets, saveClientSecrets } from '@/lib/repo/client-secrets-repo'
+import { createLaunchOpsClient } from '@/lib/launchops/client'
 import { assertClientRole } from '@/lib/repo/client-access-repo'
 
 const domainSchema = z.object({
@@ -176,4 +177,54 @@ export async function saveMetaTax(context: { client_id: string; client_slug: str
     )
   if (error) throw error
   revalidatePath(`/dashboard/clients/${result.data.client_slug}/integrations`)
+}
+
+export interface IntegrationCheck {
+  name: string
+  ok: boolean
+  detail: string
+}
+
+const ago = (iso: string) => {
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000)
+  return minutes < 60 ? `há ${minutes} min` : minutes < 2880 ? `há ${Math.round(minutes / 60)} h` : `há ${Math.round(minutes / 1440)} dias`
+}
+
+/** One live read of each source, so a gestor knows now whether a failure was a blip or is still on. */
+export async function testIntegrations(context: { client_id: string }): Promise<IntegrationCheck[]> {
+  const supabase = await createServerSupabaseClient()
+  await assertClientRole(supabase, context.client_id, 'gestor')
+  const serviceDb = createServiceRoleClient()
+  const [{ data: client }, secrets, { data: lastEvent }] = await Promise.all([
+    serviceDb.from('clients').select('funnel_source_url').eq('id', context.client_id).single(),
+    getClientSecrets(serviceDb, context.client_id),
+    serviceDb.from('hubla_events').select('received_at, outcome').eq('client_id', context.client_id).order('received_at', { ascending: false }).limit(1).maybeSingle(),
+  ])
+
+  let launchops: IntegrationCheck
+  if (!client?.funnel_source_url || !secrets.funnelSourceServiceRoleKey) {
+    launchops = { name: 'LaunchOps', ok: false, detail: 'Falta a URL ou a chave de acesso.' }
+  } else {
+    const started = Date.now()
+    try {
+      const { error } = await createLaunchOpsClient({ url: client.funnel_source_url, serviceRoleKey: secrets.funnelSourceServiceRoleKey })
+        .from('vendas')
+        .select('id')
+        .limit(1)
+      const ms = Date.now() - started
+      launchops = error
+        ? { name: 'LaunchOps', ok: false, detail: `Respondeu com erro: ${error.message}` }
+        : { name: 'LaunchOps', ok: true, detail: `Conectado, respondeu em ${(ms / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} s.` }
+    } catch (err) {
+      const timeout = err instanceof Error && err.name === 'TimeoutError'
+      launchops = { name: 'LaunchOps', ok: false, detail: timeout ? 'Não respondeu em 8 s: o LaunchOps está lento ou fora do ar.' : 'Falha de conexão com o LaunchOps.' }
+    }
+  }
+
+  const hubla: IntegrationCheck = !secrets.hublaWebhookToken
+    ? { name: 'Hubla', ok: false, detail: 'Falta o token do webhook.' }
+    : lastEvent
+      ? { name: 'Hubla', ok: true, detail: `Token configurado; último aviso recebido ${ago(lastEvent.received_at)}.` }
+      : { name: 'Hubla', ok: true, detail: 'Token configurado; nenhum aviso recebido desde 08/10. Confira a regra de webhook na Hubla.' }
+  return [launchops, hubla]
 }
