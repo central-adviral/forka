@@ -22,6 +22,8 @@ interface HublaPayload {
   event?: {
     invoice?: {
       id?: string
+      statusAt?: { status?: string; when?: string }[]
+      modifiedAt?: string
       // Confirmed against a real production payload (delivery mode "compatibility") on
       // 2026-08-30: the field is `paymentSession`, not `firstPaymentSession` as earlier
       // documentation suggested. Keep the old name as a fallback in case another delivery
@@ -48,3 +50,23 @@ export function parseHublaPaymentSucceeded(rawPayload: unknown): ParsedHublaEven
     valueCents: invoice.amount?.totalCents ?? null,
   }
 }
+
+export interface ParsedHublaRefund {
+  externalEventId: string
+  refundedAt: string
+}
+
+/**
+ * A refund (`invoice.refunded`, v2 webhooks). It names the same invoice as the payment it undoes,
+ * so the conversion is found by its invoice id. Hubla sends no separate chargeback event: a
+ * chargeback reaches the webhook as a refund of the invoice.
+ */
+export function parseHublaRefund(rawPayload: unknown): ParsedHublaRefund | null {
+  const payload = rawPayload as HublaPayload
+  if (payload?.type !== 'invoice.refunded') return null
+  const invoice = payload.event?.invoice
+  if (!invoice?.id) throw new HublaMalformedPayloadError('Hubla refund payload missing event.invoice.id')
+  const refunded = (invoice.statusAt ?? []).filter((entry) => entry.status === 'refunded').at(-1)?.when
+  return { externalEventId: invoice.id, refundedAt: refunded ?? invoice.modifiedAt ?? new Date().toISOString() }
+}
+

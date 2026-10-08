@@ -4,12 +4,15 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/domain/hubla', () => ({
   verifyHublaToken: vi.fn(),
   parseHublaPaymentSucceeded: vi.fn(),
+  parseHublaRefund: vi.fn(() => null),
   HublaIrrelevantEventError: class HublaIrrelevantEventError extends Error {},
   HublaMalformedPayloadError: class HublaMalformedPayloadError extends Error {},
 }))
 vi.mock('@/lib/repo/conversion-repo', () => ({
   getClickEventByTrackingId: vi.fn(),
   insertConversionIfNew: vi.fn(),
+  refundHublaConversion: vi.fn(),
+  wasRefunded: vi.fn(async () => false),
 }))
 // Table-aware on purpose: the token lives in client_secrets, and a mock that answered every table
 // with the same row would keep passing if the route went back to reading it off `clients`.
@@ -30,8 +33,8 @@ let mockClientRow: { id: string } | null
 let mockSecretsRow: { hubla_webhook_token: string | null } | null
 
 import { POST } from './route'
-import { verifyHublaToken, parseHublaPaymentSucceeded, HublaIrrelevantEventError, HublaMalformedPayloadError } from '@/lib/domain/hubla'
-import { getClickEventByTrackingId, insertConversionIfNew } from '@/lib/repo/conversion-repo'
+import { verifyHublaToken, parseHublaPaymentSucceeded, parseHublaRefund, HublaIrrelevantEventError, HublaMalformedPayloadError } from '@/lib/domain/hubla'
+import { getClickEventByTrackingId, insertConversionIfNew, refundHublaConversion, wasRefunded } from '@/lib/repo/conversion-repo'
 
 function makeRequest(body: unknown, token = 'valid-token') {
   return new NextRequest('https://ir.example.com/api/webhooks/hubla/gustavo-voe', {
@@ -44,6 +47,8 @@ function makeRequest(body: unknown, token = 'valid-token') {
 describe('POST /api/webhooks/hubla/[clientSlug]', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(parseHublaRefund).mockReturnValue(null)
+    vi.mocked(wasRefunded).mockResolvedValue(false)
     mockClientRow = { id: 'client-1' }
     mockSecretsRow = { hubla_webhook_token: 'valid-token' }
   })
@@ -150,4 +155,27 @@ describe('POST /api/webhooks/hubla/[clientSlug]', () => {
     const json = await response.json()
     expect(json).toEqual({ ok: true, attributed: true, result: 'inserted' })
   })
+
+  it('takes a refunded sale out of the test, by its invoice, without touching the payment path', async () => {
+    vi.mocked(verifyHublaToken).mockReturnValue(true)
+    vi.mocked(parseHublaRefund).mockReturnValue({ externalEventId: 'inv_1', refundedAt: '2026-10-08T12:00:00Z' })
+    vi.mocked(refundHublaConversion).mockResolvedValue(true)
+
+    const response = await POST(makeRequest({ type: 'invoice.refunded' }), { params: Promise.resolve({ clientSlug: 'gustavo-voe' }) })
+    expect(await response.json()).toEqual({ ok: true, attributed: false, refunded: true })
+    expect(refundHublaConversion).toHaveBeenCalledWith(expect.anything(), { clientId: 'client-1', externalEventId: 'inv_1', refundedAt: '2026-10-08T12:00:00Z' })
+    expect(parseHublaPaymentSucceeded).not.toHaveBeenCalled()
+  })
+
+  it('ignores a re-delivered payment of an invoice already refunded', async () => {
+    vi.mocked(verifyHublaToken).mockReturnValue(true)
+    vi.mocked(parseHublaPaymentSucceeded).mockReturnValue({ trackingId: 'trk_1', externalEventId: 'inv_1', valueCents: 1000 })
+    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'oferta-x', clientId: 'client-1', isBot: false })
+    vi.mocked(wasRefunded).mockResolvedValue(true)
+
+    const response = await POST(makeRequest({}), { params: Promise.resolve({ clientSlug: 'gustavo-voe' }) })
+    expect(await response.json()).toEqual({ ok: true, attributed: false, refunded: true })
+    expect(insertConversionIfNew).not.toHaveBeenCalled()
+  })
 })
+

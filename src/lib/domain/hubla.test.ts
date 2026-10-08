@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { HublaIrrelevantEventError, HublaMalformedPayloadError, verifyHublaToken, parseHublaPaymentSucceeded } from './hubla'
+import { HublaIrrelevantEventError, HublaMalformedPayloadError, verifyHublaToken, parseHublaPaymentSucceeded, parseHublaRefund } from './hubla'
 
 describe('verifyHublaToken', () => {
   it('returns true when tokens match', () => {
@@ -78,3 +78,36 @@ describe('parseHublaPaymentSucceeded', () => {
     expect(() => parseHublaPaymentSucceeded(payload)).toThrow(HublaIrrelevantEventError)
   })
 })
+
+describe('parseHublaRefund', () => {
+  const refund = {
+    type: 'invoice.refunded',
+    event: {
+      invoice: {
+        id: '7614b1bb-1d1a-43ba-890c-50d74216eb56',
+        status: 'refunded',
+        statusAt: [
+          { status: 'unpaid', when: '2024-03-28T20:35:22.671Z' },
+          { status: 'paid', when: '2024-03-28T20:35:33.512Z' },
+          { status: 'refunded', when: '2024-03-28T21:47:53.177Z' },
+        ],
+        modifiedAt: '2024-03-28T21:47:53.177Z',
+      },
+    },
+    version: '2.0.0',
+  }
+
+  it('reads the invoice it undoes and when the refund happened', () => {
+    expect(parseHublaRefund(refund)).toEqual({ externalEventId: '7614b1bb-1d1a-43ba-890c-50d74216eb56', refundedAt: '2024-03-28T21:47:53.177Z' })
+  })
+
+  it('ignores every other event, the payment included', () => {
+    expect(parseHublaRefund({ ...refund, type: 'invoice.payment_succeeded' })).toBeNull()
+    expect(parseHublaRefund({ type: 'subscription.created' })).toBeNull()
+  })
+
+  it('refuses a refund without the invoice id', () => {
+    expect(() => parseHublaRefund({ type: 'invoice.refunded', event: { invoice: {} } })).toThrow('missing event.invoice.id')
+  })
+})
+

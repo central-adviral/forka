@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { HublaIrrelevantEventError, verifyHublaToken, parseHublaPaymentSucceeded } from '@/lib/domain/hubla'
-import { getClickEventByTrackingId, insertConversionIfNew } from '@/lib/repo/conversion-repo'
+import { HublaIrrelevantEventError, HublaMalformedPayloadError, verifyHublaToken, parseHublaPaymentSucceeded, parseHublaRefund } from '@/lib/domain/hubla'
+import { getClickEventByTrackingId, insertConversionIfNew, refundHublaConversion, wasRefunded } from '@/lib/repo/conversion-repo'
 import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
 
 // Hubla's payload can carry customer PII (name/email/phone/document/address) alongside the
@@ -62,6 +62,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ ok: false, attributed: false }, { status: 422 })
   }
 
+  // A refund (or a chargeback, which Hubla sends as a refund) takes the sale out of the test (0083).
+  let refund
+  try {
+    refund = parseHublaRefund(payload)
+  } catch (err) {
+    if (!(err instanceof HublaMalformedPayloadError)) throw err
+    console.error('[hubla-webhook] rejected malformed refund payload', err.message, JSON.stringify(extractSafeDebugFields(payload)))
+    return NextResponse.json({ ok: false, attributed: false }, { status: 422 })
+  }
+  if (refund) {
+    const refunded = await refundHublaConversion(db, { clientId: client.id, externalEventId: refund.externalEventId, refundedAt: refund.refundedAt })
+    if (!refunded) console.log('[hubla-webhook] refund matched no conversion of this client', { invoiceId: refund.externalEventId })
+    return NextResponse.json({ ok: true, attributed: false, refunded })
+  }
+
   let parsed
   try {
     parsed = parseHublaPaymentSucceeded(payload)
@@ -98,6 +113,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       foundClickEvent: Boolean(clickEvent),
     })
     return NextResponse.json({ ok: true, attributed: false })
+  }
+
+  // Hubla re-delivers events: a payment of an invoice already refunded must not count again.
+  if (await wasRefunded(db, parsed.externalEventId)) {
+    console.log('[hubla-webhook] payment of a refunded invoice ignored', { invoiceId: parsed.externalEventId })
+    return NextResponse.json({ ok: true, attributed: false, refunded: true })
   }
 
   const result = await insertConversionIfNew(db, {
