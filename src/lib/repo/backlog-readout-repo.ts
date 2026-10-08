@@ -73,18 +73,31 @@ export interface RunningVerdict {
   daysRunning: number
 }
 
+export interface ReadyCard {
+  code: string
+  title: string
+  projectSlug: string
+  /** The card's A/B test, when it has one: "pronto pra subir" then means "paste the link". */
+  testId: string | null
+}
+
 /**
- * The running cards whose rules already speak (win, cut or saturated), across the given projects,
- * for the Hoje queue. Same rules and reads as the backlog screen, so both say the same thing.
+ * What the Testes tool puts in the Hoje queue, across the given projects: running cards whose rules
+ * already speak (win, cut or saturated), with the same reads as the Quadro, and cards whose checklist
+ * is complete and wait to go live.
  */
-export async function loadRunningVerdicts(
+export async function loadBacklogAttention(
   supabase: SupabaseClient,
   projects: { id: string; slug: string; test_rules: unknown; resultado: string | null }[]
-): Promise<RunningVerdict[]> {
+): Promise<{ verdicts: RunningVerdict[]; ready: ReadyCard[] }> {
   const perProject = await Promise.all(
     projects.map(async (project) => {
-      const items = (await getBacklog(supabase, project.id)).filter((item) => item.status === 'running')
-      if (items.length === 0) return []
+      const backlog = await getBacklog(supabase, project.id)
+      const ready = backlog
+        .filter((item) => item.status === 'ready')
+        .map((item) => ({ code: item.code, title: item.title, projectSlug: project.slug, testId: item.abTestId }))
+      const items = backlog.filter((item) => item.status === 'running')
+      if (items.length === 0) return { verdicts: [], ready }
       const { data: costWatcher } = await supabase
         .from('watchers')
         .select('target')
@@ -95,7 +108,7 @@ export async function loadRunningVerdicts(
       const resultado = project.resultado ?? 'compra'
       const rules = withPlanTeto(readRules(project.test_rules), costWatcher ? Number(costWatcher.target) : null, resultado)
       const readouts = await loadReadouts(supabase, project.id, items, rules, resultado)
-      return items.flatMap((item) => {
+      const verdicts = items.flatMap((item) => {
         const readout = readouts.get(item.id)
         if (!readout?.summary) return []
         return [{
@@ -107,7 +120,8 @@ export async function loadRunningVerdicts(
           daysRunning: item.startedAt ? daysRunningSince(item.startedAt) : 1,
         }]
       })
+      return { verdicts, ready }
     })
   )
-  return perProject.flat()
+  return { verdicts: perProject.flatMap((project) => project.verdicts), ready: perProject.flatMap((project) => project.ready) }
 }

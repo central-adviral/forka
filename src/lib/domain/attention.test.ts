@@ -91,4 +91,23 @@ describe('buildAttention with watcher alerts', () => {
     expect(items[1]).toMatchObject({ tool: 'ab', action: 'Decidir', href: '/dashboard/clients/voe/backlog?projeto=1k-latam&item=T5' })
     expect(items[1].detail).toContain('12 dias rodando')
   })
+
+  it('flags a skewed draw as critical, opening the link, and lists cards ready to go live', () => {
+    const items = buildAttention(
+      input({
+        skewedDraws: [{ testName: 'Checkout em 1 passo', testSlug: 't7-checkout', name: 'B', actualPct: 58, expectedPct: 50 }],
+        readyCards: [
+          { code: 'T8', title: 'Order bump de R$ 37', href: '/dashboard/clients/voe/tests/t8-bump/link', hasLink: true },
+          { code: 'T9', title: 'Vídeo de 15s', href: '/dashboard/clients/voe/backlog?projeto=p&item=T9', hasLink: false },
+        ],
+      })
+    )
+    expect(items[0]).toMatchObject({ severity: 'crit', title: 'Checkout em 1 passo · sorteio fora do peso', action: 'Ver link', href: '/dashboard/clients/voe/tests/t7-checkout/link' })
+    expect(items[0].detail).toContain('B recebeu 58% das pessoas contra 50% previsto')
+    expect(items.slice(1).map((item) => [item.severity, item.title, item.action])).toEqual([
+      ['ok', 'T8 · pronto pra subir', 'Pegar link'],
+      ['ok', 'T9 · pronto pra subir', 'Abrir card'],
+    ])
+  })
 })
+

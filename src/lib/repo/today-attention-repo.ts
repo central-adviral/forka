@@ -3,7 +3,8 @@ import { findBestVariant } from './client-hub-repo'
 import { getClientDaily, saoPauloDay, type ClientDay } from './today-repo'
 import { getAlerts, getWatchers } from './watchers-repo'
 import { getPagesWithChecks } from './pages-repo'
-import { loadRunningVerdicts } from './backlog-readout-repo'
+import { loadBacklogAttention } from './backlog-readout-repo'
+import { detectSampleRatioMismatch } from '@/lib/domain/srm-check'
 import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
 import { buildAttention, type AttentionItem } from '@/lib/domain/attention'
 import { METRICS, formatMetric, watcherScope } from '@/lib/domain/watchers'
@@ -46,18 +47,29 @@ export async function loadTodayAttention(supabase: SupabaseClient, client: { id:
   const campaigns = campaignsResult.data
   const lastRun = lastRunResult.data
   const funnels = funnelsResult.data
-  const [bestVariant, watchers, alerts, pages, unattributedResult, testVerdicts] = await Promise.all([
+  const [bestVariant, watchers, alerts, pages, unattributedResult, backlogAttention, skewedDraws] = await Promise.all([
     findBestVariant(supabase, activeTests ?? [], monthSince, week.until).catch(() => null),
     getWatchers(supabase, client.id),
     getAlerts(supabase, client.id),
     getPagesWithChecks(supabase, client.id, 2),
     supabase.from('sales').select('valor_liquido').eq('client_id', client.id).is('sales_funnel_id', null).gte('data_venda', brtDayBoundaryUtc(week.since)),
     // A failed verdict read only drops these items; the rest of the queue still stands.
-    loadRunningVerdicts(supabase, (funnels ?? []).filter((funnel) => funnel.is_active)).catch((error) => {
+    loadBacklogAttention(supabase, (funnels ?? []).filter((funnel) => funnel.is_active)).catch((error) => {
       console.error('[today-test-verdicts-failed]', { clientId: client.id }, error)
+      return { verdicts: [], ready: [] }
+    }),
+    findSkewedDraws(supabase, activeTests ?? []).catch((error) => {
+      console.error('[today-srm-failed]', { clientId: client.id }, error)
       return []
     }),
   ])
+  // "Pronto pra subir" opens the link to paste when the card has its test, otherwise the card.
+  const readyTestIds = backlogAttention.ready.flatMap((card) => (card.testId ? [card.testId] : []))
+  const { data: readyTests } = readyTestIds.length > 0 ? await supabase.from('tests').select('id, slug').in('id', readyTestIds) : { data: [] }
+  const readyCards = backlogAttention.ready.map((card) => {
+    const slug = (readyTests ?? []).find((test) => test.id === card.testId)?.slug
+    return { code: card.code, title: card.title, href: slug ? `${base}/tests/${slug}/link` : `${base}/backlog?projeto=${card.projectSlug}&item=${card.code}`, hasLink: Boolean(slug) }
+  })
   if (unattributedResult.error) throw unattributedResult.error
   const unattributedSales = (unattributedResult.data ?? []) as { valor_liquido: number | null }[]
   // A page the ads point to that is down or slow (0066) goes to the same queue as the watchers.
@@ -100,8 +112,44 @@ export async function loadTodayAttention(supabase: SupabaseClient, client: { id:
     bestVariant,
     unattributed: { count: unattributedSales.length, revenue: unattributedSales.reduce((sum, sale) => sum + Number(sale.valor_liquido ?? 0), 0) },
     watcherAlerts: [...watcherAlerts, ...pageAlerts],
-    testVerdicts,
+    testVerdicts: backlogAttention.verdicts,
+    skewedDraws,
+    readyCards,
   })
 
   return { attention, today, week, weekDays, metaDataAt, todayRow, funnels: funnels ?? [], activeTests: activeTests ?? [], conflicts, orphans, firstProject }
 }
+
+/**
+ * Active tests whose traffic does not split by the weights (SRM), counted from the last weight
+ * change (0076) so a 70/30 → 50/50 switch is not an alarm. One report per active test: a client
+ * runs a handful at a time.
+ */
+async function findSkewedDraws(supabase: SupabaseClient, tests: { id: string; name: string; slug: string }[]) {
+  const perTest = await Promise.all(
+    tests.map(async (test) => {
+      const { data: lastChange } = await supabase
+        .from('test_changes')
+        .select('created_at')
+        .eq('test_id', test.id)
+        .eq('field', 'weight_pct')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const { data, error } = await supabase.rpc('get_test_report', { p_test_id: test.id, p_since: lastChange?.created_at ?? null, p_until: null })
+      if (error) throw error
+      const rows = (data ?? []) as { variant_name: string; weight_pct: number; visits: number }[]
+      if (detectSampleRatioMismatch(rows.map((row) => ({ weightPct: Number(row.weight_pct), visits: Number(row.visits) }))) !== 'mismatch') return []
+      // The variant furthest from its share, in the words of the alert.
+      const live = rows.filter((row) => Number(row.weight_pct) > 0)
+      const totalVisits = live.reduce((sum, row) => sum + Number(row.visits), 0)
+      const totalWeight = live.reduce((sum, row) => sum + Number(row.weight_pct), 0)
+      const worst = live
+        .map((row) => ({ name: row.variant_name, actualPct: Math.round((Number(row.visits) / totalVisits) * 100), expectedPct: Math.round((Number(row.weight_pct) / totalWeight) * 100) }))
+        .sort((a, b) => Math.abs(b.actualPct - b.expectedPct) - Math.abs(a.actualPct - a.expectedPct))[0]
+      return [{ testName: test.name, testSlug: test.slug, ...worst }]
+    })
+  )
+  return perTest.flat()
+}
+

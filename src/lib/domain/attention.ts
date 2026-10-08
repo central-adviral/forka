@@ -29,6 +29,10 @@ export interface AttentionInput {
   watcherAlerts?: { severity: 'warn' | 'crit'; title: string; detail: string }[]
   /** Running backlog cards whose rules already speak: a win, a cut or a saturated creative. */
   testVerdicts?: { code: string; title: string; summary: string; kind: 'win' | 'cut' | 'decide'; projectSlug: string; daysRunning: number }[]
+  /** Active tests whose traffic does not split by the weights since the last weight change. */
+  skewedDraws?: { testName: string; testSlug: string; name: string; actualPct: number; expectedPct: number }[]
+  /** Cards with the checklist complete, waiting to go live. */
+  readyCards?: { code: string; title: string; href: string; hasLink: boolean }[]
 }
 
 const STALE_AFTER_MS = 2 * 60 * 60 * 1000
@@ -122,6 +126,29 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
       tool: 'ab',
       href: `${input.base}/backlog?projeto=${verdict.projectSlug}&item=${verdict.code}`,
       action: 'Decidir',
+    })
+  }
+
+  // A skewed draw makes every number of the test wrong: usually an ad with the wrong link.
+  for (const draw of input.skewedDraws ?? []) {
+    items.push({
+      severity: 'crit',
+      title: `${draw.testName} · sorteio fora do peso`,
+      detail: `${draw.name} recebeu ${draw.actualPct}% das pessoas contra ${draw.expectedPct}% previsto. Confira o link dos anúncios antes de ler o resultado.`,
+      tool: 'ab',
+      href: `${input.base}/tests/${draw.testSlug}/link`,
+      action: 'Ver link',
+    })
+  }
+
+  for (const card of input.readyCards ?? []) {
+    items.push({
+      severity: 'ok',
+      title: `${card.code} · pronto pra subir`,
+      detail: `${card.title}. Checklist completo${card.hasLink ? ': falta colar o link nos anúncios e levar o card para Rodando.' : '.'}`,
+      tool: 'ab',
+      href: card.href,
+      action: card.hasLink ? 'Pegar link' : 'Abrir card',
     })
   }
 
