@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getSyncCursor, recordSyncResult } from '@/lib/repo/funnel-sync-state-repo'
 import { fetchLaunchOpsSalesRows, syncSalesForFunnel, reconcileUnmatchedSales } from './sync-sales'
+import { recoverConversionsFromSales } from '@/lib/repo/conversion-repo'
 import {
   fetchLaunchOpsAdSpendRows,
   fetchLaunchOpsAdSpendRowsForDays,
@@ -84,6 +85,8 @@ async function syncSalesEntity(appDb: SupabaseClient, launchopsDb: SupabaseClien
     if (funnel.client_id) {
       const { reconciled } = await reconcileUnmatchedSales(appDb, funnel.client_id)
       if (reconciled > 0) console.log('[sync-funnel-sales-reconciled]', { salesFunnelId: funnel.id, reconciled })
+      const recovered = await recoverConversionsFromSales(appDb, funnel.client_id)
+      if (recovered > 0) console.log('[sync-funnel-conversions-recovered]', { salesFunnelId: funnel.id, recovered })
     }
     await recordSyncResult(appDb, { salesFunnelId: funnel.id, entity: 'sales', result: 'ok', newCursor: latestUpdatedAt ?? undefined })
   } catch (err) {

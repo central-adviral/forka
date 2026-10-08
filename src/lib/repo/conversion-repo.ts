@@ -46,11 +46,44 @@ export async function insertConversionIfNew(
   return 'inserted'
 }
 
-/** Whether this invoice was refunded (0083): a re-delivered payment must not bring it back. */
+/**
+ * Whether this invoice was refunded: a re-delivered payment must not bring it back (0083), and a
+ * refund that arrived before its payment keeps that payment out (0088).
+ */
 export async function wasRefunded(db: SupabaseClient, externalEventId: string): Promise<boolean> {
-  const { count, error } = await db.from('conversion_refunds').select('conversion_id', { count: 'exact', head: true }).eq('external_event_id', externalEventId)
+  const [moved, early] = await Promise.all([
+    db.from('conversion_refunds').select('conversion_id', { count: 'exact', head: true }).eq('external_event_id', externalEventId),
+    db.from('hubla_events').select('id', { count: 'exact', head: true }).eq('invoice_id', externalEventId).eq('kind', 'refund'),
+  ])
+  if (moved.error) throw moved.error
+  if (early.error) throw early.error
+  return (moved.count ?? 0) + (early.count ?? 0) > 0
+}
+
+export type HublaEventOutcome = 'counted' | 'duplicate' | 'no_tracking' | 'unknown_click' | 'already_refunded' | 'refunded' | 'refund_unmatched'
+
+/** Keeps what happened to each Hubla payment or refund (0088), with no customer data, so the loss can be measured. */
+export async function recordHublaEvent(
+  db: SupabaseClient,
+  event: { clientId: string; invoiceId: string | null; kind: 'payment' | 'refund'; outcome: HublaEventOutcome; clickEventId?: string | null; valueCents?: number | null }
+): Promise<void> {
+  const { error } = await db.from('hubla_events').insert({
+    client_id: event.clientId,
+    invoice_id: event.invoiceId,
+    kind: event.kind,
+    outcome: event.outcome,
+    click_event_id: event.clickEventId ?? null,
+    value_cents: event.valueCents ?? null,
+  })
+  // The record is for measuring; losing one must never fail the sale it describes.
+  if (error) console.error('[hubla-event-record-failed]', { invoiceId: event.invoiceId, outcome: event.outcome }, error)
+}
+
+/** Turns synced sales carrying a click's id into the conversions the webhook missed (0088). */
+export async function recoverConversionsFromSales(db: SupabaseClient, clientId: string): Promise<number> {
+  const { data, error } = await db.rpc('recover_conversions_from_sales', { p_client_id: clientId })
   if (error) throw error
-  return (count ?? 0) > 0
+  return Number(data ?? 0)
 }
 
 /** Moves a refunded Hubla sale out of the test's numbers (0083). False when nothing matched. */
