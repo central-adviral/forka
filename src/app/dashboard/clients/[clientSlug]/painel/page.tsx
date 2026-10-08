@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { PageHeader } from '@/components/page-header'
 import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getAlerts, getWatchers } from '@/lib/repo/watchers-repo'
@@ -10,6 +11,7 @@ import { canActAs } from '@/lib/view-as'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { addPage, checkPagesNow, removePage } from './actions'
 import { WatcherStatusPill } from '@/components/watcher-status'
+import { headerAction } from '@/components/header-actions'
 
 const mono = 'font-[family-name:var(--font-geist-mono)]'
 const when = (iso: string) =>
@@ -72,23 +74,15 @@ export default async function PainelPage({
 
   return (
     <div className="flex max-w-[1240px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
-      <div className="flex flex-wrap items-end gap-4 border-b border-[var(--ct-line)] pb-7">
-        <div>
-          <span className="flex items-center gap-2.5">
-            <span className={`${mono} rounded-full bg-[var(--ct-accent-soft)] px-2 py-0.5 text-[10.5px] text-[var(--ct-painel)]`}>Ferramenta</span>
-            <span className={`${mono} text-[10.5px] uppercase tracking-[0.08em] text-[var(--ct-text-3)]`}>
-              {lastDay ? `último dia fechado ${dayBr(lastDay)}` : 'nenhuma avaliação ainda'}
-            </span>
-          </span>
-          <h1 className="mt-2.5 text-[34px] font-semibold tracking-[-0.045em]">Painel de Controle</h1>
-          <p className="mt-2 max-w-[62ch] text-sm text-[var(--ct-text-2)]">
-            Os vigias de cada projeto da {client.name}. O aviso abre quando o número sai da faixa e fecha sozinho quando volta.
-          </p>
-        </div>
-        <Link href={`${base}/metas`} className="ml-auto rounded-full border border-[var(--ct-line-2)] px-4 py-2 text-[13px] font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
-          Metas e alvos
-        </Link>
-      </div>
+      <PageHeader
+        title="Painel de Controle"
+        note={`${lastDay ? `Último dia fechado ${dayBr(lastDay)}` : 'Nenhuma avaliação ainda'}. O aviso abre quando o número sai da faixa e fecha sozinho quando volta.`}
+        actions={
+          <Link href={`${base}/metas`} className={headerAction}>
+            Metas e alvos
+          </Link>
+        }
+      />
 
       <section id="atencao" className="flex flex-col gap-4 scroll-mt-6">
         <header>

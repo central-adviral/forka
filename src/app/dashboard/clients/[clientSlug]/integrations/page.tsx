@@ -155,8 +155,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
   return (
     <div className="flex max-w-[1320px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
-        tool="config"
-        eyebrow={client.name}
+        note={client.name}
         title="Integrações"
         description={`Conectadas uma vez por cliente. Todos os projetos da ${client.name} usam estas fontes.`}
       />

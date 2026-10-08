@@ -7,6 +7,8 @@ import { WatcherStatusPill } from '@/components/watcher-status'
 import { createWatcher, deleteWatcher, evaluateNow, toggleWatcher } from './actions'
 import { ScopeMetricFields } from './scope-metric-fields'
 import { canActAs } from '@/lib/view-as'
+import { PageHeader } from '@/components/page-header'
+import { headerAction } from '@/components/header-actions'
 
 const mono = 'font-[family-name:var(--font-geist-mono)]'
 const field =
@@ -39,25 +41,19 @@ export default async function MetasPage({
 
   return (
     <div className="flex max-w-[1240px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
-      <div className="flex flex-wrap items-end gap-4 border-b border-[var(--ct-line)] pb-7">
-        <div>
-          <span className={`${mono} text-[10.5px] uppercase tracking-[0.08em] text-[var(--ct-text-3)]`}>Configurar · {client.name}</span>
-          <h1 className="mt-2.5 text-[34px] font-semibold tracking-[-0.045em]">Metas e alvos</h1>
-          <p className="mt-2 max-w-[66ch] text-sm text-[var(--ct-text-2)]">
-            Cada linha é um vigia: uma métrica de um projeto, com o alvo que você aceita. As campanhas de cada projeto são as das
-            Regras de campanha, as mesmas das Análises; a frente é um recorte opcional dentro dele. A cada sincronização ele
-            olha o último dia fechado (hoje ainda é parcial) e abre um alerta no Painel de Controle quando sai da faixa. O alerta
-            fecha sozinho quando o número volta.
-          </p>
-        </div>
-        {canEdit && (
-          <form action={evaluateNow.bind(null, context)} className="ml-auto">
-            <button type="submit" className="rounded-full border border-[var(--ct-line-2)] px-4 py-2 text-[13px] font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
-              Avaliar agora
-            </button>
-          </form>
-        )}
-      </div>
+      <PageHeader
+        title="Metas e alvos"
+        note="Cada vigia é uma métrica de um projeto, com o alvo que você aceita. As campanhas são as das Regras de campanha, as mesmas das Análises; a frente é um recorte opcional. A cada sincronização ele olha o último dia fechado e abre um alerta no Painel quando sai da faixa; o alerta fecha sozinho quando o número volta."
+        actions={
+          canEdit && (
+            <form action={evaluateNow.bind(null, context)}>
+              <button type="submit" className={headerAction}>
+                Avaliar agora
+              </button>
+            </form>
+          )
+        }
+      />
 
       {ok && <p role="status" className="rounded-[10px] bg-[var(--ct-ok-soft)] px-4 py-3 text-[13px] text-[var(--ct-ok)]">{ok}</p>}
       {erro && <p role="alert" className="rounded-[10px] bg-[var(--ct-crit-soft)] px-4 py-3 text-[13px] text-[var(--ct-crit)]">{erro}</p>}

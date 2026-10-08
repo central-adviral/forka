@@ -61,8 +61,7 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
       </Suspense>
       <div className="mb-9">
         <PageHeader
-          tool="ab"
-          eyebrow={client.name}
+          note={client.name}
           title="Testes A/B de link"
           description="Cada teste divide o tráfego de um link /r entre as variantes e mede por pessoa quem compra mais."
           actions={

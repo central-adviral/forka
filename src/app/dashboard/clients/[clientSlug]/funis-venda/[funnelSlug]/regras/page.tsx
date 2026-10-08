@@ -13,6 +13,7 @@ import {
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { addRule, createFront, deleteFront, pinCampaign, removeRule, unpinCampaign } from './actions'
 import { canActAs } from '@/lib/view-as'
+import { PageHeader } from '@/components/page-header'
 
 interface FrontRow {
   id: string
@@ -114,33 +115,26 @@ export default async function CampaignRulesPage({
 
   return (
     <div className="flex max-w-[1180px] flex-col gap-8 px-4 md:px-14 pb-24 pt-12">
-      <div className="flex flex-wrap items-end gap-4">
-        <div>
-          <Link href={base} className="text-xs text-[var(--ct-text-3)] hover:text-[var(--ct-text)]">
-            ‹ {funnel.name}
-          </Link>
-          <h1 className="mt-2.5 text-[30px] font-semibold tracking-[-0.04em]">Regras de campanha</h1>
-          <p className="mt-2 max-w-[70ch] text-sm text-[var(--ct-text-2)]">
-            Cada campanha tem um dono só: uma frente. O nome sugere o dono (contém todos os textos verdes e nenhum dos
-            vermelhos) e o sync fixa essa escolha, então renomear a campanha no Gerenciador não muda o histórico. Você
-            pode fixar o dono à mão na tabela. Uma frente também pode ler outro projeto, só dentro da janela deste.
-          </p>
-        </div>
-        <div className="ml-auto flex items-center gap-1 rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface)] p-[3px]">
-          {PERIODS.map((period) => (
-            <Link
-              key={period.value}
-              href={`${base}/regras?periodo=${period.value}`}
-              aria-current={periodo === period.value ? 'page' : undefined}
-              className={`rounded-[7px] px-3 py-1 text-[12.5px] font-medium ${
-                periodo === period.value ? 'bg-[var(--ct-surface-3)] text-[var(--ct-text)]' : 'text-[var(--ct-text-3)]'
-              }`}
-            >
-              {period.label}
-            </Link>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        title="Regras de campanha"
+        note="Cada campanha tem um dono só: uma frente. O nome sugere o dono (contém todos os textos verdes e nenhum dos vermelhos) e o sync fixa essa escolha, então renomear a campanha no Gerenciador não muda o histórico. Você pode fixar o dono à mão na tabela. Uma frente também pode ler outro projeto, só dentro da janela deste."
+        actions={
+          <div className="flex items-center gap-1 rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface)] p-[3px]" role="group" aria-label="Período">
+              {PERIODS.map((period) => (
+                <Link
+                  key={period.value}
+                  href={`${base}/regras?periodo=${period.value}`}
+                  aria-current={periodo === period.value ? 'page' : undefined}
+                  className={`rounded-[7px] px-3 py-1 text-[12.5px] font-medium ${
+                    periodo === period.value ? 'bg-[var(--ct-surface-3)] text-[var(--ct-text)]' : 'text-[var(--ct-text-3)]'
+                  }`}
+                >
+                  {period.label}
+                </Link>
+              ))}
+          </div>
+        }
+      />
 
       {ok && (
         <p role="status" className="rounded-[10px] bg-[var(--ct-an-soft)] px-4 py-3 text-[13px] text-[var(--ct-an)]">

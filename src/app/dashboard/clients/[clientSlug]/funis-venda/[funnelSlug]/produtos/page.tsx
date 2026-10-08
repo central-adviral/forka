@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
@@ -11,6 +10,7 @@ import { removeProduct, setProductRole } from './actions'
 import { canActAs } from '@/lib/view-as'
 import { saoPauloDay } from '@/lib/repo/today-repo'
 import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
+import { PageHeader } from '@/components/page-header'
 
 const LOOKBACK_DAYS = 30
 
@@ -82,7 +82,6 @@ export default async function ProjectProductsPage({
   const classified = new Set(products.map((product) => product.produto_nome))
   const unclassified = catalog.filter((product) => !classified.has(product.produto_nome))
 
-  const base = `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`
   const context = { client_slug: client.slug, funnel_slug: funnel.slug, sales_funnel_id: funnel.id }
 
   function roleSelect(defaultValue: ProductRole) {
@@ -105,18 +104,17 @@ export default async function ProjectProductsPage({
 
   return (
     <div className="flex max-w-[1180px] flex-col gap-8 px-4 md:px-14 pb-24 pt-12">
-      <div>
-        <Link href={base} className="text-xs text-[var(--ct-text-3)] hover:text-[var(--ct-text)]">
-          ‹ {funnel.name}
-        </Link>
-        <h1 className="mt-2.5 text-[30px] font-semibold tracking-[-0.04em]">Produtos do projeto</h1>
-        <p className="mt-2 max-w-[70ch] text-sm text-[var(--ct-text-2)]">
-          Só as vendas dos produtos desta lista entram no projeto. O papel define a conta: o CPA divide o investimento
-          pelas vendas de <strong>entrada</strong>; faturamento e ROAS front somam entrada, order bump e upsell; a{' '}
-          <strong>ascensão</strong> tem um ROAS próprio, ao lado. Um produto listado em mais de um projeto vai para o projeto do anúncio da
-          venda. Tirar um produto não apaga vendas: elas passam para outro projeto que tenha o produto ou ficam sem atribuição.
-        </p>
-      </div>
+      <PageHeader
+        title="Produtos do projeto"
+        note={
+          <>
+            Só as vendas dos produtos desta lista entram em {funnel.name}. O papel define a conta: o CPA divide o investimento pelas vendas de{' '}
+            <strong>entrada</strong>; faturamento e ROAS front somam entrada, order bump e upsell; a <strong>ascensão</strong> tem um ROAS próprio. Um
+            produto em mais de um projeto vai para o projeto do anúncio da venda. Tirar um produto não apaga vendas: elas passam para outro projeto que
+            tenha o produto ou ficam sem atribuição.
+          </>
+        }
+      />
 
       {unattributed.length > 0 && (
         <p className="rounded-[10px] bg-[var(--ct-warn-soft)] px-4 py-3 text-[13px] text-[var(--ct-warn)]">

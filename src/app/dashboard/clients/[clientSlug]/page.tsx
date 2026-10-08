@@ -3,16 +3,12 @@ import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { deleteClient } from '../actions'
-import { findBestVariant } from '@/lib/repo/client-hub-repo'
-import { getClientDaily, saoPauloDay, type ClientDay } from '@/lib/repo/today-repo'
-import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
-import { buildAttention, type AttentionItem } from '@/lib/domain/attention'
-import { getAlerts, getWatchers } from '@/lib/repo/watchers-repo'
-import { METRICS, formatMetric, watcherScope } from '@/lib/domain/watchers'
+import { saoPauloDay, type ClientDay } from '@/lib/repo/today-repo'
+import type { AttentionItem } from '@/lib/domain/attention'
+import { loadTodayAttention } from '@/lib/repo/today-attention-repo'
 import { projectDay } from '@/lib/domain/day-pace'
-import { getPagesWithChecks } from '@/lib/repo/pages-repo'
-import { isOutage, pageHealth } from '@/lib/domain/page-probe'
 import { canActAs } from '@/lib/view-as'
+import { PageHeader } from '@/components/page-header'
 
 const PERIODS = [
   { value: 'hoje', label: 'Hoje' },
@@ -73,86 +69,22 @@ export default async function TodayPage({
   const { data: client } = await supabase.from('clients').select('id, name, slug').eq('slug', clientSlug).maybeSingle()
   if (!client) notFound()
 
-  const today = saoPauloDay(0)
-  const week = { since: saoPauloDay(-6), until: saoPauloDay(1) }
-  const monthSince = saoPauloDay(-29)
   const base = `/dashboard/clients/${client.slug}`
-
-  const [weekDays, campaignsResult, lastRunResult, funnelsResult, { data: activeTests }, { data: isOwner }] = await Promise.all([
-    getClientDaily(supabase, client.id, week.since, week.until),
-    supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: monthSince, p_until: week.until }),
-    supabase.from('sync_runs').select('finished_at, error').eq('client_id', client.id).not('finished_at', 'is', null).order('started_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('sales_funnels').select('slug, name, is_active, daily_sales_target, resultado').eq('client_id', client.id).order('name'),
-    supabase.from('tests').select('id, name').eq('client_id', client.id).eq('status', 'active'),
-    canActAs(supabase, client.id, 'owner').then((data) => ({ data })),
+  const [{ attention, today, weekDays, metaDataAt, todayRow, funnels, activeTests, conflicts, orphans, firstProject }, isOwner] = await Promise.all([
+    loadTodayAttention(supabase, client),
+    canActAs(supabase, client.id, 'owner'),
   ])
-  // A failed read must not pass for a quiet day: no conflicts, no unclassified spend, no sync.
-  const readError = campaignsResult.error ?? lastRunResult.error ?? funnelsResult.error
-  if (readError) throw readError
-  const campaigns = campaignsResult.data
-  const lastRun = lastRunResult.data
-  const funnels = funnelsResult.data
-  const [bestVariant, watchers, alerts, pages, unattributedResult] = await Promise.all([
-    findBestVariant(supabase, activeTests ?? [], monthSince, week.until).catch(() => null),
-    getWatchers(supabase, client.id),
-    getAlerts(supabase, client.id),
-    getPagesWithChecks(supabase, client.id, 2),
-    supabase.from('sales').select('valor_liquido').eq('client_id', client.id).is('sales_funnel_id', null).gte('data_venda', brtDayBoundaryUtc(week.since)),
-  ])
-  if (unattributedResult.error) throw unattributedResult.error
-  const unattributedSales = (unattributedResult.data ?? []) as { valor_liquido: number | null }[]
-  // A page the ads point to that is down or slow (0066) goes to the same queue as the watchers.
-  const pageAlerts = pages.flatMap((page) => {
-    const health = pageHealth(page.checks)
-    if (!page.isActive || health === 'ok' || health === 'sem_check') return []
-    const last = page.checks[0]
-    return [{
-      severity: (isOutage(page.checks) ? 'crit' : 'warn') as 'crit' | 'warn',
-      title: `${page.label} ${health === 'fora' ? 'fora do ar' : 'lenta'}`,
-      detail: health === 'fora' ? `${last.error ?? 'Não respondeu'} na última checagem.` : `${((last.ttfbMs ?? 0) / 1000).toFixed(1).replace('.', ',')}s para responder na última checagem.`,
-    }]
-  })
-  const watcherById = new Map(watchers.map((watcher) => [watcher.id, watcher]))
-  const watcherAlerts = alerts.flatMap((alert) => {
-    const watcher = watcherById.get(alert.watcherId)
-    if (alert.closedAt || !watcher) return []
-    const scope = `${watcher.projectName} · ${watcherScope(watcher)}`
-    return [{
-      severity: alert.severity,
-      title: `${scope} · ${METRICS[watcher.metric].label} ${alert.severity === 'crit' ? 'crítico' : 'em atenção'}`,
-      detail: `${formatMetric(watcher.metric, alert.value)} contra alvo de ${formatMetric(watcher.metric, watcher.target)} no último dia fechado.`,
-    }]
-  })
 
   const periodDays =
     period === 'hoje' ? weekDays.filter((day) => day.data === today)
     : period === 'ontem' ? weekDays.filter((day) => day.data === saoPauloDay(-1))
     : weekDays
-  const todayRow = weekDays.find((day) => day.data === today)
-  const metaDataAt = todayRow?.dadosAte ?? null
   const partial = period !== 'ontem' && Boolean(todayRow?.dadosAte)
 
   const spend = sum(periodDays, 'spendComImposto')
   const vendas = sum(periodDays, 'vendas')
   const vendasAnuncio = sum(periodDays, 'vendasAnuncio')
   const leads = sum(periodDays, 'leads')
-
-  const classified = (campaigns ?? []) as { campaign_name: string; spend: number; front_ids: string[]; suggested_front_ids: string[] }[]
-  const conflicts = classified.filter((c) => c.front_ids.length === 0 && c.suggested_front_ids.length > 1)
-  const orphans = classified.filter((c) => c.front_ids.length === 0 && c.suggested_front_ids.length === 0)
-  const firstProject = (funnels ?? [])[0]
-  const attention = buildAttention({
-    base,
-    now: new Date(),
-    metaDataAt,
-    lastRun: lastRun ? { finishedAt: lastRun.finished_at, error: lastRun.error } : null,
-    conflicts: conflicts.map((c) => ({ name: c.campaign_name, spend: Number(c.spend) })),
-    unclassified: { count: orphans.length, spend: orphans.reduce((total, c) => total + Number(c.spend), 0) },
-    rulesHref: firstProject ? `${base}/funis-venda/${firstProject.slug}/regras` : null,
-    bestVariant,
-    unattributed: { count: unattributedSales.length, revenue: unattributedSales.reduce((sum, sale) => sum + Number(sale.valor_liquido ?? 0), 0) },
-    watcherAlerts: [...watcherAlerts, ...pageAlerts],
-  })
 
   // The day's target is the sum of the active projects' targets; the projection uses the sales up
   // to the last Meta pull, the same cut the partial CPA uses.
@@ -179,34 +111,33 @@ export default async function TodayPage({
 
   return (
     <div className="flex max-w-[1320px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
-      <div className="flex flex-wrap items-end gap-4 border-b border-[var(--ct-line)] pb-7">
-        <div>
-          <span className={`${mono} text-[10.5px] uppercase tracking-[0.08em] text-[var(--ct-text-3)]`}>
-            {client.name} · {weekdayLabel}
-          </span>
-          <h1 className="mt-2.5 text-[34px] font-semibold tracking-[-0.045em]">Hoje</h1>
-          <p className="mt-2 max-w-[62ch] text-sm text-[var(--ct-text-2)]">
-            O dia do cliente nas três ferramentas.
+      <PageHeader
+        title="Hoje"
+        note={
+          <>
+            {client.name} · {weekdayLabel}.
             {metaDataAt ? ` Gasto do Meta até ${timeBr(metaDataAt)}.` : ' O gasto de hoje ainda não chegou do Meta.'}
-          </p>
-        </div>
-        <div className="ml-auto flex gap-0.5 rounded-full border border-[var(--ct-line)] bg-[var(--ct-surface-2)] p-1" role="group" aria-label="Período">
-          {PERIODS.map((option) => (
-            <Link
-              key={option.value}
-              href={option.value === 'hoje' ? base : `${base}?periodo=${option.value}`}
-              aria-current={period === option.value ? 'page' : undefined}
-              className={`rounded-full px-3.5 py-1.5 text-[12.5px] font-medium ${
-                period === option.value ? 'bg-[var(--ct-surface-3)] text-[var(--ct-text)]' : 'text-[var(--ct-text-3)] hover:text-[var(--ct-text)]'
-              }`}
-            >
-              {option.label}
-            </Link>
-          ))}
-        </div>
-      </div>
+          </>
+        }
+        actions={
+          <div className="flex gap-0.5 rounded-full border border-[var(--ct-line)] bg-[var(--ct-surface-2)] p-1" role="group" aria-label="Período">
+            {PERIODS.map((option) => (
+              <Link
+                key={option.value}
+                href={option.value === 'hoje' ? base : `${base}?periodo=${option.value}`}
+                aria-current={period === option.value ? 'page' : undefined}
+                className={`rounded-full px-3.5 py-1.5 text-[12.5px] font-medium ${
+                  period === option.value ? 'bg-[var(--ct-surface-3)] text-[var(--ct-text)]' : 'text-[var(--ct-text-3)] hover:text-[var(--ct-text)]'
+                }`}
+              >
+                {option.label}
+              </Link>
+            ))}
+          </div>
+        }
+      />
 
-      <div className="grid grid-cols-2 gap-[18px] md:grid-cols-3 xl:grid-cols-5">
+      <div id="ritmo" className="grid scroll-mt-6 grid-cols-2 gap-[18px] md:grid-cols-3 xl:grid-cols-5">
         {kpis.map((kpi) => (
           <div key={kpi.label} className="card-shadow flex flex-col gap-1.5 rounded-[18px] border border-[var(--ct-line)] px-[22px] py-5">
             <span className="flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-[var(--ct-text-3)]">
@@ -233,7 +164,7 @@ export default async function TodayPage({
       )}
 
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <section className="flex flex-col gap-4">
+        <section id="atencao" className="flex scroll-mt-6 flex-col gap-4">
           <header>
             <h2 className="text-[19px] font-semibold">Precisa da sua atenção</h2>
             <p className="mt-1 text-[13px] text-[var(--ct-text-3)]">Uma fila só, das três ferramentas. Some daqui quando o problema é resolvido.</p>
@@ -324,7 +255,7 @@ export default async function TodayPage({
         </div>
       </section>
 
-      {isOwner === true && (
+      {isOwner && (
         <div className="flex justify-end">
           <ConfirmDeleteButton action={deleteClient.bind(null, client.id)} label="Excluir cliente" />
         </div>
