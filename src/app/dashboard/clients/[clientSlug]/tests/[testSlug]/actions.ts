@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { httpUrl } from '@/lib/domain/http-url-schema'
+import { layerConflict } from '@/lib/domain/test-layers'
 import { weightsSumTo100 } from '@/lib/domain/validate-weights'
 import { buildInsightPrompt, type InsightVariantStat } from '@/lib/domain/insight-prompt'
 import { probabilityToBeatControl } from '@/lib/domain/significance'
@@ -26,7 +27,7 @@ export async function toggleTestStatus(input: z.infer<typeof toggleSchema>) {
     .update({ status: parsed.next_status })
     .eq('id', parsed.test_id)
     .select('id')
-  if (error) throw error
+  if (error) throw layerConflict(error) ?? error
   if (!data || data.length === 0) throw new Error('Teste não encontrado ou você não tem permissão para alterá-lo.')
 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests/${parsed.test_slug}`)
@@ -112,6 +113,7 @@ const updateTestSchema = z.object({
   test_type: z.enum(['page', 'checkout']),
   fallback_url: httpUrl.optional().or(z.literal('')),
   sales_page_url: httpUrl.optional().or(z.literal('')),
+  sales_funnel_id: z.string().uuid().optional().or(z.literal('')),
   variants: z
     .array(
       z.object({
@@ -167,9 +169,10 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
     .update({
       fallback_url: parsed.fallback_url || null,
       sales_page_url: parsed.sales_page_url || null,
+      sales_funnel_id: parsed.sales_funnel_id || null,
     })
     .eq('id', parsed.test_id)
-  if (testError) throw testError
+  if (testError) throw layerConflict(testError) ?? testError
 
   // Uma única statement de upsert pra todas as variantes (em vez de um update por variante)
   // — evita ficar com só algumas variantes atualizadas se uma falhar no meio do loop.

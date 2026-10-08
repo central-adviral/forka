@@ -15,6 +15,8 @@ export interface TestWithVariants {
   fallback_url: string | null
   test_type: 'page' | 'checkout'
   sales_page_url: string | null
+  /** The project, whose type-per-project layer this test fills (0078); null for an unlinked test. */
+  sales_funnel_id: string | null
   variants: VariantRow[]
 }
 
@@ -22,7 +24,7 @@ export async function getTestBySlug(db: SupabaseClient, slug: string): Promise<T
   const { data, error } = await db
     .from('tests')
     .select(
-      'id, slug, status, fallback_url, test_type, sales_page_url, variants(id, name, weight_pct, destination_url, is_control)'
+      'id, slug, status, fallback_url, test_type, sales_page_url, sales_funnel_id, variants(id, name, weight_pct, destination_url, is_control)'
     )
     .eq('slug', slug)
     .order('name', { referencedTable: 'variants' })
@@ -44,6 +46,7 @@ export async function insertClickEvent(
     userAgent?: string | null
     isBot?: boolean
     rateLimited?: boolean
+    parentTrackingId?: string | null
   }
 ): Promise<void> {
   const { error } = await db.from('click_events').insert({
@@ -56,6 +59,7 @@ export async function insertClickEvent(
     user_agent: params.userAgent ?? null,
     is_bot: params.isBot ?? false,
     rate_limited: params.rateLimited ?? false,
+    parent_tracking_id: params.parentTrackingId ?? null,
   })
   if (error) throw error
 }
@@ -125,6 +129,28 @@ export async function getLatestTrackingId(
     .select('tracking_id, source_utms')
     .eq('test_id', params.testId)
     .eq('visitor_id', params.visitorId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  if (!data?.tracking_id) return null
+  return {
+    trackingId: data.tracking_id as string,
+    sourceUtms: (data.source_utms as Record<string, string> | null) ?? {},
+  }
+}
+
+/** The visitor's latest human click on any test of the project: the page click a checkout entry continues (0078). */
+export async function getLatestFunnelClick(
+  db: SupabaseClient,
+  params: { salesFunnelId: string; visitorId: string }
+): Promise<LatestClick | null> {
+  const { data, error } = await db
+    .from('click_events')
+    .select('tracking_id, source_utms, tests!inner(sales_funnel_id)')
+    .eq('tests.sales_funnel_id', params.salesFunnelId)
+    .eq('visitor_id', params.visitorId)
+    .eq('is_bot', false)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()

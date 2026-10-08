@@ -32,6 +32,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: null,
       test_type: 'page',
       sales_page_url: null,
+      sales_funnel_id: null,
       variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
     vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
@@ -55,6 +56,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: null,
       test_type: 'page',
       sales_page_url: null,
+      sales_funnel_id: null,
       variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
     vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
@@ -80,6 +82,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: null,
       test_type: 'page',
       sales_page_url: null,
+      sales_funnel_id: null,
       variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
     vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
@@ -109,6 +112,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: null,
       test_type: 'page',
       sales_page_url: null,
+      sales_funnel_id: null,
       variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
     vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
@@ -134,6 +138,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: 'https://example.com/fallback',
       test_type: 'page',
       sales_page_url: null,
+      sales_funnel_id: null,
       variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
     const request = new NextRequest('https://ir.example.com/r/oferta-x?utm_source=facebookads')
@@ -151,6 +156,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: null,
       test_type: 'page',
       sales_page_url: null,
+      sales_funnel_id: null,
       variants: [
         { id: 'v1', name: 'A', weight_pct: 50, destination_url: 'https://example.com/a', is_control: false },
         { id: 'v2', name: 'B', weight_pct: 50, destination_url: 'https://example.com/b', is_control: true },
@@ -174,6 +180,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: null,
       test_type: 'page',
       sales_page_url: null,
+      sales_funnel_id: null,
       variants: [
         { id: 'v1', name: 'A', weight_pct: 50, destination_url: 'https://example.com/a', is_control: false },
         { id: 'v2', name: 'B', weight_pct: 50, destination_url: 'https://example.com/b', is_control: false },
@@ -195,6 +202,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: null,
       test_type: 'page',
       sales_page_url: null,
+      sales_funnel_id: null,
       variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
     vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
@@ -219,6 +227,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: null,
       test_type: 'page',
       sales_page_url: null,
+      sales_funnel_id: null,
       variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
     const request = new NextRequest('https://ir.example.com/r/oferta-x', {
@@ -243,6 +252,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: 'https://example.com/fallback',
       test_type: 'page',
       sales_page_url: null,
+      sales_funnel_id: null,
       variants: [
         { id: 'v1', name: 'A', weight_pct: 50, destination_url: 'https://example.com/a', is_control: false },
         { id: 'v2', name: 'B', weight_pct: 50, destination_url: 'https://example.com/b', is_control: true },
@@ -265,6 +275,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: null,
       test_type: 'checkout',
       sales_page_url: 'https://example.com/vendas',
+      sales_funnel_id: null,
       variants: [
         { id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://pay.hub.la/abc', is_control: true },
       ],
@@ -288,6 +299,7 @@ describe('GET /r/[slug]', () => {
       fallback_url: null,
       test_type: 'checkout',
       sales_page_url: 'https://example.com/vendas',
+      sales_funnel_id: null,
       variants: [
         { id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://pay.hub.la/abc', is_control: true },
       ],

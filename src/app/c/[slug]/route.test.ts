@@ -1,17 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
+vi.mock('next/server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/server')>()
+  return { ...actual, after: (fn: () => unknown) => fn() }
+})
 vi.mock('@/lib/repo/redirect-repo', () => ({
   getTestBySlug: vi.fn(),
   getAssignedVariantId: vi.fn(),
   getLatestTrackingId: vi.fn(),
+  getLatestFunnelClick: vi.fn(),
+  getOrAssignVariant: vi.fn(),
+  insertClickEvent: vi.fn(),
 }))
 vi.mock('@/lib/supabase/service-role', () => ({
   createServiceRoleClient: vi.fn(() => ({})),
 }))
 
 import { GET } from './route'
-import { getTestBySlug, getAssignedVariantId, getLatestTrackingId } from '@/lib/repo/redirect-repo'
+import { getTestBySlug, getAssignedVariantId, getLatestTrackingId, getLatestFunnelClick, getOrAssignVariant, insertClickEvent } from '@/lib/repo/redirect-repo'
 
 const CHECKOUT_TEST = {
   id: 'test-1',
@@ -20,6 +27,7 @@ const CHECKOUT_TEST = {
   fallback_url: null,
   test_type: 'checkout' as const,
   sales_page_url: 'https://example.com/vendas',
+  sales_funnel_id: null,
   variants: [
     { id: 'v1', name: 'A', weight_pct: 50, destination_url: 'https://pay.hub.la/aaa', is_control: true },
     { id: 'v2', name: 'B', weight_pct: 50, destination_url: 'https://pay.hub.la/bbb', is_control: false },
@@ -138,8 +146,56 @@ describe('GET /c/[slug]', () => {
       ...CHECKOUT_TEST,
       test_type: 'page' as const,
       sales_page_url: null,
+      sales_funnel_id: null,
     })
     const response = await GET(request(), params)
     expect(response.status).toBe(404)
+  })
+
+  describe('layers: a checkout test linked to a project (0078)', () => {
+    const LAYERED = { ...CHECKOUT_TEST, sales_funnel_id: 'funnel-1' }
+
+    it('enters a visitor of the project page test, drawn by weight, keeping the page click as parent', async () => {
+      vi.mocked(getTestBySlug).mockResolvedValue(LAYERED)
+      vi.mocked(getAssignedVariantId).mockResolvedValue(null)
+      vi.mocked(getLatestFunnelClick).mockResolvedValue({ trackingId: 'page-click', sourceUtms: { utm_source: 'facebookads', utm_campaign: '120' } })
+      vi.mocked(getOrAssignVariant).mockResolvedValue('v2')
+
+      const response = await GET(request('ir_vid=visitor-1'), { params: Promise.resolve({ slug: 'oferta-x' }) })
+
+      const location = new URL(response.headers.get('location')!)
+      expect(location.origin + location.pathname).toBe('https://pay.hub.la/bbb')
+      expect(location.searchParams.get('utm_source')).toBe('facebookads')
+      const trackingId = location.searchParams.get('utm_content')
+      expect(trackingId).toBeTruthy()
+      expect(trackingId).not.toBe('page-click')
+      expect(insertClickEvent).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ testId: 'test-1', variantId: 'v2', visitorId: 'visitor-1', trackingId, parentTrackingId: 'page-click' })
+      )
+      expect(response.cookies.get('ir_t_oferta-x')?.value).toBe('v2')
+    })
+
+    it('sends a paused layered test to the control carrying the page click, entering no one', async () => {
+      vi.mocked(getTestBySlug).mockResolvedValue({ ...LAYERED, status: 'paused' })
+      vi.mocked(getAssignedVariantId).mockResolvedValue(null)
+      vi.mocked(getLatestFunnelClick).mockResolvedValue({ trackingId: 'page-click', sourceUtms: {} })
+
+      const response = await GET(request('ir_vid=visitor-1'), { params: Promise.resolve({ slug: 'oferta-x' }) })
+
+      const location = new URL(response.headers.get('location')!)
+      expect(location.origin + location.pathname).toBe('https://pay.hub.la/aaa')
+      expect(location.searchParams.get('utm_content')).toBe('page-click')
+      expect(insertClickEvent).not.toHaveBeenCalled()
+    })
+
+    it('leaves an unlinked test as before: an unknown visitor goes to the control, untracked', async () => {
+      vi.mocked(getTestBySlug).mockResolvedValue(CHECKOUT_TEST)
+      vi.mocked(getAssignedVariantId).mockResolvedValue(null)
+      const response = await GET(request('ir_vid=visitor-1'), { params: Promise.resolve({ slug: 'oferta-x' }) })
+      expect(new URL(response.headers.get('location')!).searchParams.get('utm_content')).toBeNull()
+      expect(getLatestFunnelClick).not.toHaveBeenCalled()
+      expect(insertClickEvent).not.toHaveBeenCalled()
+    })
   })
 })
