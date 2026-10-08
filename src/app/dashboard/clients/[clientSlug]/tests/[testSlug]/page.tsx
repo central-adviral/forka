@@ -1,10 +1,14 @@
-import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { probabilityToBeatControl } from '@/lib/domain/significance'
 import { detectSampleRatioMismatch } from '@/lib/domain/srm-check'
 import { reportTrust } from '@/lib/domain/test-trust'
 import { testLeader } from '@/lib/domain/test-leader'
+import { linkVerdict } from '@/lib/domain/experiment-decision'
+import { experimentTimeline } from '@/lib/domain/experiment-timeline'
+import { readLinkTest, type LinkRow } from '@/lib/domain/backlog-readout'
+import { readRules } from '@/lib/domain/backlog'
+import { ExperimentBand } from './experiment-band'
 import { computeReportLayout } from '@/lib/domain/report-layout'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
@@ -213,7 +217,7 @@ export default async function TestReportPage({
   const supabase = await createServerSupabaseClient()
   const { data: test, error: testError } = await supabase
     .from('tests')
-    .select('id, name, slug, status, archived_at, conversion_method, fallback_url, test_type, client_id, created_at, clients(custom_domain, domain_status)')
+    .select('id, name, slug, status, archived_at, sales_funnel_id, conversion_method, fallback_url, test_type, client_id, created_at, clients(custom_domain, domain_status)')
     .eq('slug', testSlug)
     .maybeSingle()
 
@@ -245,8 +249,9 @@ export default async function TestReportPage({
     { data: weekdayReport, error: weekdayReportError },
     { data: hourReport, error: hourReportError },
     { data: previousReport },
-    { data: lastWeightChange },
+    { data: changeRows },
     { data: measuredCards },
+    { data: firstClick },
   ] = await Promise.all([
     supabase.from('variants').select('id, destination_url, is_control').eq('test_id', test.id),
     supabase.rpc('get_test_report', period),
@@ -255,11 +260,32 @@ export default async function TestReportPage({
     tab === 'desempenho' ? supabase.rpc('get_test_report_by_weekday', period) : skip,
     tab === 'desempenho' ? supabase.rpc('get_test_report_by_hour', period) : skip,
     previousWindow ? supabase.rpc('get_test_report', previousPeriod) : skip,
-    supabase.from('test_changes').select('created_at').eq('test_id', test.id).eq('field', 'weight_pct').order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('backlog_items').select('code, title, status, sales_funnels(slug)').eq('ab_test_id', test.id).order('created_at', { ascending: false }).limit(1),
+    supabase.from('test_changes').select('created_at, field, old_value, new_value, variants(name)').eq('test_id', test.id).order('created_at'),
+    supabase
+      .from('backlog_items')
+      .select('code, title, status, started_at, decided_at, winner_key, learning, sales_funnels(slug, test_rules)')
+      .eq('ab_test_id', test.id)
+      .order('created_at', { ascending: false })
+      .limit(1),
+    supabase.from('click_events').select('created_at').eq('test_id', test.id).eq('is_bot', false).order('created_at').limit(1).maybeSingle(),
   ])
+  const changes = ((changeRows ?? []) as unknown as { created_at: string; field: 'weight_pct' | 'destination_url'; old_value: string | null; new_value: string | null; variants: { name: string } | null }[]).map(
+    (row) => ({ ...row, variant_name: row.variants?.name ?? null })
+  )
+  const lastWeightChange = [...changes].reverse().find((change) => change.field === 'weight_pct')
   // The card this test measures: the decision lives there, next to the hypothesis and the learning.
-  const measuredCard = ((measuredCards ?? []) as unknown as { code: string; title: string; status: string; sales_funnels: { slug: string } | null }[])[0]
+  const measuredCard = (
+    (measuredCards ?? []) as unknown as {
+      code: string
+      title: string
+      status: string
+      started_at: string | null
+      decided_at: string | null
+      winner_key: string | null
+      learning: string | null
+      sales_funnels: { slug: string; test_rules: unknown } | null
+    }[]
+  )[0]
 
   // Traffic before the last weight change was drawn with the old weights: the draw is checked
   // only from that change on, or a 70/30 → 50/50 switch reads as a skewed draw (0076).
@@ -326,6 +352,22 @@ export default async function TestReportPage({
   const dataQuality = srmSince
     ? { ...trust, explain: `${trust.explain} O sorteio é conferido desde a mudança de peso de ${new Date(srmSince).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}.` }
     : trust
+
+  // The card's verdict reads from the card's start with the project's rules, the same read the
+  // Quadro makes, so the page and the card never disagree on who won.
+  const cardRows = measuredCard?.status === 'running' && measuredCard.started_at
+    ? ((await supabase.rpc('get_test_report', { p_test_id: test.id, p_since: measuredCard.started_at, p_until: null })).data as LinkRow[] | null)
+    : null
+  const verdict = cardRows
+    ? linkVerdict(readLinkTest(cardRows, controlVariantId, readRules(measuredCard!.sales_funnels?.test_rules)), daysRunningSince(measuredCard!.started_at!), Boolean(test.sales_funnel_id))
+    : null
+  const timeline = experimentTimeline({
+    createdAt: test.created_at,
+    firstClickAt: firstClick?.created_at ?? null,
+    changes,
+    card: measuredCard ? { code: measuredCard.code, startedAt: measuredCard.started_at, decidedAt: measuredCard.decided_at, winnerKey: measuredCard.winner_key } : null,
+    archivedAt: test.archived_at,
+  })
 
   // Same rule as the test list: the canvas, the summary and the list never name different leaders.
   const leader = testLeader(rows, control?.variant_id)
@@ -547,16 +589,24 @@ export default async function TestReportPage({
       </div>
       </div>
 
-      {measuredCard && measuredCard.sales_funnels && (
-        <Link
-          href={`/dashboard/clients/${clientSlug}/backlog?projeto=${measuredCard.sales_funnels.slug}&item=${measuredCard.code}${measuredCard.status === 'running' ? '#decidir' : ''}`}
-          className="mx-6 mt-4 flex flex-wrap items-center gap-2 rounded-[12px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-4 py-2.5 text-[12.5px] text-[var(--ct-text-2)] hover:border-[var(--ct-line-2)]"
-        >
-          <span className="font-[family-name:var(--font-geist-mono)] text-[var(--ct-text-3)]">{measuredCard.code}</span>
-          Este teste mede o card <b className="text-[var(--ct-text)]">{measuredCard.title}</b> do Quadro.
-          <span className="ml-auto text-[var(--ct-accent)]">{measuredCard.status === 'running' ? 'Decidir no card →' : 'Abrir o card →'}</span>
-        </Link>
-      )}
+      <ExperimentBand
+        card={
+          measuredCard && measuredCard.sales_funnels
+            ? {
+                code: measuredCard.code,
+                title: measuredCard.title,
+                status: measuredCard.status,
+                learning: measuredCard.learning,
+                winnerKey: measuredCard.winner_key,
+                href: `/dashboard/clients/${clientSlug}/backlog?projeto=${measuredCard.sales_funnels.slug}&item=${measuredCard.code}`,
+              }
+            : null
+        }
+        verdict={verdict}
+        measuring={dataQuality.explain}
+        boardHref={`/dashboard/clients/${clientSlug}/backlog`}
+        timeline={timeline}
+      />
 
       {hasPartialDataError && (
         <div className="mx-6 mt-4 rounded-[10px] border border-[var(--ct-warn)]/35 bg-[var(--ct-warn)]/10 px-4 py-2.5 text-xs text-[var(--ct-warn)]">
