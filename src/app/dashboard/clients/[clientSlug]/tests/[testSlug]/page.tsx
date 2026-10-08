@@ -2,6 +2,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { probabilityToBeatControl } from '@/lib/domain/significance'
 import { detectSampleRatioMismatch } from '@/lib/domain/srm-check'
+import { reportTrust } from '@/lib/domain/test-trust'
+import { testLeader } from '@/lib/domain/test-leader'
 import { computeReportLayout } from '@/lib/domain/report-layout'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
@@ -12,6 +14,7 @@ import { RefreshButton } from './refresh-button'
 import { CreativeMatrixPanel } from './creative-matrix-panel'
 import { InsightPanel } from './insight-panel'
 import { MiniBarChart } from '@/components/mini-bar-chart'
+import { canActAs } from '@/lib/view-as'
 
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
@@ -93,7 +96,7 @@ const METRIC_INFO = {
   faturamento: 'Soma do valor de todas as vendas confirmadas dessa linha.',
   rsPorClique: 'Faturamento dividido pelo número de cliques — quanto cada clique rendeu em média.',
   rsPorAcesso: 'Faturamento dividido pelo número de visitas únicas — quanto cada visitante rendeu em média.',
-  taxa: 'Porcentagem de cliques que viraram venda.',
+  taxa: 'Porcentagem de pessoas que compraram: cada pessoa conta uma vez, mesmo com upsell. Por isso pode diferir da coluna de vendas, que conta cada venda.',
   gasto: 'Total investido em mídia paga nesse anúncio, vindo do Meta Ads.',
   cpm: 'Custo por mil impressões do anúncio no Meta Ads.',
   ctr: 'Porcentagem de impressões do anúncio que viraram clique no link, direto no Meta Ads.',
@@ -101,11 +104,11 @@ const METRIC_INFO = {
 
 function InfoTooltip({ text }: { text: string }) {
   return (
-    <span className="group relative ml-1 inline-flex cursor-help align-middle">
+    <span tabIndex={0} aria-label={text} className="group relative ml-1 inline-flex cursor-help align-middle outline-none">
       <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[var(--ct-line-2)] text-[9px] font-bold normal-case text-[var(--ct-text-2)]">
         !
       </span>
-      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 w-48 -translate-x-1/2 rounded-md border border-[var(--ct-line)] bg-[var(--ct-surface-2)] p-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-[var(--ct-text)] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 w-48 -translate-x-1/2 rounded-md border border-[var(--ct-line)] bg-[var(--ct-surface-2)] p-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-[var(--ct-text)] opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus:opacity-100">
         {text}
       </span>
     </span>
@@ -220,6 +223,8 @@ export default async function TestReportPage({
     )
   }
   if (!test) notFound()
+  // The client reads the report; editing, pausing and the paid insight stay with who runs the test.
+  const canEdit = await canActAs(supabase, test.client_id, 'gestor')
 
   // get_test_report and the variant rows feed the header and the summary bar, which every tab
   // shows; the rest is fetched only by the tab that renders it.
@@ -298,46 +303,16 @@ export default async function TestReportPage({
     return { ...row, confidencePct: p !== null ? Math.round(p * 100) : null }
   })
 
-  const srmDetected = detectSampleRatioMismatch(rows.map((row) => ({ weightPct: row.weight_pct, visits: row.visits })))
-
-  // Três estados, e as instruções de dois deles são opostas de propósito. Sem volume, esperar
-  // resolve; com o sorteio enviesado, esperar acumula mais tráfego torto sobre um teste que já
-  // está inválido. Só o segundo caso risca o número: sem volume ele não está errado, está cedo.
-  const dataQuality =
-    srmDetected === null
-      ? {
-          trustworthy: false,
-          strikeConfidence: false,
-          badge: '◷ ainda sem volume',
-          instruction: 'mantenha o teste rodando',
-          explain:
-            'Menos de 100 visitas: ainda não dá para checar se o sorteio está respeitando os pesos, nem para confiar na leitura de confiança. Não é erro — é cedo.',
-        }
-      : srmDetected
-        ? {
-            trustworthy: false,
-            strikeConfidence: true,
-            badge: '⚠ sorteio fora do peso',
-            instruction: 'investigue antes de decidir',
-            explain:
-              'SRM: a proporção real de visitas por variante está estatisticamente diferente do peso configurado — pode ser bot, cache ou bug no sorteio. Esperar mais tráfego não corrige, só acumula dado contaminado.',
-          }
-        : {
-            trustworthy: true,
-            strikeConfidence: false,
-            badge: '✓ dados confiáveis',
-            instruction: 'confiança estatística',
-            explain: 'O tráfego chegou na proporção configurada, então a leitura de confiança se sustenta.',
-          }
-
-  const leaderRow = rows.reduce<(typeof rows)[number] | null>(
-    (best, row) =>
-      row.variant_id !== control?.variant_id && (!best || (row.confidencePct ?? -1) > (best.confidencePct ?? -1))
-        ? row
-        : best,
-    null
-  )
   const daysRunning = daysRunningSince(test.created_at)
+  const dataQuality = reportTrust(
+    detectSampleRatioMismatch(rows.map((row) => ({ weightPct: row.weight_pct, visits: row.visits }))),
+    rows.map((row) => ({ isControl: row.variant_id === control?.variant_id, weightPct: row.weight_pct, visits: row.visits, conversions: row.conversions })),
+    daysRunning
+  )
+
+  // Same rule as the test list: the canvas, the summary and the list never name different leaders.
+  const leader = testLeader(rows, control?.variant_id)
+  const leaderRow = leader ? rows.find((row) => row.variant_id === leader.variantId) : undefined
 
   const revenueByVariant = new Map(
     ((totalsReport as TotalsReportRow[]) ?? []).map((row) => [row.variant_id, row.revenue_cents])
@@ -357,7 +332,8 @@ export default async function TestReportPage({
       revenueCents: revenueByVariant.get(row.variant_id) ?? 0,
       destinationUrl: destinationById.get(row.variant_id) ?? '',
     })),
-    Boolean(test.fallback_url)
+    Boolean(test.fallback_url),
+    leader?.variantId ?? null
   )
 
   const assetLabel = test.test_type === 'checkout' ? 'Checkout' : 'Página'
@@ -438,6 +414,7 @@ export default async function TestReportPage({
         </div>
         <div className="flex items-center gap-3">
           <RefreshButton />
+          {canEdit && <>
           <a
             href={`/dashboard/clients/${clientSlug}/tests/${test.slug}/edit`}
             className="flex h-9 items-center rounded-[9px] border border-[var(--ct-line)] bg-transparent px-4 text-[13px] font-medium text-[var(--ct-text-2)]"
@@ -459,6 +436,7 @@ export default async function TestReportPage({
               {test.status === 'active' ? 'Pausar teste' : 'Ativar teste'}
             </button>
           </form>
+          </>}
         </div>
       </div>
 
@@ -535,7 +513,7 @@ export default async function TestReportPage({
       </div>
 
       <div className="order-first flex gap-1">
-        {REPORT_TABS.map((option) => {
+        {REPORT_TABS.filter((option) => canEdit || option.value !== 'insight').map((option) => {
           const query = new URLSearchParams()
           if (periodo) query.set('periodo', periodo)
           if (periodo === 'custom' && desde) query.set('desde', desde)
@@ -581,7 +559,7 @@ export default async function TestReportPage({
             {leaderRow?.conversions ?? 0}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[11.5px] text-[var(--ct-text-2)]">vendas — variante líder</span>
+            <span className="text-[11.5px] text-[var(--ct-text-2)]">{leader ? `compradores · ${leader.name} lidera` : 'compradores · sem líder ainda'}</span>
             {previousLeaderConversions !== null && (
               <Delta current={leaderRow?.conversions ?? 0} previous={previousLeaderConversions} unit="pct" />
             )}
@@ -599,9 +577,7 @@ export default async function TestReportPage({
                     : 'text-[var(--ct-text-3)]'
               }`}
             >
-              {leaderRow?.confidencePct !== null && leaderRow?.confidencePct !== undefined
-                ? `${leaderRow.confidencePct}%`
-                : '—'}
+              {leader ? `${leader.confidencePct}%` : '—'}
             </div>
             <span
               title={dataQuality.explain}
@@ -682,7 +658,7 @@ export default async function TestReportPage({
           const maxClicks = Math.max(1, ...totalsRows.map((r) => r.clicks))
           const maxRevenue = Math.max(1, ...totalsRows.map((r) => r.revenue_cents))
           return (
-            <div className="overflow-hidden rounded-2xl border border-[var(--ct-line)]">
+            <div className="overflow-x-auto rounded-2xl border border-[var(--ct-line)]">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-[var(--ct-line)] bg-[var(--ct-surface-2)] text-left">
@@ -772,7 +748,7 @@ export default async function TestReportPage({
           const maxClicks = Math.max(1, ...sourceRows.map((r) => r.clicks))
           const maxRevenue = Math.max(1, ...sourceRows.map((r) => r.revenue_cents))
           return (
-            <div className="overflow-hidden rounded-2xl border border-[var(--ct-line)]">
+            <div className="overflow-x-auto rounded-2xl border border-[var(--ct-line)]">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-[var(--ct-line)] bg-[var(--ct-surface-2)] text-left">
@@ -840,7 +816,7 @@ export default async function TestReportPage({
           const maxClicks = Math.max(1, ...adRows.map((r) => r.clicks))
           const maxRevenue = Math.max(1, ...adRows.map((r) => r.revenue_cents))
           return (
-            <div className="overflow-hidden rounded-2xl border border-[var(--ct-line)]">
+            <div className="overflow-x-auto rounded-2xl border border-[var(--ct-line)]">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-[var(--ct-line)] bg-[var(--ct-surface-2)] text-left">
@@ -909,7 +885,7 @@ export default async function TestReportPage({
       </div>
         </>
       )}
-      {tab === 'insight' && (
+      {tab === 'insight' && canEdit && (
         <>
       <InsightPanel testId={test.id} sinceIso={sinceIso} untilIso={untilIso} />
         </>

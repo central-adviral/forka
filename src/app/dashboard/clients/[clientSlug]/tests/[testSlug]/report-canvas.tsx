@@ -52,7 +52,7 @@ export function ReportCanvas({
   return (
     <div
       ref={containerRef}
-      className="relative m-6 h-[720px] flex-shrink-0 overflow-auto rounded-2xl border border-[var(--ct-line)]"
+      className="relative m-4 h-[440px] flex-shrink-0 sm:m-6 sm:h-[720px] overflow-auto rounded-2xl border border-[var(--ct-line)]"
       style={{
         // Two faint pools of light — violet where traffic enters, amber near the leader — so the
         // canvas has depth instead of reading as a flat panel.

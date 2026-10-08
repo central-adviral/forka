@@ -8,6 +8,7 @@ import { deleteTest } from '../actions'
 import { TestStatusToggle } from '../test-status-toggle'
 import { testLeader, type VariantResult } from '@/lib/domain/test-leader'
 import { daysRunningSince } from '@/lib/domain/report-period'
+import { canActAs } from '@/lib/view-as'
 
 export default async function TestsListPage({ params }: { params: Promise<{ clientSlug: string }> }) {
   const { clientSlug } = await params
@@ -19,6 +20,7 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
     .maybeSingle()
 
   if (!client) notFound()
+  const canEdit = await canActAs(supabase, client.id, 'gestor')
 
   const { data: tests } = await supabase
     .from('tests')
@@ -65,7 +67,7 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
           title="Testes A/B de link"
           description="Cada teste divide o tráfego de um link /r entre as variantes e mede por pessoa quem compra mais."
           actions={
-            <a
+            canEdit && <a
               href={`/dashboard/clients/${client.slug}/tests/new`}
               className="rounded-full bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110"
             >
@@ -117,15 +119,15 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
                 {test.test_type === 'checkout' ? 'Checkout' : 'Página'}
               </span>
             </a>
-            <TestStatusToggle testId={test.id} clientSlug={client.slug} status={test.status} />
-            <ConfirmDeleteButton
+            {canEdit && <TestStatusToggle testId={test.id} clientSlug={client.slug} status={test.status} />}
+            {canEdit && <ConfirmDeleteButton
               action={deleteTest.bind(null, test.id, client.slug)}
               warning={
                 test.test_type === 'checkout'
                   ? 'Isso vai quebrar o botão de comprar da página de vendas. Confirmar?'
                   : undefined
               }
-            />
+            />}
           </div>
         ))}
         {(tests ?? []).length === 0 && <div className="px-6 py-8 text-sm text-[var(--ct-text-2)]">Nenhum teste ainda.</div>}

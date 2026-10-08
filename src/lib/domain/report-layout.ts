@@ -52,7 +52,7 @@ function bezier(fromX: number, fromY: number, toX: number, toY: number): string 
   return `M${fromX},${fromY} C${midX},${fromY} ${midX},${toY} ${toX},${toY}`
 }
 
-export function computeReportLayout(variants: ReportVariantInput[], fallbackConfigured: boolean): ReportLayout {
+export function computeReportLayout(variants: ReportVariantInput[], fallbackConfigured: boolean, leaderId: string | null): ReportLayout {
   if (variants.length === 0) {
     throw new Error('computeReportLayout requires at least one variant')
   }
@@ -66,9 +66,6 @@ export function computeReportLayout(variants: ReportVariantInput[], fallbackConf
   const entryRightX = entryNode.x + entryNode.w
 
   const maxVisits = Math.max(1, ...variants.map((v) => v.visits))
-  const rates = variants.map((v) => (v.visits > 0 ? v.conversions / v.visits : -1))
-  const bestRate = Math.max(...rates)
-  const leaderIndex = bestRate > 0 ? rates.indexOf(bestRate) : -1
 
   const variantLayouts: ReportVariantLayout[] = variants.map((variant, index) => {
     const node: ReportNode = {
@@ -78,7 +75,7 @@ export function computeReportLayout(variants: ReportVariantInput[], fallbackConf
       h: VARIANT.h,
     }
     const centerY = node.y + node.h / 2
-    const isLeader = index === leaderIndex
+    const isLeader = variant.id === leaderId
 
     const conversionNode: ReportNode = {
       x: CONVERSION.x,

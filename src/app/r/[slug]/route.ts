@@ -33,11 +33,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const db = createServiceRoleClient()
   const test = await getTestBySlug(db, slug)
 
-  if (!test || test.status !== 'active' || test.variants.length === 0) {
-    if (test?.fallback_url) {
-      return NextResponse.redirect(test.fallback_url, 302)
-    }
+  if (!test || test.variants.length === 0) {
+    if (test?.fallback_url) return NextResponse.redirect(withUtms(test.fallback_url, captureTrackedParams(request.nextUrl.searchParams)), 302)
     return new NextResponse('Not found', { status: 404 })
+  }
+
+  // Bots and paused tests both land on the real control, never on whichever variant sorts first by
+  // name: Meta's reviewer must see the page people see, and a paused test's ads still pay for clicks.
+  const control = test.variants.find((v) => v.is_control) ?? test.variants[0]
+  const controlDestination = resolveEntryDestination({
+    testType: test.test_type,
+    salesPageUrl: test.sales_page_url,
+    variantDestinationUrl: control.destination_url,
+  })
+
+  if (test.status !== 'active') {
+    return NextResponse.redirect(withUtms(test.fallback_url ?? controlDestination, captureTrackedParams(request.nextUrl.searchParams)), 302)
   }
 
   if (isKnownBot(request.headers.get('user-agent'))) {
@@ -46,7 +57,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       try {
         await insertClickEvent(db, {
           testId: test.id,
-          variantId: test.variants[0].id,
+          variantId: control.id,
           visitorId: crypto.randomUUID(),
           trackingId: crypto.randomUUID(),
           sourceUtms: botSourceUtms,
@@ -58,14 +69,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         console.error('[click-insert-failed]', { testId: test.id, slug, isBot: true }, err)
       }
     })
-    const destination =
-      test.fallback_url ??
-      resolveEntryDestination({
-        testType: test.test_type,
-        salesPageUrl: test.sales_page_url,
-        variantDestinationUrl: test.variants[0].destination_url,
-      })
-    return NextResponse.redirect(destination, 302)
+    return NextResponse.redirect(controlDestination, 302)
   }
 
   const cookieHeader = Object.fromEntries(request.cookies.getAll().map((c) => [c.name, c.value]))

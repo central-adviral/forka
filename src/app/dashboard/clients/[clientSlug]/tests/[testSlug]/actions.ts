@@ -8,6 +8,7 @@ import { weightsSumTo100 } from '@/lib/domain/validate-weights'
 import { buildInsightPrompt, type InsightVariantStat } from '@/lib/domain/insight-prompt'
 import { probabilityToBeatControl } from '@/lib/domain/significance'
 import { createAnthropicClient } from '@/lib/anthropic/client'
+import { assertClientRole } from '@/lib/repo/client-access-repo'
 
 const toggleSchema = z.object({
   test_id: z.string().uuid(),
@@ -26,7 +27,7 @@ export async function toggleTestStatus(input: z.infer<typeof toggleSchema>) {
     .eq('id', parsed.test_id)
     .select('id')
   if (error) throw error
-  if (!data || data.length === 0) throw new Error('Test not found or not authorized to update')
+  if (!data || data.length === 0) throw new Error('Teste não encontrado ou você não tem permissão para alterá-lo.')
 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests/${parsed.test_slug}`)
 }
@@ -53,12 +54,18 @@ export async function generateInsight(input: z.infer<typeof generateInsightSchem
   const parsed = generateInsightSchema.parse(input)
   const supabase = await createServerSupabaseClient()
 
+  // The insight is a paid model call: only who runs the test may trigger it, not the client.
+  const { data: testRow, error: testRowError } = await supabase.from('tests').select('client_id').eq('id', parsed.test_id).maybeSingle()
+  if (testRowError) throw testRowError
+  if (!testRow) throw new Error('Teste não encontrado.')
+  await assertClientRole(supabase, testRow.client_id, 'gestor')
+
   const { data: variantRows, error: variantError } = await supabase
     .from('variants')
     .select('id, is_control')
     .eq('test_id', parsed.test_id)
   if (variantError) throw variantError
-  if (!variantRows || variantRows.length === 0) throw new Error('Test not found or not authorized')
+  if (!variantRows || variantRows.length === 0) throw new Error('Teste não encontrado.')
 
   const { data: report, error: reportError } = await supabase.rpc('get_test_report', {
     p_test_id: parsed.test_id,
@@ -154,7 +161,7 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
     .eq('id', parsed.test_id)
     .maybeSingle()
   if (testFetchError) throw testFetchError
-  if (!test) throw new Error('Test not found or not authorized to update')
+  if (!test) throw new Error('Teste não encontrado ou você não tem permissão para alterá-lo.')
 
   // Catch this here so the operator gets a Portuguese message instead of the raw
   // tests_checkout_requires_sales_page constraint error from Postgres. Sourced from the
