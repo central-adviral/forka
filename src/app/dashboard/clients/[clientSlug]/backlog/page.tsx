@@ -4,11 +4,11 @@ import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { canActAs } from '@/lib/view-as'
 import { getBacklog, type BacklogItem } from '@/lib/repo/backlog-repo'
-import { AUTO_LINK_GATE, COLUMNS, METHODS, STAGES, nextCode, readRules, withPlanTeto, type Method } from '@/lib/domain/backlog'
+import { AUTO_LINK_GATE, COLUMNS, TAG_LOOKBACK_DAYS, isAutoTagGate, METHODS, STAGES, nextCode, readRules, withPlanTeto, type Method } from '@/lib/domain/backlog'
 import { NewHypothesisWizard } from './new-hypothesis-wizard'
 import { daysRunningSince } from '@/lib/domain/report-period'
 import { type Verdict } from '@/lib/domain/backlog-readout'
-import { loadReadouts, readoutKind, type Readout, type VerdictKind } from '@/lib/repo/backlog-readout-repo'
+import { findTaggedCards, loadReadouts, readoutKind, type Readout, type VerdictKind } from '@/lib/repo/backlog-readout-repo'
 import { linkVerdict, matchTestVariant } from '@/lib/domain/experiment-decision'
 import { LANES, cardProgress, laneOf, recentlyDecided } from '@/lib/domain/board'
 import { Board, type BoardLane } from './board'
@@ -87,11 +87,21 @@ export default async function BacklogPage({
     )
   }
 
-  const [items, canEdit, { data: costWatcher }] = await Promise.all([
+  const [loadedItems, canEdit, { data: costWatcher }] = await Promise.all([
     getBacklog(supabase, funnel.id),
     canActAs(supabase, client.id, 'gestor'),
     supabase.from('watchers').select('target').eq('sales_funnel_id', funnel.id).is('front_id', null).eq('metric', 'cpa_geral').maybeSingle(),
   ])
+  // The Meta tag gate the Central checks itself: an ad with the card's tag spent in the last days.
+  // Shown done on the board and in the drawer; the move stores it (moveItem).
+  const waitingMeta = loadedItems.filter((item) => item.method === 'meta' && (item.status === 'queue' || item.status === 'ready'))
+  const tagged = await findTaggedCards(supabase, funnel.id, waitingMeta.map((item) => item.code)).catch((error) => {
+    console.error('[backlog-tag-check-failed]', { salesFunnelId: funnel.id }, error)
+    return new Set<string>()
+  })
+  const items = loadedItems.map((item) =>
+    tagged.has(item.code) ? { ...item, gates: item.gates.map((gate) => (isAutoTagGate(gate.label) && !gate.doneAt ? { ...gate, doneAt: 'auto' } : gate)) } : item
+  )
   const costTarget = costWatcher ? Number(costWatcher.target) : null
   const rules = withPlanTeto(readRules(funnel.test_rules), costTarget, funnel.resultado)
   const tetoFromPlan = rules.teto === costTarget && funnel.resultado === 'compra'
@@ -408,11 +418,11 @@ export default async function BacklogPage({
                     Pré-requisitos · {selected.gates.filter((gate) => gate.doneAt).length}/{selected.gates.length}
                   </span>
                   {selected.gates.map((gate) =>
-                    gate.label === AUTO_LINK_GATE ? (
+                    gate.label === AUTO_LINK_GATE || isAutoTagGate(gate.label) ? (
                       <span key={gate.id} className="flex items-center gap-2.5 py-2 text-[12.5px] text-[var(--ct-text-2)]">
                         <span className={`grid h-4 w-4 place-items-center rounded border ${gate.doneAt ? 'border-[var(--ct-ok)] bg-[var(--ct-ok)] text-[var(--ct-on-accent)]' : 'border-[var(--ct-line-2)]'}`}>{gate.doneAt ? '✓' : ''}</span>
                         <span className={gate.doneAt ? 'text-[var(--ct-text-3)] line-through' : ''}>{gate.label}</span>
-                        <span className={`${mono} ml-auto rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[10.5px] text-[var(--ct-text-3)]`} title="A Central marca sozinha quando o card tem teste A/B vinculado">auto</span>
+                        <span className={`${mono} ml-auto rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[10.5px] text-[var(--ct-text-3)]`} title={gate.label === AUTO_LINK_GATE ? 'A Central marca sozinha quando o card tem teste A/B vinculado' : `A Central marca sozinha quando um anúncio com a tag gasta (últimos ${TAG_LOOKBACK_DAYS} dias)`}>auto</span>
                       </span>
                     ) : canEdit ? (
                       <form key={gate.id} action={toggleGate.bind(null, { ...context, gate_id: gate.id, done: !gate.doneAt, code: selected.code })}>

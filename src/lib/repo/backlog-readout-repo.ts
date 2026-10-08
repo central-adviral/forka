@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getBacklog, type BacklogItem } from './backlog-repo'
-import { readRules, withPlanTeto, type TestRules } from '@/lib/domain/backlog'
-import { readLinkTest, readMetaTest, readoutSummary, type CreativeRow, type LinkRow } from '@/lib/domain/backlog-readout'
+import { TAG_LOOKBACK_DAYS, readRules, withPlanTeto, type TestRules } from '@/lib/domain/backlog'
+import { readLinkTest, readMetaTest, readoutSummary, tagKey, type CreativeRow, type LinkRow } from '@/lib/domain/backlog-readout'
 import { daysRunningSince } from '@/lib/domain/report-period'
 
 export interface Readout {
@@ -71,6 +71,19 @@ export interface RunningVerdict {
   kind: VerdictKind
   projectSlug: string
   daysRunning: number
+}
+
+/**
+ * The cards whose tag is on an ad that spent in the last days, out of the given codes: the
+ * evidence for the "Anúncios com a tag" gate. One read of the project's creative report.
+ */
+export async function findTaggedCards(supabase: SupabaseClient, salesFunnelId: string, codes: string[]): Promise<Set<string>> {
+  if (codes.length === 0) return new Set()
+  const since = new Date(Date.now() - TAG_LOOKBACK_DAYS * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+  const { data, error } = await supabase.rpc('get_funnel_report_by_creative', { p_sales_funnel_id: salesFunnelId, p_since: since, p_until: null })
+  if (error) throw error
+  const rows = (data ?? []) as CreativeRow[]
+  return new Set(codes.filter((code) => rows.some((row) => Number(row.spend ?? 0) > 0 && tagKey(row.ad_name ?? '', code) !== null)))
 }
 
 export interface ReadyCard {

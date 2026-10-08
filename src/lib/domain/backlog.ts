@@ -26,6 +26,12 @@ export type BacklogStatus = (typeof COLUMNS)[number]['status']
 /** The link gate the Central checks by itself, when the card gets its A/B test. */
 export const AUTO_LINK_GATE = 'Link /r criado'
 
+/** The Meta gate the Central checks by itself: an ad carrying the card's tag is spending. */
+export const isAutoTagGate = (label: string) => label.startsWith('Anúncios com a tag [')
+
+/** Days of the creative report read to find a card's tagged ads. */
+export const TAG_LOOKBACK_DAYS = 7
+
 /** What has to be true before a test of each method can go live. */
 export function defaultGates(method: Method, code: string): string[] {
   if (method === 'meta') return [`Anúncios com a tag [${code}-x] no nome`, 'Copy aprovada sem promessa de faturamento']

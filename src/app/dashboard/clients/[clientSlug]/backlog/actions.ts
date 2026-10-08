@@ -4,9 +4,10 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { AUTO_LINK_GATE, COLUMNS, METHODS, RULE_LIMITS, STAGES, blockedMove, defaultGates, nextCode, type BacklogStatus, type Method, type TestRules } from '@/lib/domain/backlog'
+import { AUTO_LINK_GATE, COLUMNS, isAutoTagGate, METHODS, RULE_LIMITS, STAGES, blockedMove, defaultGates, nextCode, type BacklogStatus, type Method, type TestRules } from '@/lib/domain/backlog'
 import { matchTestVariant } from '@/lib/domain/experiment-decision'
 import { equalWeights, experimentSlug, experimentVariantName } from '@/lib/domain/experiment-link'
+import { findTaggedCards } from '@/lib/repo/backlog-readout-repo'
 import { httpUrl } from '@/lib/domain/http-url-schema'
 import { layerConflict } from '@/lib/domain/test-layers'
 
@@ -182,11 +183,18 @@ export async function moveItem(context: BacklogContext & { item_id: string; code
   const supabase = await createServerSupabaseClient()
   const { data: item, error: readError } = await supabase
     .from('backlog_items')
-    .select('learning, started_at, status, ab_test_id, backlog_gates(done_at)')
+    .select('learning, started_at, status, ab_test_id, method, code, backlog_gates(id, label, done_at)')
     .eq('id', context.item_id)
     .maybeSingle()
   if (readError || !item) back(context, 'erro', 'Não foi possível ler o teste para movê-lo.', `&item=${context.code}`)
-  const gatesOpen = ((item?.backlog_gates ?? []) as { done_at: string | null }[]).filter((gate) => !gate.done_at).length
+  // The Meta tag gate is a fact the Central reads: an ad with the card's tag spent in the last days.
+  const gates = (item?.backlog_gates ?? []) as { id: string; label: string; done_at: string | null }[]
+  const tagGate = item?.method === 'meta' ? gates.find((gate) => isAutoTagGate(gate.label) && !gate.done_at) : undefined
+  if (tagGate && (await findTaggedCards(supabase, context.sales_funnel_id, [item!.code])).size > 0) {
+    await supabase.from('backlog_gates').update({ done_at: new Date().toISOString() }).eq('id', tagGate.id)
+    tagGate.done_at = new Date().toISOString()
+  }
+  const gatesOpen = gates.filter((gate) => !gate.done_at).length
   const blocked = blockedMove(to, { gatesOpen, hasLearning: Boolean(item?.learning) })
   if (blocked) back(context, 'erro', blocked, `&item=${context.code}`)
   // The card drives its A/B test: Rodando turns the link on, leaving Rodando parks it on the control.
