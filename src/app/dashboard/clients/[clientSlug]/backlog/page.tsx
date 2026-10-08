@@ -9,6 +9,7 @@ import { NewHypothesisWizard } from './new-hypothesis-wizard'
 import { daysRunningSince } from '@/lib/domain/report-period'
 import { type Verdict } from '@/lib/domain/backlog-readout'
 import { loadReadouts, readoutKind, type Readout, type VerdictKind } from '@/lib/repo/backlog-readout-repo'
+import { linkVerdict, matchTestVariant } from '@/lib/domain/experiment-decision'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { createItem, decideItem, deleteItem, linkAbTest, moveItem, saveRules, toggleGate, togglePublished } from './actions'
 import { PageHeader } from '@/components/page-header'
@@ -94,11 +95,19 @@ export default async function BacklogPage({
   const tetoFromPlan = rules.teto === costTarget && funnel.resultado === 'compra'
   const [readouts, { data: abTests }] = await Promise.all([
     loadReadouts(supabase, funnel.id, items, rules, funnel.resultado),
-    supabase.from('tests').select('id, name').eq('client_id', client.id).is('archived_at', null).order('name'),
+    supabase.from('tests').select('id, name, slug, sales_funnel_id').eq('client_id', client.id).is('archived_at', null).order('name'),
   ])
   const tab = aba === 'regras' && canEdit ? 'regras' : 'backlog'
   const selected = items.find((item) => item.code === itemCode) ?? null
   const selectedReadout = selected ? readouts.get(selected.id) : undefined
+  // The verdict card: what the rules say about the running card, and which variant the decision
+  // form starts on, so "Declarar vencedora" is one click away from the evidence.
+  const selectedTest = selected?.abTestId ? (abTests ?? []).find((test) => test.id === selected.abTestId) : undefined
+  const selectedDays = selected?.startedAt ? daysRunningSince(selected.startedAt) : 0
+  const verdict = selected?.status === 'running' && selectedReadout?.link ? linkVerdict(selectedReadout.link, selectedDays, Boolean(selectedTest?.sales_funnel_id)) : null
+  const suggestedKey = verdict
+    ? (selected!.variants.find((variant) => matchTestVariant(variant, [{ id: 'winner', name: verdict.winnerName }]) === 'winner')?.key ?? '')
+    : (selectedReadout?.meta?.find((variant) => variant.verdict === 'win')?.key ?? '')
   const context = { client_id: client.id as string, client_slug: client.slug as string, sales_funnel_id: funnel.id as string, funnel_slug: funnel.slug as string }
   const href = (extra: string) => `${base}?projeto=${funnel.slug}${extra}`
   const running = items.filter((item) => item.status === 'running').length
@@ -264,6 +273,38 @@ export default async function BacklogPage({
                 </p>
               )}
 
+              {selected.status === 'running' && selectedReadout?.summary && (
+                <div className={`flex flex-col gap-2 rounded-[14px] px-4 py-3.5 ${verdict ? 'bg-[var(--ct-ok-soft)]' : pillTone(selectedReadout)}`}>
+                  <span className={`${mono} text-[10.5px] uppercase tracking-[0.08em]`}>regra do jogo · {selectedReadout.summary}</span>
+                  {verdict ? (
+                    <>
+                      <b className="text-[17px] text-[var(--ct-text)]">
+                        {verdict.winnerName} vence: {verdict.liftPct >= 0 ? '+' : ''}{verdict.liftPct}% de conversão
+                      </b>
+                      <span className="text-[12.5px] text-[var(--ct-text-2)]">{verdict.chancePct}% de chance de bater o controle. Por que dá para confiar:</span>
+                      <ul className="flex flex-col gap-1 text-[12.5px] text-[var(--ct-text)]">
+                        {verdict.checks.map((check) => (
+                          <li key={check.label} className="flex items-baseline gap-2">
+                            <span className={check.ok ? 'text-[var(--ct-ok)]' : 'text-[var(--ct-warn)]'}>{check.ok ? '✓' : '!'}</span>
+                            <span>{check.label}</span>
+                            <span className={`${mono} ml-auto text-right text-[11.5px] text-[var(--ct-text-3)]`}>{check.value}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <span className="text-[12.5px] text-[var(--ct-text)]">
+                      {readoutKind(selectedReadout) === 'cut' ? 'Uma variante gastou o limite sem vender: pause os anúncios dela e decida.' : 'A regra do jogo pede uma decisão.'}
+                    </span>
+                  )}
+                  {canEdit && (
+                    <a href="#decidir" className="self-start rounded-full bg-[var(--ct-accent)] px-3.5 py-1.5 text-[12.5px] font-semibold text-[var(--ct-on-accent)]">
+                      {suggestedKey ? `Declarar vencedora ${suggestedKey}` : 'Decidir'}
+                    </a>
+                  )}
+                </div>
+              )}
+
               <div className="flex flex-col">
                 <span className={`${mono} mb-1 text-[10.5px] uppercase tracking-[0.08em] text-[var(--ct-text-3)]`}>Variantes</span>
                 {selected.variants.map((variant, index) => (
@@ -318,6 +359,11 @@ export default async function BacklogPage({
                     </form>
                   ) : (
                     <span className="text-[12.5px] text-[var(--ct-text-2)]">{(abTests ?? []).find((test) => test.id === selected.abTestId)?.name ?? 'nenhum'}</span>
+                  )}
+                  {selectedTest && (
+                    <Link href={`/dashboard/clients/${client.slug}/tests/${selectedTest.slug}`} className="self-start text-[12.5px] text-[var(--ct-accent)]">
+                      Abrir o relatório do teste →
+                    </Link>
                   )}
                   {selectedReadout?.link && (
                     <div className={`${mono} mt-1 grid grid-cols-[1fr_70px_70px_60px_70px] gap-x-2 gap-y-1.5 text-[12px]`}>
@@ -381,11 +427,11 @@ export default async function BacklogPage({
               )}
 
               {canEdit && (selected.status === 'running' || selected.status === 'ready') && (
-                <form action={decideItem.bind(null, { ...context, item_id: selected.id, code: selected.code })} className="flex flex-col gap-3 rounded-[14px] border border-[var(--ct-line)] px-4 py-4">
+                <form id="decidir" action={decideItem.bind(null, { ...context, item_id: selected.id, code: selected.code })} className="flex scroll-mt-4 flex-col gap-3 rounded-[14px] border border-[var(--ct-line)] px-4 py-4">
                   <b className="text-[13px]">Decidir o teste</b>
                   <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
                     Vencedora
-                    <select name="winner_key" className={field} defaultValue="">
+                    <select name="winner_key" className={field} defaultValue={suggestedKey}>
                       <option value="">nenhuma (empate ou inconclusivo)</option>
                       {selected.variants.map((variant) => (
                         <option key={variant.id} value={variant.key}>{variant.key} · {variant.name}</option>
@@ -400,7 +446,30 @@ export default async function BacklogPage({
                     Aprendizado (obrigatório)
                     <textarea name="learning" required minLength={10} rows={3} placeholder="O que este teste ensinou e onde vale aplicar de novo." className={field} />
                   </label>
-                  <button type="submit" className="self-start rounded-full bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)]">Marcar como decidido</button>
+                  <fieldset className="flex flex-col gap-2 text-[12.5px] text-[var(--ct-text-2)]">
+                    <legend className="mb-1 text-xs text-[var(--ct-text-3)]">O que fazer agora (vale quando houver vencedora)</legend>
+                    {selectedTest && (
+                      <>
+                        <label className="flex items-start gap-2">
+                          <input type="checkbox" name="send_traffic" defaultChecked className="mt-0.5" />
+                          <span>Mandar 100% do tráfego para a vencedora. O link /r continua o mesmo; os anúncios não mudam.</span>
+                        </label>
+                        <label className="flex items-start gap-2">
+                          <input type="checkbox" name="make_control" defaultChecked className="mt-0.5" />
+                          <span>Tornar a vencedora o novo controle do teste.</span>
+                        </label>
+                      </>
+                    )}
+                    <label className="flex items-start gap-2">
+                      <input type="checkbox" name="publish" defaultChecked={selected.published} className="mt-0.5" />
+                      <span>Publicar o resultado para o cliente.</span>
+                    </label>
+                    <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                      Ideia de continuação (opcional: entra na Fila com a vencedora de controle)
+                      <input name="follow_up" maxLength={120} placeholder="ex.: Ancoragem também no checkout" className={field} />
+                    </label>
+                  </fieldset>
+                  <button type="submit" className="self-start rounded-full bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)]">Confirmar decisão</button>
                 </form>
               )}
             </div>
