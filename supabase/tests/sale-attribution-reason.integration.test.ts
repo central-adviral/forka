@@ -62,4 +62,27 @@ describe('0095: the sale keeps why it is in its project, and which project its a
     const { data: frontSales } = await owner.rpc('get_project_front_sales', { p_sales_funnel_id: a, ...range })
     expect(frontSales).toEqual([{ front_id: fa, vendas: 1, receita_liquida: 100 }])
   })
+
+  it("reads the campaign id the client's real ads put in utm_campaign (0096)", async () => {
+    const { data: user } = await admin.auth.admin.createUser({ email: `camp-${unique()}@example.com`, password: 'password123', email_confirm: true })
+    const { data: client } = await admin.from('clients').insert({ owner_id: user!.user!.id, name: 'Camp', slug: `camp-${unique()}` }).select().single()
+    const clientId = client!.id as string
+    const project = async (slug: string) => (await admin.from('sales_funnels').insert({ client_id: clientId, name: slug, slug }).select().single()).data!.id as string
+    const [a, b] = [await project('a'), await project('b')]
+    const { data: fb } = await admin.from('project_fronts').insert({ sales_funnel_id: b, code: 'FB', name: 'FB' }).select().single()
+    const campaign = String(Date.now() + 7).slice(-12)
+    await admin.from('campaign_fronts').insert({ client_id: clientId, campaign_id: campaign, front_id: fb!.id, source: 'manual' })
+    const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+    await admin.from('campaign_daily').insert({ client_id: clientId, data: yesterday, campaign_id: campaign, campaign_name: 'B', spend: 50 })
+    await admin.from('project_products').insert([
+      { sales_funnel_id: a, produto_nome: 'Dos dois', papel: 'entrada' },
+      { sales_funnel_id: b, produto_nome: 'Dos dois', papel: 'entrada' },
+    ])
+    const { error } = await admin.from('sales').insert({
+      sales_funnel_id: a, external_id: `camp-${unique()}`, data_venda: `${yesterday}T15:00:00Z`, status: 'aprovada', produto: 'Dos dois', utm_campaign: campaign, valor_liquido: 80,
+    })
+    expect(error).toBeNull()
+    const { data: sale } = await admin.from('sales').select('sales_funnel_id, motivo, anuncio_funnel_id').eq('client_id', clientId).single()
+    expect(sale).toEqual({ sales_funnel_id: b, motivo: 'anuncio_do_projeto', anuncio_funnel_id: b })
+  })
 })

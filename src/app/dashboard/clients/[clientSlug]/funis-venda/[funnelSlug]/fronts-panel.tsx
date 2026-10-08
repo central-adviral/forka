@@ -156,7 +156,7 @@ export function FrontsPanel({
           </tbody>
         </table>
         <p className="border-t border-[var(--ct-line)] px-5 py-3 text-[11.5px] text-[var(--ct-text-3)]">
-          Investimento com o imposto do cliente. Vendas de anúncio da frente: as que trazem o id de um anúncio das campanhas dela. Gasto sem dono fica fora das frentes, em Não classificado:{' '}
+          Investimento com o imposto do cliente. Vendas de anúncio da frente: as que trazem na UTM o id de uma campanha dela (ou de um anúncio dela). Gasto sem dono fica fora das frentes, em Não classificado:{' '}
           <Link href={rulesHref} className="text-[var(--ct-accent)]">ver em Regras de campanha</Link>.
         </p>
       </div>
