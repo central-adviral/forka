@@ -43,10 +43,6 @@ interface InsightReportRow {
   variant_name: string
   visits: number
   conversions: number
-}
-
-interface InsightTotalsRow {
-  variant_id: string
   revenue_cents: number
 }
 
@@ -75,19 +71,9 @@ export async function generateInsight(input: z.infer<typeof generateInsightSchem
   if (reportError) throw reportError
   if (!report || report.length === 0) throw new Error('Sem dados suficientes para gerar insight')
 
-  const { data: totals, error: totalsError } = await supabase.rpc('get_test_report_totals', {
-    p_test_id: parsed.test_id,
-    p_since: parsed.since_iso,
-    p_until: parsed.until_iso,
-  })
-  if (totalsError) throw totalsError
-
   const reportRows = report as InsightReportRow[]
   const controlId = variantRows.find((v) => v.is_control)?.id
   const controlRow = reportRows.find((row) => row.variant_id === controlId) ?? reportRows[0]
-  const revenueByVariant = new Map(
-    ((totals as InsightTotalsRow[]) ?? []).map((row) => [row.variant_id, row.revenue_cents])
-  )
 
   const variants: InsightVariantStat[] = reportRows.map((row) => {
     const isControl = row.variant_id === controlRow.variant_id
@@ -102,7 +88,7 @@ export async function generateInsight(input: z.infer<typeof generateInsightSchem
       isControl,
       visits: row.visits,
       conversions: row.conversions,
-      revenueCents: revenueByVariant.get(row.variant_id) ?? 0,
+      revenueCents: Number(row.revenue_cents),
       confidencePct: confidence !== null ? Math.round(confidence * 100) : null,
     }
   })

@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { computeReportLayout } from './report-layout'
 
 const variants = [
-  { id: 'a', name: 'A', weightPct: 50, visits: 1706, uniqueVisitors: 1500, conversions: 58, revenueCents: 435000, destinationUrl: 'https://example.com/a' },
-  { id: 'b', name: 'B', weightPct: 30, visits: 1024, uniqueVisitors: 900, conversions: 61, revenueCents: 457500, destinationUrl: 'https://example.com/b' },
-  { id: 'c', name: 'C', weightPct: 20, visits: 682, uniqueVisitors: 600, conversions: 14, revenueCents: 105000, destinationUrl: 'https://example.com/c' },
+  { id: 'a', name: 'A', weightPct: 50, visits: 1706, clicks: 1500, conversions: 58, revenueCents: 435000, destinationUrl: 'https://example.com/a' },
+  { id: 'b', name: 'B', weightPct: 30, visits: 1024, clicks: 900, conversions: 61, revenueCents: 457500, destinationUrl: 'https://example.com/b' },
+  { id: 'c', name: 'C', weightPct: 20, visits: 682, clicks: 600, conversions: 14, revenueCents: 105000, destinationUrl: 'https://example.com/c' },
 ]
 
 describe('computeReportLayout', () => {
@@ -49,9 +49,9 @@ describe('computeReportLayout', () => {
     expect(layout.variants.find((v) => v.id === 'a')!.revenueCents).toBe(435000)
   })
 
-  it('passes uniqueVisitors through unchanged', () => {
+  it('passes clicks through unchanged', () => {
     const layout = computeReportLayout(variants, false, null)
-    expect(layout.variants.find((v) => v.id === 'a')!.uniqueVisitors).toBe(1500)
+    expect(layout.variants.find((v) => v.id === 'a')!.clicks).toBe(1500)
   })
 
   it('omits the fallback node when not configured', () => {
@@ -72,7 +72,7 @@ describe('computeReportLayout', () => {
       name: `V${i}`,
       weightPct: 100 / 6,
       visits: 100,
-      uniqueVisitors: 90,
+      clicks: 90,
       conversions: 10,
       revenueCents: 5000,
       destinationUrl: 'https://example.com',

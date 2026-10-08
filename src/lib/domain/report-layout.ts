@@ -3,7 +3,7 @@ export interface ReportVariantInput {
   name: string
   weightPct: number
   visits: number
-  uniqueVisitors: number
+  clicks: number
   conversions: number
   revenueCents: number
   destinationUrl: string
@@ -21,7 +21,7 @@ export interface ReportVariantLayout {
   name: string
   weightPct: number
   visits: number
-  uniqueVisitors: number
+  clicks: number
   conversions: number
   revenueCents: number
   ratePct: number
@@ -89,7 +89,7 @@ export function computeReportLayout(variants: ReportVariantInput[], fallbackConf
       name: variant.name,
       weightPct: variant.weightPct,
       visits: variant.visits,
-      uniqueVisitors: variant.uniqueVisitors,
+      clicks: variant.clicks,
       conversions: variant.conversions,
       revenueCents: variant.revenueCents,
       ratePct: variant.visits > 0 ? (variant.conversions / variant.visits) * 100 : 0,
