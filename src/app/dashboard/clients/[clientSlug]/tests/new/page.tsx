@@ -55,8 +55,8 @@ export default function NewTestPage() {
       })
   }, [params.clientSlug])
 
-  // One active test per layer in a project (0078): say which test holds it before the save fails.
-  // The answer is kept with the project and type it was asked for, so a stale one never shows.
+  // Several tests of one type can run in a project (0087); the gestor is told which one already runs,
+  // so the two get different ads. The answer is kept with the project and type it was asked for.
   const layerKey = `${salesFunnelId}:${testType}`
   useEffect(() => {
     if (!salesFunnelId) return
@@ -168,7 +168,7 @@ export default function NewTestPage() {
           </Field>
           <Field
             label="Projeto"
-            hint="Com projeto, a venda só conta para os testes dele, e um teste de página e um de checkout rodam juntos. Um teste ativo de cada tipo por projeto."
+            hint="Com projeto, a venda só conta para os testes dele, e testes de página e de checkout rodam juntos."
           >
             <select value={salesFunnelId} onChange={(e) => setSalesFunnelId(e.target.value)} className={inputClass}>
               <option value="">Sem projeto</option>
@@ -180,9 +180,9 @@ export default function NewTestPage() {
             </select>
           </Field>
           {layerTakenBy && (
-            <p role="alert" className="rounded-[10px] bg-[var(--ct-warn-soft)] px-3 py-2 text-xs text-[var(--ct-warn)]">
-              Este projeto já tem um teste de {testType === 'checkout' ? 'checkout' : 'página'} ativo: <b>{layerTakenBy}</b>. Dois na mesma camada dividiriam a
-              mesma venda. Pause o outro antes, escolha outro projeto ou junte as variantes num teste só.
+            <p className="rounded-[10px] bg-[var(--ct-an-soft)] px-3 py-2 text-xs text-[var(--ct-an)]">
+              Este projeto já roda o teste de {testType === 'checkout' ? 'checkout' : 'página'} <b>{layerTakenBy}</b>. Os dois podem rodar juntos: use anúncios
+              diferentes em cada link. Quem passar pelos dois links conta nos dois testes.
             </p>
           )}
         </Section>
