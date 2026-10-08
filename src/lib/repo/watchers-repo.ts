@@ -16,6 +16,8 @@ export interface Watcher {
   funnelId: string
   /** Set when the Plano (project) or the front's metrics own the metric and target (0094, 0102). */
   planRole: 'principal' | 'secundaria' | null
+  /** Its project or front is archived, so it is not evaluated (0100). */
+  archived: boolean
   /** Only the client's campaigns whose name contains this (0065). */
   lastDay: string | null
   lastValue: number | null
@@ -36,7 +38,7 @@ export async function getWatchers(db: SupabaseClient, clientId: string): Promise
   const { data, error } = await db
     .from('watchers')
     .select(
-      'id, metric, target, warn_pct, crit_pct, min_spend, is_active, last_day, last_value, last_status, sales_funnel_id, plan_role, project:sales_funnels!inner(name, slug), front:project_fronts(id, name)'
+      'id, metric, target, warn_pct, crit_pct, min_spend, is_active, last_day, last_value, last_status, sales_funnel_id, plan_role, project:sales_funnels!inner(name, slug, archived_at), front:project_fronts(id, name, archived_at)'
     )
     .eq('client_id', clientId)
     .order('created_at')
@@ -54,8 +56,8 @@ export async function getWatchers(db: SupabaseClient, clientId: string): Promise
     last_status: WatcherStatus | null
     sales_funnel_id: string
     plan_role: 'principal' | 'secundaria' | null
-    project: { name: string; slug: string }
-    front: { id: string; name: string } | null
+    project: { name: string; slug: string; archived_at: string | null }
+    front: { id: string; name: string; archived_at: string | null } | null
   }[]).map((row) => ({
     id: row.id,
     metric: row.metric,
@@ -70,6 +72,7 @@ export async function getWatchers(db: SupabaseClient, clientId: string): Promise
     frontName: row.front?.name ?? null,
     funnelId: row.sales_funnel_id,
     planRole: row.plan_role,
+    archived: Boolean(row.project.archived_at || row.front?.archived_at),
     lastDay: row.last_day,
     lastValue: row.last_value === null ? null : Number(row.last_value),
     lastStatus: row.last_status,

@@ -56,10 +56,21 @@ function issues(error: z.ZodError): string {
   return error.issues.map((issue) => issue.message).join('; ')
 }
 
+// A watcher of an archived project or front is not evaluated (0100), so it is read-only.
+async function archivedScopeError(supabase: SupabaseClient, funnelId: string, frontId: string | null): Promise<string | null> {
+  const { data: funnel } = await supabase.from('sales_funnels').select('archived_at').eq('id', funnelId).maybeSingle()
+  if (funnel?.archived_at) return 'Projeto arquivado: restaure o projeto para mexer nos vigias dele.'
+  if (!frontId) return null
+  const { data: front } = await supabase.from('project_fronts').select('archived_at').eq('id', frontId).maybeSingle()
+  return front?.archived_at ? 'Frente arquivada: restaure a frente para mexer nos vigias dela.' : null
+}
+
 // The rules of 0086 and 0071, checked before the database refuses with a less useful message.
 async function scopeError(supabase: SupabaseClient, scope: string, metric: WatcherMetric): Promise<string | null> {
   const [funnelId, frontId] = scope.split('|')
   if (frontId && METRICS[metric].projectOnly) return `${METRICS[metric].label} vale para todas as frentes do projeto: as vendas não são de uma frente.`
+  const archived = await archivedScopeError(supabase, funnelId, frontId || null)
+  if (archived) return archived
   if (METRICS[metric].salesOnly) {
     const { data: funnel } = await supabase.from('sales_funnels').select('resultado').eq('id', funnelId).maybeSingle()
     if (!resultUsesSales(funnel?.resultado)) return `${METRICS[metric].label} precisa de vendas, e o objetivo deste projeto não conta vendas.`
@@ -98,8 +109,10 @@ export async function updateWatcher(context: MetasContext & { watcher_id: string
   const numbers = numbersSchema.safeParse(readNumbers(formData))
   if (!numbers.success) back(context, 'erro', issues(numbers.error))
   const supabase = await createServerSupabaseClient()
-  const { data: watcher } = await supabase.from('watchers').select('id, front_id, plan_role').eq('id', context.watcher_id).maybeSingle()
+  const { data: watcher } = await supabase.from('watchers').select('id, sales_funnel_id, front_id, plan_role').eq('id', context.watcher_id).maybeSingle()
   if (!watcher) back(context, 'erro', 'Vigia não encontrado.')
+  const archived = await archivedScopeError(supabase, watcher.sales_funnel_id, watcher.front_id)
+  if (archived) back(context, 'erro', archived)
   const { target, warn_pct, crit_pct, min_spend } = numbers.data
   // The last verdict was against the old band; it is cleared and judged again below.
   const values: Record<string, unknown> = { warn_pct, crit_pct, min_spend, last_value: null, last_status: null }
