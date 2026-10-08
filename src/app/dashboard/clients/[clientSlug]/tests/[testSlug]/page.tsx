@@ -9,6 +9,8 @@ import { experimentTimeline } from '@/lib/domain/experiment-timeline'
 import { readLinkTest, type LinkRow } from '@/lib/domain/backlog-readout'
 import { readRules } from '@/lib/domain/backlog'
 import { ExperimentBand } from './experiment-band'
+import { TotalsTable } from './totals-table'
+import { type ReportRow, TH_CLASS, TD_CLASS, TR_CLASS, METRIC_INFO, ThWithInfo, BarCell, RateCell, Delta, BotTag } from './report-cells'
 import { ChanceChart } from './chance-chart'
 import { dailyChance, type DailyRow } from '@/lib/domain/daily-chance'
 import { computeReportLayout } from '@/lib/domain/report-layout'
@@ -50,18 +52,6 @@ interface HourReportRow {
   revenue_cents: number
 }
 
-// One count for the whole report (0077): visits are people, conversions are buyers, and sales and
-// revenue are every purchase of those buyers, upsell included.
-interface ReportRow {
-  variant_id: string
-  variant_name: string
-  weight_pct: number
-  visits: number
-  conversions: number
-  clicks: number
-  sales: number
-  revenue_cents: number
-}
 
 interface SourceReportRow {
   variant_id: string
@@ -86,116 +76,6 @@ interface AdReportRow {
   ad_spend: number | null
   ad_impressions: number | null
   ad_link_clicks: number | null
-}
-
-const TH_CLASS = 'px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--ct-text-2)]'
-const TD_CLASS = 'relative px-4 py-2.5'
-const TR_CLASS = 'border-b border-[var(--ct-line)] last:border-0 even:bg-[var(--ct-surface-2)] hover:bg-[var(--ct-surface-2)]'
-
-const METRIC_INFO = {
-  cliques: 'Total de vezes que o link foi clicado, incluindo cliques repetidos da mesma pessoa.',
-  visitas: 'Número de pessoas diferentes que clicaram, contando cada uma só uma vez mesmo se ela clicar várias vezes.',
-  vendas: 'Número de vendas confirmadas atribuídas a essa linha.',
-  faturamento: 'Soma do valor de todas as vendas confirmadas dessa linha.',
-  rsPorClique: 'Faturamento dividido pelo número de cliques — quanto cada clique rendeu em média.',
-  rsPorAcesso: 'Faturamento dividido pelo número de visitas únicas — quanto cada visitante rendeu em média.',
-  pessoas: 'Pessoas diferentes que entraram no teste, cada uma contada uma vez, na primeira variante que recebeu.',
-  compradores: 'Pessoas que compraram depois de entrar. É o número que decide o teste: a taxa e a chance usam ele.',
-  vendasTeste: 'Todas as compras dessas pessoas, incluindo upsell e segunda compra. Por isso pode ser maior que compradores.',
-  faturamentoTeste: 'Soma do valor dessas vendas.',
-  rsPorPessoa: 'Faturamento dividido pelas pessoas — quanto cada pessoa que entrou rendeu em média. Decide teste de preço e oferta.',
-  taxaClique: 'Porcentagem de cliques desta linha que viraram venda. É um recorte por clique: quem decide o teste é a taxa de compradores do resultado.',
-  taxa: 'Porcentagem de pessoas que compraram: cada pessoa conta uma vez, mesmo com upsell. Por isso pode diferir da coluna de vendas, que conta cada venda.',
-  gasto: 'Total investido em mídia paga nesse anúncio, vindo do Meta Ads.',
-  cpm: 'Custo por mil impressões do anúncio no Meta Ads.',
-  ctr: 'Porcentagem de impressões do anúncio que viraram clique no link, direto no Meta Ads.',
-}
-
-function InfoTooltip({ text }: { text: string }) {
-  return (
-    <span tabIndex={0} aria-label={text} className="group relative ml-1 inline-flex cursor-help align-middle outline-none">
-      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[var(--ct-line-2)] text-[9px] font-bold normal-case text-[var(--ct-text-2)]">
-        !
-      </span>
-      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1.5 w-48 -translate-x-1/2 rounded-md border border-[var(--ct-line)] bg-[var(--ct-surface-2)] p-2 text-[11px] font-normal normal-case leading-snug tracking-normal text-[var(--ct-text)] opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus:opacity-100">
-        {text}
-      </span>
-    </span>
-  )
-}
-
-function ThWithInfo({ label, info }: { label: string; info: string }) {
-  return (
-    <th className={TH_CLASS}>
-      <span className="inline-flex items-center">
-        {label}
-        <InfoTooltip text={info} />
-      </span>
-    </th>
-  )
-}
-
-function BarCell({
-  value,
-  max,
-  format,
-  children,
-}: {
-  value: number
-  max: number
-  format: string
-  children?: React.ReactNode
-}) {
-  const pct = max > 0 ? Math.max(value > 0 ? 6 : 0, (value / max) * 100) : 0
-  return (
-    <td className={TD_CLASS}>
-      <div className="absolute inset-y-1.5 left-0 rounded-r bg-[var(--ct-accent)]/[0.14]" style={{ width: `${pct}%` }} />
-      <span className="relative">{format}</span>
-      {children && <div className="relative mt-0.5">{children}</div>}
-    </td>
-  )
-}
-
-function RateCell({ rate, children }: { rate: string; children?: React.ReactNode }) {
-  return (
-    <td className={`${TD_CLASS} ${Number(rate) > 0 ? 'text-[var(--ct-ok)]' : 'text-[var(--ct-text-2)]'}`}>
-      {rate}%
-      {children && <div className="mt-0.5">{children}</div>}
-    </td>
-  )
-}
-
-// Counts and money read as a percentage; a rate reads in percentage points, because a rate that
-// moves from 2,1% to 3,4% rose 1,3 p.p., not 62%.
-function Delta({ current, previous, unit }: { current: number; previous: number | null; unit: 'pct' | 'pp' }) {
-  if (previous === null) return <span className="text-[11px] text-[var(--ct-text-3)]">—</span>
-  const diff = unit === 'pp' ? current - previous : previous === 0 ? null : ((current - previous) / previous) * 100
-  if (diff === null) {
-    return <span className="text-[11px] text-[var(--ct-text-3)]">novo</span>
-  }
-  const rounded = unit === 'pp' ? diff.toFixed(1) : Math.round(diff).toString()
-  const sign = diff > 0 ? '+' : ''
-  const tone = diff > 0 ? 'text-[var(--ct-ok)]' : diff < 0 ? 'text-[var(--ct-crit)]' : 'text-[var(--ct-text-3)]'
-  return (
-    <span className={`font-[family-name:var(--font-geist-mono)] text-[11px] ${tone}`}>
-      {sign}
-      {rounded}
-      {unit === 'pp' ? ' p.p.' : '%'}
-    </span>
-  )
-}
-
-function BotTag({ clicks, botClicks }: { clicks: number; botClicks: number }) {
-  if (botClicks === 0) return null
-  const pct = Math.round((botClicks / (clicks + botClicks)) * 100)
-  return (
-    <span
-      title="Cliques adicionais identificados como bot/crawler (ex.: pré-visualização de link da Meta) — não contam em visitas, vendas ou faturamento."
-      className="ml-2 inline-flex cursor-help items-center rounded-full bg-[var(--ct-surface-2)] px-1.5 py-0.5 text-[10px] font-medium normal-case text-[var(--ct-text-2)]"
-    >
-      {pct}% bot
-    </span>
-  )
 }
 
 export default async function TestReportPage({
@@ -744,101 +624,7 @@ export default async function TestReportPage({
       </div>
       <div className="mx-6 mb-6">
         <h2 className="mb-2 mt-8 font-[family-name:var(--font-sora)] text-lg font-semibold">Total por {assetLabel.toLowerCase()}</h2>
-        {(() => {
-          const maxClicks = Math.max(1, ...rows.map((r) => Number(r.clicks)))
-          const maxRevenue = Math.max(1, ...rows.map((r) => Number(r.revenue_cents)))
-          const perPerson = (row: ReportRow) => (row.visits > 0 ? Number(row.revenue_cents) / row.visits / 100 : 0)
-          const buyerRate = (row: ReportRow) => (row.visits > 0 ? (row.conversions / row.visits) * 100 : 0)
-          return (
-            <>
-            {/* Below 640px each row is a card with the numbers that decide; nothing gets cut. */}
-            <div className="flex flex-col gap-2 sm:hidden">
-              {rows.map((row) => (
-                <div key={row.variant_id} className="grid grid-cols-3 gap-2 rounded-2xl border border-[var(--ct-line)] bg-[var(--ct-surface)] px-4 py-3">
-                  <b className="col-span-3 text-[14px]">{row.variant_name}</b>
-                  {[
-                    ['pessoas', row.visits.toLocaleString('pt-BR')],
-                    ['compradores', row.conversions.toLocaleString('pt-BR')],
-                    ['taxa', `${buyerRate(row).toFixed(1)}%`],
-                    ['vendas', Number(row.sales).toLocaleString('pt-BR')],
-                    ['faturamento', `R$ ${(Number(row.revenue_cents) / 100).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`],
-                    ['R$/pessoa', `R$ ${perPerson(row).toFixed(2)}`],
-                  ].map(([label, value]) => (
-                    <span key={label} className="flex flex-col">
-                      <span className="font-[family-name:var(--font-geist-mono)] text-[13px]">{value}</span>
-                      <span className="text-[11px] text-[var(--ct-text-3)]">{label}</span>
-                    </span>
-                  ))}
-                </div>
-              ))}
-            </div>
-            <div className="hidden overflow-x-auto rounded-2xl border border-[var(--ct-line)] sm:block">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--ct-line)] bg-[var(--ct-surface-2)] text-left">
-                    <th className={TH_CLASS}>{assetLabel}</th>
-                    <ThWithInfo label="Cliques" info={METRIC_INFO.cliques} />
-                    <ThWithInfo label="Pessoas" info={METRIC_INFO.pessoas} />
-                    <ThWithInfo label="Compradores" info={METRIC_INFO.compradores} />
-                    <ThWithInfo label="Taxa" info={METRIC_INFO.taxa} />
-                    <ThWithInfo label="Vendas" info={METRIC_INFO.vendasTeste} />
-                    <ThWithInfo label="Faturamento" info={METRIC_INFO.faturamentoTeste} />
-                    <ThWithInfo label="R$/pessoa" info={METRIC_INFO.rsPorPessoa} />
-                    <ThWithInfo label="R$/clique" info={METRIC_INFO.rsPorClique} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => {
-                    const previous = previousByVariant.get(row.variant_id) ?? null
-                    const clicks = Number(row.clicks)
-                    const revenue = Number(row.revenue_cents)
-                    return (
-                    <tr key={row.variant_id} className={`${TR_CLASS} ${clicks === 0 ? 'opacity-50' : ''}`}>
-                      <td className={TD_CLASS}>
-                        {row.variant_name}
-                        {previous && (
-                          <div className="mt-0.5 font-[family-name:var(--font-geist-mono)] text-[10.5px] normal-case text-[var(--ct-text-3)]">
-                            período anterior
-                          </div>
-                        )}
-                      </td>
-                      <BarCell value={clicks} max={maxClicks} format={String(clicks)}>
-                        {previous && <Delta current={clicks} previous={Number(previous.clicks)} unit="pct" />}
-                      </BarCell>
-                      <td className={TD_CLASS}>
-                        {row.visits}
-                        {previous && (
-                          <div className="mt-0.5">
-                            <Delta current={row.visits} previous={previous.visits} unit="pct" />
-                          </div>
-                        )}
-                      </td>
-                      <td className={TD_CLASS}>
-                        {row.conversions}
-                        {previous && (
-                          <div className="mt-0.5">
-                            <Delta current={row.conversions} previous={previous.conversions} unit="pct" />
-                          </div>
-                        )}
-                      </td>
-                      <RateCell rate={buyerRate(row).toFixed(1)}>
-                        {previous && <Delta current={buyerRate(row)} previous={buyerRate(previous)} unit="pp" />}
-                      </RateCell>
-                      <td className={TD_CLASS}>{Number(row.sales)}</td>
-                      <BarCell value={revenue} max={maxRevenue} format={`R$ ${(revenue / 100).toFixed(2)}`}>
-                        {previous && <Delta current={revenue} previous={Number(previous.revenue_cents)} unit="pct" />}
-                      </BarCell>
-                      <td className={TD_CLASS}>R$ {perPerson(row).toFixed(2)}</td>
-                      <td className={TD_CLASS}>R$ {(clicks > 0 ? revenue / clicks / 100 : 0).toFixed(2)}</td>
-                    </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-            </>
-          )
-        })()}
+        <TotalsTable rows={rows} previousByVariant={previousByVariant} assetLabel={assetLabel} />
       </div>
         </>
       )}
