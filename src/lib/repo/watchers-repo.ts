@@ -13,6 +13,9 @@ export interface Watcher {
   projectSlug: string
   frontId: string | null
   frontName: string | null
+  funnelId: string
+  /** Set when the Plano (project) or the front's metrics own the metric and target (0094, 0102). */
+  planRole: 'principal' | 'secundaria' | null
   /** Only the client's campaigns whose name contains this (0065). */
   lastDay: string | null
   lastValue: number | null
@@ -33,7 +36,7 @@ export async function getWatchers(db: SupabaseClient, clientId: string): Promise
   const { data, error } = await db
     .from('watchers')
     .select(
-      'id, metric, target, warn_pct, crit_pct, min_spend, is_active, last_day, last_value, last_status, project:sales_funnels!inner(name, slug), front:project_fronts(id, name)'
+      'id, metric, target, warn_pct, crit_pct, min_spend, is_active, last_day, last_value, last_status, sales_funnel_id, plan_role, project:sales_funnels!inner(name, slug), front:project_fronts(id, name)'
     )
     .eq('client_id', clientId)
     .order('created_at')
@@ -49,6 +52,8 @@ export async function getWatchers(db: SupabaseClient, clientId: string): Promise
     last_day: string | null
     last_value: number | null
     last_status: WatcherStatus | null
+    sales_funnel_id: string
+    plan_role: 'principal' | 'secundaria' | null
     project: { name: string; slug: string }
     front: { id: string; name: string } | null
   }[]).map((row) => ({
@@ -63,6 +68,8 @@ export async function getWatchers(db: SupabaseClient, clientId: string): Promise
     projectSlug: row.project.slug,
     frontId: row.front?.id ?? null,
     frontName: row.front?.name ?? null,
+    funnelId: row.sales_funnel_id,
+    planRole: row.plan_role,
     lastDay: row.last_day,
     lastValue: row.last_value === null ? null : Number(row.last_value),
     lastStatus: row.last_status,

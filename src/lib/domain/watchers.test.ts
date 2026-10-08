@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { alertActions, formatMetric, thresholds, watcherScope } from './watchers'
+import { alertActions, decimalInput, formatMetric, thresholds, watcherScope, watcherSource } from './watchers'
 
 describe('thresholds', () => {
   it('puts the bands above the target for a cost', () => {
@@ -53,5 +53,26 @@ describe('alertActions', () => {
     const scoped = alertActions({ metric: 'frequencia', projectSlug: '1k', frontId: 'f-1' }, base, false)
     expect(scoped[0]).toEqual({ label: 'Ver a frente', href: '/dashboard/clients/voe/funis-venda/1k?periodo=7d&aba=frentes&frente=f-1' })
     expect(scoped.map((action) => action.label)).not.toContain('Ajustar alvo')
+  })
+})
+
+describe('watcherSource', () => {
+  it('leaves a watcher created in Metas to itself', () => {
+    expect(watcherSource({ planRole: null, frontId: null })).toBe('livre')
+    expect(watcherSource({ planRole: null, frontId: 'front-1' })).toBe('livre')
+  })
+
+  it('sends a project plan watcher to the Plano and a front one to the front', () => {
+    expect(watcherSource({ planRole: 'principal', frontId: null })).toBe('plano')
+    expect(watcherSource({ planRole: 'secundaria', frontId: null })).toBe('plano')
+    expect(watcherSource({ planRole: 'secundaria', frontId: 'front-1' })).toBe('frente')
+  })
+})
+
+describe('decimalInput', () => {
+  it('writes what the Metas form parses back to the same number', () => {
+    expect(decimalInput(55.5)).toBe('55,5')
+    expect(decimalInput(1200)).toBe('1200')
+    expect(Number(decimalInput(1234.75).replace(/\./g, '').replace(',', '.'))).toBe(1234.75)
   })
 })
