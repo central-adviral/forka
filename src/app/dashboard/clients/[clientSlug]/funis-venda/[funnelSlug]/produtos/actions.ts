@@ -7,7 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { PRODUCT_ROLES } from '@/lib/domain/product-roles'
 
 // Writes go through the user's session: the 0061 policies only let a gestor or owner change a
-// project's products. The 0061 trigger re-labels the sales and keeps the sync's list in step.
+// project's products. A change applies from now on (0101): stored sales keep their project and role.
 
 interface ProductsContext {
   client_slug: string
@@ -19,8 +19,9 @@ function productsPath(context: ProductsContext): string {
   return `/dashboard/clients/${context.client_slug}/funis-venda/${context.funnel_slug}/produtos`
 }
 
-function back(context: ProductsContext, param: 'ok' | 'erro', message: string): never {
-  redirect(`${productsPath(context)}?${param}=${encodeURIComponent(message)}`)
+// changed = a product change was saved, so the page offers "Aplicar desde".
+function back(context: ProductsContext, param: 'ok' | 'erro', message: string, changed = false): never {
+  redirect(`${productsPath(context)}?${param}=${encodeURIComponent(message)}${changed ? '&mudou=1' : ''}`)
 }
 
 const productSchema = z.object({
@@ -38,7 +39,7 @@ export async function setProductRole(context: ProductsContext, formData: FormDat
     .select('produto_nome')
   if (error || !data || data.length === 0) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode alterar os produtos.')
   revalidatePath(productsPath(context))
-  back(context, 'ok', `${result.data.produto_nome} salvo. As vendas dele entram no próximo sync.`)
+  back(context, 'ok', `${result.data.produto_nome} salvo. Vale para as vendas a partir de agora; as novas entram no próximo sync.`, true)
 }
 
 export async function removeProduct(context: ProductsContext & { produto_nome: string }) {
@@ -52,5 +53,5 @@ export async function removeProduct(context: ProductsContext & { produto_nome: s
   if (error) back(context, 'erro', error.message)
   if (!data || data.length === 0) back(context, 'erro', 'Só gestor ou owner pode remover produtos.')
   revalidatePath(productsPath(context))
-  back(context, 'ok', `${context.produto_nome} saiu do projeto. As vendas dele foram para outro projeto que tem o produto, ou ficaram sem atribuição.`)
+  back(context, 'ok', `${context.produto_nome} saiu do projeto a partir de agora. As vendas que ele já tinha continuam aqui.`, true)
 }

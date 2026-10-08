@@ -11,6 +11,8 @@ import { canActAs } from '@/lib/view-as'
 import { saoPauloDay } from '@/lib/repo/today-repo'
 import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
 import { PageHeader } from '@/components/page-header'
+import { ApplySincePanel } from '../apply-since-panel'
+import { applySince, previewApplySince } from '../apply-since-actions'
 
 const LOOKBACK_DAYS = 30
 
@@ -26,10 +28,10 @@ export default async function ProjectProductsPage({
   searchParams,
 }: {
   params: Promise<{ clientSlug: string; funnelSlug: string }>
-  searchParams: Promise<{ ok?: string; erro?: string }>
+  searchParams: Promise<{ ok?: string; erro?: string; mudou?: string }>
 }) {
   const { clientSlug, funnelSlug } = await params
-  const { ok, erro } = await searchParams
+  const { ok, erro, mudou } = await searchParams
   const supabase = await createServerSupabaseClient()
 
   const { data: client } = await supabase.from('clients').select('id, slug, funnel_source_url').eq('slug', clientSlug).maybeSingle()
@@ -83,6 +85,7 @@ export default async function ProjectProductsPage({
   const unclassified = catalog.filter((product) => !classified.has(product.produto_nome))
 
   const context = { client_slug: client.slug, funnel_slug: funnel.slug, sales_funnel_id: funnel.id }
+  const applyContext = { sales_funnel_id: funnel.id, path: `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/produtos` }
 
   function roleSelect(defaultValue: ProductRole) {
     return (
@@ -110,8 +113,8 @@ export default async function ProjectProductsPage({
           <>
             Só as vendas dos produtos desta lista entram em {funnel.name}. O papel define a conta: o CPA divide o investimento pelas vendas de{' '}
             <strong>entrada</strong>; faturamento e ROAS front somam entrada, order bump e upsell; a <strong>ascensão</strong> tem um ROAS próprio. Um
-            produto em mais de um projeto vai para o projeto do anúncio da venda. Tirar um produto não apaga vendas: elas passam para outro projeto que
-            tenha o produto ou ficam sem atribuição.
+            produto em mais de um projeto vai para o projeto do anúncio da venda. Mudar o papel, adicionar ou tirar um produto vale daqui pra frente:
+            as vendas já guardadas ficam onde estão, com o papel que tinham, até você aplicar desde uma data.
           </>
         }
       />
@@ -134,6 +137,15 @@ export default async function ProjectProductsPage({
         <p role="alert" className="rounded-[10px] bg-[var(--ct-crit-soft)] px-4 py-3 text-[13px] text-[var(--ct-crit)]">
           {erro}
         </p>
+      )}
+
+      {canEdit && mudou && (
+        <ApplySincePanel
+          previewAction={previewApplySince.bind(null, applyContext)}
+          applyAction={applySince.bind(null, applyContext)}
+          today={saoPauloDay()}
+          fieldClass={fieldClass}
+        />
       )}
 
       <section className="rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)]">
@@ -175,7 +187,7 @@ export default async function ProjectProductsPage({
                       <ConfirmDeleteButton
                         action={removeProduct.bind(null, { ...context, produto_nome: product.produto_nome })}
                         label="Remover"
-                        warning="Tirar o produto deste projeto? As vendas dele ficam guardadas: vão para outro projeto que tenha o produto ou ficam sem atribuição."
+                        warning="Tirar o produto deste projeto a partir de agora? As vendas que ele já tem continuam aqui; as próximas não entram mais."
                       />
                     )}
                   </td>
