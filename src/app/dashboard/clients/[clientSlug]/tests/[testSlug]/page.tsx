@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { probabilityToBeatControl } from '@/lib/domain/significance'
@@ -245,6 +246,7 @@ export default async function TestReportPage({
     { data: hourReport, error: hourReportError },
     { data: previousReport },
     { data: lastWeightChange },
+    { data: measuredCards },
   ] = await Promise.all([
     supabase.from('variants').select('id, destination_url, is_control').eq('test_id', test.id),
     supabase.rpc('get_test_report', period),
@@ -254,7 +256,10 @@ export default async function TestReportPage({
     tab === 'desempenho' ? supabase.rpc('get_test_report_by_hour', period) : skip,
     previousWindow ? supabase.rpc('get_test_report', previousPeriod) : skip,
     supabase.from('test_changes').select('created_at').eq('test_id', test.id).eq('field', 'weight_pct').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('backlog_items').select('code, title, status, sales_funnels(slug)').eq('ab_test_id', test.id).order('created_at', { ascending: false }).limit(1),
   ])
+  // The card this test measures: the decision lives there, next to the hypothesis and the learning.
+  const measuredCard = ((measuredCards ?? []) as unknown as { code: string; title: string; status: string; sales_funnels: { slug: string } | null }[])[0]
 
   // Traffic before the last weight change was drawn with the old weights: the draw is checked
   // only from that change on, or a 70/30 → 50/50 switch reads as a skewed draw (0076).
@@ -541,6 +546,17 @@ export default async function TestReportPage({
         })}
       </div>
       </div>
+
+      {measuredCard && measuredCard.sales_funnels && (
+        <Link
+          href={`/dashboard/clients/${clientSlug}/backlog?projeto=${measuredCard.sales_funnels.slug}&item=${measuredCard.code}${measuredCard.status === 'running' ? '#decidir' : ''}`}
+          className="mx-6 mt-4 flex flex-wrap items-center gap-2 rounded-[12px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-4 py-2.5 text-[12.5px] text-[var(--ct-text-2)] hover:border-[var(--ct-line-2)]"
+        >
+          <span className="font-[family-name:var(--font-geist-mono)] text-[var(--ct-text-3)]">{measuredCard.code}</span>
+          Este teste mede o card <b className="text-[var(--ct-text)]">{measuredCard.title}</b> do Quadro.
+          <span className="ml-auto text-[var(--ct-accent)]">{measuredCard.status === 'running' ? 'Decidir no card →' : 'Abrir o card →'}</span>
+        </Link>
+      )}
 
       {hasPartialDataError && (
         <div className="mx-6 mt-4 rounded-[10px] border border-[var(--ct-warn)]/35 bg-[var(--ct-warn)]/10 px-4 py-2.5 text-xs text-[var(--ct-warn)]">

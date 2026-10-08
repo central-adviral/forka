@@ -46,11 +46,13 @@ export interface LinkRow {
   variant_name: string
   visits: number
   conversions: number
+  weight_pct?: number
 }
 
 export interface LinkVariantRead {
   name: string
   isControl: boolean
+  weightPct: number
   visits: number
   conversions: number
   /** Chance, 0–1, of beating the control; null for the control or without visitors. */
@@ -108,7 +110,7 @@ export function readLinkTest(rows: LinkRow[], controlVariantId: string | undefin
     let verdict: Verdict = Number(row.visits) === 0 ? 'no_data' : 'measuring'
     if (chance !== null && enough && chance * 100 >= rules.conf && Number(row.conversions) >= rules.min) verdict = 'win'
     else if (chance !== null && enough && (1 - chance) * 100 >= rules.conf) verdict = 'cut'
-    return { name: row.variant_name, isControl, visits: Number(row.visits), conversions: Number(row.conversions), chance, needed, verdict }
+    return { name: row.variant_name, isControl, weightPct: Number(row.weight_pct ?? 0), visits: Number(row.visits), conversions: Number(row.conversions), chance, needed, verdict }
   })
 }
 
