@@ -235,14 +235,65 @@ export function availability(checks: PageCheck[]): number | null {
   return checks.length === 0 ? null : checks.filter((check) => check.ok).length / checks.length
 }
 
+/** Spend per hour so far today; the first hour counts as a whole one so a few minutes in do not inflate it. */
+export function spendPerHour(spendToday: number, hoursIntoDay: number): number {
+  return spendToday <= 0 || hoursIntoDay <= 0 ? 0 : spendToday / Math.max(hoursIntoDay, 1)
+}
+
 /**
- * What a fall costs, estimated: the project's spend rate today (spend so far ÷ hours elapsed)
- * times the hours the page has been down.
+ * What a fall costs, estimated: the spend rate today of the page's front (of its project when it has
+ * no front) times the hours the page has been down.
  */
 export function outageCost(spendToday: number, hoursIntoDay: number, downSince: Date, now: Date): number {
-  if (spendToday <= 0 || hoursIntoDay <= 0) return 0
   const hoursDown = Math.max(0, (now.getTime() - downSince.getTime()) / 3_600_000)
-  return (spendToday / Math.max(hoursIntoDay, 1)) * hoursDown
+  return spendPerHour(spendToday, hoursIntoDay) * hoursDown
+}
+
+// --- Fronts ---
+
+/** Fronts that spent in the last NO_TRAFFIC_DAYS days and have no active page: ads sending people nowhere the probe watches. */
+export function frontsWithoutPage(fronts: { id: string; spendRecent: number }[], pages: { frontId: string | null; isActive: boolean }[]): Set<string> {
+  const watched = new Set(pages.flatMap((page) => (page.isActive && page.frontId ? [page.frontId] : [])))
+  return new Set(fronts.filter((front) => front.spendRecent > 0 && !watched.has(front.id)).map((front) => front.id))
+}
+
+export interface FrontGroup<P> {
+  /** Null is "sem frente · orgânico". */
+  frontId: string | null
+  pages: P[]
+  unwatched: boolean
+}
+
+export interface ProjectGroup<P> {
+  /** Null is the last group: pages with no project. */
+  projectId: string | null
+  fronts: FrontGroup<P>[]
+}
+
+/**
+ * Pages by project, then by front, in the order given. A project shows when it has a page or an
+ * unwatched front; a front shows when it has a page or is unwatched. A page whose front is not in
+ * its project's list falls under "sem frente" rather than out of the screen.
+ */
+export function groupPagesByFront<P extends { salesFunnelId: string | null; frontId: string | null }>(
+  pages: P[],
+  projects: { id: string; frontIds: string[] }[],
+  unwatched: Set<string>
+): ProjectGroup<P>[] {
+  const groups: ProjectGroup<P>[] = []
+  for (const project of projects) {
+    const own = pages.filter((page) => page.salesFunnelId === project.id)
+    const fronts: FrontGroup<P>[] = project.frontIds
+      .map((frontId) => ({ frontId, pages: own.filter((page) => page.frontId === frontId), unwatched: unwatched.has(frontId) }))
+      .filter((front) => front.pages.length > 0 || front.unwatched)
+    const organic = own.filter((page) => page.frontId === null || !project.frontIds.includes(page.frontId))
+    if (organic.length > 0) fronts.push({ frontId: null, pages: organic, unwatched: false })
+    if (fronts.length > 0) groups.push({ projectId: project.id, fronts })
+  }
+  const known = new Set(projects.map((project) => project.id))
+  const loose = pages.filter((page) => page.salesFunnelId === null || !known.has(page.salesFunnelId))
+  if (loose.length > 0) groups.push({ projectId: null, fronts: [{ frontId: null, pages: loose, unwatched: false }] })
+  return groups
 }
 
 export interface LpvDay {

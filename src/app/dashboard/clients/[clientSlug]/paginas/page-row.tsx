@@ -3,19 +3,48 @@ import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { CopyButton } from '@/components/copy-button'
 import { checkFindings, seconds, type Finding, type LpvDay, type Outage, type PageCheck, type PageStatus } from '@/lib/domain/page-probe'
 import type { ProbedPage } from '@/lib/repo/pages-repo'
-import { checkPageNow, removePage, setPageActive, silencePage } from './actions'
+import { checkPageNow, movePage, removePage, setPageActive, silencePage } from './actions'
 import { currency, durationLabel, mono, timeOnly, when } from './format'
+
+interface Lpv {
+  average: number | null
+  days: LpvDay[]
+}
+
+/** Today's spend is with tax; the recent one only says whether there was any. */
+export interface FrontInfo {
+  id: string
+  code: string
+  name: string
+  spendToday: number
+  spendRecent: number
+  lpv: Lpv
+}
+
+export interface ProjectInfo {
+  id: string
+  name: string
+  slug: string
+  spendToday: number
+  spendRecent: number
+  lpv: Lpv
+  /** Own fronts only: a mirror front cannot own a page. */
+  fronts: FrontInfo[]
+}
 
 export interface PageView {
   page: ProbedPage
   status: PageStatus
   silenced: boolean
   findings: Finding[]
-  project: { id: string; name: string; slug: string; spendToday: number; spendRecent: number; lpv: { average: number | null; days: LpvDay[] } } | null
+  project: ProjectInfo | null
+  front: FrontInfo | null
   outages: Outage[]
   /** The outage going on now, when the page is critical. */
   currentOutage: Outage | null
   costSinceDown: number | null
+  /** R$/h today of the front, or of the project when the page has no front. */
+  spendRate: number | null
   affectedTests: string[]
 }
 
@@ -55,6 +84,7 @@ export function PageRow({
   const strip = page.checks.slice(0, 24).reverse()
   const passing = findings.filter((finding) => finding.ok).length
   const pageContext = { ...context, page_id: page.id }
+  const lpv = (view.front ?? view.project)?.lpv ?? null
   const pill = page.isActive ? STATUS[status] : { label: 'pausada', tone: 'bg-[var(--ct-surface-3)] text-[var(--ct-text-2)]' }
 
   return (
@@ -64,9 +94,13 @@ export function PageRow({
           <strong className="block text-[13.5px] font-semibold">{page.label}</strong>
           <span className="block truncate text-xs text-[var(--ct-text-3)]">{page.url}</span>
           <span className="mt-0.5 block text-[11.5px] text-[var(--ct-text-3)]">
-            {view.project ? (
+            {view.front ? (
               <>
-                {view.project.name} · <span className={mono}>{currency(view.project.spendToday)}</span> hoje
+                frente {view.front.name} · <span className={mono}>{currency(view.front.spendToday)}</span> hoje
+              </>
+            ) : view.project ? (
+              <>
+                sem frente · projeto <span className={mono}>{currency(view.project.spendToday)}</span> hoje
               </>
             ) : (
               'sem projeto ligado'
@@ -127,13 +161,14 @@ export function PageRow({
 
           <section aria-labelledby={`chega-${page.id}`}>
             <h3 id={`chega-${page.id}`} className="text-[13px] font-semibold">Quem clica chega na página?</h3>
-            {view.project && view.project.lpv.average !== null ? (
+            {lpv && lpv.average !== null ? (
               <>
                 <p className="mt-1 text-[11.5px] text-[var(--ct-text-3)]">
-                  Visualizações da página por clique no link, 7 dias. Média <span className={mono}>{Math.round(view.project.lpv.average * 100)}%</span>.
+                  Visualizações da página por clique no link, 7 dias. Média <span className={mono}>{Math.round(lpv.average * 100)}%</span>.{' '}
+                  {view.front ? `Só as campanhas da frente ${view.front.name}.` : 'Página sem frente: soma o projeto inteiro.'}
                 </p>
                 <ul className="mt-2 flex flex-col gap-1">
-                  {view.project.lpv.days.map((day) => (
+                  {lpv.days.map((day) => (
                     <li key={day.day} className="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-2 text-[11.5px]">
                       <span className={`${mono} text-[var(--ct-text-3)]`}>{`${day.day.slice(8, 10)}/${day.day.slice(5, 7)}`}</span>
                       <span className="h-2 rounded-full bg-[var(--ct-surface-3)]">
@@ -149,29 +184,63 @@ export function PageRow({
                     </li>
                   ))}
                 </ul>
-                {view.project.lpv.days.some((day) => day.dropped) && (
+                {lpv.days.some((day) => day.dropped) && (
                   <p className="mt-2 text-[11.5px] text-[var(--ct-crit)]">Dia marcado: muita gente clicou e não chegou. Página lenta ou fora em parte do dia?</p>
                 )}
               </>
             ) : (
               <p className="mt-2 text-[12.5px] text-[var(--ct-text-3)]">
-                {view.project ? 'Sem cliques no link nos últimos 7 dias.' : 'Ligue a página a um projeto para ver se quem clica chega.'}
+                {view.front
+                  ? `Sem cliques no link da frente ${view.front.name} nos últimos 7 dias.`
+                  : view.project
+                    ? 'Sem cliques no link nos últimos 7 dias.'
+                    : 'Ligue a página a um projeto para ver se quem clica chega.'}
               </p>
             )}
           </section>
 
           <section aria-labelledby={`historico-${page.id}`}>
-            <h3 id={`historico-${page.id}`} className="text-[13px] font-semibold">Projeto e histórico</h3>
+            <h3 id={`historico-${page.id}`} className="text-[13px] font-semibold">Frente e histórico</h3>
             <p className="mt-2 text-[12.5px] text-[var(--ct-text-2)]">
               {view.project ? (
                 <>
-                  <Link href={`${base}/funis-venda/${view.project.slug}`} className="text-[var(--ct-accent)]">{view.project.name}</Link> ·{' '}
-                  <span className={mono}>{currency(view.project.spendToday)}</span> gastos hoje
+                  {view.front ? (
+                    <>
+                      Frente <b className="font-medium text-[var(--ct-text)]">{view.front.name}</b> <span className={mono}>{view.front.code}</span> ·{' '}
+                      <span className={mono}>{currency(view.front.spendToday)}</span> hoje, do projeto{' '}
+                    </>
+                  ) : (
+                    'Sem frente · orgânico, no projeto '
+                  )}
+                  <Link href={`${base}/funis-venda/${view.project.slug}`} className="text-[var(--ct-accent)]">{view.project.name}</Link>
                 </>
               ) : (
                 'Sem projeto ligado.'
               )}
             </p>
+            {canEdit && view.project && view.project.fronts.length > 0 && (
+              <form action={movePage.bind(null, pageContext)} className="mt-2 flex flex-wrap items-end gap-2">
+                <input type="hidden" name="sales_funnel_id" value={view.project.id} />
+                <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-[11.5px] text-[var(--ct-text-3)]">
+                  Mudar de frente
+                  <select
+                    name="front_id"
+                    defaultValue={page.frontId ?? ''}
+                    className="min-h-11 rounded-[10px] border border-[var(--ct-line-2)] bg-[var(--ct-surface)] px-2.5 text-[12.5px] text-[var(--ct-text)]"
+                  >
+                    {view.project.fronts.map((front) => (
+                      <option key={front.id} value={front.id}>
+                        {front.name} ({front.code})
+                      </option>
+                    ))}
+                    <option value="">Sem frente (orgânico)</option>
+                  </select>
+                </label>
+                <button type="submit" className={button}>
+                  Mudar
+                </button>
+              </form>
+            )}
             <ul className="mt-2 flex flex-col gap-1 text-[12px]">
               {view.outages.slice(0, 5).map((outage) => (
                 <li key={outage.since} className="flex justify-between gap-3">
@@ -257,12 +326,16 @@ function Incident({
           </dd>
         </div>
         <div>
-          <dt className="text-[var(--ct-text-3)]">Gasto do projeto desde a queda</dt>
+          <dt className="text-[var(--ct-text-3)]">{view.front || !view.project ? 'Gasto da frente desde a queda' : 'Gasto do projeto desde a queda'}</dt>
           <dd className="mt-1 font-medium">
-            {view.costSinceDown !== null ? (
+            {view.costSinceDown !== null && view.spendRate !== null ? (
               <>
                 <span className={mono}>~{currency(view.costSinceDown)}</span>
-                <span className="block text-[11.5px] text-[var(--ct-text-2)]">estimado pelo ritmo de gasto de hoje</span>
+                <span className="block text-[11.5px] text-[var(--ct-text-2)]">
+                  {view.front
+                    ? `frente ${view.front.name}, ritmo de ${currency(view.spendRate)}/h`
+                    : `página sem frente: ritmo do projeto inteiro, ${currency(view.spendRate)}/h`}
+                </span>
               </>
             ) : (
               <span className="text-[var(--ct-text-2)]">sem projeto ligado</span>

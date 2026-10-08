@@ -18,14 +18,17 @@ import {
   checkFindings,
   isSilenced,
   lpvSignal,
+  frontsWithoutPage,
+  groupPagesByFront,
   outageCost,
   outages,
   pageStatus,
+  spendPerHour,
   suggestPages,
   testsPointingTo,
 } from '@/lib/domain/page-probe'
 import { checkPagesNow } from './actions'
-import { PageRow, type PageView } from './page-row'
+import { PageRow, type PageView, type ProjectInfo } from './page-row'
 import { currency, durationLabel, mono, when } from './format'
 
 type Filter = 'todas' | 'problema' | 'sem_trafego'
@@ -53,7 +56,7 @@ export default async function PaginasPage({
   const [pages, canEdit, funnelsResult, destinations] = await Promise.all([
     getPagesWithChecks(supabase, client.id, { sinceDays: 7 }),
     canActAs(supabase, client.id, 'gestor'),
-    supabase.from('sales_funnels').select('id, slug, name').eq('client_id', client.id),
+    supabase.from('sales_funnels').select('id, slug, name').eq('client_id', client.id).order('name'),
     // Suggestions are a convenience: a failed read only hides them.
     getAbDestinations(supabase, client.id).catch((error) => {
       console.error('[pages-ab-destinations-failed]', { clientId: client.id }, error)
@@ -67,30 +70,80 @@ export default async function PaginasPage({
   const today = saoPauloDay(0, now)
   const lastThreeDays = saoPauloDay(-(NO_TRAFFIC_DAYS - 1), now)
   const hoursIntoDay = (now.getTime() - new Date(brtDayBoundaryUtc(today)).getTime()) / 3_600_000
-  const linkedIds = [...new Set(pages.flatMap((page) => (page.salesFunnelId ? [page.salesFunnelId] : [])))]
-  const dailies = await Promise.all(linkedIds.map((id) => getDailyFunnel(supabase, id, saoPauloDay(-7, now), saoPauloDay(1, now))))
-  const projectById = new Map(
-    linkedIds.map((id, index) => {
-      const funnel = funnels.find((item) => item.id === id)
-      const days = dailies[index]
-      return [
-        id,
-        {
-          id,
-          name: funnel?.name ?? 'Projeto',
-          slug: funnel?.slug ?? '',
-          spendToday: days.find((day) => day.data === today)?.spendComImposto ?? 0,
-          spendRecent: days.filter((day) => day.data >= lastThreeDays).reduce((sum, day) => sum + day.spendComImposto, 0),
-          // Closed days only: today's views lag behind its clicks.
-          lpv: lpvSignal(days.filter((day) => day.data < today).map((day) => ({ day: day.data, linkClicks: day.linkClicks, landingPageViews: day.landingPageViews }))),
-        },
-      ]
-    })
-  )
+  const since = saoPauloDay(-7, now)
+  const until = saoPauloDay(1, now)
+  // Mirror fronts only read another project: no ad of their own sends anyone to a page.
+  const { data: frontRows, error: frontsError } = funnels.length
+    ? await supabase
+        .from('project_fronts')
+        .select('id, sales_funnel_id, code, name')
+        .in('sales_funnel_id', funnels.map((funnel) => funnel.id))
+        .is('source_sales_funnel_id', null)
+        .order('position')
+    : { data: [], error: null }
+  if (frontsError) throw frontsError
+  const ownFronts = (frontRows ?? []) as { id: string; sales_funnel_id: string; code: string; name: string }[]
+  // Projects with a page, plus projects with fronts: a front can be spending with no page at all.
+  const projectIds = funnels
+    .map((funnel) => funnel.id)
+    .filter((id) => pages.some((page) => page.salesFunnelId === id) || ownFronts.some((front) => front.sales_funnel_id === id))
+  const [dailies, frontDailies] = await Promise.all([
+    Promise.all(projectIds.map((id) => getDailyFunnel(supabase, id, since, until))),
+    Promise.all(
+      projectIds.map(async (id) => {
+        if (!ownFronts.some((front) => front.sales_funnel_id === id)) return []
+        const { data, error } = await supabase.rpc('get_project_front_daily', { p_sales_funnel_id: id, p_since: since, p_until: until })
+        if (error) throw error
+        return (data ?? []) as { front_id: string; data: string; spend: number; link_clicks: number; landing_page_views: number }[]
+      })
+    ),
+  ])
+  const projects: ProjectInfo[] = projectIds.map((id, index) => {
+    const funnel = funnels.find((item) => item.id === id)
+    const days = dailies[index]
+    // Closed days only: today's views lag behind its clicks.
+    const closed = days.filter((day) => day.data < today)
+    // A front has only its media: it goes "with tax" by the same day's factor the project uses.
+    const factor = (day: string) => {
+      const row = days.find((item) => item.data === day)
+      return row && row.spend > 0 ? row.spendComImposto / row.spend : 1
+    }
+    const fronts = ownFronts
+      .filter((front) => front.sales_funnel_id === id)
+      .map((front) => {
+        const rows = frontDailies[index].filter((row) => row.front_id === front.id)
+        const sum = (ofDay: typeof rows, key: 'spend' | 'link_clicks' | 'landing_page_views') => ofDay.reduce((total, row) => total + Number(row[key]), 0)
+        return {
+          id: front.id,
+          code: front.code,
+          name: front.name,
+          spendToday: sum(rows.filter((row) => row.data === today), 'spend') * factor(today),
+          spendRecent: sum(rows.filter((row) => row.data >= lastThreeDays), 'spend'),
+          lpv: lpvSignal(
+            closed.map((day) => {
+              const ofDay = rows.filter((row) => row.data === day.data)
+              return { day: day.data, linkClicks: sum(ofDay, 'link_clicks'), landingPageViews: sum(ofDay, 'landing_page_views') }
+            })
+          ),
+        }
+      })
+    return {
+      id,
+      name: funnel?.name ?? 'Projeto',
+      slug: funnel?.slug ?? '',
+      spendToday: days.find((day) => day.data === today)?.spendComImposto ?? 0,
+      spendRecent: days.filter((day) => day.data >= lastThreeDays).reduce((total, day) => total + day.spendComImposto, 0),
+      lpv: lpvSignal(closed.map((day) => ({ day: day.data, linkClicks: day.linkClicks, landingPageViews: day.landingPageViews }))),
+      fronts,
+    }
+  })
+  const projectById = new Map(projects.map((project) => [project.id, project]))
 
   const views: PageView[] = pages.map((page) => {
     const project = page.salesFunnelId ? (projectById.get(page.salesFunnelId) ?? null) : null
-    const status = page.isActive ? pageStatus(page.checks, page.watch, now, project ? project.spendRecent : null) : 'sem_check'
+    const front = project?.fronts.find((item) => item.id === page.frontId) ?? null
+    const rateSource = front ?? project
+    const status = page.isActive ? pageStatus(page.checks, page.watch, now, rateSource ? rateSource.spendRecent : null) : 'sem_check'
     const pageOutages = outages(page.checks)
     const current = status === 'critico' ? (pageOutages.find((outage) => outage.until === null) ?? null) : null
     return {
@@ -99,9 +152,11 @@ export default async function PaginasPage({
       silenced: isSilenced(page.silencedUntil, now),
       findings: page.checks[0] ? checkFindings(page.checks[0], page.watch, now) : [],
       project,
+      front,
       outages: pageOutages,
       currentOutage: current,
-      costSinceDown: current && project ? outageCost(project.spendToday, hoursIntoDay, new Date(current.since), now) : null,
+      costSinceDown: current && rateSource ? outageCost(rateSource.spendToday, hoursIntoDay, new Date(current.since), now) : null,
+      spendRate: rateSource ? spendPerHour(rateSource.spendToday, hoursIntoDay) : null,
       affectedTests: testsPointingTo(destinations, page.url),
     }
   })
@@ -109,6 +164,13 @@ export default async function PaginasPage({
   const problem = (view: PageView) => view.status === 'critico' || view.status === 'atencao'
   const shown = views.filter((view) => (filter === 'problema' ? problem(view) : filter === 'sem_trafego' ? view.status === 'sem_trafego' : true))
   const count = (status: PageView['status']) => activeViews.filter((view) => view.status === status).length
+  // The "frente sem página" warning reads every page; under a filter only the matching pages show.
+  const unwatched = frontsWithoutPage(projects.flatMap((project) => project.fronts), pages)
+  const groups = groupPagesByFront(
+    shown.map((view) => ({ view, salesFunnelId: view.page.salesFunnelId, frontId: view.page.frontId })),
+    projects.map((project) => ({ id: project.id, frontIds: project.fronts.map((front) => front.id) })),
+    filter === 'todas' ? unwatched : new Set<string>()
+  )
 
   const allChecks = activeViews.flatMap((view) => view.page.checks)
   const uptime = availability(allChecks)
@@ -210,18 +272,79 @@ export default async function PaginasPage({
           </span>
         </div>
 
-        <div className="card-shadow rounded-[18px] border border-[var(--ct-line)]">
-          {pages.length === 0 && (
-            <p className="px-6 py-5 text-[13.5px] text-[var(--ct-text-2)]">
-              Nenhuma página na sonda ainda.{' '}
-              {canEdit && <Link href={`${base}/paginas/nova`} className="text-[var(--ct-accent)]">Adicione a primeira</Link>}
-            </p>
-          )}
-          {pages.length > 0 && shown.length === 0 && <p className="px-6 py-5 text-[13.5px] text-[var(--ct-text-2)]">Nenhuma página neste filtro.</p>}
-          {shown.map((view) => (
-            <PageRow key={view.page.id} view={view} base={base} context={context} canEdit={canEdit} now={now} />
-          ))}
-        </div>
+        {(pages.length === 0 || shown.length === 0) && (
+          <div className="card-shadow rounded-[18px] border border-[var(--ct-line)]">
+            {pages.length === 0 ? (
+              <p className="px-6 py-5 text-[13.5px] text-[var(--ct-text-2)]">
+                Nenhuma página na sonda ainda.{' '}
+                {canEdit && <Link href={`${base}/paginas/nova`} className="text-[var(--ct-accent)]">Adicione a primeira</Link>}
+              </p>
+            ) : (
+              <p className="px-6 py-5 text-[13.5px] text-[var(--ct-text-2)]">Nenhuma página neste filtro.</p>
+            )}
+          </div>
+        )}
+        {groups.map((group) => {
+          const project = group.projectId ? (projectById.get(group.projectId) ?? null) : null
+          const headingId = `projeto-${group.projectId ?? 'nenhum'}`
+          return (
+            <section key={headingId} aria-labelledby={headingId} className="card-shadow rounded-[18px] border border-[var(--ct-line)]">
+              <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-[var(--ct-line)] px-6 py-4">
+                <h2 id={headingId} className="text-[14px] font-semibold">
+                  {project ? (
+                    <Link href={`${base}/funis-venda/${project.slug}`} className="hover:text-[var(--ct-accent)]">
+                      {project.name}
+                    </Link>
+                  ) : (
+                    'Sem projeto'
+                  )}
+                </h2>
+                {project && (
+                  <span className="text-[12px] text-[var(--ct-text-3)]">
+                    {project.fronts.length} {project.fronts.length === 1 ? 'frente' : 'frentes'} · <span className={mono}>{currency(project.spendToday)}</span> hoje
+                  </span>
+                )}
+              </header>
+              {group.fronts.map((front) => {
+                const info = front.frontId ? (project?.fronts.find((item) => item.id === front.frontId) ?? null) : null
+                return (
+                  <div key={front.frontId ?? 'organico'} className="border-b border-[var(--ct-line)] last:border-b-0">
+                    {project && (
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-6 py-2.5 text-[12.5px]">
+                        <h3 className="font-semibold">{info ? info.name : 'Sem frente · orgânico'}</h3>
+                        {info && <span className={`${mono} text-[var(--ct-text-3)]`}>{info.code}</span>}
+                        {info && (
+                          <span className="text-[var(--ct-text-3)]">
+                            · <span className={mono}>{currency(info.spendToday)}</span> hoje
+                          </span>
+                        )}
+                        {front.unwatched && (
+                          <span className="rounded-full bg-[var(--ct-warn-soft)] px-2.5 py-0.5 text-[11.5px] font-semibold text-[var(--ct-warn)]">Frente sem página vigiada</span>
+                        )}
+                      </div>
+                    )}
+                    {front.pages.map(({ view }) => (
+                      <PageRow key={view.page.id} view={view} base={base} context={context} canEdit={canEdit} now={now} />
+                    ))}
+                    {front.unwatched && front.pages.length === 0 && (
+                      <p className="flex flex-wrap items-center gap-x-3 px-6 py-3 text-[12.5px] text-[var(--ct-text-2)]">
+                        Gastou nos últimos {NO_TRAFFIC_DAYS} dias e nenhuma página desta frente está na sonda.
+                        {canEdit && project && info && (
+                          <Link
+                            href={`${base}/paginas/nova?projeto=${project.id}&frente=${info.id}`}
+                            className="inline-flex min-h-11 items-center text-[var(--ct-accent)]"
+                          >
+                            Adicionar página desta frente
+                          </Link>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </section>
+          )
+        })}
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-[var(--ct-text-3)]">
           <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[var(--ct-ok)]" /> checagem ok</span>
           <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[var(--ct-warn)]" /> abriu com aviso</span>
@@ -232,8 +355,8 @@ export default async function PaginasPage({
       <footer className="rounded-[14px] border border-[var(--ct-line)] px-5 py-4 text-[12px] leading-relaxed text-[var(--ct-text-3)]">
         <b className="font-semibold text-[var(--ct-text-2)]">Como a sonda decide.</b> Fora do ar: não abriu em 2 checagens seguidas, ou a cadeia de redirecionamentos termina
         em erro. Atenção: servidor acima de {PAGE_SLOW_MS / 1000}s, certificado vencendo em menos de {CERT_WARN_DAYS} dias, ou pixel, botão de compra ou texto vigiado
-        ausentes. Sem tráfego: o projeto ligado não gastou nos últimos {NO_TRAFFIC_DAYS} dias. Quem clica chega: dia com visualizações por clique {LPV_DROP * 100}% abaixo da
-        média de 7 dias fica marcado. Página silenciada continua sendo checada, mas não avisa.
+        ausentes. Sem tráfego: a frente da página (ou o projeto, se ela não tem frente) não gastou nos últimos {NO_TRAFFIC_DAYS} dias. Quem clica chega: dia com visualizações por clique {LPV_DROP * 100}% abaixo da
+        média de 7 dias fica marcado. Frente sem página vigiada: gastou nos últimos {NO_TRAFFIC_DAYS} dias e nenhuma página ativa dela está na sonda. Página silenciada continua sendo checada, mas não avisa.
       </footer>
     </div>
   )
