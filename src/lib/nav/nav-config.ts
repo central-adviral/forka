@@ -120,7 +120,7 @@ export const NAV_SECTIONS: SectionDef[] = [
     subs: [
       { id: 'quadro', label: 'Quadro', desc: 'Fila, pronto, rodando, decidido', exists: true, needsProject: true, href: (c) => `${c.base}/backlog?projeto=${c.project}` },
       { id: 'ab', label: 'A/B de link', desc: 'Página contra página', exists: true, href: (c) => `${c.base}/tests` },
-      { id: 'aprendizados', label: 'Aprendizados', desc: 'O que já sabemos', exists: false, href: (c) => `${c.base}/backlog` },
+      { id: 'aprendizados', label: 'Aprendizados', desc: 'O que testamos e aprendemos', exists: true, href: (c) => `${c.base}/aprendizados` },
       { id: 'regras-jogo', label: 'Regras do jogo', desc: 'Quando cortar e quando vencer', exists: true, needsProject: true, minRole: 'gestor', href: (c) => `${c.base}/backlog?projeto=${c.project}&aba=regras` },
     ],
   },
@@ -180,6 +180,8 @@ export function resolveActive(pathname: string, search: string, hash: string, cl
       return { section: 'testes', sub: aba === 'regras' ? 'regras-jogo' : 'quadro' }
     case 'tests':
       return { section: 'testes', sub: rest.length === 1 ? 'ab' : null }
+    case 'aprendizados':
+      return { section: 'testes', sub: 'aprendizados' }
     case 'metas':
       return { section: 'projeto', sub: 'metas' }
     case 'integrations':
