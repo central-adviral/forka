@@ -44,6 +44,7 @@ vi.mock('@/lib/launchops/sync-campaigns', () => ({
 }))
 
 import { GET } from './route'
+import { GET as syncClientGET } from '../sync-client/route'
 import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
 import { createLaunchOpsClient } from '@/lib/launchops/client'
 import { syncCampaignsForClient } from '@/lib/launchops/sync-campaigns'
@@ -57,7 +58,13 @@ import {
 describe('GET /api/internal/sync-funnel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // The cron fans out over HTTP to /api/internal/sync-client; here each call goes straight to that route.
+    vi.stubGlobal('fetch', (url: URL, init?: RequestInit) => syncClientGET(new NextRequest(url, init as ConstructorParameters<typeof NextRequest>[1])))
     process.env.CRON_SECRET = 'test-secret'
+    vi.mocked(getClientSecrets).mockImplementation(async (_db: unknown, clientId: string) => ({
+      funnelSourceServiceRoleKey: secretsByClientId[clientId] ?? null,
+      hublaWebhookToken: null,
+    }))
     listMock.mockReturnValue([])
     for (const key of Object.keys(secretsByClientId)) delete secretsByClientId[key]
   })
@@ -101,7 +108,7 @@ describe('GET /api/internal/sync-funnel', () => {
     })
     const response = await GET(request)
     const body = await response.json()
-    expect(body).toEqual({ ok: true, funnelsProcessed: 0, funnelsFailed: 0, clientsWithCampaigns: 0 })
+    expect(body).toEqual({ ok: true, funnelsProcessed: 0, funnelsFailed: 0, clientsWithCampaigns: 0, clientsFailed: 0 })
   })
 
   it('syncs the client campaigns before the funnel, since the creative spend picks its ads from them', async () => {
@@ -190,13 +197,16 @@ describe('GET /api/internal/sync-funnel', () => {
       { id: 'funnel-b', client_id: 'client-b', launchops_operacao_ids: null, launchops_produto_nomes: null, clients: { funnel_source_url: 'https://client-b.example.com' } },
     ])
     secretsByClientId['client-b'] = 'key-b'
-    vi.mocked(getClientSecrets).mockRejectedValueOnce(new Error('vault unavailable'))
+    vi.mocked(getClientSecrets).mockImplementation(async (_db: unknown, clientId: string) => {
+      if (clientId === 'client-a') throw new Error('vault unavailable')
+      return { funnelSourceServiceRoleKey: secretsByClientId[clientId] ?? null, hublaWebhookToken: null }
+    })
     const request = new NextRequest('https://app.example.com/api/internal/sync-funnel', {
       headers: { authorization: 'Bearer test-secret' },
     })
     const body = await (await GET(request)).json()
 
-    expect(body).toEqual({ ok: true, funnelsProcessed: 1, funnelsFailed: 1, clientsWithCampaigns: 1 })
+    expect(body).toEqual({ ok: true, funnelsProcessed: 1, funnelsFailed: 1, clientsWithCampaigns: 1, clientsFailed: 0 })
     expect(syncCampaignsForClient).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'client-b')
   })
 
@@ -225,12 +235,39 @@ describe('GET /api/internal/sync-funnel', () => {
     const response = await GET(request)
     const body = await response.json()
 
-    expect(body).toEqual({ ok: true, funnelsProcessed: 2, funnelsFailed: 0, clientsWithCampaigns: 2 })
+    expect(body).toEqual({ ok: true, funnelsProcessed: 2, funnelsFailed: 0, clientsWithCampaigns: 2, clientsFailed: 0 })
     // Campaigns are read once per client, with that client's own LaunchOps connection.
     expect(syncCampaignsForClient).toHaveBeenCalledTimes(2)
     expect(syncCampaignsForClient).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'client-a')
     expect(syncCampaignsForClient).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'client-b')
     expect(createLaunchOpsClient).toHaveBeenNthCalledWith(1, { url: 'https://client-a.example.com', serviceRoleKey: 'key-a' })
     expect(createLaunchOpsClient).toHaveBeenNthCalledWith(2, { url: 'https://client-b.example.com', serviceRoleKey: 'key-b' })
+  })
+
+  it('counts a client whose own sync invocation fails, and still answers for the others', async () => {
+    listMock.mockReturnValue([
+      { id: 'funnel-a', client_id: 'client-a', launchops_operacao_ids: null, launchops_produto_nomes: null, clients: { funnel_source_url: 'https://client-a.example.com' } },
+      { id: 'funnel-b', client_id: 'client-b', launchops_operacao_ids: null, launchops_produto_nomes: null, clients: { funnel_source_url: 'https://client-b.example.com' } },
+    ])
+    secretsByClientId['client-a'] = 'key-a'
+    secretsByClientId['client-b'] = 'key-b'
+    vi.stubGlobal('fetch', async (url: URL, init?: RequestInit) =>
+      url.searchParams.get('client') === 'client-a'
+        ? new Response('timeout', { status: 504 })
+        : syncClientGET(new NextRequest(url, init as ConstructorParameters<typeof NextRequest>[1]))
+    )
+    const request = new NextRequest('https://app.example.com/api/internal/sync-funnel', {
+      headers: { authorization: 'Bearer test-secret' },
+    })
+    const body = await (await GET(request)).json()
+
+    expect(body).toEqual({ ok: true, funnelsProcessed: 1, funnelsFailed: 0, clientsWithCampaigns: 1, clientsFailed: 1 })
+  })
+
+  it('refuses a per-client sync without a client', async () => {
+    const request = new NextRequest('https://app.example.com/api/internal/sync-client', {
+      headers: { authorization: 'Bearer test-secret' },
+    })
+    expect((await syncClientGET(request)).status).toBe(400)
   })
 })
