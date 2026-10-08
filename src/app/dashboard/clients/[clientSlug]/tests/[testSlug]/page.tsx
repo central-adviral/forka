@@ -105,7 +105,7 @@ export default async function TestReportPage({
   const supabase = await createServerSupabaseClient()
   const { data: test, error: testError } = await supabase
     .from('tests')
-    .select('id, name, slug, status, archived_at, sales_funnel_id, conversion_method, fallback_url, test_type, client_id, created_at, clients(custom_domain, domain_status)')
+    .select('id, name, slug, status, archived_at, sales_funnel_id, conversion_method, receita_liquida, fallback_url, test_type, client_id, created_at, clients(custom_domain, domain_status)')
     .eq('slug', testSlug)
     .maybeSingle()
 
@@ -608,6 +608,13 @@ export default async function TestReportPage({
           <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[var(--ct-text-2)]">
             Faturamento por {assetLabel.toLowerCase()}
           </h3>
+          {test.conversion_method === 'hubla_webhook' && (
+            <p className="-mt-3 mb-4 text-[11px] text-[var(--ct-text-3)]">
+              {test.receita_liquida
+                ? 'Receita líquida, só venda de entrada, gasto com imposto (como o resto do Central). Fica líquida quando o LaunchOps sincroniza a venda.'
+                : 'Receita bruta da fatura (regra antiga deste teste)'}
+            </p>
+          )}
           <MiniBarChart
             data={rows.map((row) => ({
               label: row.variant_name,
