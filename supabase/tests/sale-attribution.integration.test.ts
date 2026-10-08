@@ -56,16 +56,15 @@ describe('sale attribution: ad, then product, then no project (0073)', () => {
       'no-utm': [null, 'sem_atribuicao'],
     })
 
-    // The capture project stops selling 1K: every 1K sale now has a single candidate.
+    // The capture project stops selling 1K, and then nobody does: from now on (0101), so past sales stay where they are.
+    const before = await owners()
     await admin.from('project_products').delete().eq('sales_funnel_id', captacao).eq('produto_nome', '1K')
-    expect(await owners()).toMatchObject({ 'by-ad-cap': [perpetuo, 'produto'], 'no-utm': [perpetuo, 'produto'] })
-
-    // Nobody sells 1K any more: its sales stay, without a project.
     await admin.from('project_products').delete().eq('sales_funnel_id', perpetuo).eq('produto_nome', '1K')
     const after = await owners()
-    expect(Object.keys(after)).toHaveLength(4)
-    expect(after['no-utm']).toEqual([null, 'sem_atribuicao'])
-    expect(after.bump).toEqual([perpetuo, 'produto'])
+    expect(after).toEqual(before)
+    // A resync of a past sale decides it with the products of its date, so it lands where it was.
+    await admin.from('sales').update({ produto: '1K' }).eq('client_id', clientId).eq('external_id', 'by-ad-cap')
+    expect((await owners())['by-ad-cap']).toEqual([captacao, 'anuncio'])
 
     // The same sale synced again is still one row for the client.
     const { error: again } = await admin.from('sales').upsert(sale('bump', 'Bump', null), { onConflict: 'client_id,source,external_id' })

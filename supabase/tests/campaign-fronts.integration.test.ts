@@ -102,26 +102,29 @@ describe('campaign fronts and naming rules (0053)', () => {
       .select()
       .single()
     await owner.db.from('naming_rules').insert({ front_id: front!.id, kind: 'include', value: 'mtv-t15' })
-    const conflict = (await campaigns(owner.db)).get('ger-1')!
+    // ger-1 already spent under GRA-GER and keeps it (0101); a campaign new to the client is disputed.
+    expect((await campaigns(owner.db)).get('ger-1')!.assignment).toBe('auto')
+    await admin.from('campaign_daily').insert({ client_id: clientId, data: today, campaign_id: 'ger-2', campaign_name: '08 - [MTV-T15][GER] - Nova', spend: 5 })
+    const conflict = (await campaigns(owner.db)).get('ger-2')!
     expect(conflict.front_ids).toEqual([])
     expect(conflict.suggested_front_ids).toHaveLength(2)
 
     const { error } = await owner.db
       .from('campaign_fronts')
-      .insert({ client_id: clientId, campaign_id: 'ger-1', front_id: front!.id, source: 'manual' })
+      .insert({ client_id: clientId, campaign_id: 'ger-2', front_id: front!.id, source: 'manual' })
     expect(error).toBeNull()
-    const pinned = (await campaigns(owner.db)).get('ger-1')!
+    const pinned = (await campaigns(owner.db)).get('ger-2')!
     expect(pinned.front_ids).toEqual([front!.id])
     expect(pinned.assignment).toBe('manual')
 
     await owner.db.from('project_fronts').delete().eq('id', front!.id)
-    expect((await campaigns(owner.db)).get('ger-1')!.assignment).toBe('nome')
+    expect((await campaigns(owner.db)).get('ger-2')!.assignment).toBe('nome')
+    await admin.from('campaign_daily').delete().eq('client_id', clientId).eq('campaign_id', 'ger-2')
   })
 
-  it('keeps the frozen owner when the campaign is renamed, and releases it when the rules change (0054)', async () => {
-    const { data: frozen, error } = await admin.rpc('freeze_campaign_fronts', { p_client_id: clientId })
+  it('keeps the frozen owner when the campaign is renamed or the rules change (0054, 0101)', async () => {
+    const { error } = await admin.rpc('freeze_campaign_fronts', { p_client_id: clientId })
     expect(error).toBeNull()
-    expect(Number(frozen)).toBeGreaterThan(0)
     const before = (await campaigns(owner.db)).get('ger-1')!
     expect(before.assignment).toBe('auto')
 
@@ -138,11 +141,11 @@ describe('campaign fronts and naming rules (0053)', () => {
     // A rule that cannot touch this campaign leaves its owner alone (0090).
     await owner.db.from('naming_rules').insert({ front_id: preFront!.id, kind: 'exclude', value: 'renomeada-nunca' })
     expect((await campaigns(owner.db)).get('ger-1')!.assignment).toBe('auto')
-    // A rule whose text is in its name releases it, to be decided again by the rules.
+    // A rule whose text is in its name applies from now on: the campaign already had spend, so it keeps its owner.
     await owner.db.from('naming_rules').insert({ front_id: preFront!.id, kind: 'include', value: 'renomeada' })
-    const released = (await campaigns(owner.db)).get('ger-1')!
-    expect(released.assignment).toBe('nome')
-    expect(released.front_ids).toEqual([preFront!.id])
+    const kept = (await campaigns(owner.db)).get('ger-1')!
+    expect(kept.assignment).toBe('auto')
+    expect(kept.front_ids).toEqual(before.front_ids)
 
     await admin
       .from('campaign_daily')

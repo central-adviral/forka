@@ -18,7 +18,7 @@ async function projectWithFront(clientId: string, slug: string, resultado: 'comp
 }
 
 describe('0090: números que batem', () => {
-  it('releases only the campaigns a naming rule can touch', async () => {
+  it('a naming rule change releases no campaign that already has an owner (0101)', async () => {
     const clientId = await newClient()
     const ger = await projectWithFront(clientId, 'ger')
     const vnd = await projectWithFront(clientId, 'vnd')
@@ -34,8 +34,8 @@ describe('0090: números que batem', () => {
     await admin.from('naming_rules').insert({ front_id: ger.frontId, kind: 'include', value: '[ger]' })
 
     const { data: owners } = await admin.from('campaign_fronts').select('campaign_id').eq('client_id', clientId).order('campaign_id')
-    // The [GER] campaign is released to be decided again; the [VND] one, out of the rule's reach, keeps its owner.
-    expect(owners).toEqual([{ campaign_id: 'c-vnd' }])
+    // The rule applies from now on: both campaigns had spend before it and keep their owners.
+    expect(owners).toEqual([{ campaign_id: 'c-ger' }, { campaign_id: 'c-vnd' }])
   })
 
   it('gives a pending sale its project once its ad is known, and the newest ad day wins a tie', async () => {
