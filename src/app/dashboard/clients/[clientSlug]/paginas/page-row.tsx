@@ -3,7 +3,9 @@ import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { CopyButton } from '@/components/copy-button'
 import { checkFindings, seconds, type Finding, type LpvDay, type Outage, type PageCheck, type PageStatus } from '@/lib/domain/page-probe'
 import type { ProbedPage } from '@/lib/repo/pages-repo'
-import { checkPageNow, movePage, removePage, setPageActive, silencePage } from './actions'
+import { linkLabel, type LinkOptionGroup, type LinkProject } from '@/lib/domain/page-links'
+import { checkPageNow, removePage, setPageActive, silencePage } from './actions'
+import { PageLinkSelect } from './link-controls'
 import { currency, durationLabel, mono, timeOnly, when } from './format'
 
 interface Lpv {
@@ -72,12 +74,16 @@ export function PageRow({
   context,
   canEdit,
   now,
+  linkGroups,
+  linkProjects,
 }: {
   view: PageView
   base: string
   context: { client_id: string; client_slug: string }
   canEdit: boolean
   now: Date
+  linkGroups: LinkOptionGroup[]
+  linkProjects: LinkProject[]
 }) {
   const { page, status, findings } = view
   const last = page.checks[0]
@@ -88,202 +94,190 @@ export function PageRow({
   const pill = page.isActive ? STATUS[status] : { label: 'pausada', tone: 'bg-[var(--ct-surface-3)] text-[var(--ct-text-2)]' }
 
   return (
-    <details id={`pagina-${page.id}`} open={status === 'critico' && page.isActive} className="group scroll-mt-6 border-b border-[var(--ct-line)] last:border-b-0">
-      <summary className={`grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-3 px-6 py-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto_auto] ${page.isActive ? '' : 'opacity-60'}`}>
-        <div className="min-w-0">
-          <strong className="block text-[13.5px] font-semibold">{page.label}</strong>
-          <span className="block truncate text-xs text-[var(--ct-text-3)]">{page.url}</span>
-          <span className="mt-0.5 block text-[11.5px] text-[var(--ct-text-3)]">
-            {view.front ? (
-              <>
-                frente {view.front.name} · <span className={mono}>{currency(view.front.spendToday)}</span> hoje
-              </>
-            ) : view.project ? (
-              <>
-                sem frente · projeto <span className={mono}>{currency(view.project.spendToday)}</span> hoje
-              </>
-            ) : (
-              'sem projeto ligado'
-            )}
-          </span>
-        </div>
-        <div className="order-last col-span-2 flex items-center gap-[3px] md:order-none md:col-span-1" aria-label={`Últimas ${strip.length} checagens, da mais antiga para a mais nova: ${strip.filter((check) => !check.ok).length} falharam`}>
-          {strip.map((check) => (
-            <span
-              key={check.checkedAt}
-              title={`${when(check.checkedAt)} · ${check.ok ? (check.ttfbMs !== null ? seconds(check.ttfbMs) : 'ok') : (check.error ?? 'falhou')}`}
-              className="h-4 w-1.5 rounded-sm"
-              style={{ background: checkTone(check, page, now) }}
-            />
-          ))}
-          {strip.length === 0 && <span className="text-xs text-[var(--ct-text-3)]">sem checagens</span>}
-        </div>
-        <div className="hidden text-right text-[11px] text-[var(--ct-text-3)] md:block">
-          <b className={`${mono} block text-[14px] font-medium text-[var(--ct-text)]`}>{last?.ok && last.ttfbMs !== null ? seconds(last.ttfbMs) : '—'}</b>
-          servidor
-        </div>
-        <div className="hidden text-right text-[11px] text-[var(--ct-text-3)] md:block">
-          <b className={`${mono} block text-[14px] font-medium text-[var(--ct-text)]`}>{findings.length > 0 ? `${passing}/${findings.length}` : '—'}</b>
-          conferências ok
-        </div>
-        <span className="flex flex-col items-end gap-1">
-          <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${pill.tone}`}>{pill.label}</span>
-          {view.silenced && page.silencedUntil && <span className="text-[11px] text-[var(--ct-text-3)]">silenciada até {timeOnly(page.silencedUntil)}</span>}
-        </span>
-      </summary>
-
-      <div className="flex flex-col gap-5 border-t border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-6 py-5">
-        {status === 'critico' && page.isActive && view.currentOutage && <Incident view={view} now={now} canEdit={canEdit} pageContext={pageContext} />}
-
-        <div className="grid gap-5 md:grid-cols-3">
-          <section aria-labelledby={`confere-${page.id}`}>
-            <h3 id={`confere-${page.id}`} className="text-[13px] font-semibold">O que a sonda confere</h3>
-            <ul className="mt-2 flex flex-col gap-1.5 text-[12.5px]">
-              {findings.map((finding) => (
-                <li key={finding.id} className="flex items-start gap-2">
-                  <span className={`mt-0.5 rounded-full px-1.5 text-[10.5px] font-semibold ${finding.ok ? 'bg-[var(--ct-ok-soft)] text-[var(--ct-ok)]' : 'bg-[var(--ct-warn-soft)] text-[var(--ct-warn)]'}`}>
-                    {finding.ok ? 'ok' : 'atenção'}
-                  </span>
-                  <span>
-                    <b className="font-medium">{finding.label}</b> <span className="text-[var(--ct-text-2)]">{finding.detail}</span>
-                  </span>
-                </li>
-              ))}
-              {findings.length === 0 && <li className="text-[var(--ct-text-3)]">Ainda não checada.</li>}
-            </ul>
-            {(!page.watch.watchPixel || !page.watch.watchCheckout || !page.watch.requiredText) && (
-              <p className="mt-2 text-[11.5px] text-[var(--ct-text-3)]">
-                Não vigiado:{' '}
-                {[!page.watch.watchPixel && 'pixel', !page.watch.watchCheckout && 'botão de compra', !page.watch.requiredText && 'texto obrigatório'].filter(Boolean).join(', ')}.
-              </p>
-            )}
-          </section>
-
-          <section aria-labelledby={`chega-${page.id}`}>
-            <h3 id={`chega-${page.id}`} className="text-[13px] font-semibold">Quem clica chega na página?</h3>
-            {lpv && lpv.average !== null ? (
-              <>
-                <p className="mt-1 text-[11.5px] text-[var(--ct-text-3)]">
-                  Visualizações da página por clique no link, 7 dias. Média <span className={mono}>{Math.round(lpv.average * 100)}%</span>.{' '}
-                  {view.front ? `Só as campanhas da frente ${view.front.name}.` : 'Página sem frente: soma o projeto inteiro.'}
-                </p>
-                <ul className="mt-2 flex flex-col gap-1">
-                  {lpv.days.map((day) => (
-                    <li key={day.day} className="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-2 text-[11.5px]">
-                      <span className={`${mono} text-[var(--ct-text-3)]`}>{`${day.day.slice(8, 10)}/${day.day.slice(5, 7)}`}</span>
-                      <span className="h-2 rounded-full bg-[var(--ct-surface-3)]">
-                        <span
-                          className="block h-2 rounded-full"
-                          style={{ width: `${Math.min(100, Math.round((day.rate ?? 0) * 100))}%`, background: day.dropped ? 'var(--ct-crit)' : 'var(--ct-an)' }}
-                        />
-                      </span>
-                      <span className={`${mono} text-right ${day.dropped ? 'text-[var(--ct-crit)]' : ''}`}>
-                        {day.rate === null ? '—' : `${Math.round(day.rate * 100)}%`}
-                        {day.dropped && <span className="sr-only"> (queda)</span>}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                {lpv.days.some((day) => day.dropped) && (
-                  <p className="mt-2 text-[11.5px] text-[var(--ct-crit)]">Dia marcado: muita gente clicou e não chegou. Página lenta ou fora em parte do dia?</p>
-                )}
-              </>
-            ) : (
-              <p className="mt-2 text-[12.5px] text-[var(--ct-text-3)]">
-                {view.front
-                  ? `Sem cliques no link da frente ${view.front.name} nos últimos 7 dias.`
-                  : view.project
-                    ? 'Sem cliques no link nos últimos 7 dias.'
-                    : 'Ligue a página a um projeto para ver se quem clica chega.'}
-              </p>
-            )}
-          </section>
-
-          <section aria-labelledby={`historico-${page.id}`}>
-            <h3 id={`historico-${page.id}`} className="text-[13px] font-semibold">Frente e histórico</h3>
-            <p className="mt-2 text-[12.5px] text-[var(--ct-text-2)]">
-              {view.project ? (
+    <div className="border-b border-[var(--ct-line)] last:border-b-0">
+      <details id={`pagina-${page.id}`} open={status === 'critico' && page.isActive} className="group scroll-mt-6">
+        <summary className={`grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-x-5 gap-y-3 px-6 py-4 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto_auto] ${page.isActive ? '' : 'opacity-60'}`}>
+          <div className="min-w-0">
+            <strong className="block text-[13.5px] font-semibold">{page.label}</strong>
+            <span className="block truncate text-xs text-[var(--ct-text-3)]">{page.url}</span>
+            <span className="mt-0.5 block text-[11.5px] text-[var(--ct-text-3)]">
+              {view.front ? (
                 <>
-                  {view.front ? (
-                    <>
-                      Frente <b className="font-medium text-[var(--ct-text)]">{view.front.name}</b> <span className={mono}>{view.front.code}</span> ·{' '}
-                      <span className={mono}>{currency(view.front.spendToday)}</span> hoje, do projeto{' '}
-                    </>
-                  ) : (
-                    'Sem frente · orgânico, no projeto '
-                  )}
-                  <Link href={`${base}/funis-venda/${view.project.slug}`} className="text-[var(--ct-accent)]">{view.project.name}</Link>
+                  frente {view.front.name} · <span className={mono}>{currency(view.front.spendToday)}</span> hoje
+                </>
+              ) : view.project ? (
+                <>
+                  sem frente · projeto <span className={mono}>{currency(view.project.spendToday)}</span> hoje
                 </>
               ) : (
-                'Sem projeto ligado.'
+                'sem projeto ligado'
               )}
-            </p>
-            {canEdit && view.project && view.project.fronts.length > 0 && (
-              <form action={movePage.bind(null, pageContext)} className="mt-2 flex flex-wrap items-end gap-2">
-                <input type="hidden" name="sales_funnel_id" value={view.project.id} />
-                <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-[11.5px] text-[var(--ct-text-3)]">
-                  Mudar de frente
-                  <select
-                    name="front_id"
-                    defaultValue={page.frontId ?? ''}
-                    className="min-h-11 rounded-[10px] border border-[var(--ct-line-2)] bg-[var(--ct-surface)] px-2.5 text-[12.5px] text-[var(--ct-text)]"
-                  >
-                    {view.project.fronts.map((front) => (
-                      <option key={front.id} value={front.id}>
-                        {front.name} ({front.code})
-                      </option>
-                    ))}
-                    <option value="">Sem frente (orgânico)</option>
-                  </select>
-                </label>
-                <button type="submit" className={button}>
-                  Mudar
-                </button>
-              </form>
-            )}
-            <ul className="mt-2 flex flex-col gap-1 text-[12px]">
-              {view.outages.slice(0, 5).map((outage) => (
-                <li key={outage.since} className="flex justify-between gap-3">
-                  <span className={mono}>{when(outage.since)}</span>
-                  <span className="text-[var(--ct-text-2)]">
-                    {outage.until ? `fora por ${durationLabel(new Date(outage.until).getTime() - new Date(outage.since).getTime())}` : 'ainda fora'}
-                  </span>
-                </li>
-              ))}
-              {view.outages.length === 0 && <li className="text-[var(--ct-text-3)]">Nenhuma queda nos últimos 7 dias.</li>}
-            </ul>
-          </section>
-        </div>
+            </span>
+          </div>
+          <div className="order-last col-span-2 flex items-center gap-[3px] md:order-none md:col-span-1" aria-label={`Últimas ${strip.length} checagens, da mais antiga para a mais nova: ${strip.filter((check) => !check.ok).length} falharam`}>
+            {strip.map((check) => (
+              <span
+                key={check.checkedAt}
+                title={`${when(check.checkedAt)} · ${check.ok ? (check.ttfbMs !== null ? seconds(check.ttfbMs) : 'ok') : (check.error ?? 'falhou')}`}
+                className="h-4 w-1.5 rounded-sm"
+                style={{ background: checkTone(check, page, now) }}
+              />
+            ))}
+            {strip.length === 0 && <span className="text-xs text-[var(--ct-text-3)]">sem checagens</span>}
+          </div>
+          <div className="hidden text-right text-[11px] text-[var(--ct-text-3)] md:block">
+            <b className={`${mono} block text-[14px] font-medium text-[var(--ct-text)]`}>{last?.ok && last.ttfbMs !== null ? seconds(last.ttfbMs) : '—'}</b>
+            servidor
+          </div>
+          <div className="hidden text-right text-[11px] text-[var(--ct-text-3)] md:block">
+            <b className={`${mono} block text-[14px] font-medium text-[var(--ct-text)]`}>{findings.length > 0 ? `${passing}/${findings.length}` : '—'}</b>
+            conferências ok
+          </div>
+          <span className="flex flex-col items-end gap-1">
+            <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${pill.tone}`}>{pill.label}</span>
+            {view.silenced && page.silencedUntil && <span className="text-[11px] text-[var(--ct-text-3)]">silenciada até {timeOnly(page.silencedUntil)}</span>}
+          </span>
+        </summary>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <a href={page.url} target="_blank" rel="noopener noreferrer" className={button}>
-            Abrir página
-          </a>
-          {canEdit && (
-            <>
-              <Link href={`${base}/paginas/${page.id}/editar`} className={button}>
-                Editar o que vigiar
-              </Link>
-              <form action={setPageActive.bind(null, { ...pageContext, active: !page.isActive })}>
-                <button type="submit" className={button}>
-                  {page.isActive ? 'Pausar sonda' : 'Retomar sonda'}
-                </button>
-              </form>
-              {view.silenced && (
-                <form action={silencePage.bind(null, { ...pageContext, hours: 0 })}>
+        <div className="flex flex-col gap-5 border-t border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-6 py-5">
+          {status === 'critico' && page.isActive && view.currentOutage && <Incident view={view} now={now} canEdit={canEdit} pageContext={pageContext} />}
+
+          <div className="grid gap-5 md:grid-cols-3">
+            <section aria-labelledby={`confere-${page.id}`}>
+              <h3 id={`confere-${page.id}`} className="text-[13px] font-semibold">O que a sonda confere</h3>
+              <ul className="mt-2 flex flex-col gap-1.5 text-[12.5px]">
+                {findings.map((finding) => (
+                  <li key={finding.id} className="flex items-start gap-2">
+                    <span className={`mt-0.5 rounded-full px-1.5 text-[10.5px] font-semibold ${finding.ok ? 'bg-[var(--ct-ok-soft)] text-[var(--ct-ok)]' : 'bg-[var(--ct-warn-soft)] text-[var(--ct-warn)]'}`}>
+                      {finding.ok ? 'ok' : 'atenção'}
+                    </span>
+                    <span>
+                      <b className="font-medium">{finding.label}</b> <span className="text-[var(--ct-text-2)]">{finding.detail}</span>
+                    </span>
+                  </li>
+                ))}
+                {findings.length === 0 && <li className="text-[var(--ct-text-3)]">Ainda não checada.</li>}
+              </ul>
+              {(!page.watch.watchPixel || !page.watch.watchCheckout || !page.watch.requiredText) && (
+                <p className="mt-2 text-[11.5px] text-[var(--ct-text-3)]">
+                  Não vigiado:{' '}
+                  {[!page.watch.watchPixel && 'pixel', !page.watch.watchCheckout && 'botão de compra', !page.watch.requiredText && 'texto obrigatório'].filter(Boolean).join(', ')}.
+                </p>
+              )}
+            </section>
+
+            <section aria-labelledby={`chega-${page.id}`}>
+              <h3 id={`chega-${page.id}`} className="text-[13px] font-semibold">Quem clica chega na página?</h3>
+              {lpv && lpv.average !== null ? (
+                <>
+                  <p className="mt-1 text-[11.5px] text-[var(--ct-text-3)]">
+                    Visualizações da página por clique no link, 7 dias. Média <span className={mono}>{Math.round(lpv.average * 100)}%</span>.{' '}
+                    {view.front ? `Só as campanhas da frente ${view.front.name}.` : 'Página sem frente: soma o projeto inteiro.'}
+                  </p>
+                  <ul className="mt-2 flex flex-col gap-1">
+                    {lpv.days.map((day) => (
+                      <li key={day.day} className="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-2 text-[11.5px]">
+                        <span className={`${mono} text-[var(--ct-text-3)]`}>{`${day.day.slice(8, 10)}/${day.day.slice(5, 7)}`}</span>
+                        <span className="h-2 rounded-full bg-[var(--ct-surface-3)]">
+                          <span
+                            className="block h-2 rounded-full"
+                            style={{ width: `${Math.min(100, Math.round((day.rate ?? 0) * 100))}%`, background: day.dropped ? 'var(--ct-crit)' : 'var(--ct-an)' }}
+                          />
+                        </span>
+                        <span className={`${mono} text-right ${day.dropped ? 'text-[var(--ct-crit)]' : ''}`}>
+                          {day.rate === null ? '—' : `${Math.round(day.rate * 100)}%`}
+                          {day.dropped && <span className="sr-only"> (queda)</span>}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {lpv.days.some((day) => day.dropped) && (
+                    <p className="mt-2 text-[11.5px] text-[var(--ct-crit)]">Dia marcado: muita gente clicou e não chegou. Página lenta ou fora em parte do dia?</p>
+                  )}
+                </>
+              ) : (
+                <p className="mt-2 text-[12.5px] text-[var(--ct-text-3)]">
+                  {view.front
+                    ? `Sem cliques no link da frente ${view.front.name} nos últimos 7 dias.`
+                    : view.project
+                      ? 'Sem cliques no link nos últimos 7 dias.'
+                      : 'Ligue a página a um projeto para ver se quem clica chega.'}
+                </p>
+              )}
+            </section>
+
+            <section aria-labelledby={`historico-${page.id}`}>
+              <h3 id={`historico-${page.id}`} className="text-[13px] font-semibold">Frente e histórico</h3>
+              <p className="mt-2 text-[12.5px] text-[var(--ct-text-2)]">
+                {view.project ? (
+                  <>
+                    {view.front ? (
+                      <>
+                        Frente <b className="font-medium text-[var(--ct-text)]">{view.front.name}</b> <span className={mono}>{view.front.code}</span> ·{' '}
+                        <span className={mono}>{currency(view.front.spendToday)}</span> hoje, do projeto{' '}
+                      </>
+                    ) : (
+                      'Sem frente · orgânico, no projeto '
+                    )}
+                    <Link href={`${base}/funis-venda/${view.project.slug}`} className="text-[var(--ct-accent)]">{view.project.name}</Link>
+                  </>
+                ) : (
+                  'Sem projeto ligado.'
+                )}
+              </p>
+              <ul className="mt-2 flex flex-col gap-1 text-[12px]">
+                {view.outages.slice(0, 5).map((outage) => (
+                  <li key={outage.since} className="flex justify-between gap-3">
+                    <span className={mono}>{when(outage.since)}</span>
+                    <span className="text-[var(--ct-text-2)]">
+                      {outage.until ? `fora por ${durationLabel(new Date(outage.until).getTime() - new Date(outage.since).getTime())}` : 'ainda fora'}
+                    </span>
+                  </li>
+                ))}
+                {view.outages.length === 0 && <li className="text-[var(--ct-text-3)]">Nenhuma queda nos últimos 7 dias.</li>}
+              </ul>
+            </section>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <a href={page.url} target="_blank" rel="noopener noreferrer" className={button}>
+              Abrir página
+            </a>
+            {canEdit && (
+              <>
+                <Link href={`${base}/paginas/${page.id}/editar`} className={button}>
+                  Editar o que vigiar
+                </Link>
+                <form action={setPageActive.bind(null, { ...pageContext, active: !page.isActive })}>
                   <button type="submit" className={button}>
-                    Reativar aviso
+                    {page.isActive ? 'Pausar sonda' : 'Retomar sonda'}
                   </button>
                 </form>
-              )}
-              <span className="ml-auto">
-                <ConfirmDeleteButton action={removePage.bind(null, pageContext)} label="Tirar da sonda" warning="Tirar a página e o histórico dela da sonda?" />
-              </span>
-            </>
-          )}
+                {view.silenced && (
+                  <form action={silencePage.bind(null, { ...pageContext, hours: 0 })}>
+                    <button type="submit" className={button}>
+                      Reativar aviso
+                    </button>
+                  </form>
+                )}
+                <span className="ml-auto">
+                  <ConfirmDeleteButton action={removePage.bind(null, pageContext)} label="Tirar da sonda" warning="Tirar a página e o histórico dela da sonda?" />
+                </span>
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </details>
+      </details>
+      {canEdit && (
+        <PageLinkSelect
+          context={context}
+          pageId={page.id}
+          current={{ salesFunnelId: page.salesFunnelId, frontId: page.frontId }}
+          currentLabel={linkLabel(linkProjects, { salesFunnelId: page.salesFunnelId, frontId: page.frontId })}
+          groups={linkGroups}
+        />
+      )}
+    </div>
   )
 }
 

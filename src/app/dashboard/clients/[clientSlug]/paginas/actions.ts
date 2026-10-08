@@ -125,6 +125,27 @@ export async function movePage(context: PagesContext & { page_id: string }, form
   back(context, 'ok', `${data[0].label} ${result.data.front_id ? 'mudou de frente' : 'agora está sem frente'}.`, `#pagina-${context.page_id}`)
 }
 
+/** Inline "Ligar a" on the list: sets project and front together and answers instead of redirecting. */
+export async function linkPage(
+  context: PagesContext & { page_id: string },
+  link: { sales_funnel_id: string | null; front_id: string | null }
+): Promise<{ error: string | null }> {
+  const result = moveSchema.safeParse(link)
+  if (!result.success || (result.data.front_id && !result.data.sales_funnel_id)) return { error: 'Projeto ou frente inválidos.' }
+  const supabase = await createServerSupabaseClient()
+  const { data, error } = await supabase.from('pages').update(result.data).eq('id', context.page_id).eq('client_id', context.client_id).select('id')
+  if (error?.code === '23514') return { error: 'Essa frente não é deste projeto.' }
+  if (error?.code === '23503') return { error: 'Esse projeto não é deste cliente.' }
+  if (error) {
+    console.error('[pages-link-failed]', { pageId: context.page_id }, error)
+    return { error: 'Não foi possível ligar a página. Tente de novo.' }
+  }
+  // The write policy is gestor-only: a lower role updates no row.
+  if (!data?.length) return { error: 'Só gestor ou owner pode ligar a página.' }
+  refresh(context)
+  return { error: null }
+}
+
 export async function removePage(context: PagesContext & { page_id: string }) {
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase.from('pages').delete().eq('id', context.page_id).select('id')

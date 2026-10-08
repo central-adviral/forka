@@ -27,7 +27,9 @@ import {
   suggestPages,
   testsPointingTo,
 } from '@/lib/domain/page-probe'
+import { linkOptionGroups, pagesToLinkToFront, type LinkProject } from '@/lib/domain/page-links'
 import { checkPagesNow } from './actions'
+import { FrontLinkSelect } from './link-controls'
 import { PageRow, type PageView, type ProjectInfo } from './page-row'
 import { currency, durationLabel, mono, when } from './format'
 
@@ -56,7 +58,7 @@ export default async function PaginasPage({
   const [pages, canEdit, funnelsResult, destinations] = await Promise.all([
     getPagesWithChecks(supabase, client.id, { sinceDays: 7 }),
     canActAs(supabase, client.id, 'gestor'),
-    supabase.from('sales_funnels').select('id, slug, name').eq('client_id', client.id).order('name'),
+    supabase.from('sales_funnels').select('id, slug, name, archived_at').eq('client_id', client.id).order('name'),
     // Suggestions are a convenience: a failed read only hides them.
     getAbDestinations(supabase, client.id).catch((error) => {
       console.error('[pages-ab-destinations-failed]', { clientId: client.id }, error)
@@ -76,13 +78,13 @@ export default async function PaginasPage({
   const { data: frontRows, error: frontsError } = funnels.length
     ? await supabase
         .from('project_fronts')
-        .select('id, sales_funnel_id, code, name')
+        .select('id, sales_funnel_id, code, name, archived_at')
         .in('sales_funnel_id', funnels.map((funnel) => funnel.id))
         .is('source_sales_funnel_id', null)
         .order('position')
     : { data: [], error: null }
   if (frontsError) throw frontsError
-  const ownFronts = (frontRows ?? []) as { id: string; sales_funnel_id: string; code: string; name: string }[]
+  const ownFronts = (frontRows ?? []) as { id: string; sales_funnel_id: string; code: string; name: string; archived_at: string | null }[]
   // Projects with a page, plus projects with fronts: a front can be spending with no page at all.
   const projectIds = funnels
     .map((funnel) => funnel.id)
@@ -183,6 +185,16 @@ export default async function PaginasPage({
     (sum, id) => sum + (projectById.get(id)?.spendToday ?? 0),
     0
   )
+  // Every project and own front of the client, archived ones too: they still name where a page is now.
+  const linkProjects: LinkProject[] = funnels.map((funnel) => ({
+    id: funnel.id,
+    name: funnel.name,
+    archived: funnel.archived_at !== null,
+    fronts: ownFronts
+      .filter((front) => front.sales_funnel_id === funnel.id)
+      .map((front) => ({ id: front.id, name: front.name, archived: front.archived_at !== null })),
+  }))
+  const linkGroups = linkOptionGroups(linkProjects)
   const suggestions = suggestPages(destinations, pages.map((page) => page.url))
   const base = `/dashboard/clients/${client.slug}`
   const context = { client_id: client.id as string, client_slug: client.slug as string }
@@ -324,7 +336,7 @@ export default async function PaginasPage({
                       </div>
                     )}
                     {front.pages.map(({ view }) => (
-                      <PageRow key={view.page.id} view={view} base={base} context={context} canEdit={canEdit} now={now} />
+                      <PageRow key={view.page.id} view={view} base={base} context={context} canEdit={canEdit} now={now} linkGroups={linkGroups} linkProjects={linkProjects} />
                     ))}
                     {front.unwatched && front.pages.length === 0 && (
                       <p className="flex flex-wrap items-center gap-x-3 px-6 py-3 text-[12.5px] text-[var(--ct-text-2)]">
@@ -336,6 +348,9 @@ export default async function PaginasPage({
                           >
                             Adicionar página desta frente
                           </Link>
+                        )}
+                        {canEdit && project && info && (
+                          <FrontLinkSelect context={context} salesFunnelId={project.id} frontId={info.id} groups={pagesToLinkToFront(pages, info.id, linkProjects)} />
                         )}
                       </p>
                     )}
