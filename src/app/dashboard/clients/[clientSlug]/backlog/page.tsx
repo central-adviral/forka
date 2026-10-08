@@ -94,7 +94,7 @@ export default async function BacklogPage({
   const tetoFromPlan = rules.teto === costTarget && funnel.resultado === 'compra'
   const [readouts, { data: abTests }] = await Promise.all([
     loadReadouts(supabase, funnel.id, items, rules, funnel.resultado),
-    supabase.from('tests').select('id, name').eq('client_id', client.id).order('name'),
+    supabase.from('tests').select('id, name').eq('client_id', client.id).is('archived_at', null).order('name'),
   ])
   const tab = aba === 'regras' && canEdit ? 'regras' : 'backlog'
   const selected = items.find((item) => item.code === itemCode) ?? null

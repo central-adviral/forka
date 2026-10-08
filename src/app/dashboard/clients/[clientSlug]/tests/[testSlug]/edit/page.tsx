@@ -12,13 +12,13 @@ export default async function EditTestPage({
   const supabase = await createServerSupabaseClient()
   const { data: test } = await supabase
     .from('tests')
-    .select('id, name, slug, client_id, fallback_url, test_type, sales_page_url, clients(slug)')
+    .select('id, name, slug, client_id, archived_at, fallback_url, test_type, sales_page_url, clients(slug)')
     .eq('slug', testSlug)
     .maybeSingle()
 
   const testClientSlug = (test?.clients as unknown as { slug: string } | null)?.slug
   if (!test || testClientSlug !== clientSlug) notFound()
-  if (!(await canActAs(supabase, test.client_id, 'gestor'))) notFound()
+  if (test.archived_at || !(await canActAs(supabase, test.client_id, 'gestor'))) notFound()
 
   const { data: variants } = await supabase
     .from('variants')

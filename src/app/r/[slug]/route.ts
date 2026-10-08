@@ -94,19 +94,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const ip = getClientIp(request)
   after(async () => {
     try {
+      // Past the limit the click is still recorded, only flagged: many phones share one carrier IP,
+      // and a click left out would leave its sale with no variant (0076).
       const recentClicksFromIp = ip ? await countRecentClickEventsByIp(db, { testId: test.id, ip, sinceMinutes: 60 }) : 0
-      if (!ip || recentClicksFromIp < MAX_CLICKS_PER_IP_PER_HOUR) {
-        await insertClickEvent(db, {
-          testId: test.id,
-          variantId: variant.id,
-          visitorId,
-          trackingId,
-          sourceUtms,
-          ip,
-        })
-      } else {
-        console.log('[click-rate-limited]', { testId: test.id, slug, ip, visitorId, recentClicksFromIp })
-      }
+      const rateLimited = recentClicksFromIp >= MAX_CLICKS_PER_IP_PER_HOUR
+      if (rateLimited) console.log('[click-rate-limited]', { testId: test.id, slug, ip, visitorId, recentClicksFromIp })
+      await insertClickEvent(db, {
+        testId: test.id,
+        variantId: variant.id,
+        visitorId,
+        trackingId,
+        sourceUtms,
+        ip,
+        rateLimited,
+      })
     } catch (err) {
       console.error('[click-insert-failed]', { testId: test.id, slug, isBot: false }, err)
     }

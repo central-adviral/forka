@@ -210,7 +210,7 @@ export default async function TestReportPage({
   const supabase = await createServerSupabaseClient()
   const { data: test, error: testError } = await supabase
     .from('tests')
-    .select('id, name, slug, status, conversion_method, fallback_url, test_type, client_id, created_at, clients(custom_domain, domain_status)')
+    .select('id, name, slug, status, archived_at, conversion_method, fallback_url, test_type, client_id, created_at, clients(custom_domain, domain_status)')
     .eq('slug', testSlug)
     .maybeSingle()
 
@@ -225,6 +225,8 @@ export default async function TestReportPage({
   if (!test) notFound()
   // The client reads the report; editing, pausing and the paid insight stay with who runs the test.
   const canEdit = await canActAs(supabase, test.client_id, 'gestor')
+  // An archived test is read-only history (0076): no edit, no reactivation.
+  const archived = test.archived_at !== null
 
   // get_test_report and the variant rows feed the header and the summary bar, which every tab
   // shows; the rest is fetched only by the tab that renders it.
@@ -243,6 +245,7 @@ export default async function TestReportPage({
     { data: hourReport, error: hourReportError },
     { data: previousReport },
     { data: previousTotalsReport },
+    { data: lastWeightChange },
   ] = await Promise.all([
     supabase.from('variants').select('id, destination_url, is_control').eq('test_id', test.id),
     supabase.rpc('get_test_report', period),
@@ -253,7 +256,16 @@ export default async function TestReportPage({
     tab === 'desempenho' ? supabase.rpc('get_test_report_by_hour', period) : skip,
     previousWindow ? supabase.rpc('get_test_report', previousPeriod) : skip,
     previousWindow && tab === 'desempenho' ? supabase.rpc('get_test_report_totals', previousPeriod) : skip,
+    supabase.from('test_changes').select('created_at').eq('test_id', test.id).eq('field', 'weight_pct').order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
+
+  // Traffic before the last weight change was drawn with the old weights: the draw is checked
+  // only from that change on, or a 70/30 → 50/50 switch reads as a skewed draw (0076).
+  const weightChangedAt: string | null = lastWeightChange?.created_at ?? null
+  const srmSince = weightChangedAt && (!sinceIso || weightChangedAt > sinceIso) ? weightChangedAt : null
+  const { data: srmReport } = srmSince
+    ? await supabase.rpc('get_test_report', { p_test_id: test.id, p_since: srmSince, p_until: untilIso })
+    : { data: null }
 
   if (variantRowsError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'variantRows' }, variantRowsError)
   if (reportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report' }, reportError)
@@ -304,11 +316,15 @@ export default async function TestReportPage({
   })
 
   const daysRunning = daysRunningSince(test.created_at)
-  const dataQuality = reportTrust(
-    detectSampleRatioMismatch(rows.map((row) => ({ weightPct: row.weight_pct, visits: row.visits }))),
+  const srmRows = srmReport ? (srmReport as ReportRow[]) : rows
+  const trust = reportTrust(
+    detectSampleRatioMismatch(srmRows.map((row) => ({ weightPct: row.weight_pct, visits: row.visits }))),
     rows.map((row) => ({ isControl: row.variant_id === control?.variant_id, weightPct: row.weight_pct, visits: row.visits, conversions: row.conversions })),
     daysRunning
   )
+  const dataQuality = srmSince
+    ? { ...trust, explain: `${trust.explain} O sorteio é conferido desde a mudança de peso de ${new Date(srmSince).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}.` }
+    : trust
 
   // Same rule as the test list: the canvas, the summary and the list never name different leaders.
   const leader = testLeader(rows, control?.variant_id)
@@ -404,7 +420,7 @@ export default async function TestReportPage({
                   test.status === 'active' ? 'bg-[var(--ct-ok)]' : 'bg-[var(--ct-crit)]'
                 }`}
               />
-              {test.status === 'active' ? 'Ativo' : 'Pausado'}
+              {archived ? 'Arquivado' : test.status === 'active' ? 'Ativo' : 'Pausado'}
             </span>
           </div>
           <div className="mt-2 flex items-center gap-1.5">
@@ -414,7 +430,7 @@ export default async function TestReportPage({
         </div>
         <div className="flex items-center gap-3">
           <RefreshButton />
-          {canEdit && <>
+          {canEdit && !archived && <>
           <a
             href={`/dashboard/clients/${clientSlug}/tests/${test.slug}/edit`}
             className="flex h-9 items-center rounded-[9px] border border-[var(--ct-line)] bg-transparent px-4 text-[13px] font-medium text-[var(--ct-text-2)]"
