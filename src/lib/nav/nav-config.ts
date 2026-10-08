@@ -146,12 +146,11 @@ export const NAV_SECTIONS: SectionDef[] = [
     label: 'Cliente e equipe',
     short: 'Equipe',
     icon: 'cliente',
-    help: 'Vale para todos os projetos do cliente: de onde vêm os dados, quem acessa e o imposto.',
+    help: 'Vale para todos os projetos do cliente: de onde vêm os dados, o imposto do Meta e quem acessa.',
     minRole: 'analista',
     subs: [
       { id: 'integracoes', label: 'Integrações', desc: 'LaunchOps, Hubla e domínio', exists: true, minRole: 'owner', step: 'integracoes', href: (c) => `${c.base}/integrations` },
       { id: 'membros', label: 'Membros', desc: 'Quem vê e quem edita', exists: true, minRole: 'owner', href: (c) => `${c.base}/membros` },
-      { id: 'imposto', label: 'Imposto', desc: 'Taxa do Meta por data', exists: true, minRole: 'owner', href: (c) => `${c.base}/integrations#imposto` },
     ],
   },
 ]
@@ -184,7 +183,7 @@ export function resolveActive(pathname: string, search: string, hash: string, cl
     case 'metas':
       return { section: 'projeto', sub: 'metas' }
     case 'integrations':
-      return { section: 'cliente', sub: anchor === 'imposto' ? 'imposto' : 'integracoes' }
+      return { section: 'cliente', sub: 'integracoes' }
     case 'membros':
       return { section: 'cliente', sub: 'membros' }
     case 'funis-venda': {

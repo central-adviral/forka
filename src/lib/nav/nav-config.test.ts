@@ -30,7 +30,6 @@ describe('resolveActive: the active section and subsection come from the URL onl
     expect(resolveActive(`${base}/funis-venda/1k/plano`, '', '', slug)).toEqual({ section: 'projeto', sub: 'plano' })
     expect(resolveActive(`${base}/metas`, '', '', slug)).toEqual({ section: 'projeto', sub: 'metas' })
     expect(resolveActive(`${base}/integrations`, '', '', slug)).toEqual({ section: 'cliente', sub: 'integracoes' })
-    expect(resolveActive(`${base}/integrations`, '', '#imposto', slug)).toEqual({ section: 'cliente', sub: 'imposto' })
     expect(resolveActive(`${base}/membros`, '', '', slug)).toEqual({ section: 'cliente', sub: 'membros' })
   })
 
@@ -61,7 +60,8 @@ describe('buildNav: what each role sees', () => {
 
   it('gives the owner every built screen, and keeps owner-only and editor-only ones from the roles below', () => {
     expect(sectionIds(nav())).toEqual(['hoje', 'alertas', 'desempenho', 'testes', 'projeto', 'cliente'])
-    expect(subIds(nav(), 'cliente')).toEqual(['integracoes', 'membros', 'imposto'])
+    // The Meta tax lives inside Integrações; it is not a subsection of its own.
+    expect(subIds(nav(), 'cliente')).toEqual(['integracoes', 'membros'])
     // Integrações and Membros answer 404 below owner, so the section has nothing left for an analista.
     expect(sectionIds(nav({ role: 'analista' }))).not.toContain('cliente')
     expect(subIds(nav({ role: 'analista' }), 'testes')).toEqual(['quadro', 'ab'])
@@ -94,7 +94,7 @@ describe('buildNav: links, badges and setup dots', () => {
     expect(href('testes', 'quadro')).toBe(`${base}/backlog?projeto=1k`)
     expect(href('testes', 'regras-jogo')).toBe(`${base}/backlog?projeto=1k&aba=regras`)
     expect(href('projeto', 'visao-projeto')).toBe(`${base}/funis-venda/1k/configurar`)
-    expect(href('cliente', 'imposto')).toBe(`${base}/integrations#imposto`)
+    expect(href('cliente', 'integracoes')).toBe(`${base}/integrations`)
   })
 
   it('keeps the period and the front when switching analysis tabs on the analysis page', () => {
