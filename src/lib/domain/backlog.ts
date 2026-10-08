@@ -23,10 +23,13 @@ export const COLUMNS = [
 ] as const
 export type BacklogStatus = (typeof COLUMNS)[number]['status']
 
+/** The link gate the Central checks by itself, when the card gets its A/B test. */
+export const AUTO_LINK_GATE = 'Link /r criado'
+
 /** What has to be true before a test of each method can go live. */
 export function defaultGates(method: Method, code: string): string[] {
   if (method === 'meta') return [`Anúncios com a tag [${code}-x] no nome`, 'Copy aprovada sem promessa de faturamento']
-  if (method === 'link') return ['Versão nova publicada', 'Link /r criado']
+  if (method === 'link') return ['Versão nova publicada', AUTO_LINK_GATE]
   return ['Data de início definida', 'Mudança publicada']
 }
 
