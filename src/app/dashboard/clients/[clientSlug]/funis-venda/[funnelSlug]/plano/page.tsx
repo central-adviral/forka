@@ -6,6 +6,7 @@ import { saoPauloDay } from '@/lib/repo/today-repo'
 import { canActAs } from '@/lib/view-as'
 import { PROJECT_RESULTS, readResult, suggestedCost, suggestedVolume, type ProjectResult } from '@/lib/domain/project-plan'
 import { savePlan } from './actions'
+import { PageHeader } from '@/components/page-header'
 
 const LOOKBACK_DAYS = 30
 const mono = 'font-[family-name:var(--font-geist-mono)]'
@@ -66,18 +67,17 @@ export default async function ProjectPlanPage({
 
   return (
     <div className="flex max-w-[980px] flex-col gap-8 px-4 md:px-14 pb-24 pt-12">
-      <div>
-        <Link href={base} className="text-xs text-[var(--ct-text-3)] hover:text-[var(--ct-text)]">
-          ‹ {funnel.name}
-        </Link>
-        <h1 className="mt-2.5 text-[30px] font-semibold tracking-[-0.04em]">Plano do projeto</h1>
-        <p className="mt-2 max-w-[70ch] text-sm text-[var(--ct-text-2)]">
-          O que este projeto produz e quanto ele pode custar. As campanhas vêm das{' '}
-          <Link href={`${base}/regras`} className="text-[var(--ct-accent)]">Regras de campanha</Link> e as vendas dos{' '}
-          <Link href={`${base}/produtos`} className="text-[var(--ct-accent)]">Produtos</Link>; o plano decide como as telas leem esses números e
-          contra qual alvo os alertas julgam.
-        </p>
-      </div>
+      <PageHeader
+        title="Plano do projeto"
+        note={
+          <>
+            O que {funnel.name} produz e quanto pode custar. As campanhas vêm das{' '}
+            <Link href={`${base}/regras`} className="text-[var(--ct-accent)]">Regras de campanha</Link> e as vendas dos{' '}
+            <Link href={`${base}/produtos`} className="text-[var(--ct-accent)]">Produtos</Link>; o plano decide como as telas leem esses números e contra
+            qual alvo os alertas julgam.
+          </>
+        }
+      />
 
       {ok && <p role="status" className="rounded-[10px] bg-[var(--ct-ok-soft)] px-4 py-3 text-[13px] text-[var(--ct-ok)]">{ok}</p>}
       {erro && <p role="alert" className="rounded-[10px] bg-[var(--ct-crit-soft)] px-4 py-3 text-[13px] text-[var(--ct-crit)]">{erro}</p>}

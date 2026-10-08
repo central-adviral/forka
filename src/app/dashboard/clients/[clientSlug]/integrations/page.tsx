@@ -58,6 +58,7 @@ function IntegrationCard({
   details,
   settings,
   dashed,
+  id,
 }: {
   logo: string
   name: string
@@ -67,9 +68,12 @@ function IntegrationCard({
   details?: [string, ReactNode][]
   settings?: ReactNode
   dashed?: boolean
+  /** Anchor the navigation links to (Cliente e equipe › Imposto). */
+  id?: string
 }) {
   return (
     <div
+      id={id}
       className={`flex min-w-0 flex-col gap-3.5 rounded-[22px] border bg-[var(--ct-surface)] px-6 py-[22px] shadow-[var(--ct-shadow)] ${
         dashed ? 'border-dashed border-[var(--ct-line-2)]' : 'border-[var(--ct-line)]'
       }`}
@@ -155,8 +159,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
   return (
     <div className="flex max-w-[1320px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
-        tool="config"
-        eyebrow={client.name}
+        note={client.name}
         title="Integrações"
         description={`Conectadas uma vez por cliente. Todos os projetos da ${client.name} usam estas fontes.`}
       />
@@ -266,6 +269,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
         />
 
         <IntegrationCard
+          id="imposto"
           logo="%"
           name="Imposto do Meta"
           status={currentTax ? `${percent(currentTax.factor)} vigente` : 'sem imposto'}

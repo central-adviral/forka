@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import type { ClientRole } from '@/lib/repo/client-access-repo'
 import { addMember, changeMemberRole, removeMember } from './actions'
+import { PageHeader } from '@/components/page-header'
 
 interface Member {
   user_id: string
@@ -48,15 +49,7 @@ export default async function MembersPage({
 
   return (
     <div className="flex max-w-[960px] flex-col gap-10 px-4 md:px-14 pb-24 pt-12">
-      <div>
-        <span className="font-[family-name:var(--font-geist-mono)] text-[10.5px] font-medium uppercase tracking-[0.08em] text-[var(--ct-text-3)]">
-          Configurar
-        </span>
-        <h1 className="mt-2.5 text-[30px] font-semibold tracking-[-0.04em]">Membros</h1>
-        <p className="mt-2 text-sm text-[var(--ct-text-2)]">
-          Quem acessa {client.name} e o que cada pessoa pode fazer. Outros clientes continuam invisíveis para elas.
-        </p>
-      </div>
+      <PageHeader title="Membros" note={`Quem acessa ${client.name} e o que cada pessoa pode fazer. Outros clientes continuam invisíveis para elas.`} />
 
       {ok && (
         <p role="status" className="rounded-[10px] bg-[var(--ct-an-soft)] px-4 py-3 text-[13px] text-[var(--ct-an)]">

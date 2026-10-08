@@ -10,6 +10,8 @@ import { daysRunningSince } from '@/lib/domain/report-period'
 import { readLinkTest, readMetaTest, readoutSummary, type CreativeRow, type LinkRow, type Verdict } from '@/lib/domain/backlog-readout'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { createItem, decideItem, deleteItem, linkAbTest, moveItem, saveRules, toggleGate, togglePublished } from './actions'
+import { PageHeader } from '@/components/page-header'
+import { headerPrimaryAction } from '@/components/header-actions'
 
 const mono = 'font-[family-name:var(--font-geist-mono)]'
 const field =
@@ -145,56 +147,18 @@ export default async function BacklogPage({
 
   return (
     <div className="flex max-w-[1440px] flex-col gap-7 px-10 pb-24 pt-10">
-      <div className="flex flex-wrap items-end gap-4 border-b border-[var(--ct-line)] pb-6">
-        <div>
-          <span className="flex items-center gap-2.5">
-            <span className={`${mono} rounded-full bg-[var(--ct-ab-soft)] px-2 py-0.5 text-[10.5px] text-[var(--ct-ab)]`}>Ferramenta</span>
-            <span className={`${mono} text-[10.5px] uppercase tracking-[0.08em] text-[var(--ct-text-3)]`}>{funnel.name}</span>
-          </span>
-          <h1 className="mt-2.5 text-[34px] font-semibold tracking-[-0.045em]">Testes</h1>
-          <p className="mt-2 max-w-[62ch] text-sm text-[var(--ct-text-2)]">O que testar, o que está rodando e o que já foi decidido.</p>
-        </div>
-        {canEdit && (
-          <Link href={href('&nova=1')} className="ml-auto rounded-full bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)]">
-            + Nova hipótese
-          </Link>
-        )}
-      </div>
+      <PageHeader
+        title="Testes"
+        note={`Projeto ${funnel.name}. Para trocar, use o seletor de projeto no menu.`}
+        actions={
+          canEdit && (
+            <Link href={href('&nova=1')} className={headerPrimaryAction}>
+              + Nova hipótese
+            </Link>
+          )
+        }
+      />
 
-      {(funnels ?? []).length > 1 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[12px] text-[var(--ct-text-2)]">Projeto:</span>
-          {(funnels ?? []).map((row) => (
-            <a
-              key={row.id}
-              href={`${base}?projeto=${row.slug}`}
-              aria-current={row.id === funnel.id ? 'page' : undefined}
-              className={`rounded-full border px-3 py-1 text-[12.5px] font-medium ${row.id === funnel.id ? 'border-[var(--ct-accent)] bg-[var(--ct-accent-soft)]' : 'border-[var(--ct-line)] text-[var(--ct-text-2)]'}`}
-            >
-              {row.name}
-            </a>
-          ))}
-        </div>
-      )}
-
-      <nav className="inline-flex gap-0.5 self-start rounded-full border border-[var(--ct-line)] bg-[var(--ct-surface-2)] p-1">
-        {[
-          { label: 'Backlog', target: href(''), active: tab === 'backlog', show: true },
-          { label: 'Regras do jogo', target: href('&aba=regras'), active: tab === 'regras', show: canEdit },
-          { label: 'Funis de teste', target: `/dashboard/clients/${client.slug}/tests`, active: false, show: true },
-        ]
-          .filter((option) => option.show)
-          .map((option) => (
-            <a
-              key={option.label}
-              href={option.target}
-              aria-current={option.active ? 'page' : undefined}
-              className={`rounded-full px-4 py-2 text-[13px] font-medium ${option.active ? 'bg-[var(--ct-surface-3)] text-[var(--ct-text)]' : 'text-[var(--ct-text-2)]'}`}
-            >
-              {option.label}
-            </a>
-          ))}
-      </nav>
 
       {ok && <p role="status" className="rounded-[10px] bg-[var(--ct-ok-soft)] px-4 py-3 text-[13px] text-[var(--ct-ok)]">{ok}</p>}
       {erro && <p role="alert" className="rounded-[10px] bg-[var(--ct-crit-soft)] px-4 py-3 text-[13px] text-[var(--ct-crit)]">{erro}</p>}

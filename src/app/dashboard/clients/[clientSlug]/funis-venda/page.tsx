@@ -37,8 +37,7 @@ export default async function SalesFunnelsListPage({
   return (
     <div className="flex max-w-[1240px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
-        tool="an"
-        eyebrow={client.name}
+        note={client.name}
         title="Análises"
         description="Os projetos do cliente. Cada um lê as próprias campanhas, produtos e alvos."
         actions={
