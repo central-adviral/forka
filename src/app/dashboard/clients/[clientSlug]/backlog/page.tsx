@@ -186,6 +186,7 @@ export default async function BacklogPage({
               methods={Object.entries(METHODS).map(([value, label]) => ({ value, label }))}
               serverError={erro}
               defaultConversion={funnel.resultado === 'lead' ? 'thank_you_page' : 'hubla_webhook'}
+              rules={rules}
             />
           )}
 

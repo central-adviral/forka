@@ -2,25 +2,25 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { SampleCalculator } from './sample-calculator'
 
-// "Nova hipótese" as a guided setup: one step per decision, each saying what it is and why it
-// matters. Every field stays in the one form, so the server action gets the same fields as before.
+// "Novo experimento" on one page (Testes 2.0): the idea, how it is measured and its variants, with
+// the help inside each block and a calculator of what the test costs in people and days.
 
 type Option = { value: string; label: string }
-
-const STEPS = [
-  { title: 'A ideia', hint: 'o que muda e por quê' },
-  { title: 'Onde e como', hint: 'etapa do funil e método' },
-  { title: 'Prioridade', hint: 'impacto, confiança, facilidade' },
-  { title: 'Como decidir', hint: 'métrica e responsável' },
-  { title: 'Variantes', hint: 'controle e desafiantes' },
-  { title: 'Revisão', hint: 'confere e cria' },
-] as const
 
 const METHOD_HELP: Record<string, string> = {
   meta: 'As variantes são anúncios no Meta. Cada anúncio leva a tag da variante no nome, e a Central mede gasto, compras (ou leads) e CPA por tag. Use para testar criativo, gancho, copy ou formato.',
   link: 'Um link /r divide o tráfego entre páginas (ou checkouts). A Central conta por pessoa e calcula a chance de cada variante vencer o controle. Use para testar página, oferta ou checkout.',
   antes: 'Muda tudo de uma vez numa data e compara os dias antes e depois. Use só quando não dá para dividir o tráfego: é o método menos confiável, porque o resto também muda com o tempo.',
+}
+
+// The numbers each method can decide by: the ones the Central actually measures for it, so the
+// metric chosen up front is one the verdict can read.
+const METRICS: Record<string, string[]> = {
+  link: ['Conversão por pessoa', 'Receita por pessoa (preço e oferta)', 'Taxa de lead por pessoa'],
+  meta: ['CPA do anúncio', 'CTR, depois CPA do anúncio', 'CPL do anúncio'],
+  antes: ['CPA geral, antes e depois', 'Vendas por dia, antes e depois'],
 }
 
 const STAGE_HELP: Record<string, string> = {
@@ -76,6 +76,7 @@ export function NewHypothesisWizard({
   methods,
   serverError,
   defaultConversion,
+  rules,
 }: {
   action: (formData: FormData) => void | Promise<void>
   cancelHref: string
@@ -86,8 +87,9 @@ export function NewHypothesisWizard({
   serverError?: string
   /** What counts as a conversion in this project: a Hubla sale, or a lead on the thank-you page. */
   defaultConversion: 'hubla_webhook' | 'thank_you_page'
+  /** The project's rules of the game: the calculator sizes the sample the way the verdict will. */
+  rules: { conf: number; mde: number; minVisits: number }
 }) {
-  const [step, setStep] = useState(0)
   const [title, setTitle] = useState('')
   const [hypothesis, setHypothesis] = useState('')
   const [stage, setStage] = useState('pagina')
@@ -126,7 +128,6 @@ export function NewHypothesisWizard({
       setSalesPageUrl(draft.salesPageUrl ?? '')
       setConversionMethod(draft.conversionMethod ?? defaultConversion)
       setUrls(draft.urls ?? [])
-      setStep(STEPS.length - 1)
       /* eslint-enable react-hooks/set-state-in-effect */
     } catch {
       // No storage (private window) or a broken draft: start clean.
@@ -136,10 +137,8 @@ export function NewHypothesisWizard({
   const variantNames = variants.split('\n').map((name) => name.trim()).filter(Boolean).slice(0, 26)
   const linkNow = method === 'link' && createLink
   const ice = Math.round(((scores.impact + scores.confidence + scores.ease) / 3) * 10) / 10
-  const stageLabel = stages.find((option) => option.value === stage)?.label ?? stage
-  const methodLabel = methods.find((option) => option.value === method)?.label ?? method
 
-  // What keeps a step from moving on; the server checks the same rules again on submit.
+  // What keeps the form from submitting; the server checks the same rules again.
   function blocker(at: number): string | null {
     if (at === 0 && !title.trim()) return 'Dê um título para a hipótese.'
     if (at === 4 && variantNames.length < 2) return 'Liste pelo menos duas variantes: o controle e uma desafiante.'
@@ -149,21 +148,6 @@ export function NewHypothesisWizard({
       if (missing >= 0) return `Falta o link da variante ${String.fromCharCode(65 + missing)}, com https://.`
     }
     return null
-  }
-
-  function go(to: number) {
-    if (to > step) {
-      for (let at = step; at < to; at++) {
-        const reason = blocker(at)
-        if (reason) {
-          setStep(at)
-          setProblem(reason)
-          return
-        }
-      }
-    }
-    setProblem(null)
-    setStep(to)
   }
 
   return (
@@ -182,54 +166,18 @@ export function NewHypothesisWizard({
           // Without storage the form still submits; only the restore on error is lost.
         }
       }}
-      className="grid items-start gap-4 lg:grid-cols-[250px_minmax(0,1fr)]"
+      className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]"
     >
-      <ol className="card-shadow flex flex-col gap-0.5 rounded-[22px] border border-[var(--ct-line)] p-2.5" aria-label="Passos da nova hipótese">
-        {STEPS.map((item, index) => {
-          const state = index < step ? 'done' : index === step ? 'cur' : 'next'
-          return (
-            <li key={item.title}>
-              <button
-                type="button"
-                onClick={() => go(index)}
-                aria-current={state === 'cur' ? 'step' : undefined}
-                className={`grid w-full grid-cols-[26px_minmax(0,1fr)] items-start gap-2.5 rounded-[14px] p-2.5 text-left ${state === 'cur' ? 'bg-[var(--ct-surface-2)]' : 'hover:bg-[var(--ct-surface-2)]'}`}
-              >
-                <span
-                  className={`${mono} grid h-6 w-6 place-items-center rounded-full border text-[11px] ${
-                    state === 'done'
-                      ? 'border-transparent bg-[var(--ct-ok-soft)] text-[var(--ct-ok)]'
-                      : state === 'cur'
-                        ? 'border-[var(--ct-accent)] bg-[var(--ct-accent)] text-[var(--ct-on-accent)]'
-                        : 'border-[var(--ct-line-2)] text-[var(--ct-text-3)]'
-                  }`}
-                >
-                  {state === 'done' ? '✓' : index + 1}
-                </span>
-                <span>
-                  <b className="block text-[13px] font-medium">{item.title}</b>
-                  <span className="block text-[11.5px] text-[var(--ct-text-3)]">{item.hint}</span>
-                </span>
-              </button>
-            </li>
-          )
-        })}
-        <li className="px-2.5 pb-1.5 pt-2">
-          <div className="h-1 overflow-hidden rounded-full bg-[var(--ct-surface-3)]">
-            <i className="block h-full rounded-full bg-[var(--ct-accent)]" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
-          </div>
-        </li>
-      </ol>
 
       <div className="card-shadow flex min-w-0 flex-col gap-5 rounded-[22px] border border-[var(--ct-line)] px-6 py-6">
         <div className="flex flex-wrap items-baseline gap-3">
           <span className={`${mono} text-[11px] uppercase tracking-[0.08em] text-[var(--ct-text-3)]`}>
-            Nova hipótese · passo {step + 1} de {STEPS.length}
+            Novo experimento
           </span>
           <span className={`${mono} ml-auto rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[11px] text-[var(--ct-text-2)]`}>{nextCode}</span>
         </div>
 
-        <section hidden={step !== 0} className="flex flex-col gap-4">
+        <section className="flex flex-col gap-4 border-b border-[var(--ct-line)] pb-6 last:border-b-0 last:pb-0">
           <h2 className="text-[20px] font-semibold">Qual é a ideia?</h2>
           <Why title="Por que escrever a hipótese">
             Um teste sem hipótese só diz qual versão ganhou, não o porquê. Escrever &quot;se mudarmos X, Y melhora porque Z&quot; obriga a dizer o que você
@@ -253,7 +201,7 @@ export function NewHypothesisWizard({
           </label>
         </section>
 
-        <section hidden={step !== 1} className="flex flex-col gap-4">
+        <section className="flex flex-col gap-4 border-b border-[var(--ct-line)] pb-6 last:border-b-0 last:pb-0">
           <h2 className="text-[20px] font-semibold">Onde e como testar?</h2>
           <Why title="Por que escolher a etapa e o método">
             A etapa diz em que ponto do funil a mudança acontece, e serve para filtrar e comparar testes depois. O método define como a Central mede: o
@@ -286,7 +234,7 @@ export function NewHypothesisWizard({
           </fieldset>
         </section>
 
-        <section hidden={step !== 2} className="flex flex-col gap-4">
+        <section className="flex flex-col gap-4 border-b border-[var(--ct-line)] pb-6 last:border-b-0 last:pb-0">
           <h2 className="text-[20px] font-semibold">Qual a prioridade?</h2>
           <Why title="Por que dar notas (ICE)">
             Sempre há mais ideias do que tempo. A média das três notas é o ICE, e a fila do quadro é ordenada por ele: o que tem mais chance de mudar o
@@ -317,7 +265,7 @@ export function NewHypothesisWizard({
           </p>
         </section>
 
-        <section hidden={step !== 3} className="flex flex-col gap-4">
+        <section className="flex flex-col gap-4 border-b border-[var(--ct-line)] pb-6 last:border-b-0 last:pb-0">
           <h2 className="text-[20px] font-semibold">Como o teste vai ser decidido?</h2>
           <Why title="Por que decidir a métrica antes">
             Se a métrica é escolhida depois, é fácil achar uma que favoreça a versão que você já preferia. Combinar antes qual número decide (e quem
@@ -325,14 +273,14 @@ export function NewHypothesisWizard({
           </Why>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Métrica que decide
-            <input
-              name="metric"
-              maxLength={120}
-              value={metric}
-              onChange={(event) => setMetric(event.target.value)}
-              placeholder={method === 'link' ? 'ex.: conversão da página por pessoa' : method === 'meta' ? 'ex.: CTR, depois CPA de anúncio' : 'ex.: CPA geral, 7 dias antes e depois'}
-              className={field}
-            />
+            <select name="metric" value={metric} onChange={(event) => setMetric(event.target.value)} className={field}>
+              <option value="">Escolha o número que decide</option>
+              {(METRICS[method] ?? []).map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Responsável
@@ -340,7 +288,7 @@ export function NewHypothesisWizard({
           </label>
         </section>
 
-        <section hidden={step !== 4} className="flex flex-col gap-4">
+        <section className="flex flex-col gap-4 border-b border-[var(--ct-line)] pb-6 last:border-b-0 last:pb-0">
           <h2 className="text-[20px] font-semibold">Quais são as variantes?</h2>
           <Why title="Por que a primeira é o controle">
             O controle é o que roda hoje: sem ele não há com o que comparar. Cada linha vira uma variante (A, B, C…), e a Central mede todas contra a A.
@@ -428,31 +376,6 @@ export function NewHypothesisWizard({
           )}
         </section>
 
-        <section hidden={step !== 5} className="flex flex-col gap-4">
-          <h2 className="text-[20px] font-semibold">Confere e cria</h2>
-          <Why title="O que acontece depois">
-            A hipótese entra na Fila, ordenada pelo ICE. Ela ganha uma lista de pré-requisitos (por exemplo, criar os anúncios com a tag) e só pode ir para
-            Rodando quando todos estiverem feitos. Para decidir, a Central pede o aprendizado: é o que fica para os próximos testes.
-          </Why>
-          <dl className="grid gap-x-6 gap-y-2.5 text-[13px] sm:grid-cols-[150px_minmax(0,1fr)]">
-            <dt className="text-[var(--ct-text-3)]">Título</dt>
-            <dd>{title || '—'}</dd>
-            <dt className="text-[var(--ct-text-3)]">Hipótese</dt>
-            <dd className="text-[var(--ct-text-2)]">{hypothesis || '—'}</dd>
-            <dt className="text-[var(--ct-text-3)]">Etapa e método</dt>
-            <dd>
-              {stageLabel} · {methodLabel}
-            </dd>
-            <dt className="text-[var(--ct-text-3)]">ICE</dt>
-            <dd className={mono}>
-              {ice.toLocaleString('pt-BR')} (I{scores.impact} C{scores.confidence} F{scores.ease})
-            </dd>
-            <dt className="text-[var(--ct-text-3)]">Decide por</dt>
-            <dd>{metric || '—'}{owner ? ` · ${owner}` : ''}</dd>
-            <dt className="text-[var(--ct-text-3)]">Variantes</dt>
-            <dd>{variantNames.map((name, index) => `${String.fromCharCode(65 + index)} ${name}`).join(' · ') || '—'}</dd>
-          </dl>
-        </section>
 
         {problem && (
           <p role="alert" className="rounded-[10px] bg-[var(--ct-crit-soft)] px-4 py-2.5 text-[13px] text-[var(--ct-crit)]">
@@ -464,26 +387,27 @@ export function NewHypothesisWizard({
           <Link href={cancelHref} className="text-[13px] text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
             Cancelar
           </Link>
-          {step > 0 && (
-            <button type="button" onClick={() => go(step - 1)} className="ml-auto rounded-full border border-[var(--ct-line-2)] px-4 py-2 text-[13px] font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
-              Voltar
-            </button>
-          )}
-          {step < STEPS.length - 1 ? (
-            <button
-              type="button"
-              onClick={() => go(step + 1)}
-              className={`${step === 0 ? 'ml-auto' : ''} rounded-full bg-[var(--ct-accent)] px-5 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110`}
-            >
-              Continuar
-            </button>
-          ) : (
-            <button type="submit" className="rounded-full bg-[var(--ct-accent)] px-5 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110">
+            <button type="submit" className="ml-auto rounded-full bg-[var(--ct-accent)] px-5 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110">
               {linkNow ? 'Criar e gerar o link' : 'Criar na fila'}
             </button>
-          )}
         </div>
       </div>
+
+      <aside className="flex flex-col gap-3 lg:sticky lg:top-4">
+        {method === 'link' ? (
+          <SampleCalculator rules={rules} arms={variantNames.length} />
+        ) : (
+          <div className="rounded-[18px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-4 py-4 text-[12.5px] leading-relaxed text-[var(--ct-text-2)]">
+            <b className="mb-1 block text-[14px] text-[var(--ct-text)]">Como este teste decide</b>
+            {method === 'meta'
+              ? 'Pelas Regras do jogo do projeto: vence o criativo com CPA no teto e compras suficientes; corta o que gasta o limite sem vender. A calculadora de amostra vale para o A/B de link.'
+              : 'Compara os dias antes e depois da mudança. É o método menos confiável: o resto também muda com o tempo.'}
+          </div>
+        )}
+        <p className="px-1 text-[12px] text-[var(--ct-text-3)]">
+          ICE {ice.toLocaleString('pt-BR')} (I{scores.impact} C{scores.confidence} F{scores.ease}) · entra na Fila ordenada por ele.
+        </p>
+      </aside>
     </form>
   )
 }
