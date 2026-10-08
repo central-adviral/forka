@@ -79,6 +79,15 @@ export const RULE_LIMITS: Record<keyof TestRules, [number, number, boolean]> = {
   sat: [1, 90, true],
 }
 
+/**
+ * The test ceiling of a purchase project is its CPA target, read live from the project's cost
+ * watcher (the one the Plano and Metas edit), so a target changed in one place is the ceiling
+ * everywhere. Only a lead project, or one without a target, keeps the ceiling stored in its rules.
+ */
+export function withPlanTeto(rules: TestRules, costTarget: number | null, resultado: string): TestRules {
+  return resultado === 'compra' && costTarget !== null && costTarget > 0 ? { ...rules, teto: costTarget } : rules
+}
+
 /** Reads the project's rules, falling back to the default for any missing or out-of-range number. */
 export function readRules(raw: unknown): TestRules {
   const source = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>

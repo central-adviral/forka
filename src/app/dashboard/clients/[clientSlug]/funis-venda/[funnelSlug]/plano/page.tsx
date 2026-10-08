@@ -4,7 +4,6 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getDailyFunnel } from '@/lib/repo/funnel-repo'
 import { saoPauloDay } from '@/lib/repo/today-repo'
 import { canActAs } from '@/lib/view-as'
-import { readRules } from '@/lib/domain/backlog'
 import { PROJECT_RESULTS, readResult, suggestedCost, suggestedVolume, type ProjectResult } from '@/lib/domain/project-plan'
 import { savePlan } from './actions'
 
@@ -28,7 +27,7 @@ export default async function ProjectPlanPage({
   if (!client) notFound()
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, resultado, daily_sales_target, test_rules')
+    .select('id, name, slug, resultado, daily_sales_target')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
@@ -62,7 +61,6 @@ export default async function ProjectPlanPage({
   const resultado = readResult(funnel.resultado)
   const current = found.find((option) => option.result === resultado)!
   const watcher = (watchersResult.data ?? []).find((row) => row.metric === PROJECT_RESULTS[resultado].costMetric) ?? (watchersResult.data ?? [])[0]
-  const teto = readRules(funnel.test_rules).teto
   const context = { client_id: client.id as string, client_slug: client.slug as string, funnel_slug: funnel.slug as string, sales_funnel_id: funnel.id as string }
   const base = `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`
 
@@ -155,10 +153,9 @@ export default async function ProjectPlanPage({
             Gasto mínimo no dia para julgar
             <input name="min_spend" inputMode="decimal" defaultValue={watcher?.min_spend ?? ''} placeholder="300" className={`${field} ${mono}`} />
           </label>
-          <label className="flex items-center gap-2 text-[12.5px] text-[var(--ct-text-2)] md:col-span-2">
-            <input type="checkbox" name="teto_from_cost" defaultChecked={resultado === 'compra'} />
-            Usar o CPA-alvo como teto dos testes (hoje {currency(teto)}). Só vale para projeto de compra.
-          </label>
+          <p className="text-[12.5px] text-[var(--ct-text-2)] md:col-span-2">
+            Num projeto de compra, o CPA-alvo também é o teto das Regras do jogo dos testes: muda aqui, muda lá.
+          </p>
         </fieldset>
 
         {canEdit ? (

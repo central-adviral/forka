@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { canActAs } from '@/lib/view-as'
 import { getBacklog, type BacklogItem } from '@/lib/repo/backlog-repo'
-import { COLUMNS, METHODS, STAGES, nextCode, readRules, type Method } from '@/lib/domain/backlog'
+import { COLUMNS, METHODS, STAGES, nextCode, readRules, withPlanTeto, type Method } from '@/lib/domain/backlog'
 import { NewHypothesisWizard } from './new-hypothesis-wizard'
 import { daysRunningSince } from '@/lib/domain/report-period'
 import { readLinkTest, readMetaTest, readoutSummary, type CreativeRow, type LinkRow, type Verdict } from '@/lib/domain/backlog-readout'
@@ -124,8 +124,14 @@ export default async function BacklogPage({
     )
   }
 
-  const [items, canEdit] = await Promise.all([getBacklog(supabase, funnel.id), canActAs(supabase, client.id, 'gestor')])
-  const rules = readRules(funnel.test_rules)
+  const [items, canEdit, { data: costWatcher }] = await Promise.all([
+    getBacklog(supabase, funnel.id),
+    canActAs(supabase, client.id, 'gestor'),
+    supabase.from('watchers').select('target').eq('sales_funnel_id', funnel.id).is('front_id', null).eq('metric', 'cpa_geral').maybeSingle(),
+  ])
+  const costTarget = costWatcher ? Number(costWatcher.target) : null
+  const rules = withPlanTeto(readRules(funnel.test_rules), costTarget, funnel.resultado)
+  const tetoFromPlan = rules.teto === costTarget && funnel.resultado === 'compra'
   const [readouts, { data: abTests }] = await Promise.all([
     loadReadouts(supabase, client.id, funnel.id, items, rules, funnel.resultado),
     supabase.from('tests').select('id, name').eq('client_id', client.id).order('name'),
@@ -271,8 +277,26 @@ export default async function BacklogPage({
             {RULE_FIELDS.map((rule) => (
               <label key={rule.key} className="flex flex-col gap-1.5 border-b border-[var(--ct-line)] pb-5 text-[13px] font-semibold last:border-b-0 last:pb-0">
                 {rule.label}
-                <input name={rule.key} type="number" step={rule.step} defaultValue={rules[rule.key]} required className={`${field} ${mono} max-w-[180px] font-normal`} />
-                <span className="text-[12px] font-normal text-[var(--ct-text-3)]">{rule.hint}</span>
+                <input
+                  name={rule.key}
+                  type="number"
+                  step={rule.step}
+                  defaultValue={rules[rule.key]}
+                  required
+                  readOnly={rule.key === 'teto' && tetoFromPlan}
+                  className={`${field} ${mono} max-w-[180px] font-normal read-only:opacity-70`}
+                />
+                {rule.key === 'teto' && tetoFromPlan ? (
+                  <span className="text-[12px] font-normal text-[var(--ct-text-3)]">
+                    Vem do CPA-alvo do{' '}
+                    <Link className="text-[var(--ct-accent)]" href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/plano`}>
+                      Plano
+                    </Link>
+                    : mudou lá, muda aqui.
+                  </span>
+                ) : (
+                  <span className="text-[12px] font-normal text-[var(--ct-text-3)]">{rule.hint}</span>
+                )}
               </label>
             ))}
             <button type="submit" className="self-start rounded-full bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)]">Salvar regras</button>
