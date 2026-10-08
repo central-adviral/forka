@@ -57,18 +57,18 @@ export default async function PainelPage({
   return (
     <div className="flex max-w-[1240px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
-        title="Painel de Controle"
+        title="Alertas"
         note={`${lastDay ? `Último dia fechado ${dayBr(lastDay)}` : 'Nenhuma avaliação ainda'}. O aviso abre quando o número sai da faixa e fecha sozinho quando volta.`}
         actions={
           <Link href={`${base}/metas`} className={headerAction}>
-            Metas e alvos
+            Metas e vigias
           </Link>
         }
       />
 
       <section id="atencao" className="flex flex-col gap-4 scroll-mt-6">
         <header>
-          <h2 className="text-[19px] font-semibold">Precisa da sua atenção</h2>
+          <h2 className="text-[19px] font-semibold">Alertas abertos</h2>
           <p className="mt-1 text-[13px] text-[var(--ct-text-3)]">Alertas abertos agora, do pior para o mais leve.</p>
         </header>
         <div className="card-shadow rounded-[18px] border border-[var(--ct-line)]">
@@ -88,7 +88,7 @@ export default async function PainelPage({
                       {watcher.projectName} · {watcherScope(watcher)} · {METRICS[watcher.metric].label} {alert.severity === 'crit' ? 'crítico' : 'em atenção'}
                     </b>
                     <p className="mt-1 text-[12.5px] text-[var(--ct-text-2)]">
-                      <span className={mono}>{formatMetric(watcher.metric, alert.value)}</span> contra alvo de{' '}
+                      <span className={mono}>{formatMetric(watcher.metric, alert.value)}</span> contra meta de{' '}
                       <span className={mono}>{formatMetric(watcher.metric, watcher.target)}</span> em {dayBr(alert.day)}.
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -116,12 +116,12 @@ export default async function PainelPage({
 
       <section id="vigias" className="flex flex-col gap-4 scroll-mt-6">
         <header>
-          <h2 className="text-[19px] font-semibold">Vigias por projeto</h2>
-          <p className="mt-1 text-[13px] text-[var(--ct-text-3)]">Cada vigia cuida de uma métrica num recorte, com alvo próprio.</p>
+          <h2 className="text-[19px] font-semibold">Vigias por funil</h2>
+          <p className="mt-1 text-[13px] text-[var(--ct-text-3)]">Cada vigia cuida de uma métrica num recorte, com meta própria.</p>
         </header>
         {watchers.length === 0 && (
           <p className="rounded-[18px] border border-dashed border-[var(--ct-line-2)] p-6 text-sm text-[var(--ct-text-2)]">
-            Nenhum vigia ainda. Crie em <Link href={`${base}/metas`} className="text-[var(--ct-accent)]">Metas e alvos</Link>.
+            Nenhum vigia ainda. Crie em <Link href={`${base}/metas`} className="text-[var(--ct-accent)]">Metas e vigias</Link>.
           </p>
         )}
         {[...byProject.entries()].map(([project, list]) => (
@@ -145,7 +145,7 @@ export default async function PainelPage({
                 )}
                 <div className="text-right text-[11px] text-[var(--ct-text-3)]">
                   <b className={`${mono} block text-[15px] font-medium text-[var(--ct-text)]`}>{formatMetric(watcher.metric, watcher.lastValue)}</b>
-                  alvo {formatMetric(watcher.metric, watcher.target)}
+                  meta {formatMetric(watcher.metric, watcher.target)}
                 </div>
                 {watcher.lastStatus ? <WatcherStatusPill status={watcher.isActive ? watcher.lastStatus : 'sem_dado'} /> : <span className="text-xs text-[var(--ct-text-3)]">não avaliado</span>}
               </div>

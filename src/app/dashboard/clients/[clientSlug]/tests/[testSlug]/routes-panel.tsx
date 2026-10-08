@@ -13,10 +13,10 @@ export function RoutesPanel({ variants, segments }: { variants: RouteReadoutVari
 
   return (
     <div className="mx-6 mb-6">
-      <h2 className="mb-1 mt-8 font-[family-name:var(--font-sora)] text-lg font-semibold">Por regra de destino</h2>
+      <h2 className="mb-1 mt-8 font-[family-name:var(--font-sora)] text-lg font-semibold">Por destino</h2>
       <p className="mb-4 max-w-[760px] text-[13px] text-[var(--ct-text-2)]">
-        Cada regra é comparada com o mesmo público no {controlName}: quem tem a mesma condição (anúncio, origem ou dispositivo) e caiu no controle. Assim a
-        diferença é da página, não do anúncio. Conte a partir do dia em que as regras foram criadas: antes disso ninguém foi roteado.
+        Cada destino é comparado com o mesmo público no {controlName}: quem tem a mesma condição (anúncio, origem ou dispositivo) e caiu no controle. Assim a
+        diferença é da página, não do anúncio. Conte a partir do dia em que os destinos foram criados: antes disso ninguém foi roteado.
       </p>
       {readout.map(({ variant, lines }) => (
         <div key={variant.id} className="mb-6 overflow-x-auto rounded-2xl border border-[var(--ct-line)]">
@@ -42,7 +42,7 @@ export function RoutesPanel({ variants, segments }: { variants: RouteReadoutVari
                         <div className="max-w-[280px] truncate text-[12px] text-[var(--ct-text-3)]">{line.route.destination_url}</div>
                       </>
                     ) : (
-                      <span className="text-[var(--ct-text-2)]">Sem regra (página da variante)</span>
+                      <span className="text-[var(--ct-text-2)]">Sem destino (página da variante)</span>
                     )}
                   </td>
                   <td className={TD_CLASS}>{line.routed.people}</td>

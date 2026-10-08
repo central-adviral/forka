@@ -43,7 +43,7 @@ export default async function EditSalesFunnelPage({
             salesFunnelId={funnel.id}
             archivedAt={funnel.archived_at}
             canRestore={await canActAs(supabase, client.id, 'gestor')}
-            note="Restaure o projeto para editar."
+            note="Restaure o funil para editar."
           />
         </div>
       ) : (
@@ -63,7 +63,7 @@ export default async function EditSalesFunnelPage({
           <label className="mb-1 mt-2 block text-xs text-[var(--ct-text-2)]">IDs de operação do LaunchOps (separados por vírgula)</label>
           <input name="launchops_operacao_ids" defaultValue={(funnel.launchops_operacao_ids ?? []).join(', ')} className={inputClass} />
           <p className="mt-1 text-xs text-[var(--ct-text-2)]">
-            Só para projetos com dias anteriores às campanhas sincronizadas. Com frentes, o gasto vem das campanhas pela etiqueta.
+            Só para funis com dias anteriores às campanhas sincronizadas. Com frentes, o gasto vem das campanhas pela etiqueta.
           </p>
         </details>
         <div className="grid grid-cols-2 gap-3">
@@ -77,7 +77,7 @@ export default async function EditSalesFunnelPage({
           </label>
         </div>
         <p className="text-xs text-[var(--ct-text-2)]">
-          Opcional. Uma frente que lê outro projeto (ex.: a Captação Paga do lançamento lendo o perpétuo) só conta os dias
+          Opcional. Uma frente que lê outro funil (ex.: a Captação Paga do lançamento lendo o perpétuo) só conta os dias
           dentro desta janela. Vazio = sem limite.
         </p>
         <button type="submit" className="rounded-[10px] bg-[var(--ct-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--ct-on-accent)]">

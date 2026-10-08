@@ -12,7 +12,7 @@ export const STAGES = {
 } as const
 export type Stage = keyof typeof STAGES
 
-export const METHODS = { meta: 'Criativo Meta', link: 'A/B de link', antes: 'Antes e depois' } as const
+export const METHODS = { meta: 'Criativo Meta Ads', link: 'Link A/B', antes: 'Antes e depois' } as const
 export type Method = keyof typeof METHODS
 
 export const COLUMNS = [

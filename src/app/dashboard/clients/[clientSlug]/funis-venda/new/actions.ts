@@ -67,7 +67,7 @@ export async function createProject(context: { client_id: string; client_slug: s
   if (pagesError || projectsError) return { error: (pagesError ?? projectsError)!.message }
   const found = seals(project, {
     campaigns: [],
-    existingPages: (pageRows ?? []).map((page) => ({ url: page.url, where: 'outro projeto' })),
+    existingPages: (pageRows ?? []).map((page) => ({ url: page.url, where: 'outro funil' })),
     activePages: (pageRows ?? []).filter((page) => page.is_active).length,
     takenSlugs: (projectRows ?? []).map((row) => row.slug),
   })
@@ -92,7 +92,7 @@ export async function createProject(context: { client_id: string; client_slug: s
     })
     .select('id')
     .single()
-  if (error) return { error: error.code === '23505' ? 'Já existe um projeto com esse endereço neste cliente.' : error.message }
+  if (error) return { error: error.code === '23505' ? 'Já existe um funil com esse endereço neste cliente.' : error.message }
 
   const failure = await fillProject(supabase, context.client_id, funnel.id, project)
   if (failure) {

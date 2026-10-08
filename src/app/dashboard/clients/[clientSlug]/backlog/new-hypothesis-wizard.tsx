@@ -11,7 +11,7 @@ import { similarLearnings, type Learning } from '@/lib/domain/similar-learnings'
 type Option = { value: string; label: string }
 
 const METHOD_HELP: Record<string, string> = {
-  meta: 'As variantes são anúncios no Meta. Cada anúncio leva a tag da variante no nome, e a Central mede gasto, compras (ou leads) e CPA por tag. Use para testar criativo, gancho, copy ou formato.',
+  meta: 'As variantes são anúncios no Meta Ads. Cada anúncio leva a tag da variante no nome, e a Central mede gasto, compras (ou leads) e CPA por tag. Use para testar criativo, gancho, copy ou formato.',
   link: 'Um link /r divide o tráfego entre páginas (ou checkouts). A Central conta por pessoa e calcula a chance de cada variante vencer o controle. Use para testar página, oferta ou checkout.',
   antes: 'Muda tudo de uma vez numa data e compara os dias antes e depois. Use só quando não dá para dividir o tráfego: é o método menos confiável, porque o resto também muda com o tempo.',
 }
@@ -39,7 +39,7 @@ const SCORES = [
   {
     name: 'impact',
     label: 'Impacto',
-    help: 'Quanto o resultado do projeto muda se a hipótese estiver certa. 10 = muda o CPA do projeto inteiro; 1 = mexe num detalhe.',
+    help: 'Quanto o resultado do funil muda se a aposta estiver certa. 10 = muda o CPA do funil inteiro; 1 = mexe num detalhe.',
   },
   {
     name: 'confidence',
@@ -144,7 +144,7 @@ export function NewHypothesisWizard({
 
   // What keeps the form from submitting; the server checks the same rules again.
   function blocker(at: number): string | null {
-    if (at === 0 && !title.trim()) return 'Dê um título para a hipótese.'
+    if (at === 0 && !title.trim()) return 'Dê um título para o teste.'
     if (at === 4 && variantNames.length < 2) return 'Liste pelo menos duas variantes: o controle e uma desafiante.'
     if (at === 4 && linkNow) {
       if (testType === 'checkout' && !/^https?:\/\//i.test(salesPageUrl)) return 'Informe a URL da página de vendas, com https://.'
@@ -176,19 +176,19 @@ export function NewHypothesisWizard({
       <div className="card-shadow flex min-w-0 flex-col gap-5 rounded-[22px] border border-[var(--ct-line)] px-6 py-6">
         <div className="flex flex-wrap items-baseline gap-3">
           <span className={`${mono} text-[11px] uppercase tracking-[0.08em] text-[var(--ct-text-3)]`}>
-            Novo experimento
+            Novo teste
           </span>
           <span className={`${mono} ml-auto rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[11px] text-[var(--ct-text-2)]`}>{nextCode}</span>
         </div>
 
         <section className="flex flex-col gap-4 border-b border-[var(--ct-line)] pb-6 last:border-b-0 last:pb-0">
           <h2 className="text-[20px] font-semibold">Qual é a ideia?</h2>
-          <Why title="Por que escrever a hipótese">
-            Um teste sem hipótese só diz qual versão ganhou, não o porquê. Escrever &quot;se mudarmos X, Y melhora porque Z&quot; obriga a dizer o que você
+          <Why title="Por que escrever a aposta">
+            Um teste sem aposta escrita só diz qual versão ganhou, não o porquê. Escrever &quot;se mudarmos X, Y melhora porque Z&quot; obriga a dizer o que você
             espera e por quê; no fim, o aprendizado é a resposta a esse porquê, e é ele que vale para os próximos testes.
           </Why>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-            Título curto (aparece no card do quadro)
+            Título curto (aparece no quadro de testes)
             <input name="title" maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="ex.: Prova social acima da dobra" className={field} />
           </label>
           {similarLearnings(title, learnings).map((learning) => (
@@ -198,7 +198,7 @@ export function NewHypothesisWizard({
             </p>
           ))}
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-            Hipótese
+            Aposta
             <textarea
               name="hypothesis"
               rows={3}
@@ -271,7 +271,7 @@ export function NewHypothesisWizard({
             ))}
           </div>
           <p className="text-[13px] text-[var(--ct-text-2)]">
-            ICE desta hipótese: <b className={`${mono} text-[var(--ct-text)]`}>{ice.toLocaleString('pt-BR')}</b>
+            ICE deste teste: <b className={`${mono} text-[var(--ct-text)]`}>{ice.toLocaleString('pt-BR')}</b>
           </p>
         </section>
 
@@ -279,7 +279,7 @@ export function NewHypothesisWizard({
           <h2 className="text-[20px] font-semibold">Como o teste vai ser decidido?</h2>
           <Why title="Por que decidir a métrica antes">
             Se a métrica é escolhida depois, é fácil achar uma que favoreça a versão que você já preferia. Combinar antes qual número decide (e quem
-            acompanha) evita discussão no fim e deixa o resultado confiável. Os limites de corte e vitória vêm das Regras do jogo do projeto.
+            acompanha) evita discussão no fim e deixa o resultado confiável. Os limites de corte e vitória vêm dos Critérios de decisão do funil.
           </Why>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Métrica que decide
@@ -338,9 +338,9 @@ export function NewHypothesisWizard({
               <label className="flex items-start gap-2 text-[13px]">
                 <input type="checkbox" name="create_link" checked={createLink} onChange={(event) => setCreateLink(event.target.checked)} className="mt-0.5" />
                 <span>
-                  <b>Criar o teste A/B e o link /r agora</b>
+                  <b>Criar o link A/B (/r) agora</b>
                   <span className="block text-[12px] text-[var(--ct-text-3)]">
-                    As variantes acima viram as do teste, com pesos iguais. O link fica pausado (todos vão para o controle) até o card ir para Rodando.
+                    As variantes acima viram as do link, com pesos iguais. O link fica pausado (todos vão para o controle) até o teste ir para Rodando.
                   </span>
                 </span>
               </label>
@@ -410,7 +410,7 @@ export function NewHypothesisWizard({
           <div className="rounded-[18px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-4 py-4 text-[12.5px] leading-relaxed text-[var(--ct-text-2)]">
             <b className="mb-1 block text-[14px] text-[var(--ct-text)]">Como este teste decide</b>
             {method === 'meta'
-              ? 'Pelas Regras do jogo do projeto: vence o criativo com CPA no teto e compras suficientes; corta o que gasta o limite sem vender. A calculadora de amostra vale para o A/B de link.'
+              ? 'Pelos Critérios de decisão do funil: vence o criativo com CPA no teto e compras suficientes; corta o que gasta o limite sem vender. A calculadora de amostra vale para o Link A/B.'
               : 'Compara os dias antes e depois da mudança. É o método menos confiável: o resto também muda com o tempo.'}
           </div>
         )}

@@ -31,7 +31,7 @@ function Kpi({ role, metric, target, inputs, big }: ObjectiveMetric & { role: st
         <span className="text-[13px] text-[var(--ct-text-2)]">{PROJECT_RESULTS[metric].cost}</span>
       </span>
       <span className="flex flex-wrap items-center gap-2 text-[12.5px]">
-        <span className="text-[var(--ct-text-3)]">{target ? `alvo ${PROJECT_RESULTS[metric].higherIsBetter ? '≥' : '≤'} ${formatResult(metric, target)}` : 'sem alvo'}</span>
+        <span className="text-[var(--ct-text-3)]">{target ? `meta ${PROJECT_RESULTS[metric].higherIsBetter ? '≥' : '≤'} ${formatResult(metric, target)}` : 'sem meta'}</span>
         {good !== null && (
           <span className={`rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${good ? 'bg-[var(--ct-ok-soft)] text-[var(--ct-ok)]' : 'bg-[var(--ct-warn-soft)] text-[var(--ct-warn)]'}`}>
             {good ? 'na meta' : 'fora da meta'}
@@ -44,10 +44,10 @@ function Kpi({ role, metric, target, inputs, big }: ObjectiveMetric & { role: st
 
 export function ObjectivesPanel({ primary, secondary, inputs, fronts }: { primary: ObjectiveMetric; secondary: ObjectiveMetric | null; inputs: ResultInputs; fronts: ObjectiveFront[] }) {
   return (
-    <section aria-label="Métricas do projeto" className="mb-6 flex flex-col gap-3">
+    <section aria-label="Métricas do funil" className="mb-6 flex flex-col gap-3">
       <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-        <Kpi role="Principal do projeto" {...primary} inputs={inputs} big />
-        {secondary && <Kpi role="Secundária do projeto" {...secondary} inputs={inputs} big />}
+        <Kpi role="Principal do funil" {...primary} inputs={inputs} big />
+        {secondary && <Kpi role="Secundária do funil" {...secondary} inputs={inputs} big />}
       </div>
       {fronts.length > 0 && (
         <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
@@ -59,7 +59,7 @@ export function ObjectivesPanel({ primary, secondary, inputs, fronts }: { primar
                   {front.name}
                 </b>
                 <span className={`rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${front.own ? 'bg-[var(--ct-accent-soft)] text-[var(--ct-accent)]' : 'bg-[var(--ct-surface-3)] text-[var(--ct-text-2)]'}`}>
-                  {front.own ? 'métricas próprias' : 'segue o projeto'}
+                  {front.own ? 'métricas próprias' : 'segue o funil'}
                 </span>
               </span>
               {front.own ? (

@@ -41,14 +41,14 @@ export default async function SalesFunnelsListPage({
     <div className="flex max-w-[1240px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
         note={client.name}
-        title="Análises"
-        description="Os projetos do cliente. Cada um lê as próprias campanhas, produtos e alvos."
+        title="Desempenho"
+        description="Os funis do cliente. Cada um lê as próprias campanhas, produtos e metas."
         actions={
           <a
             href={`/dashboard/clients/${client.slug}/funis-venda/new`}
             className="rounded-full bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110"
           >
-            + Novo projeto
+            + Novo funil
           </a>
         }
       />
@@ -81,7 +81,7 @@ export default async function SalesFunnelsListPage({
             />
           </div>
         ))}
-        {summaries.length === 0 && <div className="px-6 py-8 text-sm text-[var(--ct-text-2)]">Nenhum projeto ainda.</div>}
+        {summaries.length === 0 && <div className="px-6 py-8 text-sm text-[var(--ct-text-2)]">Nenhum funil ainda.</div>}
       </div>
 
       {archived.length > 0 && (

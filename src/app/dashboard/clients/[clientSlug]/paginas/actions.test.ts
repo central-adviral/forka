@@ -122,13 +122,13 @@ describe('linkPage', () => {
   })
 
   it('refuses a front without its project before writing', async () => {
-    await expect(linkPage(pageContext, { sales_funnel_id: null, front_id: frontId })).resolves.toEqual({ error: 'Projeto ou frente inválidos.' })
+    await expect(linkPage(pageContext, { sales_funnel_id: null, front_id: frontId })).resolves.toEqual({ error: 'Funil ou frente inválidos.' })
     expect(role.updated).toEqual([])
   })
 
   it('reports a front of another project', async () => {
     role.updateResult = { data: null, error: { code: '23514', message: 'front cannot own page' } }
-    await expect(linkPage(pageContext, { sales_funnel_id: projectId, front_id: frontId })).resolves.toEqual({ error: 'Essa frente não é deste projeto.' })
+    await expect(linkPage(pageContext, { sales_funnel_id: projectId, front_id: frontId })).resolves.toEqual({ error: 'Essa frente não é deste funil.' })
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 

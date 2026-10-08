@@ -146,7 +146,7 @@ export function TrafficPanel({
             {scope.label}
           </a>
         ))}
-        {isFront && <span className="text-[11.5px] text-[var(--ct-text-3)]">frente = só mídia; as vendas são do projeto inteiro</span>}
+        {isFront && <span className="text-[11.5px] text-[var(--ct-text-3)]">frente = só mídia; as vendas são do funil inteiro</span>}
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">

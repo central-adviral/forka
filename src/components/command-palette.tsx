@@ -60,13 +60,13 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
           setOpen(true)
         }}
         className="flex items-center gap-2.5 rounded-[14px] sm:min-w-[240px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] py-1.5 pl-3 pr-1.5 text-[12.5px] text-[var(--ct-text-3)] hover:border-[var(--ct-line-2)] hover:text-[var(--ct-text-2)]"
-        aria-label="Buscar cliente, projeto ou tela"
+        aria-label="Buscar cliente, funil ou tela"
       >
         <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
           <circle cx="7" cy="7" r="4.5" />
           <path d="m10.5 10.5 3 3" />
         </svg>
-        <span className="hidden sm:inline">Buscar cliente, projeto, tela…</span>
+        <span className="hidden sm:inline">Buscar cliente, funil, tela…</span>
         <kbd className="ml-auto hidden rounded-[5px] sm:inline border border-[var(--ct-line-2)] px-1.5 font-[family-name:var(--font-geist-mono)] text-[10.5px]">⌘K</kbd>
       </button>
       {open && (
@@ -97,8 +97,8 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
                   go(results[cursor])
                 }
               }}
-              placeholder="Cliente, projeto ou tela…"
-              aria-label="Buscar cliente, projeto ou tela"
+              placeholder="Cliente, funil ou tela…"
+              aria-label="Buscar cliente, funil ou tela"
               className="w-full border-b border-[var(--ct-line)] bg-transparent px-5 py-4 text-[15px] text-[var(--ct-text)] outline-none"
             />
             <ul role="listbox" className="max-h-[360px] overflow-y-auto py-2">

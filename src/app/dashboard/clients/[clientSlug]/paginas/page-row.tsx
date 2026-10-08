@@ -107,10 +107,10 @@ export function PageRow({
                 </>
               ) : view.project ? (
                 <>
-                  sem frente · projeto <span className={mono}>{currency(view.project.spendToday)}</span> hoje
+                  sem frente · funil <span className={mono}>{currency(view.project.spendToday)}</span> hoje
                 </>
               ) : (
-                'sem projeto ligado'
+                'sem funil ligado'
               )}
             </span>
           </div>
@@ -172,7 +172,7 @@ export function PageRow({
                 <>
                   <p className="mt-1 text-[11.5px] text-[var(--ct-text-3)]">
                     Visualizações da página por clique no link, 7 dias. Média <span className={mono}>{Math.round(lpv.average * 100)}%</span>.{' '}
-                    {view.front ? `Só as campanhas da frente ${view.front.name}.` : 'Página sem frente: soma o projeto inteiro.'}
+                    {view.front ? `Só as campanhas da frente ${view.front.name}.` : 'Página sem frente: soma o funil inteiro.'}
                   </p>
                   <ul className="mt-2 flex flex-col gap-1">
                     {lpv.days.map((day) => (
@@ -201,7 +201,7 @@ export function PageRow({
                     ? `Sem cliques no link da frente ${view.front.name} nos últimos 7 dias.`
                     : view.project
                       ? 'Sem cliques no link nos últimos 7 dias.'
-                      : 'Ligue a página a um projeto para ver se quem clica chega.'}
+                      : 'Ligue a página a um funil para ver se quem clica chega.'}
                 </p>
               )}
             </section>
@@ -214,15 +214,15 @@ export function PageRow({
                     {view.front ? (
                       <>
                         Frente <b className="font-medium text-[var(--ct-text)]">{view.front.name}</b> <span className={mono}>{view.front.code}</span> ·{' '}
-                        <span className={mono}>{currency(view.front.spendToday)}</span> hoje, do projeto{' '}
+                        <span className={mono}>{currency(view.front.spendToday)}</span> hoje, do funil{' '}
                       </>
                     ) : (
-                      'Sem frente · orgânico, no projeto '
+                      'Sem frente · orgânico, no funil '
                     )}
                     <Link href={`${base}/funis-venda/${view.project.slug}`} className="text-[var(--ct-accent)]">{view.project.name}</Link>
                   </>
                 ) : (
-                  'Sem projeto ligado.'
+                  'Sem funil ligado.'
                 )}
               </p>
               <ul className="mt-2 flex flex-col gap-1 text-[12px]">
@@ -320,7 +320,7 @@ function Incident({
           </dd>
         </div>
         <div>
-          <dt className="text-[var(--ct-text-3)]">{view.front || !view.project ? 'Gasto da frente desde a queda' : 'Gasto do projeto desde a queda'}</dt>
+          <dt className="text-[var(--ct-text-3)]">{view.front || !view.project ? 'Gasto da frente desde a queda' : 'Gasto do funil desde a queda'}</dt>
           <dd className="mt-1 font-medium">
             {view.costSinceDown !== null && view.spendRate !== null ? (
               <>
@@ -328,17 +328,17 @@ function Incident({
                 <span className="block text-[11.5px] text-[var(--ct-text-2)]">
                   {view.front
                     ? `frente ${view.front.name}, ritmo de ${currency(view.spendRate)}/h`
-                    : `página sem frente: ritmo do projeto inteiro, ${currency(view.spendRate)}/h`}
+                    : `página sem frente: ritmo do funil inteiro, ${currency(view.spendRate)}/h`}
                 </span>
               </>
             ) : (
-              <span className="text-[var(--ct-text-2)]">sem projeto ligado</span>
+              <span className="text-[var(--ct-text-2)]">sem funil ligado</span>
             )}
           </dd>
         </div>
         <div>
           <dt className="text-[var(--ct-text-3)]">Também afetado</dt>
-          <dd className="mt-1 font-medium">{view.affectedTests.length > 0 ? view.affectedTests.map((name) => `Teste A/B ${name}`).join(', ') : 'nenhum teste A/B aponta para cá'}</dd>
+          <dd className="mt-1 font-medium">{view.affectedTests.length > 0 ? view.affectedTests.map((name) => `Link A/B ${name}`).join(', ') : 'nenhum link A/B aponta para cá'}</dd>
         </div>
       </dl>
 

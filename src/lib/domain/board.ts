@@ -6,10 +6,10 @@ import type { LinkVariantRead, MetaVariantRead } from './backlog-readout'
 export type Lane = BacklogStatus | 'decide'
 
 export const LANES: { lane: Lane; label: string; hint: string }[] = [
-  { lane: 'queue', label: 'Fila', hint: 'ordenadas por ICE' },
+  { lane: 'queue', label: 'Fila', hint: 'ordenados por ICE' },
   { lane: 'ready', label: 'Pronto pra subir', hint: 'checklist completo' },
   { lane: 'running', label: 'Rodando', hint: 'amostra · dias' },
-  { lane: 'decide', label: 'Pede decisão', hint: 'a regra do jogo bateu' },
+  { lane: 'decide', label: 'Pede decisão', hint: 'os critérios de decisão bateram' },
   { lane: 'decided', label: 'Decidido', hint: 'últimos 30 dias' },
 ]
 

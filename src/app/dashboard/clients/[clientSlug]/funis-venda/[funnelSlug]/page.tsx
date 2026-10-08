@@ -247,14 +247,14 @@ export default async function SalesFunnelPage({
           note={
             <>
               {`objetivo: ${PROJECT_RESULTS[readResult(funnel.resultado)].label.toLowerCase()}`}
-              {rows.length > 0 ? ` · investimento das ${rows[0].spendSource === 'frentes' ? 'regras de campanha' : 'operações do LaunchOps'}` : ''}
+              {rows.length > 0 ? ` · investimento das ${rows[0].spendSource === 'frentes' ? 'frentes' : 'operações do LaunchOps'}` : ''}
             </>
           }
           title={funnel.name}
           description={
             funnel.resultado === 'lead'
-              ? 'Gasto, leads e criativos das campanhas do projeto.'
-              : 'Gasto, vendas, receita e criativos do projeto, lidos das regras de campanha e dos produtos.'
+              ? 'Gasto, leads e criativos das campanhas do funil.'
+              : 'Gasto, vendas, receita e criativos do funil, lidos das frentes e dos produtos.'
           }
           actions={
             funnel.archived_at ? (
@@ -268,13 +268,13 @@ export default async function SalesFunnelPage({
                   href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/plano`}
                   className="rounded-full border border-[var(--ct-accent)] bg-[var(--ct-accent-soft)] px-4 py-2 text-[13px] font-medium text-[var(--ct-accent)]"
                 >
-                  Plano
+                  Resultado e meta
                 </a>
                 <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/produtos`} className={headerAction}>
                   Produtos
                 </a>
                 <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`} className={headerAction}>
-                  Regras de campanha
+                  Frentes e etiquetas
                 </a>
                 <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`} className={headerAction}>
                   Editar
@@ -385,7 +385,7 @@ export default async function SalesFunnelPage({
       {partialToday?.dadosAte && (
         <p className="mb-3 text-[12.5px] text-[var(--ct-text-2)]" role="status">
           <span className="mr-2 rounded-full bg-[var(--ct-warn)]/[0.12] px-2 py-0.5 text-[11px] text-[var(--ct-warn)]">hoje parcial</span>
-          Gasto do Meta até {timeBr(partialToday.dadosAte)}. As vendas de hoje entram até esse horário para o CPA comparar
+          Gasto do Meta Ads até {timeBr(partialToday.dadosAte)}. As vendas de hoje entram até esse horário para o CPA comparar
           igual com igual
           {partialToday.vendasAposDados > 0
             ? `; ${partialToday.vendasAposDados.toLocaleString('pt-BR')} chegaram depois e entram no próximo pull.`
@@ -426,7 +426,7 @@ export default async function SalesFunnelPage({
             ))}
           </dl>
           <p className="mt-3 text-[12px] text-[var(--ct-text-3)]">
-            CPA geral = investimento com imposto ÷ vendas de entrada do projeto. O CPA de anúncio, no projeto e por frente, divide pelas vendas cuja
+            CPA geral = investimento com imposto ÷ vendas de entrada do funil. O CPA de anúncio, no funil e por frente, divide pelas vendas cuja
             UTM traz o id de uma campanha conhecida (ou de um anúncio dela), seja qual for a frente dona da campanha. A UTM antiga sem id fica em
             &quot;anúncio sem identificação&quot;.
           </p>

@@ -81,13 +81,13 @@ export default async function ProjectPlanPage({
   return (
     <div className="flex max-w-[980px] flex-col gap-8 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
-        title="Plano do projeto"
+        title="Resultado e meta"
         note={
           <>
             O que {funnel.name} produz e quanto pode custar. As campanhas vêm das{' '}
-            <Link href={`${base}/regras`} className="text-[var(--ct-accent)]">Regras de campanha</Link> e as vendas dos{' '}
+            <Link href={`${base}/regras`} className="text-[var(--ct-accent)]">Frentes e etiquetas</Link> e as vendas dos{' '}
             <Link href={`${base}/produtos`} className="text-[var(--ct-accent)]">Produtos</Link>; o plano decide como as telas leem esses números e contra
-            qual alvo os alertas julgam.
+            qual meta os alertas julgam.
           </>
         }
       />
@@ -126,19 +126,19 @@ export default async function ProjectPlanPage({
             ))}
           </div>
           <p className="text-[12px] text-[var(--ct-text-3)]">
-            Quando o projeto passar a produzir outra coisa (perpétuo que vira captação paga, por exemplo), crie um projeto novo com a nomenclatura nova
+            Quando o funil passar a produzir outra coisa (perpétuo que vira captação paga, por exemplo), crie um funil novo com a nomenclatura nova
             das campanhas; este fica com o histórico.
           </p>
         </fieldset>
 
         <fieldset disabled={!canEdit} className="card-shadow grid gap-4 rounded-[18px] border border-[var(--ct-line)] px-6 py-5 md:grid-cols-2">
-          <legend className="sr-only">Alvos</legend>
+          <legend className="sr-only">Metas</legend>
           <div className="flex flex-wrap items-baseline gap-3 md:col-span-2">
-            <b className="text-[15px]">2 · Alvos</b>
+            <b className="text-[15px]">2 · Metas</b>
             <span className={`${mono} text-[11.5px] text-[var(--ct-text-3)]`}>sugestão = mediana dos dias fechados</span>
           </div>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-            {PROJECT_RESULTS[resultado].higherIsBetter ? `${PROJECT_RESULTS[resultado].cost} mínimo (x)` : `Custo-alvo por resultado (${PROJECT_RESULTS[resultado].cost})`}
+            {PROJECT_RESULTS[resultado].higherIsBetter ? `${PROJECT_RESULTS[resultado].cost} mínimo (x)` : `Meta de custo por resultado (${PROJECT_RESULTS[resultado].cost})`}
             <input
               name="cost_target"
               inputMode="decimal"
@@ -146,7 +146,7 @@ export default async function ProjectPlanPage({
               placeholder={current.suggestedCost !== null ? `sugestão ${current.suggestedCost.toFixed(2).replace('.', ',')}` : 'ex.: 30,00'}
               className={`${field} ${mono}`}
             />
-            <span className="text-[11px]">Vira o vigia de custo do projeto no Painel e na fila da aba Hoje. Em branco, sem vigia de custo.</span>
+            <span className="text-[11px]">Vira o vigia de custo do funil em Alertas e na fila da aba Hoje. Em branco, sem vigia de custo.</span>
           </label>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Volume por dia ({PROJECT_RESULTS[resultado].perDay})
@@ -160,7 +160,7 @@ export default async function ProjectPlanPage({
             <span className="text-[11px]">A aba Hoje projeta o dia contra este número.</span>
           </label>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-            Atenção / crítico (% acima do alvo)
+            Atenção / crítico (% acima da meta)
             <span className="flex gap-2">
               <input name="warn_pct" inputMode="decimal" defaultValue={watcher?.warn_pct ?? ''} placeholder="20" className={`${field} ${mono} w-full`} aria-label="Atenção a partir de, em %" />
               <input name="crit_pct" inputMode="decimal" defaultValue={watcher?.crit_pct ?? ''} placeholder="40" className={`${field} ${mono} w-full`} aria-label="Crítico a partir de, em %" />
@@ -180,15 +180,15 @@ export default async function ProjectPlanPage({
                 </option>
               ))}
             </select>
-            <span className="text-[11px]">A Visão geral destaca a principal e a secundária. Diferente da principal.</span>
+            <span className="text-[11px]">O Resumo do funil destaca a principal e a secundária. Diferente da principal.</span>
           </label>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-            Alvo da secundária
+            Meta da secundária
             <input name="secondary_target" inputMode="decimal" defaultValue={secondaryWatcher ? String(secondaryWatcher.target).replace('.', ',') : ''} placeholder="ex.: 4,00" className={`${field} ${mono}`} />
-            <span className="text-[11px]">Vira um segundo vigia do projeto. Em branco, sem vigia.</span>
+            <span className="text-[11px]">Vira um segundo vigia do funil. Em branco, sem vigia.</span>
           </label>
           <p className="text-[12.5px] text-[var(--ct-text-2)] md:col-span-2">
-            Num projeto de compra, o CPA-alvo também é o teto das Regras do jogo dos testes: muda aqui, muda lá.
+            Num funil de compra, a meta de CPA também é o teto dos Critérios de decisão dos testes: muda aqui, muda lá.
           </p>
         </fieldset>
 

@@ -1,5 +1,5 @@
 export const ANALYSIS_TABS = [
-  { value: 'visao', label: 'Visão geral' },
+  { value: 'visao', label: 'Resumo do funil' },
   { value: 'trafego', label: 'Tráfego' },
   { value: 'frentes', label: 'Frentes' },
   { value: 'criativos', label: 'Por criativo' },

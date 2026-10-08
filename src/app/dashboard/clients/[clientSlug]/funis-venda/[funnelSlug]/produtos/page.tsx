@@ -110,12 +110,12 @@ export default async function ProjectProductsPage({
   return (
     <div className="flex max-w-[1180px] flex-col gap-8 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
-        title="Produtos do projeto"
+        title="Produtos"
         note={
           <>
             Só as vendas dos produtos desta lista entram em {funnel.name}. O papel define a conta: o CPA divide o investimento pelas vendas de{' '}
             <strong>entrada</strong>; faturamento e ROAS front somam entrada, order bump e upsell; a <strong>ascensão</strong> tem um ROAS próprio. Um
-            produto em mais de um projeto vai para o projeto do anúncio da venda. Mudar o papel, adicionar ou tirar um produto vale daqui pra frente:
+            produto em mais de um funil vai para o funil do anúncio da venda. Mudar o papel, adicionar ou tirar um produto vale daqui pra frente:
             as vendas já guardadas ficam onde estão, com o papel que tinham, até você aplicar desde uma data.
           </>
         }
@@ -128,9 +128,9 @@ export default async function ProjectProductsPage({
       {unattributed.length > 0 && (
         <p className="rounded-[10px] bg-[var(--ct-warn-soft)] px-4 py-3 text-[13px] text-[var(--ct-warn)]">
           {unattributed.length.toLocaleString('pt-BR')} {unattributed.length === 1 ? 'venda' : 'vendas'} deste cliente nos últimos {LOOKBACK_DAYS} dias
-          {' '}estão sem projeto ({currency(unattributedRevenue)}): {unattributedProducts.slice(0, 4).join(', ')}
-          {unattributedProducts.length > 4 ? '…' : ''}. Acontece quando o produto está em mais de um projeto e a venda não traz o anúncio, ou
-          quando nenhum projeto lista o produto.
+          {' '}estão sem funil ({currency(unattributedRevenue)}): {unattributedProducts.slice(0, 4).join(', ')}
+          {unattributedProducts.length > 4 ? '…' : ''}. Acontece quando o produto está em mais de um funil e a venda não traz o anúncio, ou
+          quando nenhum funil lista o produto.
         </p>
       )}
 
@@ -155,7 +155,7 @@ export default async function ProjectProductsPage({
       )}
 
       <section className="rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)]">
-        <h2 className="border-b border-[var(--ct-line)] px-[22px] py-4 text-sm font-semibold">No projeto</h2>
+        <h2 className="border-b border-[var(--ct-line)] px-[22px] py-4 text-sm font-semibold">No funil</h2>
         {products.length === 0 ? (
           <p className="px-[22px] py-5 text-sm text-[var(--ct-text-2)]">Nenhum produto ainda. Adicione abaixo, a partir do LaunchOps.</p>
         ) : (
@@ -193,7 +193,7 @@ export default async function ProjectProductsPage({
                       <ConfirmDeleteButton
                         action={removeProduct.bind(null, { ...context, produto_nome: product.produto_nome })}
                         label="Remover"
-                        warning="Tirar o produto deste projeto a partir de agora? As vendas que ele já tem continuam aqui; as próximas não entram mais."
+                        warning="Tirar o produto deste funil a partir de agora? As vendas que ele já tem continuam aqui; as próximas não entram mais."
                       />
                     )}
                   </td>
@@ -214,7 +214,7 @@ export default async function ProjectProductsPage({
               {catalogError}
             </p>
           ) : unclassified.length === 0 ? (
-            <p className="px-[22px] py-5 text-sm text-[var(--ct-text-2)]">Todos os produtos com venda no período já estão no projeto.</p>
+            <p className="px-[22px] py-5 text-sm text-[var(--ct-text-2)]">Todos os produtos com venda no período já estão no funil.</p>
           ) : (
             <table className="w-full text-[13px]">
               <thead>

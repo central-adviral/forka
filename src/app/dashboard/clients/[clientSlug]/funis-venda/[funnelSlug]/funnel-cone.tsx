@@ -73,7 +73,7 @@ export function FunnelCone({ totals, currency }: { totals: FunnelTotals; currenc
   return (
     <div className="card-shadow h-full rounded-[22px] border border-[var(--ct-line)] p-6">
       <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="whitespace-nowrap text-base font-semibold">Funil de tráfego</h2>
+        <h2 className="whitespace-nowrap text-base font-semibold">Caminho de conversão</h2>
         <span className="whitespace-nowrap font-[family-name:var(--font-geist-mono)] text-[11px] uppercase tracking-wider text-[var(--ct-text-2)]">
           Gasto <span className="text-[var(--ct-text)]">{currency(totals.spend)}</span>
         </span>

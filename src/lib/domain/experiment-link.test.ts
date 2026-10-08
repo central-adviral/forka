@@ -9,7 +9,7 @@ describe('experimentSlug', () => {
   })
 
   it('keeps the slug short and never ends it on a dash', () => {
-    const slug = experimentSlug('T12', 'Uma hipótese com um título comprido demais para caber num link de anúncio')
+    const slug = experimentSlug('T12', 'Um teste com um título comprido demais para caber num link de anúncio')
     expect(slug.length).toBeLessThanOrEqual(48)
     expect(slug.endsWith('-')).toBe(false)
   })

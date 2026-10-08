@@ -26,9 +26,9 @@ const RULE_FIELDS = [
   { key: 'teto', label: 'CPA teto (R$)', hint: 'Corte e vitória são medidos contra ele.', step: '0.01' },
   { key: 'mult', label: 'Corte: gasto sem venda (× teto)', hint: 'A variante que gastar isso sem venda, ou com CPA acima disso, é marcada para pausar.', step: '0.1' },
   { key: 'min', label: 'Vitória: mínimo de compras', hint: 'CPA no teto ou abaixo e pelo menos esse número de compras de anúncio.', step: '1' },
-  { key: 'conf', label: 'A/B de link: chance mínima de vencer (%)', hint: 'Calculada por pessoa, pelo motor do Teste A/B.', step: '1' },
-  { key: 'minVisits', label: 'A/B de link: mínimo de visitantes por variante', hint: 'Sem esse piso, uma chance alta com pouca gente não vale como vitória.', step: '50' },
-  { key: 'mde', label: 'A/B de link: menor melhora que importa (%)', hint: 'Define quantas pessoas cada lado precisa antes do veredito. Quanto menor, mais gente.', step: '1' },
+  { key: 'conf', label: 'Link A/B: chance mínima de vencer (%)', hint: 'Calculada por pessoa, pelo motor do Link A/B.', step: '1' },
+  { key: 'minVisits', label: 'Link A/B: mínimo de visitantes por variante', hint: 'Sem esse piso, uma chance alta com pouca gente não vale como vitória.', step: '50' },
+  { key: 'mde', label: 'Link A/B: menor melhora que importa (%)', hint: 'Define quantas pessoas cada lado precisa antes do veredito. Quanto menor, mais gente.', step: '1' },
   { key: 'sat', label: 'Janela de saturação de criativo (dias)', hint: 'Criativo rodando há mais tempo que isso pede decisão.', step: '1' },
 ] as const
 
@@ -83,7 +83,7 @@ export default async function BacklogPage({
   if (!funnel) {
     return (
       <div className="px-4 md:px-14 pt-12 text-sm text-[var(--ct-text-2)]">
-        Crie um projeto em <Link className="text-[var(--ct-accent)]" href={`/dashboard/clients/${client.slug}/funis-venda`}>Análises</Link> para começar o backlog de testes.
+        Crie um funil em <Link className="text-[var(--ct-accent)]" href={`/dashboard/clients/${client.slug}/funis-venda`}>Análises</Link> para começar o backlog de testes.
       </div>
     )
   }
@@ -165,12 +165,12 @@ export default async function BacklogPage({
   return (
     <div className="flex max-w-[1440px] flex-col gap-7 px-10 pb-24 pt-10">
       <PageHeader
-        title="Testes"
-        note={`Projeto ${funnel.name}. Para trocar, use o seletor de projeto no menu.`}
+        title="Quadro de testes"
+        note={`Funil ${funnel.name}. Para trocar, use o seletor de funil no menu.`}
         actions={
           canEdit && (
             <Link href={href('&nova=1')} className={headerPrimaryAction}>
-              + Nova hipótese
+              + Novo teste
             </Link>
           )
         }
@@ -246,9 +246,9 @@ export default async function BacklogPage({
                 />
                 {rule.key === 'teto' && tetoFromPlan ? (
                   <span className="text-[12px] font-normal text-[var(--ct-text-3)]">
-                    Vem do CPA-alvo do{' '}
+                    Vem da meta de CPA em{' '}
                     <Link className="text-[var(--ct-accent)]" href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/plano`}>
-                      Plano
+                      Resultado e meta
                     </Link>
                     : mudou lá, muda aqui.
                   </span>
@@ -257,14 +257,14 @@ export default async function BacklogPage({
                 )}
               </label>
             ))}
-            <button type="submit" className="self-start rounded-full bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)]">Salvar regras</button>
+            <button type="submit" className="self-start rounded-full bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)]">Salvar critérios</button>
           </form>
           <div className="card-shadow flex flex-col gap-3 rounded-[18px] border border-[var(--ct-line)] px-6 py-6 text-[13px]">
-            <b className="text-[15px]">Como as regras leem um teste</b>
+            <b className="text-[15px]">Como os critérios leem um teste</b>
             {[
               ['Corte', `variante com R$ ${(rules.teto * rules.mult).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} gastos sem venda ou com CPA acima disso`],
               ['Vitória de criativo', `CPA de até R$ ${rules.teto.toLocaleString('pt-BR')} com ${rules.min}+ compras`],
-              ['Vitória de A/B de link', `chance de ${rules.conf}%+, ${rules.min}+ conversões e a amostra para ver ${rules.mde}% de melhora (mín. ${rules.minVisits.toLocaleString('pt-BR')} pessoas)`],
+              ['Vitória de link A/B', `chance de ${rules.conf}%+, ${rules.min}+ conversões e a amostra para ver ${rules.mde}% de melhora (mín. ${rules.minVisits.toLocaleString('pt-BR')} pessoas)`],
               ['Saturação', `criativo rodando há mais de ${rules.sat} dias pede decisão`],
             ].map(([label, text]) => (
               <div key={label} className="flex justify-between gap-4 border-b border-[var(--ct-line)] pb-3 last:border-b-0 last:pb-0">
@@ -307,7 +307,7 @@ export default async function BacklogPage({
                       <input name="title" required maxLength={120} defaultValue={selected.title} className={field} />
                     </label>
                     <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-                      Hipótese
+                      Aposta
                       <textarea name="hypothesis" rows={3} maxLength={1000} defaultValue={selected.hypothesis} className={field} />
                     </label>
                     <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
@@ -319,7 +319,7 @@ export default async function BacklogPage({
                       <input name="owner" maxLength={60} defaultValue={selected.owner ?? ''} className={field} />
                     </label>
                     {selected.abTestId ? (
-                      <p className="text-[11.5px] text-[var(--ct-text-3)]">Os nomes das variantes ficam como estão: o teste A/B vinculado os usa para achar a vencedora.</p>
+                      <p className="text-[11.5px] text-[var(--ct-text-3)]">Os nomes das variantes ficam como estão: o link A/B vinculado os usa para achar a vencedora.</p>
                     ) : (
                       selected.variants.map((variant) => (
                         <label key={variant.id} className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
@@ -337,7 +337,7 @@ export default async function BacklogPage({
 
               {selected.status === 'running' && selectedReadout?.summary && (
                 <div className={`flex flex-col gap-2 rounded-[14px] px-4 py-3.5 ${verdict ? 'bg-[var(--ct-ok-soft)]' : pillTone(selectedReadout)}`}>
-                  <span className={`${mono} text-[10.5px] uppercase tracking-[0.08em]`}>regra do jogo · {selectedReadout.summary}</span>
+                  <span className={`${mono} text-[10.5px] uppercase tracking-[0.08em]`}>critérios de decisão · {selectedReadout.summary}</span>
                   {verdict ? (
                     <>
                       <b className="text-[17px] text-[var(--ct-text)]">
@@ -356,7 +356,7 @@ export default async function BacklogPage({
                     </>
                   ) : (
                     <span className="text-[12.5px] text-[var(--ct-text)]">
-                      {readoutKind(selectedReadout) === 'cut' ? 'Uma variante gastou o limite sem vender: pause os anúncios dela e decida.' : 'A regra do jogo pede uma decisão.'}
+                      {readoutKind(selectedReadout) === 'cut' ? 'Uma variante gastou o limite sem vender: pause os anúncios dela e decida.' : 'Os critérios de decisão pedem uma decisão.'}
                     </span>
                   )}
                   {canEdit && (
@@ -428,10 +428,10 @@ export default async function BacklogPage({
 
               {selected.method === 'link' && selected.status !== 'decided' && (
                 <div className="flex flex-col gap-2 rounded-[14px] border border-[var(--ct-line)] px-4 py-3">
-                  <span className="text-[12.5px] font-semibold">Teste A/B que mede este card</span>
+                  <span className="text-[12.5px] font-semibold">Link A/B que mede este teste</span>
                   {canEdit ? (
                     <form action={linkAbTest.bind(null, { ...context, item_id: selected.id, code: selected.code })} className="flex items-center gap-2">
-                      <select name="ab_test_id" defaultValue={selected.abTestId ?? ''} className={`${field} flex-1 py-1.5 text-[12.5px]`} aria-label="Teste A/B vinculado">
+                      <select name="ab_test_id" defaultValue={selected.abTestId ?? ''} className={`${field} flex-1 py-1.5 text-[12.5px]`} aria-label="Link A/B vinculado">
                         <option value="">nenhum</option>
                         {(abTests ?? []).map((test) => <option key={test.id} value={test.id}>{test.name}</option>)}
                       </select>
@@ -478,7 +478,7 @@ export default async function BacklogPage({
                   <p className="text-[11.5px] text-[var(--ct-text-3)]">
                     {selected.status === 'running'
                       ? `Vence com ${rules.conf}%+ de chance, ${rules.min}+ conversões e a amostra completa nos dois lados. É sugestão: a decisão é sua.`
-                      : 'A medição começa quando o card for para Rodando.'}
+                      : 'A medição começa quando o teste for para Rodando.'}
                   </p>
                 </div>
               )}
@@ -493,7 +493,7 @@ export default async function BacklogPage({
                       <span key={gate.id} className="flex items-center gap-2.5 py-2 text-[12.5px] text-[var(--ct-text-2)]">
                         <span className={`grid h-4 w-4 place-items-center rounded border ${gate.doneAt ? 'border-[var(--ct-ok)] bg-[var(--ct-ok)] text-[var(--ct-on-accent)]' : 'border-[var(--ct-line-2)]'}`}>{gate.doneAt ? '✓' : ''}</span>
                         <span className={gate.doneAt ? 'text-[var(--ct-text-3)] line-through' : ''}>{gate.label}</span>
-                        <span className={`${mono} ml-auto rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[10.5px] text-[var(--ct-text-3)]`} title={gate.label === AUTO_LINK_GATE ? 'A Central marca sozinha quando o card tem teste A/B vinculado' : `A Central marca sozinha quando um anúncio com a tag gasta (últimos ${TAG_LOOKBACK_DAYS} dias)`}>auto</span>
+                        <span className={`${mono} ml-auto rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[10.5px] text-[var(--ct-text-3)]`} title={gate.label === AUTO_LINK_GATE ? 'A Central marca sozinha quando o teste tem link A/B vinculado' : `A Central marca sozinha quando um anúncio com a tag gasta (últimos ${TAG_LOOKBACK_DAYS} dias)`}>auto</span>
                       </span>
                     ) : canEdit ? (
                       <form key={gate.id} action={toggleGate.bind(null, { ...context, gate_id: gate.id, done: !gate.doneAt, code: selected.code })}>
@@ -582,7 +582,7 @@ export default async function BacklogPage({
                   </button>
                 </form>
                 <span className="ml-auto">
-                  <ConfirmDeleteButton action={deleteItem.bind(null, { ...context, item_id: selected.id, code: selected.code })} label="excluir" warning="Excluir a hipótese?" />
+                  <ConfirmDeleteButton action={deleteItem.bind(null, { ...context, item_id: selected.id, code: selected.code })} label="excluir" warning="Excluir o teste?" />
                 </span>
               </div>
             )}

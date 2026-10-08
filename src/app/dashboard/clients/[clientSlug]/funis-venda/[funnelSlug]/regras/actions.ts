@@ -25,7 +25,7 @@ function back(context: RulesContext, param: 'ok' | 'erro', message: string, chan
 
 function databaseMessage(error: { code?: string; message: string }, duplicate: string): string {
   if (error.code === '23505') return duplicate
-  if (error.code === '42501' || error.message.includes('row-level security')) return 'Só gestor ou owner pode alterar as regras.'
+  if (error.code === '42501' || error.message.includes('row-level security')) return 'Só gestor ou owner pode alterar as etiquetas.'
   return error.message
 }
 
@@ -69,14 +69,14 @@ export async function createFront(context: RulesContext, formData: FormData) {
     ...dates?.data,
     position: count ?? 0,
   })
-  if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste projeto (veja também as arquivadas).`))
+  if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste funil (veja também as arquivadas).`))
   revalidatePath(rulesPath(context))
   back(
     context,
     'ok',
     result.data.source_sales_funnel_id
-      ? `Frente ${result.data.code} criada. Ela lê o outro projeto só dentro da janela dela.`
-      : `Frente ${result.data.code} criada. Agora adicione as regras de nome.`
+      ? `Frente ${result.data.code} criada. Ela lê o outro funil só dentro da janela dela.`
+      : `Frente ${result.data.code} criada. Agora adicione as etiquetas.`
   )
 }
 
@@ -85,7 +85,7 @@ const frontTarget = z
   .string()
   .trim()
   .transform((value) => (value === '' ? null : Number(value.replace(/\./g, '').replace(',', '.'))))
-  .refine((value) => value === null || (Number.isFinite(value) && value > 0), 'o alvo da frente é um número maior que zero')
+  .refine((value) => value === null || (Number.isFinite(value) && value > 0), 'a meta da frente é um número maior que zero')
 
 // Code, name and the front's own metrics (0102); a trigger keeps the front's watchers in step. The
 // source decides who owns its campaigns, so changing it is remove and create.
@@ -115,7 +115,7 @@ export async function updateFront(context: RulesContext & { front_id: string }, 
     .update({ ...result.data, ...dates?.data })
     .eq('id', context.front_id)
     .select('id')
-  if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste projeto (veja também as arquivadas).`))
+  if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste funil (veja também as arquivadas).`))
   if (!data || data.length === 0) back(context, 'erro', 'Só gestor ou owner pode editar frentes.')
   revalidatePath(rulesPath(context))
   back(context, 'ok', `Frente ${result.data.code} atualizada.`)
@@ -135,7 +135,7 @@ export async function pinCampaign(context: RulesContext & { client_id: string },
   )
   if (error) back(context, 'erro', databaseMessage(error, ''))
   revalidatePath(rulesPath(context))
-  back(context, 'ok', 'Dono da campanha fixado. Renomear ou mudar regras não muda mais esta campanha.')
+  back(context, 'ok', 'Dono da campanha fixado. Renomear ou mudar etiquetas não muda mais esta campanha.')
 }
 
 export async function unpinCampaign(context: RulesContext & { client_id: string; campaign_id: string }) {
@@ -149,7 +149,7 @@ export async function unpinCampaign(context: RulesContext & { client_id: string;
   if (error) back(context, 'erro', databaseMessage(error, ''))
   if (!data || data.length === 0) back(context, 'erro', 'Só gestor ou owner pode soltar a campanha.')
   revalidatePath(rulesPath(context))
-  back(context, 'ok', 'Campanha solta. Ela volta a seguir as regras de nome.')
+  back(context, 'ok', 'Campanha solta. Ela volta a seguir as etiquetas.')
 }
 
 // Archive, never delete: the front keeps the campaigns it owns and their history, and claims no new one (0100).
@@ -169,7 +169,7 @@ export async function setFrontArchived(context: RulesContext & { front_id: strin
 
 const ruleSchema = z.object({
   kind: z.enum(['include', 'exclude']),
-  value: z.string().trim().min(1, 'informe o texto da regra').max(120),
+  value: z.string().trim().min(1, 'informe o texto da etiqueta').max(120),
 })
 
 export async function addRule(context: RulesContext & { front_id: string }, formData: FormData) {
@@ -179,9 +179,9 @@ export async function addRule(context: RulesContext & { front_id: string }, form
   const { error } = await supabase
     .from('naming_rules')
     .insert({ front_id: context.front_id, kind: result.data.kind, value: result.data.value })
-  if (error) back(context, 'erro', databaseMessage(error, 'Essa regra já existe nesta frente.'))
+  if (error) back(context, 'erro', databaseMessage(error, 'Essa etiqueta já existe nesta frente.'))
   revalidatePath(rulesPath(context))
-  back(context, 'ok', 'Regra adicionada. Campanhas que já gastaram ficam com o dono que têm; a regra decide as novas.', true)
+  back(context, 'ok', 'Etiqueta adicionada. Campanhas que já gastaram ficam com o dono que têm; a etiqueta decide as novas.', true)
 }
 
 export interface RulePreview {
@@ -195,14 +195,14 @@ export async function previewRule(context: RulesContext & { front_id: string }, 
   if (!result.success) return { text: null, error: result.error.issues.map((issue) => issue.message).join('; ') }
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase.rpc('preview_naming_rule', { p_front_id: context.front_id, p_kind: result.data.kind, p_value: result.data.value })
-  if (error) return { text: null, error: error.message.includes('access denied') ? 'Só gestor ou owner pode prever regras.' : error.message }
+  if (error) return { text: null, error: error.message.includes('access denied') ? 'Só gestor ou owner pode prever etiquetas.' : error.message }
   const row = (data as { campaigns: number; spend: number; disputed: number; kept_by_others: number }[])[0]
   const campaigns = Number(row.campaigns)
   const spend = Number(row.spend).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
   const parts = [
-    campaigns === 0 ? 'Com esta regra a frente não pega nenhuma campanha sem dono dos últimos 30 dias.' : `Com esta regra a frente pega ${campaigns} ${campaigns === 1 ? 'campanha sem dono' : 'campanhas sem dono'} dos últimos 30 dias, ${spend}.`,
+    campaigns === 0 ? 'Com esta etiqueta a frente não pega nenhuma campanha sem dono dos últimos 30 dias.' : `Com esta etiqueta a frente pega ${campaigns} ${campaigns === 1 ? 'campanha sem dono' : 'campanhas sem dono'} dos últimos 30 dias, ${spend}.`,
     Number(row.disputed) > 0 ? `${row.disputed} passa${Number(row.disputed) === 1 ? '' : 'm'} a bater também em outra frente e fica${Number(row.disputed) === 1 ? '' : 'm'} em disputa.` : null,
-    Number(row.kept_by_others) > 0 ? `${row.kept_by_others} ${Number(row.kept_by_others) === 1 ? 'casa' : 'casam'} com a regra mas já ${Number(row.kept_by_others) === 1 ? 'tem' : 'têm'} dono e ${Number(row.kept_by_others) === 1 ? 'fica' : 'ficam'} com ele (use Aplicar desde para refazer o passado).` : null,
+    Number(row.kept_by_others) > 0 ? `${row.kept_by_others} ${Number(row.kept_by_others) === 1 ? 'casa' : 'casam'} com a etiqueta mas já ${Number(row.kept_by_others) === 1 ? 'tem' : 'têm'} dono e ${Number(row.kept_by_others) === 1 ? 'fica' : 'ficam'} com ele (use Aplicar desde para refazer o passado).` : null,
     'Campanhas que já gastaram ficam com o dono que têm.',
   ]
   return { text: parts.filter(Boolean).join(' '), error: null }
@@ -216,25 +216,25 @@ export async function updateRule(context: RulesContext & { front_id: string; rul
   if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '))
   const supabase = await createServerSupabaseClient()
   const { data: current } = await supabase.from('naming_rules').select('kind, value').eq('id', context.rule_id).maybeSingle()
-  if (!current) back(context, 'erro', 'Regra não encontrada.')
-  if (current.kind === result.data.kind && current.value === result.data.value) back(context, 'ok', 'Nada mudou na regra.')
+  if (!current) back(context, 'erro', 'Etiqueta não encontrada.')
+  if (current.kind === result.data.kind && current.value === result.data.value) back(context, 'ok', 'Nada mudou na etiqueta.')
   const { data: added, error } = await supabase
     .from('naming_rules')
     .insert({ front_id: context.front_id, kind: result.data.kind, value: result.data.value })
     .select('id')
-  if (error) back(context, 'erro', databaseMessage(error, 'Essa regra já existe nesta frente.'))
-  if (!added?.length) back(context, 'erro', 'Só gestor ou owner pode alterar as regras.')
+  if (error) back(context, 'erro', databaseMessage(error, 'Essa etiqueta já existe nesta frente.'))
+  if (!added?.length) back(context, 'erro', 'Só gestor ou owner pode alterar as etiquetas.')
   const { error: removeError } = await supabase.from('naming_rules').delete().eq('id', context.rule_id)
   if (removeError) back(context, 'erro', databaseMessage(removeError, ''))
   revalidatePath(rulesPath(context))
-  back(context, 'ok', 'Regra alterada. Campanhas que já gastaram ficam com o dono que têm; a regra decide as novas.', true)
+  back(context, 'ok', 'Etiqueta alterada. Campanhas que já gastaram ficam com o dono que têm; a etiqueta decide as novas.', true)
 }
 
 export async function removeRule(context: RulesContext & { rule_id: string }) {
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase.from('naming_rules').delete().eq('id', context.rule_id).select('id')
   if (error) back(context, 'erro', databaseMessage(error, ''))
-  if (!data || data.length === 0) back(context, 'erro', 'Só gestor ou owner pode remover regras.')
+  if (!data || data.length === 0) back(context, 'erro', 'Só gestor ou owner pode remover etiquetas.')
   revalidatePath(rulesPath(context))
-  back(context, 'ok', 'Regra removida. Campanhas que já gastaram ficam com o dono que têm; a mudança decide as novas.', true)
+  back(context, 'ok', 'Etiqueta removida. Campanhas que já gastaram ficam com o dono que têm; a mudança decide as novas.', true)
 }

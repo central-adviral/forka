@@ -14,7 +14,7 @@ interface Member {
 
 const ROLE_OPTIONS: { value: ClientRole; label: string; help: string }[] = [
   { value: 'owner', label: 'Owner', help: 'tudo, inclusive integrações e membros' },
-  { value: 'gestor', label: 'Gestor', help: 'cria e edita testes e projetos' },
+  { value: 'gestor', label: 'Gestor', help: 'cria e edita testes e funis' },
   { value: 'analista', label: 'Analista', help: 'vê tudo, não altera' },
   { value: 'cliente', label: 'Cliente', help: 'acesso de leitura do cliente' },
 ]

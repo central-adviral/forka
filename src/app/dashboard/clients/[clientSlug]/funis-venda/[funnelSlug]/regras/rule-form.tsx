@@ -19,16 +19,16 @@ export function RuleForm({
   return (
     <form action={addAction} className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <select name="kind" defaultValue="include" className={fieldClass} aria-label="Tipo da regra">
+        <select name="kind" defaultValue="include" className={fieldClass} aria-label="Tipo da etiqueta">
           <option value="include">contém</option>
           <option value="exclude">não contém</option>
         </select>
-        <input name="value" required placeholder="ex: [MTV-T15][GER]" className={`${fieldClass} ${mono} min-w-[220px]`} aria-label="Texto da regra" />
+        <input name="value" required placeholder="ex: [MTV-T15][GER]" className={`${fieldClass} ${mono} min-w-[220px]`} aria-label="Texto da etiqueta" />
         <button type="submit" formAction={runPreview} className="text-[12.5px] font-medium text-[var(--ct-text-2)] hover:underline">
           {pending ? 'Prevendo…' : 'Prever'}
         </button>
         <button type="submit" className="text-[12.5px] font-medium text-[var(--ct-accent)] hover:underline">
-          + regra
+          + etiqueta
         </button>
       </div>
       {preview && (

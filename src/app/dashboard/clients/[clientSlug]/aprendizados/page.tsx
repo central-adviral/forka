@@ -100,7 +100,7 @@ export default async function LearningsPage({
       <PageHeader
         note={`${client.name} · ${
           showAll
-            ? 'Todos os testes decididos, publicados ou não. Busque antes de criar uma hipótese: talvez já se saiba a resposta.'
+            ? 'Todos os testes decididos, publicados ou não. Busque antes de criar um teste: talvez já se saiba a resposta.'
             : 'O que testamos, o que ganhou e o que aprendemos. Só aparece o que foi publicado para o cliente.'
         }`}
       />

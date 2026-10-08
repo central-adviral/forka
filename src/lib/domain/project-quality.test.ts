@@ -38,7 +38,7 @@ describe('cpaSources', () => {
       { label: 'Vendas de entrada (CPA geral)', value: '100' },
       { label: 'de anúncio, com a campanha identificada (CPA de anúncio e por frente)', value: '70' },
       { label: 'fora do CPA de anúncio', value: '10 anúncio sem identificação · 12 sem UTM · 5 da bio · 3 de outra origem' },
-      { label: 'do cliente, sem projeto (fora deste CPA)', value: '4' },
+      { label: 'do cliente, sem funil (fora deste CPA)', value: '4' },
     ])
   })
 })

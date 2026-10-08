@@ -130,15 +130,15 @@ export default async function CampaignRulesPage({
     const front = frontById.get(frontId)
     if (!front) return { text: '?', own: false }
     const own = front.sales_funnel_id === funnel!.id
-    const text = own ? front.code : `${front.sales_funnels?.name ?? 'outro projeto'} · ${front.code}`
+    const text = own ? front.code : `${front.sales_funnels?.name ?? 'outro funil'} · ${front.code}`
     return { text: front.archived_at ? `${text} (arquivada)` : text, own }
   }
 
   return (
     <div className="flex max-w-[1180px] flex-col gap-8 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
-        title="Regras de campanha"
-        note="Cada campanha tem um dono só: uma frente. O nome sugere o dono (contém todos os textos verdes e nenhum dos vermelhos) e o sync fixa essa escolha, então renomear a campanha no Gerenciador não muda o histórico. Mudar uma regra vale daqui pra frente: campanhas que já gastaram ficam com o dono que têm. Você pode fixar o dono à mão na tabela. Uma frente também pode ler outro projeto, só dentro da janela deste."
+        title="Frentes e etiquetas"
+        note="Cada campanha tem um dono só: uma frente. O nome sugere o dono (contém todos os textos verdes e nenhum dos vermelhos) e o sync fixa essa escolha, então renomear a campanha no Gerenciador não muda o histórico. Mudar uma etiqueta vale daqui pra frente: campanhas que já gastaram ficam com o dono que têm. Você pode fixar o dono à mão na tabela. Uma frente também pode ler outro funil, só dentro da janela deste."
         actions={
           <div className="flex items-center gap-1 rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface)] p-[3px]" role="group" aria-label="Período">
               {PERIODS.map((period) => (
@@ -179,8 +179,8 @@ export default async function CampaignRulesPage({
 
       <div className="grid grid-cols-2 gap-[18px] lg:grid-cols-4">
         {[
-          { label: 'Gasto do projeto', value: currency(projectSpend), foot: `campanhas nas frentes · ${periodo === '7d' ? '7' : '30'} dias` },
-          { label: 'Frentes', value: String(fronts.length), foot: 'deste projeto' },
+          { label: 'Gasto do funil', value: currency(projectSpend), foot: `campanhas nas frentes · ${periodo === '7d' ? '7' : '30'} dias` },
+          { label: 'Frentes', value: String(fronts.length), foot: 'deste funil' },
           { label: 'Não classificado', value: currency(unclassifiedSpend), foot: 'sem dono · aparece em todos os totais' },
           {
             label: 'Última leitura',
@@ -210,7 +210,7 @@ export default async function CampaignRulesPage({
           >
             <b className="font-semibold">{balanced ? 'Conferência ok' : 'Conferência não fecha'}</b>
             <span className={mono}>
-              gasto do Meta {currency(check.total)} = frentes {currency(check.classified)} + não classificado {currency(check.unclassified)}
+              gasto do Meta Ads {currency(check.total)} = frentes {currency(check.classified)} + não classificado {currency(check.unclassified)}
             </span>
             {!balanced && (
               <span>
@@ -223,7 +223,7 @@ export default async function CampaignRulesPage({
 
       {campaigns.length === 0 && (
         <p className="rounded-[14px] border border-dashed border-[var(--ct-line-2)] p-6 text-sm text-[var(--ct-text-2)]">
-          Nenhuma campanha com gasto chegou do LaunchOps neste período. Use “Atualizar agora” no projeto para fazer a
+          Nenhuma campanha com gasto chegou do LaunchOps neste período. Use “Atualizar agora” no funil para fazer a
           primeira leitura — ela traz os últimos 60 dias.
         </p>
       )}
@@ -236,7 +236,7 @@ export default async function CampaignRulesPage({
                 {conflicts.length} {conflicts.length === 1 ? 'campanha está' : 'campanhas estão'} em mais de uma frente
               </b>
               O nome bate com mais de uma frente, então nenhuma conta o gasto até alguém escolher. Fixe o dono na tabela
-              abaixo ou ajuste as regras.
+              abaixo ou ajuste as etiquetas.
               <ul className="mt-2 flex flex-col gap-1">
                 {conflicts.slice(0, 8).map((campaign) => (
                   <li key={campaign.campaign_id} className={`${mono} text-[12px]`}>
@@ -251,7 +251,7 @@ export default async function CampaignRulesPage({
               <b className="block text-[var(--ct-warn)]">
                 {orphans.length} campanhas com gasto e sem frente somam {currency(orphanSpend)}
               </b>
-              Elas aparecem como Não classificado em todos os totais, até ganharem uma regra ou um dono fixado. As maiores:
+              Elas aparecem como Não classificado em todos os totais, até ganharem uma etiqueta ou um dono fixado. As maiores:
               <ul className="mt-2 flex flex-col gap-1">
                 {orphans.slice(0, 6).map((campaign) => (
                   <li key={campaign.campaign_id} className={`${mono} text-[12px]`}>
@@ -271,7 +271,7 @@ export default async function CampaignRulesPage({
         </div>
         {fronts.length === 0 && (
           <p className="text-sm text-[var(--ct-text-3)]">
-            Este projeto ainda não tem frentes. Crie a primeira abaixo — por exemplo GRA-GER (Captação Gratuita), PAG
+            Este funil ainda não tem frentes. Crie a primeira abaixo — por exemplo GRA-GER (Captação Gratuita), PAG
             (Captação Paga) ou PRE (Pré-lançamento).
           </p>
         )}
@@ -279,7 +279,7 @@ export default async function CampaignRulesPage({
           const stats = summary.get(front.id) ?? { campaigns: 0, spend: 0, leads: 0 }
           const frontContext = { ...context, front_id: front.id }
           const includes = front.naming_rules.filter((rule) => rule.kind === 'include')
-          const sourceName = front.source_sales_funnel_id ? funnelNameById.get(front.source_sales_funnel_id) ?? 'outro projeto' : null
+          const sourceName = front.source_sales_funnel_id ? funnelNameById.get(front.source_sales_funnel_id) ?? 'outro funil' : null
           return (
             <div key={front.id} className="relative flex flex-col gap-3 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-6 py-5">
               <div className="flex flex-wrap items-center gap-3">
@@ -321,7 +321,7 @@ export default async function CampaignRulesPage({
                           <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
                             Métrica {role === 'principal' ? 'principal' : 'secundária'} da frente
                             <select name={`metrica_${role}`} defaultValue={front[`metrica_${role}`] ?? ''} className={`${fieldClass} w-48`}>
-                              <option value="">segue o projeto</option>
+                              <option value="">segue o funil</option>
                               {(Object.keys(PROJECT_RESULTS) as ProjectResult[]).map((metric) => (
                                 <option key={metric} value={metric}>
                                   {PROJECT_RESULTS[metric].cost}
@@ -330,12 +330,12 @@ export default async function CampaignRulesPage({
                             </select>
                           </label>
                           <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-                            Alvo
+                            Meta
                             <input name={`alvo_${role}`} inputMode="decimal" defaultValue={front[`alvo_${role}`] !== null ? String(front[`alvo_${role}`]).replace('.', ',') : ''} className={`${fieldClass} ${mono} w-28`} />
                           </label>
                         </div>
                       ))}
-                      <p className="basis-full text-[11.5px] text-[var(--ct-text-3)]">Com métrica e alvo, a frente ganha um vigia próprio. Vazio: segue o projeto, sem alerta próprio.</p>
+                      <p className="basis-full text-[11.5px] text-[var(--ct-text-3)]">Com métrica e meta, a frente ganha um vigia próprio. Vazio: segue o funil, sem alerta próprio.</p>
                       <button type="submit" className="rounded-[8px] bg-[var(--ct-accent)] px-3.5 py-1.5 text-[12.5px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110">
                         Salvar
                       </button>
@@ -357,14 +357,14 @@ export default async function CampaignRulesPage({
                       [front.metrica_secundaria, front.alvo_secundaria],
                     ]
                       .filter((pair): pair is [ProjectResult, number | null] => pair[0] !== null)
-                      .map(([metric, target]) => `${PROJECT_RESULTS[metric].cost}${target !== null ? ` alvo ${Number(target).toLocaleString('pt-BR')}` : ''}`)
+                      .map(([metric, target]) => `${PROJECT_RESULTS[metric].cost}${target !== null ? ` meta ${Number(target).toLocaleString('pt-BR')}` : ''}`)
                       .join(' · ')}`
-                  : 'Segue as métricas do projeto, sem alerta próprio.'}
+                  : 'Segue as métricas do funil, sem alerta próprio.'}
               </p>
               {sourceName && (
                 <p className="text-[12.5px] text-[var(--ct-text-2)]">
-                  Lê as campanhas do projeto <b>{sourceName}</b>, só nos dias da janela{' '}
-                  <b>{windowText(front.janela_inicio ?? funnel.starts_on, front.janela_fim ?? funnel.ends_on)}</b>. Não tem regras próprias: as
+                  Lê as campanhas do funil <b>{sourceName}</b>, só nos dias da janela{' '}
+                  <b>{windowText(front.janela_inicio ?? funnel.starts_on, front.janela_fim ?? funnel.ends_on)}</b>. Não tem etiquetas próprias: as
                   campanhas continuam com um dono só.
                 </p>
               )}
@@ -373,11 +373,11 @@ export default async function CampaignRulesPage({
                 {front.naming_rules.map((rule) =>
                   canEdit && regra === rule.id ? (
                     <form key={rule.id} action={updateRule.bind(null, { ...frontContext, rule_id: rule.id })} className="flex flex-wrap items-center gap-2">
-                      <select name="kind" defaultValue={rule.kind} className={fieldClass} aria-label="Tipo da regra">
+                      <select name="kind" defaultValue={rule.kind} className={fieldClass} aria-label="Tipo da etiqueta">
                         <option value="include">contém</option>
                         <option value="exclude">não contém</option>
                       </select>
-                      <input name="value" required defaultValue={rule.value} autoFocus className={`${fieldClass} ${mono} min-w-[220px]`} aria-label="Texto da regra" />
+                      <input name="value" required defaultValue={rule.value} autoFocus className={`${fieldClass} ${mono} min-w-[220px]`} aria-label="Texto da etiqueta" />
                       <button type="submit" className="text-[12.5px] font-medium text-[var(--ct-accent)] hover:underline">
                         salvar
                       </button>
@@ -394,13 +394,13 @@ export default async function CampaignRulesPage({
                   >
                     {rule.kind === 'include' ? 'contém' : 'não contém'} {rule.value}
                     {canEdit && (
-                      <Link href={`${base}/regras?regra=${rule.id}`} aria-label={`Editar regra ${rule.value}`} className="opacity-60 hover:opacity-100 hover:underline">
+                      <Link href={`${base}/regras?regra=${rule.id}`} aria-label={`Editar etiqueta ${rule.value}`} className="opacity-60 hover:opacity-100 hover:underline">
                         editar
                       </Link>
                     )}
                     {canEdit && (
                       <form action={removeRule.bind(null, { ...context, rule_id: rule.id })}>
-                        <button type="submit" aria-label={`Remover regra ${rule.value}`} className="opacity-60 hover:opacity-100">
+                        <button type="submit" aria-label={`Remover etiqueta ${rule.value}`} className="opacity-60 hover:opacity-100">
                           ×
                         </button>
                       </form>
@@ -409,7 +409,7 @@ export default async function CampaignRulesPage({
                   )
                 )}
                 {includes.length === 0 && (
-                  <span className="text-[12px] text-[var(--ct-text-3)]">sem “contém”, esta frente não pega nenhuma campanha</span>
+                  <span className="text-[12px] text-[var(--ct-text-3)]">sem etiqueta, esta frente não pega nenhuma campanha</span>
                 )}
               </div>
               )}
@@ -435,10 +435,10 @@ export default async function CampaignRulesPage({
             <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
               Campanhas
               <select name="source_sales_funnel_id" defaultValue="" className={fieldClass}>
-                <option value="">próprias, pelas regras de nome</option>
+                <option value="">próprias, pelas etiquetas</option>
                 {(otherFunnels ?? []).filter((other) => !other.archived_at).map((other) => (
                   <option key={other.id} value={other.id}>
-                    lê o projeto {other.name}
+                    lê o funil {other.name}
                   </option>
                 ))}
               </select>
@@ -485,7 +485,7 @@ export default async function CampaignRulesPage({
           <h2 className="text-[16px] font-semibold">Etiquetas encontradas nos nomes</h2>
           <p className="text-[12.5px] text-[var(--ct-text-3)]">
             As etiquetas entre colchetes das campanhas com gasto no período, da que carrega mais verba para a que carrega
-            menos. Bons pontos de partida para as regras.
+            menos. Bons pontos de partida para as etiquetas.
           </p>
           <div className="flex flex-wrap gap-1.5">
             {tags.map((tag) => (

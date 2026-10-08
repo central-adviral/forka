@@ -2,7 +2,7 @@ import type { SalesByOrigin } from '@/lib/repo/funnel-repo'
 
 // The same order everywhere: what the ads brought first, then what came in on its own.
 const ORIGINS: { key: string; label: string; rule: string; fromAd: boolean }[] = [
-  { key: 'anuncio', label: 'Anúncio Meta', rule: 'ad_id do Meta na utm_content', fromAd: true },
+  { key: 'anuncio', label: 'Anúncio Meta Ads', rule: 'ad_id do Meta Ads na utm_content', fromAd: true },
   { key: 'anuncio_legado', label: 'Anúncio sem identificação', rule: 'utm_source=facebookads, sem id de campanha ou anúncio', fromAd: false },
   { key: 'organico_bio', label: 'Bio do Instagram', rule: 'ig/instagram com "bio" na UTM', fromAd: false },
   { key: 'sem_utm', label: 'Sem UTM', rule: 'nenhuma UTM na venda', fromAd: false },

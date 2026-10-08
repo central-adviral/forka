@@ -209,8 +209,8 @@ describe('A/B destinations', () => {
 
   it('suggests the pages not yet probed, active tests first, without the query', () => {
     expect(suggestPages(destinations, ['https://www.exemplo.com.br/oferta'])).toEqual([
-      { url: 'https://www.exemplo.com.br/oferta-b', source: 'Teste A/B Headline · variante B' },
-      { url: 'https://www.exemplo.com.br/velha', source: 'Teste A/B Antigo · variante A' },
+      { url: 'https://www.exemplo.com.br/oferta-b', source: 'Link A/B Headline · variante B' },
+      { url: 'https://www.exemplo.com.br/velha', source: 'Link A/B Antigo · variante A' },
     ])
   })
 

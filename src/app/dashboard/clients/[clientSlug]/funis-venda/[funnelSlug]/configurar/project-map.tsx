@@ -46,11 +46,11 @@ export function ProjectMap({ fronts, products, quality, resultado }: { fronts: M
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <h2 className="text-[16px] font-semibold">Mapa do projeto</h2>
+        <h2 className="text-[16px] font-semibold">Mapa do funil</h2>
         <p className="mt-1 text-[13px] text-[var(--ct-text-2)]">Últimos 30 dias. Cada caixa alimenta a seguinte; vermelho é onde falta algo.</p>
       </div>
       <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,0.8fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
-        <Box title="Campanhas → frentes" empty={fronts.length === 0 ? 'Nenhuma frente: nenhuma campanha é do projeto.' : null}>
+        <Box title="Campanhas → frentes" empty={fronts.length === 0 ? 'Nenhuma frente: nenhuma campanha é do funil.' : null}>
           <ul className="flex flex-col gap-1.5 text-[13px]">
             {fronts.map((front) => (
               <li key={front.code} className="flex items-baseline justify-between gap-3">
@@ -63,11 +63,11 @@ export function ProjectMap({ fronts, products, quality, resultado }: { fronts: M
             ))}
           </ul>
           {quality && Number(quality.cliente_gasto_sem_frente) > 0 && (
-            <p className="text-[12px] text-[var(--ct-warn)]">{brl(Number(quality.cliente_gasto_sem_frente))} do cliente sem frente, fora de todo projeto</p>
+            <p className="text-[12px] text-[var(--ct-warn)]">{brl(Number(quality.cliente_gasto_sem_frente))} do cliente sem frente, fora de todo funil</p>
           )}
         </Box>
         <Arrow />
-        <Box title="Projeto" empty={null}>
+        <Box title="Funil" empty={null}>
           <p className="font-[family-name:var(--font-geist-mono)] text-[20px] font-semibold tabular-nums">{brl(spend)}</p>
           <p className="text-[12.5px] text-[var(--ct-text-2)]">
             {!PROJECT_RESULTS[readResult(resultado)].sales
@@ -105,7 +105,7 @@ export function ProjectMap({ fronts, products, quality, resultado }: { fronts: M
               </li>
               {Number(quality.cliente_vendas_sem_projeto) > 0 && (
                 <li className="flex justify-between gap-3 text-[var(--ct-warn)]">
-                  <span>do cliente, sem projeto</span>
+                  <span>do cliente, sem funil</span>
                   <span className="font-[family-name:var(--font-geist-mono)] tabular-nums">{Number(quality.cliente_vendas_sem_projeto).toLocaleString('pt-BR')}</span>
                 </li>
               )}

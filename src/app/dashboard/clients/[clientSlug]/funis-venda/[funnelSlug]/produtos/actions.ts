@@ -58,5 +58,5 @@ export async function removeProduct(context: ProductsContext & { produto_nome: s
   if (error) back(context, 'erro', error.message)
   if (!data || data.length === 0) back(context, 'erro', 'Só gestor ou owner pode remover produtos.')
   revalidatePath(productsPath(context))
-  back(context, 'ok', `${context.produto_nome} saiu do projeto a partir de agora. As vendas que ele já tinha continuam aqui.`, true)
+  back(context, 'ok', `${context.produto_nome} saiu do funil a partir de agora. As vendas que ele já tinha continuam aqui.`, true)
 }

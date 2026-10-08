@@ -58,7 +58,7 @@ export function linkVerdict(read: LinkVariantRead[], daysRunning: number, hasPro
       { ok: control.visits >= needed && winner.visits >= needed, label: 'Amostra', value: `${fmt(winner.visits)} e ${fmt(control.visits)} pessoas · meta ${fmt(needed)}` },
       { ok: srm === 'ok', label: 'Sorteio no peso', value: srm === 'ok' ? 'ok' : srm === 'mismatch' ? 'fora do peso' : 'não conferido' },
       { ok: daysRunning >= MIN_CYCLE_DAYS, label: `Ciclo de ${MIN_CYCLE_DAYS}+ dias`, value: `${daysRunning} ${daysRunning === 1 ? 'dia' : 'dias'}` },
-      { ok: hasProject, label: 'Venda do próprio projeto', value: hasProject ? 'teste no projeto' : 'teste sem projeto: a venda pode contar em outro' },
+      { ok: hasProject, label: 'Venda do próprio funil', value: hasProject ? 'teste no funil' : 'teste sem funil: a venda pode contar em outro' },
       { ok: true, label: 'Reembolsos', value: 'descontados (webhook da Hubla)' },
     ],
   }

@@ -350,7 +350,7 @@ export function suggestPages(destinations: AbDestination[], pageUrls: string[]):
     const clean = `https://${url.host}${url.pathname}`
     if (!isSafeProbeUrl(clean)) continue
     seen.add(key)
-    suggestions.push({ url: clean, source: `Teste A/B ${destination.testName} · variante ${destination.variantName}` })
+    suggestions.push({ url: clean, source: `Link A/B ${destination.testName} · variante ${destination.variantName}` })
   }
   return suggestions
 }

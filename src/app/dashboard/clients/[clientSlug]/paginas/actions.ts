@@ -80,8 +80,8 @@ export async function savePage(context: PagesContext & { page_id?: string }, for
     const message =
       error.code === '23505' ? 'Essa página já está na sonda.'
       : error.code === '42501' ? 'Só gestor ou owner pode cadastrar páginas.'
-      : error.code === '23503' ? 'Esse projeto não é deste cliente.'
-      : error.code === '23514' ? 'Escolha uma frente do próprio projeto que tenha campanhas.'
+      : error.code === '23503' ? 'Esse funil não é deste cliente.'
+      : error.code === '23514' ? 'Escolha uma frente do próprio funil que tenha campanhas.'
       : error.message
     redirect(`${formUrl}?erro=${encodeURIComponent(message)}`)
   }
@@ -119,10 +119,10 @@ export async function movePage(context: PagesContext & { page_id: string }, form
     return typeof value === 'string' && value.trim() !== '' ? value : null
   }
   const result = moveSchema.safeParse({ sales_funnel_id: text('sales_funnel_id'), front_id: text('front_id') })
-  if (!result.success) back(context, 'erro', 'Projeto ou frente inválidos.')
+  if (!result.success) back(context, 'erro', 'Funil ou frente inválidos.')
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase.from('pages').update(result.data).eq('id', context.page_id).eq('client_id', context.client_id).select('label')
-  if (error?.code === '23514') back(context, 'erro', 'Escolha uma frente do próprio projeto que tenha campanhas.', `#pagina-${context.page_id}`)
+  if (error?.code === '23514') back(context, 'erro', 'Escolha uma frente do próprio funil que tenha campanhas.', `#pagina-${context.page_id}`)
   if (error || !data?.length) back(context, 'erro', 'Só gestor ou owner pode mudar a página de frente.')
   refresh(context)
   back(context, 'ok', `${data[0].label} ${result.data.front_id ? 'mudou de frente' : 'agora está sem frente'}.`, `#pagina-${context.page_id}`)
@@ -134,11 +134,11 @@ export async function linkPage(
   link: { sales_funnel_id: string | null; front_id: string | null }
 ): Promise<{ error: string | null }> {
   const result = moveSchema.safeParse(link)
-  if (!result.success || (result.data.front_id && !result.data.sales_funnel_id)) return { error: 'Projeto ou frente inválidos.' }
+  if (!result.success || (result.data.front_id && !result.data.sales_funnel_id)) return { error: 'Funil ou frente inválidos.' }
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase.from('pages').update(result.data).eq('id', context.page_id).eq('client_id', context.client_id).select('id')
-  if (error?.code === '23514') return { error: 'Essa frente não é deste projeto.' }
-  if (error?.code === '23503') return { error: 'Esse projeto não é deste cliente.' }
+  if (error?.code === '23514') return { error: 'Essa frente não é deste funil.' }
+  if (error?.code === '23503') return { error: 'Esse funil não é deste cliente.' }
   if (error) {
     console.error('[pages-link-failed]', { pageId: context.page_id }, error)
     return { error: 'Não foi possível ligar a página. Tente de novo.' }

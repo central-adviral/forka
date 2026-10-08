@@ -18,7 +18,7 @@ const HINT: Record<ProjectStatus, string> = {
 }
 const NEXT: Record<ProjectStatus, { to: ProjectStatus; label: string; confirm?: string }> = {
   rascunho: { to: 'rodando', label: 'Ligar' },
-  rodando: { to: 'encerrado', label: 'Encerrar', confirm: 'Encerrar o projeto? O sync e os vigias param e os números ficam como estão.' },
+  rodando: { to: 'encerrado', label: 'Encerrar', confirm: 'Encerrar o funil? O sync e os vigias param e os números ficam como estão.' },
   encerrado: { to: 'rodando', label: 'Reabrir' },
 }
 

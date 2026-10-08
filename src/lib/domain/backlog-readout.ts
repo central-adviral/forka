@@ -125,7 +125,7 @@ export function readLinkTest(rows: LinkRow[], controlVariantId: string | undefin
 export function readoutSummary(verdicts: { label: string; verdict: Verdict }[], daysRunning: number, rules: TestRules, method: Method): string | null {
   const winners = verdicts.filter((v) => v.verdict === 'win').map((v) => v.label)
   const cuts = verdicts.filter((v) => v.verdict === 'cut').map((v) => v.label)
-  if (winners.length > 0) return `vencedora pelas regras: ${winners.join(', ')}`
+  if (winners.length > 0) return `vencedora pelos critérios: ${winners.join(', ')}`
   if (cuts.length > 0) return `cortar: ${cuts.join(', ')}`
   if (method === 'meta' && daysRunning > rules.sat) return `${daysRunning} dias rodando, pede decisão`
   return null

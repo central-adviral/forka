@@ -17,7 +17,7 @@ export function ArchivedProjectBanner({
     <div role="status" className={`flex flex-wrap items-center gap-3 rounded-[12px] bg-[var(--ct-surface-2)] px-5 py-3 text-[13px] text-[var(--ct-text-2)] ${className}`}>
       <span>
         <b className="text-[var(--ct-text)]">
-          Projeto arquivado em {new Date(archivedAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' })}.
+          Funil arquivado em {new Date(archivedAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' })}.
         </b>{' '}
         {note}
       </span>

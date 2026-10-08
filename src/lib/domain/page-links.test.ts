@@ -49,7 +49,7 @@ describe('linkLabel', () => {
   it('names where a page is, archived places included', () => {
     expect(linkLabel(projects, { salesFunnelId: 'p1', frontId: 'f2' })).toBe('1K › Velha')
     expect(linkLabel(projects, { salesFunnelId: 'p2', frontId: null })).toBe('Antigo (sem frente)')
-    expect(linkLabel(projects, { salesFunnelId: null, frontId: null })).toBe('Sem projeto')
+    expect(linkLabel(projects, { salesFunnelId: null, frontId: null })).toBe('Sem funil')
   })
 })
 
@@ -65,7 +65,7 @@ describe('pagesToLinkToFront', () => {
       {
         label: 'Sem frente',
         options: [
-          { value: 'a', label: 'Vendas · Sem projeto' },
+          { value: 'a', label: 'Vendas · Sem funil' },
           { value: 'b', label: 'Obrigado · 1K (sem frente)' },
         ],
       },

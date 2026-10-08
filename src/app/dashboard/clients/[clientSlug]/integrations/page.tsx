@@ -159,17 +159,17 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
       <PageHeader
         note={client.name}
         title="Integrações"
-        description={`Conectadas uma vez por cliente. Todos os projetos da ${client.name} usam estas fontes.`}
+        description={`Conectadas uma vez por cliente. Todos os funis da ${client.name} usam estas fontes.`}
       />
       <TestIntegrationsButton testAction={testIntegrations.bind(null, { client_id: client.id })} />
 
       <div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
         <IntegrationCard
           logo="Lo"
-          name="LaunchOps · Meta e vendas"
+          name="LaunchOps · Meta Ads e vendas"
           status={source.label}
           tone={source.tone}
-          description="Gasto do Meta por anúncio, leads pagos e vendas da Hubla. A Central relê a janela dos últimos 7 dias a cada sincronização, de hora em hora."
+          description="Gasto do Meta Ads por anúncio, leads pagos e vendas da Hubla. A Central relê a janela dos últimos 7 dias a cada sincronização, de hora em hora."
           details={[
             ['Via', 'LaunchOps (só leitura)'],
             ['Gasto', 'anuncio_dia · por anúncio'],
@@ -203,7 +203,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
           name="Hubla"
           status={hasHublaToken ? 'token configurado' : 'sem token'}
           tone={hasHublaToken ? 'ok' : 'warn'}
-          description="Webhook de pagamento: liga cada venda ao clique do teste A/B que a trouxe."
+          description="Webhook de pagamento: liga cada venda ao clique do link A/B que a trouxe."
           details={[
             ['URL', webhookUrl],
             ['Token', hasHublaToken ? 'configurado' : 'falta colar'],
@@ -269,10 +269,10 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
 
         <IntegrationCard
           logo="%"
-          name="Imposto do Meta"
+          name="Imposto do Meta Ads"
           status={currentTax ? `${percent(currentTax.factor)} vigente` : 'sem imposto'}
           tone={currentTax ? 'ok' : 'warn'}
-          description="O gasto chega do Meta sem imposto. A taxa entra no investimento, no CPA e no ROAS a partir da data; os dias anteriores mantêm a taxa que valia antes."
+          description="O gasto chega do Meta Ads sem imposto. A taxa entra no investimento, no CPA e no ROAS a partir da data; os dias anteriores mantêm a taxa que valia antes."
           details={(taxRates ?? []).map((rate) => [`desde ${rate.valid_from.split('-').reverse().join('/')}`, percent(rate.factor)] as [string, ReactNode])}
           settings={
             <>

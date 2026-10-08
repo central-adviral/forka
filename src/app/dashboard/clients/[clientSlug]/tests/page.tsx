@@ -65,7 +65,7 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
       <div className="mb-9">
         <PageHeader
           note={client.name}
-          title="A/B de link"
+          title="Links A/B"
           description="Cada teste divide o tráfego de um link /r entre as variantes e mede por pessoa quem compra mais."
           actions={
             canEdit && <a

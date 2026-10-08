@@ -128,7 +128,7 @@ describe('updateWatcher', () => {
   it('refuses editing a watcher of an archived project', async () => {
     db.watcher = { id: 'w-1', front_id: null, plan_role: 'principal' }
     db.archivedTable = 'sales_funnels'
-    await expect(updateWatcher(context, form({ target: '80' }))).rejects.toThrow(/erro=Projeto arquivado/)
+    await expect(updateWatcher(context, form({ target: '80' }))).rejects.toThrow(/erro=Funil arquivado/)
     expect(updates('watchers')).toEqual([])
   })
 

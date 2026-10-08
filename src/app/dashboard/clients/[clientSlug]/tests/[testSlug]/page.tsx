@@ -38,7 +38,7 @@ const REPORT_TABS = [
   { value: 'desempenho', label: 'Desempenho' },
   { value: 'criativos', label: 'Criativos' },
   { value: 'origens', label: 'Origens' },
-  { value: 'regras', label: 'Regras' },
+  { value: 'regras', label: 'Destinos' },
   { value: 'insight', label: 'Insight' },
 ] as const
 

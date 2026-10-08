@@ -35,7 +35,7 @@ export default async function NewProjectPage({ params }: { params: Promise<{ cli
   const { data: client } = await supabase.from('clients').select('id, slug, funnel_source_url').eq('slug', clientSlug).maybeSingle()
   if (!client) notFound()
   if (!(await canActAs(supabase, client.id, 'gestor'))) {
-    return <p className="px-4 pt-12 text-[13px] text-[var(--ct-text-2)] md:px-14">Só gestor ou owner cria projetos.</p>
+    return <p className="px-4 pt-12 text-[13px] text-[var(--ct-text-2)] md:px-14">Só gestor ou owner cria funis.</p>
   }
 
   const [projects, fronts, watchers, products, pages, campaigns] = await Promise.all([
@@ -60,12 +60,12 @@ export default async function NewProjectPage({ params }: { params: Promise<{ cli
 
   const previewCampaigns: PreviewCampaign[] = ((campaigns.data ?? []) as ClassifiedCampaign[]).map((campaign) => {
     const owner = campaign.front_ids[0] ? frontById.get(campaign.front_ids[0]) : undefined
-    return { campaign_name: campaign.campaign_name, spend: Number(campaign.spend), owner_project: owner ? (projectName.get(owner.sales_funnel_id) ?? 'outro projeto') : null }
+    return { campaign_name: campaign.campaign_name, spend: Number(campaign.spend), owner_project: owner ? (projectName.get(owner.sales_funnel_id) ?? 'outro funil') : null }
   })
   const existingPages: ExistingPage[] = pageRows.map((page) => {
     const front = page.front_id ? frontById.get(page.front_id) : undefined
     const project = page.sales_funnel_id ? projectName.get(page.sales_funnel_id) : undefined
-    return { url: page.url, where: [project ?? 'sem projeto', front?.name].filter(Boolean).join(' · ') }
+    return { url: page.url, where: [project ?? 'sem funil', front?.name].filter(Boolean).join(' · ') }
   })
   const targets = (watchers.data ?? []) as { sales_funnel_id: string; target: number; plan_role: 'principal' | 'secundaria' }[]
   const productRows = (products.data ?? []) as unknown as { sales_funnel_id: string; produto_nome: string; papel: ProductRole }[]
@@ -111,7 +111,7 @@ export default async function NewProjectPage({ params }: { params: Promise<{ cli
 
   return (
     <div className="flex max-w-[1240px] flex-col gap-6 px-4 pb-24 pt-12 md:px-14">
-      <PageHeader title="Novo projeto" note="Quatro passos: o projeto, as frentes (de onde vem o gasto e para onde vão as pessoas), os produtos e a conferência." />
+      <PageHeader title="Novo funil" note="Quatro passos: o funil, as frentes (de onde vem o gasto e para onde vão as pessoas), os produtos e a conferência." />
       <ProjectWizard
         context={{ client_id: client.id, client_slug: client.slug }}
         campaigns={previewCampaigns}

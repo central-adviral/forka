@@ -46,7 +46,7 @@ export function FrontsPanel({
   if (fronts.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-[var(--ct-line-2)] p-6 text-sm text-[var(--ct-text-2)]">
-        Este projeto ainda não tem frentes. Crie em <Link href={rulesHref} className="text-[var(--ct-accent)]">Regras de campanha</Link>.
+        Este funil ainda não tem frentes. Crie em <Link href={rulesHref} className="text-[var(--ct-accent)]">Frentes e etiquetas</Link>.
       </p>
     )
   }
@@ -157,7 +157,7 @@ export function FrontsPanel({
         </table>
         <p className="border-t border-[var(--ct-line)] px-5 py-3 text-[11.5px] text-[var(--ct-text-3)]">
           Investimento com o imposto do cliente. Vendas de anúncio da frente: as que trazem na UTM o id de uma campanha dela (ou de um anúncio dela). Gasto sem dono fica fora das frentes, em Não classificado:{' '}
-          <Link href={rulesHref} className="text-[var(--ct-accent)]">ver em Regras de campanha</Link>.
+          <Link href={rulesHref} className="text-[var(--ct-accent)]">ver em Frentes e etiquetas</Link>.
         </p>
       </div>
     </div>

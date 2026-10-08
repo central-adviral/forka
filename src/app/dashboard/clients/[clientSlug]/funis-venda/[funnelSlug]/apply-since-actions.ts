@@ -49,7 +49,7 @@ function describe(since: string, row: ApplySinceRow): string {
   if (n(row.sales_changed) === 0) parts.push(`Nenhuma venda desde ${dayLabel(since)} muda.`)
   else {
     const details = [
-      n(row.sales_in) > 0 ? `${n(row.sales_in)} entram neste projeto (${currency(n(row.revenue_in))} líquido)` : null,
+      n(row.sales_in) > 0 ? `${n(row.sales_in)} entram neste funil (${currency(n(row.revenue_in))} líquido)` : null,
       n(row.sales_out) > 0 ? `${n(row.sales_out)} saem dele (${currency(n(row.revenue_out))} líquido)` : null,
       n(row.role_changed) > 0 ? `${n(row.role_changed)} mudam de papel` : null,
     ].filter(Boolean)

@@ -116,7 +116,7 @@ export function Sidebar(props: Props) {
               {props.clients.length === 0 && <span className="px-2.5 py-1.5 text-[12.5px] text-[var(--ct-text-3)]">Nenhum cliente ainda</span>}
             </Picker>
             {activeClient ? (
-              <Picker label="Projeto" value={project?.name ?? 'Nenhum'} dot={projectDot}>
+              <Picker label="Funil" value={project?.name ?? 'Nenhum'} dot={projectDot}>
                 {activeClient.projects.map((item) => (
                   <PickerItem key={item.slug} href={props.projectHref(item.slug)} active={item.slug === project?.slug} onNavigate={props.onNavigate}>
                     <span className="truncate">{item.name}</span>
@@ -124,7 +124,7 @@ export function Sidebar(props: Props) {
                   </PickerItem>
                 ))}
                 <PickerItem href={`/dashboard/clients/${activeClient.slug}/funis-venda`} active={false} onNavigate={props.onNavigate}>
-                  <span className="text-[var(--ct-text-3)]">Todos os projetos</span>
+                  <span className="text-[var(--ct-text-3)]">Todos os funis</span>
                 </PickerItem>
               </Picker>
             ) : (

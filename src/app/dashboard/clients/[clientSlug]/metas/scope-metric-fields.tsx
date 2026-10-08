@@ -56,10 +56,10 @@ export function ScopeMetricFields({
     <>
       <input type="hidden" name="scope" value={scope} />
       <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)] xl:col-span-2">
-        Projeto
+        Funil
         <select required value={funnelId} onChange={(event) => pick(event.target.value, '')} className={fieldClass}>
           <option value="" disabled>
-            escolher projeto
+            escolher funil
           </option>
           {projects.map((option) => (
             <option key={option.funnelId} value={option.funnelId}>
@@ -69,9 +69,9 @@ export function ScopeMetricFields({
         </select>
         {project && (
           <span className="text-[11px]">
-            Campanhas do projeto pelas{' '}
+            Campanhas do funil pelas{' '}
             <a href={project.rulesHref} className="text-[var(--ct-accent)] hover:underline">
-              Regras de campanha
+              Frentes e etiquetas
             </a>
             , as mesmas das Análises.
           </span>
@@ -88,7 +88,7 @@ export function ScopeMetricFields({
             </option>
           ))}
         </select>
-        <span className="text-[11px]">{frontId ? 'Vendas da frente: as que a UTM liga a um anúncio dela (CPA de anúncio e ROAS).' : 'Com todas as vendas do projeto: vale para CPA e ROAS.'}</span>
+        <span className="text-[11px]">{frontId ? 'Vendas da frente: as que a UTM liga a um anúncio dela (CPA de anúncio e ROAS).' : 'Com todas as vendas do funil: vale para CPA e ROAS.'}</span>
       </label>
       <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
         Métrica

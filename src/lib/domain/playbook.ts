@@ -6,7 +6,7 @@ export const PLAYBOOK = [
   { from: 1, label: 'D1 · Primeiros cliques', text: 'Confira se os cliques chegam nas variantes e se a primeira venda chega com código.' },
   { from: 3, label: 'D3 · Conferir o sorteio', text: 'O selo "sorteio no peso" deve estar ok. Se não estiver, o link de algum anúncio está errado.' },
   { from: 7, label: 'D7 · Primeira leitura', text: 'Olhe a tendência, mas não decida: uma semana ainda é pouco para a maioria dos testes.' },
-  { from: 10, label: 'D10–21 · Decidir', text: 'Decida quando o card for para "Pede decisão": amostra batida e regra do jogo atingida.' },
+  { from: 10, label: 'D10–21 · Decidir', text: 'Decida quando o teste for para "Pede decisão": amostra batida e critérios de decisão atingidos.' },
 ] as const
 
 /** What not to do while a test runs: each one mixes the result or makes it lie. */

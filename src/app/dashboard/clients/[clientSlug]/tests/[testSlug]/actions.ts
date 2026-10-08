@@ -208,7 +208,7 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
 // the draw. Written on the user's session: the 0084 policy lets only gestor or owner change them.
 const routeSchema = z.object({
   match_field: z.enum(['ad_name', 'utm_source', 'device']),
-  match_value: z.string().trim().min(1, 'informe o valor da regra').max(120),
+  match_value: z.string().trim().min(1, 'informe o valor do destino').max(120),
   destination_url: httpUrl,
 })
 
@@ -236,7 +236,7 @@ export async function addRoute(target: { client_slug: string; test_slug: string;
     match_value: parsed.data.match_value,
     destination_url: parsed.data.destination_url,
   })
-  if (error) redirect(editPath(target.client_slug, target.test_slug, 'A regra não foi salva. Só gestor ou owner pode mudar o teste.'))
+  if (error) redirect(editPath(target.client_slug, target.test_slug, 'O destino não foi salvo. Só gestor ou owner pode mudar o teste.'))
   revalidatePath(`/dashboard/clients/${target.client_slug}/tests/${target.test_slug}`)
   redirect(editPath(target.client_slug, target.test_slug))
 }
@@ -244,7 +244,7 @@ export async function addRoute(target: { client_slug: string; test_slug: string;
 export async function deleteRoute(target: { client_slug: string; test_slug: string; route_id: string }) {
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase.from('variant_routes').delete().eq('id', target.route_id).select('id')
-  if (error || !data?.length) redirect(editPath(target.client_slug, target.test_slug, 'A regra não foi removida. Só gestor ou owner pode mudar o teste.'))
+  if (error || !data?.length) redirect(editPath(target.client_slug, target.test_slug, 'O destino não foi removido. Só gestor ou owner pode mudar o teste.'))
   revalidatePath(`/dashboard/clients/${target.client_slug}/tests/${target.test_slug}`)
   redirect(editPath(target.client_slug, target.test_slug))
 }

@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Central de Tráfego",
-  description: "Black Sheep · performance de tráfego por cliente e projeto",
+  description: "Black Sheep · performance de tráfego por cliente e funil",
 };
 
 // Applied before the first paint so a light-mode user never sees a dark flash.

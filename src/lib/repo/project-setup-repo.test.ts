@@ -86,7 +86,7 @@ describe('getProjectSetupStatus', () => {
     expect(result!.steps.find((step) => step.id === 'produtos')!.text).toContain('CPL')
   })
 
-  it('3. Regras de campanha: every own front needs a "contém" rule; a mirror front needs none', async () => {
+  it('3. Frentes e etiquetas: every own front needs a "contém" rule; a mirror front needs none', async () => {
     // No front at all: no rules, and no front to hang a page on.
     expect(pending(await status({ fronts: [] }))).toEqual(['regras', 'paginas'])
     const excludeOnly = await status({ fronts: [{ id: 'f1', name: 'Captação', source_sales_funnel_id: null, naming_rules: [{ kind: 'exclude' }] }] })
@@ -95,7 +95,7 @@ describe('getProjectSetupStatus', () => {
     const mirror = await status({ namingRules: 0, fronts: [{ source_sales_funnel_id: 'other', naming_rules: [] }] })
     // Rules are fine; pages are not, since a mirror front owns no page.
     expect(pending(mirror)).toEqual(['paginas'])
-    expect(mirror!.steps.find((step) => step.id === 'regras')!.text).toBe('1 frente lê outro projeto.')
+    expect(mirror!.steps.find((step) => step.id === 'regras')!.text).toBe('1 frente lê outro funil.')
   })
 
   it('4. Plano: needs the result and the cost target (the project-wide cost watcher)', async () => {

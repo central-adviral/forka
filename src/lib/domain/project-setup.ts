@@ -58,12 +58,12 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
   const rulesDone = facts.ownFronts + facts.mirrorFronts > 0 && frontsWithoutInclude === 0
   const rulesText =
     facts.ownFronts + facts.mirrorFronts === 0
-      ? 'Nenhuma frente: o projeto ainda não sabe quais campanhas são dele.'
+      ? 'Nenhuma frente: o funil ainda não sabe quais campanhas são dele.'
       : frontsWithoutInclude > 0
-        ? `${plural(frontsWithoutInclude, 'frente sem', 'frentes sem')} regra de "contém": não pega nenhuma campanha.`
+        ? `${plural(frontsWithoutInclude, 'frente sem etiqueta: não pega', 'frentes sem etiqueta: não pegam')} nenhuma campanha.`
         : [
-            facts.ownFronts > 0 ? `${plural(facts.namingRules, 'regra', 'regras')} de nome definindo as campanhas do projeto` : null,
-            facts.mirrorFronts > 0 ? `${plural(facts.mirrorFronts, 'frente lê', 'frentes leem')} outro projeto` : null,
+            facts.ownFronts > 0 ? `${plural(facts.namingRules, 'etiqueta', 'etiquetas')} definindo as campanhas do funil` : null,
+            facts.mirrorFronts > 0 ? `${plural(facts.mirrorFronts, 'frente lê', 'frentes leem')} outro funil` : null,
           ]
             .filter(Boolean)
             .join('; ') + '.'
@@ -80,7 +80,7 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
     },
     {
       id: 'projeto',
-      label: 'Projeto',
+      label: 'Funil',
       done: true,
       text: `Objetivo ${objective.label.toLowerCase()} (${objective.cost}), ${window}.`,
     },
@@ -98,7 +98,7 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
     },
     {
       id: 'regras',
-      label: 'Frentes e regras',
+      label: 'Frentes e etiquetas',
       done: rulesDone,
       text: rulesText,
     },
@@ -115,13 +115,13 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
     },
     {
       id: 'plano',
-      label: 'Plano',
+      label: 'Resultado e meta',
       done: plan,
-      text: plan ? `Resultado ${facts.resultado} com alvo definido.` : 'Falta o resultado do projeto e o custo-alvo.',
+      text: plan ? `Resultado ${facts.resultado} com meta definida.` : 'Falta o resultado do funil e a meta de custo.',
     },
     {
       id: 'metas',
-      label: 'Vigias',
+      label: 'Metas e vigias',
       done: facts.extraWatchers > 0,
       text: facts.extraWatchers > 0 ? `${plural(facts.extraWatchers, 'vigia', 'vigias')} além do de custo.` : 'Só o vigia de custo: nada avisa quando CTR, CPM ou frequência saem da faixa.',
     },
@@ -136,7 +136,7 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
         ? `Falta resolver: ${facts.openSeals.join('; ')}.`
         : pendingBefore > 0
           ? 'Conclua os passos acima; o mapa abaixo mostra o que entra em cada número.'
-          : 'Tudo certo: cada número do projeto mostra de onde vem.',
+          : 'Tudo certo: cada número do funil mostra de onde vem.',
   })
   return { steps, done: steps.filter((step) => step.done).length }
 }

@@ -303,13 +303,13 @@ export interface SealContext {
 /** What is still missing, by severity: a critical seal blocks "Ligar projeto". */
 export function seals(project: WizardProject, context: SealContext): Seal[] {
   const out: Seal[] = []
-  if (!project.name.trim()) out.push({ tone: 'crit', text: 'Projeto sem nome.', step: 0 })
-  if (!project.slug) out.push({ tone: 'crit', text: 'Projeto sem endereço interno.', step: 0 })
-  else if (context.takenSlugs.includes(project.slug)) out.push({ tone: 'crit', text: `Já existe um projeto com o endereço /${project.slug}.`, step: 0 })
+  if (!project.name.trim()) out.push({ tone: 'crit', text: 'Funil sem nome.', step: 0 })
+  if (!project.slug) out.push({ tone: 'crit', text: 'Funil sem endereço interno.', step: 0 })
+  else if (context.takenSlugs.includes(project.slug)) out.push({ tone: 'crit', text: `Já existe um funil com o endereço /${project.slug}.`, step: 0 })
   if (project.primary === project.secondary) out.push({ tone: 'crit', text: 'A métrica secundária precisa ser diferente da principal.', step: 0 })
-  if (!(project.primaryTarget > 0) || !(project.secondaryTarget > 0)) out.push({ tone: 'crit', text: 'Preencha os alvos da métrica principal e da secundária.', step: 0, draftOk: true })
-  if (project.startsOn && project.endsOn && project.endsOn < project.startsOn) out.push({ tone: 'crit', text: 'O fim do projeto vem antes do início.', step: 0 })
-  if (project.fronts.length === 0) out.push({ tone: 'crit', text: 'Projeto sem frente: não há de onde vir o gasto.', step: 1, draftOk: true })
+  if (!(project.primaryTarget > 0) || !(project.secondaryTarget > 0)) out.push({ tone: 'crit', text: 'Preencha as metas da métrica principal e da secundária.', step: 0, draftOk: true })
+  if (project.startsOn && project.endsOn && project.endsOn < project.startsOn) out.push({ tone: 'crit', text: 'O fim do funil vem antes do início.', step: 0 })
+  if (project.fronts.length === 0) out.push({ tone: 'crit', text: 'Funil sem frente: não há de onde vir o gasto.', step: 1, draftOk: true })
   const codes = project.fronts.map((front) => front.code.trim().toUpperCase())
   project.fronts.forEach((front, index) => {
     if (!front.code.trim() || !front.name.trim()) out.push({ tone: 'crit', text: `Frente ${index + 1} sem nome ou código.`, step: 1 })
@@ -322,12 +322,12 @@ export function seals(project: WizardProject, context: SealContext): Seal[] {
       else if (!preview.campaigns.length) out.push({ tone: 'info', text: `Frente ${front.name} aguardando campanhas com ${front.tag.trim()}.`, step: 1 })
       if (preview.campaigns.length && !front.pages.some((page) => page.url.trim())) out.push({ tone: 'warn', text: `Frente ${front.name} recebe anúncio e não tem página vigiada.`, step: 1 })
     } else {
-      if (!front.sourceProjectId) out.push({ tone: 'crit', text: `Frente espelho ${front.name} sem projeto de origem.`, step: 1 })
+      if (!front.sourceProjectId) out.push({ tone: 'crit', text: `Frente espelho ${front.name} sem funil de origem.`, step: 1 })
       if (!front.windowStart || !front.windowEnd) out.push({ tone: 'crit', text: `Frente espelho ${front.name} sem janela de datas.`, step: 1, draftOk: true })
       else if (front.windowEnd < front.windowStart) out.push({ tone: 'crit', text: `Frente espelho ${front.name}: o fim da janela vem antes do início.`, step: 1 })
     }
     if (front.own && front.primary === front.secondary) out.push({ tone: 'crit', text: `Frente ${front.name}: a métrica secundária precisa ser diferente da principal.`, step: 1 })
-    if (front.own && (!(front.primaryTarget > 0) || !(front.secondaryTarget > 0))) out.push({ tone: 'crit', text: `Frente ${front.name}: preencha os alvos das métricas próprias.`, step: 1, draftOk: true })
+    if (front.own && (!(front.primaryTarget > 0) || !(front.secondaryTarget > 0))) out.push({ tone: 'crit', text: `Frente ${front.name}: preencha as metas das métricas próprias.`, step: 1, draftOk: true })
     if (front.pages.some((_, pageIndex) => pageConflict(project, index, pageIndex, context.existingPages))) {
       out.push({ tone: 'crit', text: `Frente ${front.name} tem página que já está em outra frente.`, step: 1 })
     }
@@ -335,7 +335,7 @@ export function seals(project: WizardProject, context: SealContext): Seal[] {
   })
   const newPages = project.fronts.filter((front) => front.kind === 'propria').flatMap((front) => front.pages).filter((page) => page.url.trim()).length
   if (context.activePages + newPages > MAX_PAGES_PER_CLIENT) {
-    out.push({ tone: 'crit', text: `A sonda acompanha até ${MAX_PAGES_PER_CLIENT} páginas por cliente; este projeto passaria de ${context.activePages + newPages}.`, step: 1 })
+    out.push({ tone: 'crit', text: `A sonda acompanha até ${MAX_PAGES_PER_CLIENT} páginas por cliente; este funil passaria de ${context.activePages + newPages}.`, step: 1 })
   }
   if (needsProducts(project) && !Object.values(project.products).includes('entrada')) {
     out.push({ tone: 'crit', text: 'Uma métrica escolhida depende de venda (CPA ou ROAS) e não há produto de entrada.', step: 2, draftOk: true })

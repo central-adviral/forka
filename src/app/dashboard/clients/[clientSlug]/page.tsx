@@ -21,7 +21,7 @@ const PERIODS = [
 type Period = (typeof PERIODS)[number]['value']
 
 const TOOL_LABEL: Record<AttentionItem['tool'], string> = {
-  painel: 'Painel de Controle',
+  painel: 'Alertas',
   analises: 'Análises',
   ab: 'Testes',
   config: 'Configurar',
@@ -137,7 +137,7 @@ export default async function TodayPage({
       foot: [
         vendasAnuncio > 0 ? `de anúncio ${currency2(cpaBase / vendasAnuncio)}` : 'sem venda de anúncio',
         vendasAnuncioSemId > 0 ? `${vendasAnuncioSemId} anúncio sem identificação (fora do CPA de anúncio)` : null,
-        vendasSemProjeto > 0 ? `${vendasSemProjeto} sem projeto` : null,
+        vendasSemProjeto > 0 ? `${vendasSemProjeto} sem funil` : null,
       ]
         .filter(Boolean)
         .join(' · '),
@@ -145,7 +145,7 @@ export default async function TodayPage({
       color: '',
     },
     { label: 'Leads', tag: 'pagos', value: leads.toLocaleString('pt-BR'), foot: 'leads de anúncio, sem duplicata', spark: sparkOf('leads'), color: 'var(--ct-painel)' },
-    { label: 'CPL', tag: partial ? 'parcial' : 'pagos', value: leads > 0 ? currency2(cplBase / leads) : '—', foot: classified ? 'investimento dos projetos de lead ÷ leads' : 'investimento ÷ leads', spark: [], color: '' },
+    { label: 'CPL', tag: partial ? 'parcial' : 'pagos', value: leads > 0 ? currency2(cplBase / leads) : '—', foot: classified ? 'investimento dos funis de lead ÷ leads' : 'investimento ÷ leads', spark: [], color: '' },
   ]
 
   const maxVendas = Math.max(...weekDays.map((day) => day.vendas), 1)
@@ -157,7 +157,7 @@ export default async function TodayPage({
         note={
           <>
             {client.name} · {weekdayLabel}.
-            {metaDataAt ? ` Gasto do Meta até ${timeBr(metaDataAt)}.` : ' O gasto de hoje ainda não chegou do Meta.'}
+            {metaDataAt ? ` Gasto do Meta Ads até ${timeBr(metaDataAt)}.` : ' O gasto de hoje ainda não chegou do Meta Ads.'}
           </>
         }
         actions={
@@ -198,7 +198,7 @@ export default async function TodayPage({
 
       {partial && todayRow?.dadosAte && (
         <p className="-mt-4 border-l-2 border-[var(--ct-line-2)] pl-3 text-[12.5px] text-[var(--ct-text-3)]">
-          Hoje é parcial: as vendas entram até {timeBr(todayRow.dadosAte)}, o horário do último gasto do Meta, para o CPA comparar igual com
+          Hoje é parcial: as vendas entram até {timeBr(todayRow.dadosAte)}, o horário do último gasto do Meta Ads, para o CPA comparar igual com
           igual.{todayRow.vendasAposDados > 0 && ` ${todayRow.vendasAposDados} chegaram depois e entram no próximo pull.`} O CPA geral conta
           todas as vendas de entrada; o de anúncio, só as que a UTM liga ao anúncio.
         </p>
@@ -207,7 +207,7 @@ export default async function TodayPage({
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <section id="atencao" className="flex scroll-mt-6 flex-col gap-4">
           <header>
-            <h2 className="text-[19px] font-semibold">Precisa da sua atenção</h2>
+            <h2 className="text-[19px] font-semibold">Fila do dia</h2>
             <p className="mt-1 text-[13px] text-[var(--ct-text-3)]">Uma fila só, das três ferramentas. Some daqui quando o problema é resolvido.</p>
           </header>
           <div className="card-shadow rounded-[18px] border border-[var(--ct-line)]">
@@ -280,9 +280,9 @@ export default async function TodayPage({
         </header>
         <div className="grid gap-5 md:grid-cols-3">
           {[
-            { href: `${base}/funis-venda`, title: 'Análises', color: 'var(--ct-an)', stat: `${(funnels ?? []).filter((f) => f.is_active).length} projetos ativos`, text: 'Frentes, funil, origem das vendas e criativos de cada projeto.' },
+            { href: `${base}/funis-venda`, title: 'Análises', color: 'var(--ct-an)', stat: `${(funnels ?? []).filter((f) => f.is_active).length} funis ativos`, text: 'Frentes, caminho de conversão, origem das vendas e criativos de cada funil.' },
             { href: `${base}/tests`, title: 'Testes', color: 'var(--ct-ab)', stat: `${(activeTests ?? []).length} testes rodando`, text: 'Sorteio no clique, venda devolvida ao anúncio e veredito com probabilidade.' },
-            { href: firstProject ? `${base}/funis-venda/${firstProject.slug}/regras` : `${base}/funis-venda`, title: 'Regras de campanha', color: 'var(--ct-painel)', stat: `${conflicts.length + orphans.length} campanhas sem dono`, text: 'Quem é dono de cada campanha, e o que fica em Não classificado.' },
+            { href: firstProject ? `${base}/funis-venda/${firstProject.slug}/regras` : `${base}/funis-venda`, title: 'Frentes e etiquetas', color: 'var(--ct-painel)', stat: `${conflicts.length + orphans.length} campanhas sem dono`, text: 'Quem é dono de cada campanha, e o que fica em Não classificado.' },
           ].map((door) => (
             <Link
               key={door.title}

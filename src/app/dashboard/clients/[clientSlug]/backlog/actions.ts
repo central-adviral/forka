@@ -31,7 +31,7 @@ function back(context: BacklogContext, param: 'ok' | 'erro', message: string, ex
 
 const score = z.coerce.number().int().min(1).max(10)
 const itemSchema = z.object({
-  title: z.string().trim().min(1, 'dê um título para a hipótese').max(120),
+  title: z.string().trim().min(1, 'dê um título para o teste').max(120),
   hypothesis: z.string().trim().max(1000),
   stage: z.enum(Object.keys(STAGES) as [keyof typeof STAGES, ...(keyof typeof STAGES)[]]),
   method: z.enum(Object.keys(METHODS) as [Method, ...Method[]]),
@@ -86,7 +86,7 @@ export async function createItem(context: BacklogContext, formData: FormData) {
     })
     .select('id')
     .single()
-  if (error) back(context, 'erro', error.code === '42501' ? 'Só gestor ou owner pode criar hipóteses.' : error.message, '&nova=1')
+  if (error) back(context, 'erro', error.code === '42501' ? 'Só gestor ou owner pode criar testes.' : error.message, '&nova=1')
   const { error: childError } = await supabase.from('backlog_variants').insert(
     names.map((name, index) => ({ item_id: item.id, client_id: context.client_id, key: String.fromCharCode(65 + index), name, position: index }))
   )
@@ -103,7 +103,7 @@ export async function createItem(context: BacklogContext, formData: FormData) {
       revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
       redirect(`/dashboard/clients/${context.client_slug}/tests/${created.slug}/link`)
     }
-    linkNote = ` O link não foi criado: ${created.error} Crie em Testes › A/B de link e vincule no card.`
+    linkNote = ` O link não foi criado: ${created.error} Crie em Testes › Links A/B e vincule no teste.`
   }
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
   back(context, 'ok', `${code} entrou na fila.${linkNote}`, `&item=${code}`)
@@ -164,14 +164,14 @@ async function createExperimentTest(
       break
     }
     // Only a taken slug is worth a second try with a suffix; anything else is the answer.
-    if (error.code !== '23505') return { ok: false, error: 'o teste A/B foi recusado.' }
+    if (error.code !== '23505') return { ok: false, error: 'o link A/B foi recusado.' }
   }
   if (!testId) return { ok: false, error: 'o endereço do link já está em uso.' }
 
   const { error: placeError } = await supabase.from('tests').update({ status: 'paused', sales_funnel_id: context.sales_funnel_id }).eq('id', testId)
-  if (placeError) return { ok: false, error: 'o teste foi criado, mas não entrou no projeto.' }
+  if (placeError) return { ok: false, error: 'o link A/B foi criado, mas não entrou no funil.' }
   const { error: linkError } = await supabase.from('backlog_items').update({ ab_test_id: testId }).eq('id', input.itemId)
-  if (linkError) return { ok: false, error: 'o teste foi criado, mas não ficou vinculado ao card.' }
+  if (linkError) return { ok: false, error: 'o link A/B foi criado, mas não ficou vinculado ao teste.' }
   await supabase.from('backlog_gates').update({ done_at: new Date().toISOString() }).eq('item_id', input.itemId).eq('label', AUTO_LINK_GATE)
   return { ok: true, slug: testSlug }
 }
@@ -207,7 +207,7 @@ export async function moveItem(context: BacklogContext & { item_id: string; code
     .update({ status: to, started_at: to === 'running' ? (item.started_at ?? new Date().toISOString()) : null })
     .eq('id', context.item_id)
     .select('id')
-  if (error || !moved?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode mover hipóteses.', `&item=${context.code}`)
+  if (error || !moved?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode mover testes.', `&item=${context.code}`)
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
   back(context, 'ok', `${context.code} foi para ${COLUMNS.find((column) => column.status === to)!.label}.`, `&item=${context.code}`)
 }
@@ -268,12 +268,12 @@ export async function decideItem(context: BacklogContext & { item_id: string; co
   let winnerVariantId: string | null = null
   if (actOnTest) {
     const { data: card } = await supabase.from('backlog_items').select('ab_test_id').eq('id', context.item_id).maybeSingle()
-    if (!card?.ab_test_id) back(context, 'erro', 'Este card não tem teste A/B vinculado: não há tráfego para mudar.', `&item=${context.code}`)
+    if (!card?.ab_test_id) back(context, 'erro', 'Este teste não tem link A/B vinculado: não há tráfego para mudar.', `&item=${context.code}`)
     const { data: testVariants, error: readError } = await supabase.from('variants').select('id, name').eq('test_id', card.ab_test_id)
-    if (readError || !testVariants?.length) back(context, 'erro', 'Não foi possível ler as variantes do teste A/B.', `&item=${context.code}`)
+    if (readError || !testVariants?.length) back(context, 'erro', 'Não foi possível ler as variantes do link A/B.', `&item=${context.code}`)
     winnerVariantId = matchTestVariant(winnerCardVariant!, testVariants)
     if (!winnerVariantId) {
-      back(context, 'erro', `Não achei no teste A/B a variante "${winnerCardVariant!.name}". Renomeie a variante do teste com o mesmo nome ou com a letra ${winnerKey}.`, `&item=${context.code}`)
+      back(context, 'erro', `Não achei no link A/B a variante "${winnerCardVariant!.name}". Renomeie a variante do link com o mesmo nome ou com a letra ${winnerKey}.`, `&item=${context.code}`)
     }
   }
   const { error } = await supabase.rpc('decide_experiment', {
@@ -345,14 +345,14 @@ export async function linkAbTest(context: BacklogContext & { item_id: string; co
   const supabase = await createServerSupabaseClient()
   if (testId) {
     const { data: test } = await supabase.from('tests').select('id').eq('id', testId).eq('client_id', context.client_id).maybeSingle()
-    if (!test) back(context, 'erro', 'Teste A/B não encontrado neste cliente.', `&item=${context.code}`)
+    if (!test) back(context, 'erro', 'Link A/B não encontrado neste cliente.', `&item=${context.code}`)
   }
   const { data, error } = await supabase.from('backlog_items').update({ ab_test_id: testId || null }).eq('id', context.item_id).select('id')
-  if (error || !data?.length) back(context, 'erro', 'Só gestor ou owner pode vincular o teste A/B.', `&item=${context.code}`)
+  if (error || !data?.length) back(context, 'erro', 'Só gestor ou owner pode vincular o link A/B.', `&item=${context.code}`)
   // "Link /r criado" is a fact the Central knows, not a box to tick: it follows the link.
   await supabase.from('backlog_gates').update({ done_at: testId ? new Date().toISOString() : null }).eq('item_id', context.item_id).eq('label', AUTO_LINK_GATE)
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
-  back(context, 'ok', testId ? `${context.code} agora é medido pelo teste A/B vinculado.` : `${context.code} ficou sem teste A/B vinculado.`, `&item=${context.code}`)
+  back(context, 'ok', testId ? `${context.code} agora é medido pelo link A/B vinculado.` : `${context.code} ficou sem link A/B vinculado.`, `&item=${context.code}`)
 }
 
 const textSchema = itemSchema.pick({ title: true, hypothesis: true, metric: true, owner: true })
@@ -381,7 +381,7 @@ export async function editItem(context: BacklogContext & { item_id: string; code
     .update({ ...result.data, owner: result.data.owner || null })
     .eq('id', context.item_id)
     .select('id, ab_test_id')
-  if (error || !data?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode editar hipóteses.', `&item=${context.code}`)
+  if (error || !data?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode editar testes.', `&item=${context.code}`)
   if (!data[0].ab_test_id) {
     for (const variant of variants) {
       const { error: variantError } = await supabase.from('backlog_variants').update({ name: variant.name }).eq('id', variant.id).eq('item_id', context.item_id)
@@ -395,7 +395,7 @@ export async function editItem(context: BacklogContext & { item_id: string; code
 export async function deleteItem(context: BacklogContext & { item_id: string; code: string }) {
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase.from('backlog_items').delete().eq('id', context.item_id).select('id')
-  if (error || !data?.length) back(context, 'erro', 'Só gestor ou owner pode excluir hipóteses.', `&item=${context.code}`)
+  if (error || !data?.length) back(context, 'erro', 'Só gestor ou owner pode excluir testes.', `&item=${context.code}`)
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
   back(context, 'ok', `${context.code} saiu do backlog.`)
 }
@@ -412,7 +412,7 @@ export async function saveRules(context: BacklogContext, formData: FormData) {
   }
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase.from('sales_funnels').update({ test_rules: rules }).eq('id', context.sales_funnel_id).select('id')
-  if (error || !data?.length) back(context, 'erro', 'Só gestor ou owner pode mudar as regras do jogo.', '&aba=regras')
+  if (error || !data?.length) back(context, 'erro', 'Só gestor ou owner pode mudar os critérios de decisão.', '&aba=regras')
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
-  back(context, 'ok', 'Regras do jogo salvas.', '&aba=regras')
+  back(context, 'ok', 'Critérios de decisão salvos.', '&aba=regras')
 }
