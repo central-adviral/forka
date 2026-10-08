@@ -167,7 +167,7 @@ export default async function SalesFunnelPage({
   const hasSyncError = health.some((h) => h.lastResult === 'error')
 
   return (
-    <div className="flex max-w-[1440px] flex-col px-14 pb-24 pt-12">
+    <div className="flex max-w-[1440px] flex-col px-4 md:px-14 pb-24 pt-12">
       <div className="mb-9">
         <PageHeader
           tool="an"

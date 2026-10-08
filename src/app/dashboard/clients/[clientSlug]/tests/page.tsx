@@ -55,7 +55,7 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
   )
 
   return (
-    <div className="flex max-w-[1240px] flex-col px-14 pb-24 pt-12">
+    <div className="flex max-w-[1240px] flex-col px-4 md:px-14 pb-24 pt-12">
       <Suspense fallback={null}>
         <SuccessBanner param="created" message="Teste criado com sucesso." />
       </Suspense>

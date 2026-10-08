@@ -118,7 +118,7 @@ export default async function BacklogPage({
   const base = `/dashboard/clients/${client.slug}/backlog`
   if (!funnel) {
     return (
-      <div className="px-14 pt-12 text-sm text-[var(--ct-text-2)]">
+      <div className="px-4 md:px-14 pt-12 text-sm text-[var(--ct-text-2)]">
         Crie um projeto em <Link className="text-[var(--ct-accent)]" href={`/dashboard/clients/${client.slug}/funis-venda`}>Análises</Link> para começar o backlog de testes.
       </div>
     )

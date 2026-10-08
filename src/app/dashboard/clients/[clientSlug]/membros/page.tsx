@@ -47,7 +47,7 @@ export default async function MembersPage({
   const context = { client_id: client.id, client_slug: client.slug }
 
   return (
-    <div className="flex max-w-[960px] flex-col gap-10 px-14 pb-24 pt-12">
+    <div className="flex max-w-[960px] flex-col gap-10 px-4 md:px-14 pb-24 pt-12">
       <div>
         <span className="font-[family-name:var(--font-geist-mono)] text-[10.5px] font-medium uppercase tracking-[0.08em] text-[var(--ct-text-3)]">
           Configurar

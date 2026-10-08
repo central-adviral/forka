@@ -71,7 +71,7 @@ export default async function PainelPage({
   const lastDay = watchers.find((watcher) => watcher.lastDay)?.lastDay
 
   return (
-    <div className="flex max-w-[1240px] flex-col gap-9 px-14 pb-24 pt-12">
+    <div className="flex max-w-[1240px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <div className="flex flex-wrap items-end gap-4 border-b border-[var(--ct-line)] pb-7">
         <div>
           <span className="flex items-center gap-2.5">

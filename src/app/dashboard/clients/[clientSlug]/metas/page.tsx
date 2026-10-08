@@ -38,7 +38,7 @@ export default async function MetasPage({
     (front.naming_rules ?? []).filter((rule) => rule.kind === 'include').map((rule) => rule.value).join(' + ')
 
   return (
-    <div className="flex max-w-[1240px] flex-col gap-9 px-14 pb-24 pt-12">
+    <div className="flex max-w-[1240px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <div className="flex flex-wrap items-end gap-4 border-b border-[var(--ct-line)] pb-7">
         <div>
           <span className={`${mono} text-[10.5px] uppercase tracking-[0.08em] text-[var(--ct-text-3)]`}>Configurar · {client.name}</span>
