@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { VariantRoute } from '@/lib/domain/routing'
 
 export interface VariantRow {
   id: string
@@ -6,6 +7,8 @@ export interface VariantRow {
   weight_pct: number
   destination_url: string
   is_control: boolean
+  /** Routing rules (0084), in order; absent on rows read before them. */
+  variant_routes?: VariantRoute[]
 }
 
 export interface TestWithVariants {
@@ -24,10 +27,11 @@ export async function getTestBySlug(db: SupabaseClient, slug: string): Promise<T
   const { data, error } = await db
     .from('tests')
     .select(
-      'id, slug, status, fallback_url, test_type, sales_page_url, sales_funnel_id, variants(id, name, weight_pct, destination_url, is_control)'
+      'id, slug, status, fallback_url, test_type, sales_page_url, sales_funnel_id, variants(id, name, weight_pct, destination_url, is_control, variant_routes(id, match_field, match_value, destination_url, position))'
     )
     .eq('slug', slug)
     .order('name', { referencedTable: 'variants' })
+    .order('position', { referencedTable: 'variants.variant_routes' })
     .maybeSingle()
 
   if (error) throw error
@@ -47,6 +51,7 @@ export async function insertClickEvent(
     isBot?: boolean
     rateLimited?: boolean
     parentTrackingId?: string | null
+    routeId?: string | null
   }
 ): Promise<void> {
   const { error } = await db.from('click_events').insert({
@@ -60,6 +65,7 @@ export async function insertClickEvent(
     is_bot: params.isBot ?? false,
     rate_limited: params.rateLimited ?? false,
     parent_tracking_id: params.parentTrackingId ?? null,
+    route_id: params.routeId ?? null,
   })
   if (error) throw error
 }

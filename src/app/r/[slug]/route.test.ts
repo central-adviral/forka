@@ -314,4 +314,60 @@ describe('GET /r/[slug]', () => {
     expect(insertClickEvent).toHaveBeenCalledOnce()
     expect(insertClickEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ isBot: true }))
   })
+
+  describe('routing rules (0084): the draw picks the variant, the rule picks the page', () => {
+    const routedTest = (testType: 'page' | 'checkout' = 'page') => ({
+      id: 'test-1',
+      slug: 'oferta-x',
+      status: 'active' as const,
+      fallback_url: null,
+      test_type: testType,
+      sales_page_url: testType === 'checkout' ? 'https://example.com/vendas' : null,
+      sales_funnel_id: null,
+      variants: [
+        { id: 'v1', name: 'A · genérica', weight_pct: 50, destination_url: 'https://example.com/generica', is_control: true, variant_routes: [] },
+        {
+          id: 'v2',
+          name: 'B · casada',
+          weight_pct: 50,
+          destination_url: 'https://example.com/casada',
+          is_control: false,
+          variant_routes: [
+            { id: 'r-dor', match_field: 'ad_name' as const, match_value: '[dor]', destination_url: 'https://example.com/dor' },
+            { id: 'r-ganho', match_field: 'ad_name' as const, match_value: '[ganho]', destination_url: 'https://example.com/ganho' },
+          ],
+        },
+      ],
+    })
+
+    it('sends a [dor] ad drawn into the matched variant to the pain page, recording the rule', async () => {
+      vi.mocked(getTestBySlug).mockResolvedValue(routedTest())
+      vi.mocked(getOrAssignVariant).mockResolvedValue('v2')
+      const response = await GET(new NextRequest('https://ir.example.com/r/oferta-x?utm_term=UGC%20%5Bdor%5D%20v3&utm_source=facebookads'), { params: Promise.resolve({ slug: 'oferta-x' }) })
+      const location = new URL(response.headers.get('location')!)
+      expect(location.origin + location.pathname).toBe('https://example.com/dor')
+      expect(location.searchParams.get('utm_content')).toBeTruthy()
+      expect(insertClickEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ variantId: 'v2', routeId: 'r-dor' }))
+    })
+
+    it('keeps the variant page when no rule matches, and the generic variant untouched', async () => {
+      vi.mocked(getTestBySlug).mockResolvedValue(routedTest())
+      vi.mocked(getOrAssignVariant).mockResolvedValue('v2')
+      const response = await GET(new NextRequest('https://ir.example.com/r/oferta-x?utm_term=Carrossel'), { params: Promise.resolve({ slug: 'oferta-x' }) })
+      expect(new URL(response.headers.get('location')!).pathname).toBe('/casada')
+      expect(insertClickEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ routeId: null }))
+
+      vi.mocked(getOrAssignVariant).mockResolvedValue('v1')
+      const generic = await GET(new NextRequest('https://ir.example.com/r/oferta-x?utm_term=UGC%20%5Bdor%5D'), { params: Promise.resolve({ slug: 'oferta-x' }) })
+      expect(new URL(generic.headers.get('location')!).pathname).toBe('/generica')
+    })
+
+    it('ignores the rules on a checkout test: everyone goes to the sales page', async () => {
+      vi.mocked(getTestBySlug).mockResolvedValue(routedTest('checkout'))
+      vi.mocked(getOrAssignVariant).mockResolvedValue('v2')
+      const response = await GET(new NextRequest('https://ir.example.com/r/oferta-x?utm_term=UGC%20%5Bdor%5D'), { params: Promise.resolve({ slug: 'oferta-x' }) })
+      expect(new URL(response.headers.get('location')!).pathname).toBe('/vendas')
+    })
+  })
 })
+
