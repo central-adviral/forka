@@ -35,7 +35,9 @@ export function readMetaTest(code: string, keys: string[], creatives: CreativeRo
     const cpa = sales > 0 ? spend / sales : null
     let verdict: Verdict = 'measuring'
     if (tagged.length === 0) verdict = 'no_data'
-    else if (sales === 0 && spend >= rules.teto * rules.mult) verdict = 'cut'
+    // Cut: the limit spent with no sale, or spent at a CPA that is itself past the limit (one sale
+    // at R$ 300 against a R$ 55 ceiling is not a reason to keep paying).
+    else if (spend >= rules.teto * rules.mult && (sales === 0 || (cpa !== null && cpa >= rules.teto * rules.mult))) verdict = 'cut'
     else if (cpa !== null && cpa <= rules.teto && sales >= rules.min) verdict = 'win'
     return { key, ads: tagged.length, spend, sales, cpa, verdict }
   })

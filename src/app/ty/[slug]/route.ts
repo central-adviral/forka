@@ -11,7 +11,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (trackingId) {
     const db = createServiceRoleClient()
     const clickEvent = await getClickEventByTrackingId(db, trackingId)
-    if (clickEvent && clickEvent.testSlug === slug) {
+    // A bot's click is not a person: its "lead" would inflate the variant it was sent to.
+    if (clickEvent && clickEvent.testSlug === slug && !clickEvent.isBot) {
       await insertConversionIfNew(db, { clickEventId: clickEvent.id, source: 'thank_you_page' })
     }
   }
