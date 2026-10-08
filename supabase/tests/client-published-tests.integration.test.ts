@@ -23,7 +23,7 @@ async function abTest(clientId: string, name: string) {
   return test!.id as string
 }
 
-describe('0080: a client member reads only the A/B tests of published experiments', () => {
+describe('0082: a client member reads only the A/B tests of published experiments', () => {
   it('hides an unpublished test from the client, report included, and keeps every test for the analista', async () => {
     const { data: owner } = await admin.auth.admin.createUser({ email: `pub-owner-${unique()}@example.com`, password: 'password123', email_confirm: true })
     const { data: client } = await admin.from('clients').insert({ owner_id: owner!.user!.id, name: 'Pub', slug: `pub-${unique()}` }).select().single()
@@ -42,6 +42,8 @@ describe('0080: a client member reads only the A/B tests of published experiment
     expect(new Set(clientVariants!.map((row) => row.test_id))).toEqual(new Set([published]))
     expect((await cliente.rpc('get_test_report', { p_test_id: published, p_since: null, p_until: null })).error).toBeNull()
     expect((await cliente.rpc('get_test_report', { p_test_id: draft, p_since: null, p_until: null })).error?.message).toContain('not found or access denied')
+    expect((await cliente.rpc('get_test_daily', { p_test_id: draft, p_since: null })).error?.message).toContain('not found or access denied')
+    expect((await cliente.rpc('get_test_daily', { p_test_id: published, p_since: null })).error).toBeNull()
 
     const analista = await member(client!.id, 'analista')
     const { data: teamTests } = await analista.from('tests').select('name').eq('client_id', client!.id).order('name')
