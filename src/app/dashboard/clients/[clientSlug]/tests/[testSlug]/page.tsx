@@ -43,12 +43,17 @@ interface HourReportRow {
   revenue_cents: number
 }
 
+// One count for the whole report (0077): visits are people, conversions are buyers, and sales and
+// revenue are every purchase of those buyers, upsell included.
 interface ReportRow {
   variant_id: string
   variant_name: string
   weight_pct: number
   visits: number
   conversions: number
+  clicks: number
+  sales: number
+  revenue_cents: number
 }
 
 interface SourceReportRow {
@@ -60,15 +65,6 @@ interface SourceReportRow {
   conversions: number
   revenue_cents: number
   bot_clicks: number
-}
-
-interface TotalsReportRow {
-  variant_id: string
-  variant_name: string
-  clicks: number
-  visitors: number
-  conversions: number
-  revenue_cents: number
 }
 
 interface AdReportRow {
@@ -96,6 +92,12 @@ const METRIC_INFO = {
   faturamento: 'Soma do valor de todas as vendas confirmadas dessa linha.',
   rsPorClique: 'Faturamento dividido pelo número de cliques — quanto cada clique rendeu em média.',
   rsPorAcesso: 'Faturamento dividido pelo número de visitas únicas — quanto cada visitante rendeu em média.',
+  pessoas: 'Pessoas diferentes que entraram no teste, cada uma contada uma vez, na primeira variante que recebeu.',
+  compradores: 'Pessoas que compraram depois de entrar. É o número que decide o teste: a taxa e a chance usam ele.',
+  vendasTeste: 'Todas as compras dessas pessoas, incluindo upsell e segunda compra. Por isso pode ser maior que compradores.',
+  faturamentoTeste: 'Soma do valor dessas vendas.',
+  rsPorPessoa: 'Faturamento dividido pelas pessoas — quanto cada pessoa que entrou rendeu em média. Decide teste de preço e oferta.',
+  taxaClique: 'Porcentagem de cliques desta linha que viraram venda. É um recorte por clique: quem decide o teste é a taxa de compradores do resultado.',
   taxa: 'Porcentagem de pessoas que compraram: cada pessoa conta uma vez, mesmo com upsell. Por isso pode diferir da coluna de vendas, que conta cada venda.',
   gasto: 'Total investido em mídia paga nesse anúncio, vindo do Meta Ads.',
   cpm: 'Custo por mil impressões do anúncio no Meta Ads.',
@@ -231,7 +233,6 @@ export default async function TestReportPage({
   // get_test_report and the variant rows feed the header and the summary bar, which every tab
   // shows; the rest is fetched only by the tab that renders it.
   const skip = Promise.resolve({ data: null, error: null })
-  const needsTotals = tab === 'desempenho' || tab === 'criativos'
   const period = { p_test_id: test.id, p_since: sinceIso, p_until: untilIso }
   const previousPeriod = { p_test_id: test.id, p_since: previousSinceIso, p_until: previousUntilIso }
 
@@ -240,22 +241,18 @@ export default async function TestReportPage({
     { data: report, error: reportError },
     { data: sourceReport, error: sourceReportError },
     { data: adReport, error: adReportError },
-    { data: totalsReport, error: totalsReportError },
     { data: weekdayReport, error: weekdayReportError },
     { data: hourReport, error: hourReportError },
     { data: previousReport },
-    { data: previousTotalsReport },
     { data: lastWeightChange },
   ] = await Promise.all([
     supabase.from('variants').select('id, destination_url, is_control').eq('test_id', test.id),
     supabase.rpc('get_test_report', period),
     tab === 'origens' ? supabase.rpc('get_test_report_by_source', period) : skip,
     tab === 'criativos' ? supabase.rpc('get_test_report_by_ad', period) : skip,
-    needsTotals ? supabase.rpc('get_test_report_totals', period) : skip,
     tab === 'desempenho' ? supabase.rpc('get_test_report_by_weekday', period) : skip,
     tab === 'desempenho' ? supabase.rpc('get_test_report_by_hour', period) : skip,
     previousWindow ? supabase.rpc('get_test_report', previousPeriod) : skip,
-    previousWindow && tab === 'desempenho' ? supabase.rpc('get_test_report_totals', previousPeriod) : skip,
     supabase.from('test_changes').select('created_at').eq('test_id', test.id).eq('field', 'weight_pct').order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
@@ -271,12 +268,11 @@ export default async function TestReportPage({
   if (reportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report' }, reportError)
   if (sourceReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_source' }, sourceReportError)
   if (adReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_ad' }, adReportError)
-  if (totalsReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_totals' }, totalsReportError)
   if (weekdayReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_weekday' }, weekdayReportError)
   if (hourReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_hour' }, hourReportError)
 
   const hasPartialDataError = Boolean(
-    variantRowsError || sourceReportError || adReportError || totalsReportError || weekdayReportError || hourReportError
+    variantRowsError || reportError || sourceReportError || adReportError || weekdayReportError || hourReportError
   )
 
   const destinationById = new Map((variantRows ?? []).map((v) => [v.id, v.destination_url as string]))
@@ -330,12 +326,6 @@ export default async function TestReportPage({
   const leader = testLeader(rows, control?.variant_id)
   const leaderRow = leader ? rows.find((row) => row.variant_id === leader.variantId) : undefined
 
-  const revenueByVariant = new Map(
-    ((totalsReport as TotalsReportRow[]) ?? []).map((row) => [row.variant_id, row.revenue_cents])
-  )
-  const uniqueVisitorsByVariant = new Map(
-    ((totalsReport as TotalsReportRow[]) ?? []).map((row) => [row.variant_id, row.visitors])
-  )
 
   const layout = computeReportLayout(
     rows.map((row) => ({
@@ -343,9 +333,9 @@ export default async function TestReportPage({
       name: row.variant_name,
       weightPct: row.weight_pct,
       visits: row.visits,
-      uniqueVisitors: uniqueVisitorsByVariant.get(row.variant_id) ?? 0,
+      clicks: Number(row.clicks),
       conversions: row.conversions,
-      revenueCents: revenueByVariant.get(row.variant_id) ?? 0,
+      revenueCents: Number(row.revenue_cents),
       destinationUrl: destinationById.get(row.variant_id) ?? '',
     })),
     Boolean(test.fallback_url),
@@ -385,9 +375,7 @@ export default async function TestReportPage({
 
   const previousRows = (previousReport as ReportRow[] | null) ?? null
   const previousTotalVisits = previousRows ? previousRows.reduce((sum, row) => sum + row.visits, 0) : null
-  const previousConversionsByVariant = new Map(
-    ((previousTotalsReport as TotalsReportRow[] | null) ?? []).map((row) => [row.variant_id, row])
-  )
+  const previousByVariant = new Map((previousRows ?? []).map((row) => [row.variant_id, row]))
   const previousLeaderConversions = previousRows
     ? (previousRows.find((row) => row.variant_id === leaderRow?.variant_id)?.conversions ?? 0)
     : null
@@ -565,7 +553,7 @@ export default async function TestReportPage({
         <div>
           <div className="font-[family-name:var(--font-geist-mono)] text-[22px] font-semibold tabular-nums">{totalVisits}</div>
           <div className="flex items-center gap-2">
-            <span className="text-[11.5px] text-[var(--ct-text-2)]">acessos totais</span>
+            <span className="text-[11.5px] text-[var(--ct-text-2)]">pessoas no teste</span>
             {previousTotalVisits !== null && <Delta current={totalVisits} previous={previousTotalVisits} unit="pct" />}
           </div>
         </div>
@@ -635,9 +623,9 @@ export default async function TestReportPage({
             Faturamento por {assetLabel.toLowerCase()}
           </h3>
           <MiniBarChart
-            data={((totalsReport as TotalsReportRow[]) ?? []).map((row) => ({
+            data={rows.map((row) => ({
               label: row.variant_name,
-              value: row.revenue_cents,
+              value: Number(row.revenue_cents),
             }))}
             valueFormat={(v) => `R$ ${(v / 100).toFixed(0)}`}
             barColor="#4ADE9B"
@@ -670,9 +658,10 @@ export default async function TestReportPage({
       <div className="mx-6 mb-6">
         <h2 className="mb-2 mt-8 font-[family-name:var(--font-sora)] text-lg font-semibold">Total por {assetLabel.toLowerCase()}</h2>
         {(() => {
-          const totalsRows = (totalsReport as TotalsReportRow[]) ?? []
-          const maxClicks = Math.max(1, ...totalsRows.map((r) => r.clicks))
-          const maxRevenue = Math.max(1, ...totalsRows.map((r) => r.revenue_cents))
+          const maxClicks = Math.max(1, ...rows.map((r) => Number(r.clicks)))
+          const maxRevenue = Math.max(1, ...rows.map((r) => Number(r.revenue_cents)))
+          const perPerson = (row: ReportRow) => (row.visits > 0 ? Number(row.revenue_cents) / row.visits / 100 : 0)
+          const buyerRate = (row: ReportRow) => (row.visits > 0 ? (row.conversions / row.visits) * 100 : 0)
           return (
             <div className="overflow-x-auto rounded-2xl border border-[var(--ct-line)]">
               <table className="w-full border-collapse text-sm">
@@ -680,19 +669,22 @@ export default async function TestReportPage({
                   <tr className="border-b border-[var(--ct-line)] bg-[var(--ct-surface-2)] text-left">
                     <th className={TH_CLASS}>{assetLabel}</th>
                     <ThWithInfo label="Cliques" info={METRIC_INFO.cliques} />
-                    <ThWithInfo label="Visitas únicas" info={METRIC_INFO.visitas} />
-                    <ThWithInfo label="Vendas" info={METRIC_INFO.vendas} />
-                    <ThWithInfo label="Faturamento" info={METRIC_INFO.faturamento} />
-                    <ThWithInfo label="R$/clique" info={METRIC_INFO.rsPorClique} />
-                    <ThWithInfo label="R$/acesso" info={METRIC_INFO.rsPorAcesso} />
+                    <ThWithInfo label="Pessoas" info={METRIC_INFO.pessoas} />
+                    <ThWithInfo label="Compradores" info={METRIC_INFO.compradores} />
                     <ThWithInfo label="Taxa" info={METRIC_INFO.taxa} />
+                    <ThWithInfo label="Vendas" info={METRIC_INFO.vendasTeste} />
+                    <ThWithInfo label="Faturamento" info={METRIC_INFO.faturamentoTeste} />
+                    <ThWithInfo label="R$/pessoa" info={METRIC_INFO.rsPorPessoa} />
+                    <ThWithInfo label="R$/clique" info={METRIC_INFO.rsPorClique} />
                   </tr>
                 </thead>
                 <tbody>
-                  {totalsRows.map((row) => {
-                    const previous = previousConversionsByVariant.get(row.variant_id) ?? null
+                  {rows.map((row) => {
+                    const previous = previousByVariant.get(row.variant_id) ?? null
+                    const clicks = Number(row.clicks)
+                    const revenue = Number(row.revenue_cents)
                     return (
-                    <tr key={row.variant_id} className={`${TR_CLASS} ${row.clicks === 0 ? 'opacity-50' : ''}`}>
+                    <tr key={row.variant_id} className={`${TR_CLASS} ${clicks === 0 ? 'opacity-50' : ''}`}>
                       <td className={TD_CLASS}>
                         {row.variant_name}
                         {previous && (
@@ -701,14 +693,14 @@ export default async function TestReportPage({
                           </div>
                         )}
                       </td>
-                      <BarCell value={row.clicks} max={maxClicks} format={String(row.clicks)}>
-                        {previous && <Delta current={row.clicks} previous={previous.clicks} unit="pct" />}
+                      <BarCell value={clicks} max={maxClicks} format={String(clicks)}>
+                        {previous && <Delta current={clicks} previous={Number(previous.clicks)} unit="pct" />}
                       </BarCell>
                       <td className={TD_CLASS}>
-                        {row.visitors}
+                        {row.visits}
                         {previous && (
                           <div className="mt-0.5">
-                            <Delta current={row.visitors} previous={previous.visitors} unit="pct" />
+                            <Delta current={row.visits} previous={previous.visits} unit="pct" />
                           </div>
                         )}
                       </td>
@@ -720,30 +712,15 @@ export default async function TestReportPage({
                           </div>
                         )}
                       </td>
-                      <BarCell
-                        value={row.revenue_cents}
-                        max={maxRevenue}
-                        format={`R$ ${(row.revenue_cents / 100).toFixed(2)}`}
-                      >
-                        {previous && (
-                          <Delta current={row.revenue_cents} previous={previous.revenue_cents} unit="pct" />
-                        )}
-                      </BarCell>
-                      <td className={TD_CLASS}>
-                        R$ {(row.clicks > 0 ? row.revenue_cents / row.clicks / 100 : 0).toFixed(2)}
-                      </td>
-                      <td className={TD_CLASS}>
-                        R$ {(row.visitors > 0 ? row.revenue_cents / row.visitors / 100 : 0).toFixed(2)}
-                      </td>
-                      <RateCell rate={row.clicks > 0 ? ((row.conversions / row.clicks) * 100).toFixed(1) : '0.0'}>
-                        {previous && (
-                          <Delta
-                            current={row.clicks > 0 ? (row.conversions / row.clicks) * 100 : 0}
-                            previous={previous.clicks > 0 ? (previous.conversions / previous.clicks) * 100 : 0}
-                            unit="pp"
-                          />
-                        )}
+                      <RateCell rate={buyerRate(row).toFixed(1)}>
+                        {previous && <Delta current={buyerRate(row)} previous={buyerRate(previous)} unit="pp" />}
                       </RateCell>
+                      <td className={TD_CLASS}>{Number(row.sales)}</td>
+                      <BarCell value={revenue} max={maxRevenue} format={`R$ ${(revenue / 100).toFixed(2)}`}>
+                        {previous && <Delta current={revenue} previous={Number(previous.revenue_cents)} unit="pct" />}
+                      </BarCell>
+                      <td className={TD_CLASS}>R$ {perPerson(row).toFixed(2)}</td>
+                      <td className={TD_CLASS}>R$ {(clicks > 0 ? revenue / clicks / 100 : 0).toFixed(2)}</td>
                     </tr>
                     )
                   })}
@@ -776,7 +753,7 @@ export default async function TestReportPage({
                     <ThWithInfo label="Faturamento" info={METRIC_INFO.faturamento} />
                     <ThWithInfo label="R$/clique" info={METRIC_INFO.rsPorClique} />
                     <ThWithInfo label="R$/acesso" info={METRIC_INFO.rsPorAcesso} />
-                    <ThWithInfo label="Taxa" info={METRIC_INFO.taxa} />
+                    <ThWithInfo label="Taxa" info={METRIC_INFO.taxaClique} />
                   </tr>
                 </thead>
                 <tbody>
@@ -820,7 +797,7 @@ export default async function TestReportPage({
       <div className="mx-6 mb-6">
         <CreativeMatrixPanel
           adRows={(adReport as AdReportRow[]) ?? []}
-          variants={((totalsReport as TotalsReportRow[]) ?? []).map((r) => ({
+          variants={rows.map((r) => ({
             id: r.variant_id,
             name: r.variant_name,
           }))}
@@ -844,7 +821,7 @@ export default async function TestReportPage({
                     <ThWithInfo label="Faturamento" info={METRIC_INFO.faturamento} />
                     <ThWithInfo label="R$/clique" info={METRIC_INFO.rsPorClique} />
                     <ThWithInfo label="R$/acesso" info={METRIC_INFO.rsPorAcesso} />
-                    <ThWithInfo label="Taxa" info={METRIC_INFO.taxa} />
+                    <ThWithInfo label="Taxa" info={METRIC_INFO.taxaClique} />
                     <ThWithInfo label="Gasto" info={METRIC_INFO.gasto} />
                     <ThWithInfo label="CPM" info={METRIC_INFO.cpm} />
                     <ThWithInfo label="CTR" info={METRIC_INFO.ctr} />

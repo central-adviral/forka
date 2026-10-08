@@ -146,7 +146,7 @@ export function ReportCanvas({
           </div>
           <div className="mb-4 break-all font-[family-name:var(--font-geist-mono)] text-[12.5px] text-[var(--ct-an)]">{redirectUrl}</div>
           <div className="font-[family-name:var(--font-sora)] text-[22px] font-semibold">{totalVisits}</div>
-          <div className="text-[11.5px] text-[var(--ct-text-2)]">acessos totais</div>
+          <div className="text-[11.5px] text-[var(--ct-text-2)]">pessoas no teste</div>
         </div>
 
         {layout.fallback && (
@@ -188,27 +188,24 @@ export function ReportCanvas({
               <div className="mb-3.5 grid grid-cols-2 gap-x-7 gap-y-2.5">
                 <div>
                   <div className="font-[family-name:var(--font-geist-mono)] text-base font-medium">{variant.visits}</div>
-                  <div className="text-[11px] text-[var(--ct-text-2)]">acessos</div>
+                  <div className="text-[11px] text-[var(--ct-text-2)]">pessoas</div>
                 </div>
                 <div>
                   <div className="font-[family-name:var(--font-geist-mono)] text-base font-medium">{variant.conversions}</div>
-                  <div className="text-[11px] text-[var(--ct-text-2)]">conversões</div>
+                  <div className="text-[11px] text-[var(--ct-text-2)]">compradores</div>
                 </div>
                 <div>
                   <div className="font-[family-name:var(--font-geist-mono)] text-base font-medium">
                     R$ {(variant.visits > 0 ? variant.revenueCents / variant.visits / 100 : 0).toFixed(2)}
                   </div>
-                  <div className="text-[11px] text-[var(--ct-text-2)]">R$/clique</div>
+                  <div className="text-[11px] text-[var(--ct-text-2)]">R$/pessoa</div>
                 </div>
                 <div>
                   <div className="font-[family-name:var(--font-geist-mono)] text-base font-medium">
                     R${' '}
-                    {(variant.uniqueVisitors > 0
-                      ? variant.revenueCents / variant.uniqueVisitors / 100
-                      : 0
-                    ).toFixed(2)}
+                    {(variant.clicks > 0 ? variant.revenueCents / variant.clicks / 100 : 0).toFixed(2)}
                   </div>
-                  <div className="text-[11px] text-[var(--ct-text-2)]">R$/acesso</div>
+                  <div className="text-[11px] text-[var(--ct-text-2)]">R$/clique</div>
                 </div>
               </div>
               <div className="truncate border-t border-[var(--ct-line)] pt-3 font-[family-name:var(--font-geist-mono)] text-xs text-[var(--ct-text-2)]">
@@ -237,7 +234,7 @@ export function ReportCanvas({
                 {variant.ratePct.toFixed(1)}%
               </div>
               <div className="mt-1 text-[11.5px] text-[var(--ct-text-2)]">
-                {variant.conversions} vendas · {confidenceLabelById.get(variant.id)}
+                {variant.conversions} {variant.conversions === 1 ? 'comprador' : 'compradores'} · {confidenceLabelById.get(variant.id)}
               </div>
             </div>
           </div>
