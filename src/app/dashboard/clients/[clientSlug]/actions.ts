@@ -55,9 +55,15 @@ export async function createTest(input: z.infer<typeof createTestSchema>) {
   if (error) throw error
 }
 
-export async function deleteTest(testId: string, clientSlug: string) {
+// Archived, never deleted: the clicks and conversions stay for late sales, and the slug stays
+// taken so old ads cannot start feeding a new test (0076). Its link keeps sending to the control.
+export async function archiveTest(testId: string, clientSlug: string) {
   const supabase = await createServerSupabaseClient()
-  const { data, error } = await supabase.from('tests').delete().eq('id', testId).select('id')
+  const { data, error } = await supabase
+    .from('tests')
+    .update({ status: 'paused', archived_at: new Date().toISOString() })
+    .eq('id', testId)
+    .select('id')
   if (error) throw error
   if (!data || data.length === 0) throw new Error('Teste não encontrado ou você não tem permissão para alterá-lo.')
   revalidatePath(`/dashboard/clients/${clientSlug}/tests`)

@@ -44,6 +44,7 @@ describe('GET /r/[slug]', () => {
     expect(location.origin + location.pathname).toBe('https://example.com/page')
     expect(location.searchParams.get('utm_content')).toBeTruthy()
     expect(insertClickEvent).toHaveBeenCalledOnce()
+    expect(insertClickEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ rateLimited: false }))
   })
 
   it('forwards utm_source, utm_medium, utm_campaign and utm_term from the incoming ad click', async () => {
@@ -186,7 +187,7 @@ describe('GET /r/[slug]', () => {
     expect(location.origin + location.pathname).toBe('https://example.com/b')
   })
 
-  it('still redirects but skips recording the click when the ip is over the rate limit', async () => {
+  it('still records a click over the ip rate limit, flagged, so its sale keeps a variant', async () => {
     vi.mocked(getTestBySlug).mockResolvedValue({
       id: 'test-1',
       slug: 'oferta-x',
@@ -207,7 +208,7 @@ describe('GET /r/[slug]', () => {
     expect(response.status).toBe(302)
     const location = new URL(response.headers.get('location')!)
     expect(location.origin + location.pathname).toBe('https://example.com/page')
-    expect(insertClickEvent).not.toHaveBeenCalled()
+    expect(insertClickEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ rateLimited: true }))
   })
 
   it('redirects a known bot but records the click as a bot, without setting cookies', async () => {

@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { SuccessBanner } from '@/components/success-banner'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { deleteTest } from '../actions'
+import { archiveTest } from '../actions'
 import { TestStatusToggle } from '../test-status-toggle'
 import { testLeader, type VariantResult } from '@/lib/domain/test-leader'
 import { daysRunningSince } from '@/lib/domain/report-period'
@@ -26,6 +26,7 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
     .from('tests')
     .select('id, name, slug, status, test_type, created_at')
     .eq('client_id', client.id)
+    .is('archived_at', null)
     .order('name')
 
   // Leader and confidence per test, from the same report and math the test page uses, over the
@@ -121,12 +122,9 @@ export default async function TestsListPage({ params }: { params: Promise<{ clie
             </a>
             {canEdit && <TestStatusToggle testId={test.id} clientSlug={client.slug} status={test.status} />}
             {canEdit && <ConfirmDeleteButton
-              action={deleteTest.bind(null, test.id, client.slug)}
-              warning={
-                test.test_type === 'checkout'
-                  ? 'Isso vai quebrar o botão de comprar da página de vendas. Confirmar?'
-                  : undefined
-              }
+              action={archiveTest.bind(null, test.id, client.slug)}
+              label="Arquivar"
+              warning="Sai da lista e o link manda todos para o controle. Os dados ficam. Confirmar?"
             />}
           </div>
         ))}
