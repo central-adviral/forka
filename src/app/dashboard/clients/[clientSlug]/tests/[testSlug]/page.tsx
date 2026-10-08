@@ -21,6 +21,9 @@ import { toggleTestStatus } from './actions'
 import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil, resolveDateRange, resolvePreviousWindow, formatBr, daysRunningSince } from '@/lib/domain/report-period'
 import { RefreshButton } from './refresh-button'
 import { CreativeMatrixPanel } from './creative-matrix-panel'
+import { RoutesPanel } from './routes-panel'
+import type { SegmentRow } from '@/lib/domain/route-readout'
+import type { VariantRoute } from '@/lib/domain/routing'
 import { InsightPanel } from './insight-panel'
 import { MiniBarChart } from '@/components/mini-bar-chart'
 import { canActAs } from '@/lib/view-as'
@@ -33,6 +36,7 @@ const REPORT_TABS = [
   { value: 'desempenho', label: 'Desempenho' },
   { value: 'criativos', label: 'Criativos' },
   { value: 'origens', label: 'Origens' },
+  { value: 'regras', label: 'Regras' },
   { value: 'insight', label: 'Insight' },
 ] as const
 
@@ -135,8 +139,13 @@ export default async function TestReportPage({
     { data: measuredCards },
     { data: firstClick },
     { data: dailyRows },
+    { data: segmentRows, error: segmentReportError },
   ] = await Promise.all([
-    supabase.from('variants').select('id, destination_url, is_control').eq('test_id', test.id),
+    supabase
+      .from('variants')
+      .select('id, name, destination_url, is_control, variant_routes(id, match_field, match_value, destination_url, position)')
+      .eq('test_id', test.id)
+      .order('position', { referencedTable: 'variant_routes' }),
     supabase.rpc('get_test_report', period),
     tab === 'origens' ? supabase.rpc('get_test_report_by_source', period) : skip,
     tab === 'criativos' ? supabase.rpc('get_test_report_by_ad', period) : skip,
@@ -152,6 +161,7 @@ export default async function TestReportPage({
       .limit(1),
     supabase.from('click_events').select('created_at').eq('test_id', test.id).eq('is_bot', false).order('created_at').limit(1).maybeSingle(),
     tab === 'desempenho' ? supabase.rpc('get_test_daily', { p_test_id: test.id, p_since: sinceIso }) : skip,
+    tab === 'regras' ? supabase.rpc('get_test_report_by_segment', period) : skip,
   ])
   const changes = ((changeRows ?? []) as unknown as { created_at: string; field: 'weight_pct' | 'destination_url'; old_value: string | null; new_value: string | null; variants: { name: string } | null }[]).map(
     (row) => ({ ...row, variant_name: row.variants?.name ?? null })
@@ -185,13 +195,17 @@ export default async function TestReportPage({
   if (adReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_ad' }, adReportError)
   if (weekdayReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_weekday' }, weekdayReportError)
   if (hourReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_hour' }, hourReportError)
+  if (segmentReportError) console.error('[test-report-rpc-failed]', { testId: test.id, rpc: 'get_test_report_by_segment' }, segmentReportError)
 
   const hasPartialDataError = Boolean(
-    variantRowsError || reportError || sourceReportError || adReportError || weekdayReportError || hourReportError
+    variantRowsError || reportError || sourceReportError || adReportError || weekdayReportError || hourReportError || segmentReportError
   )
 
   const destinationById = new Map((variantRows ?? []).map((v) => [v.id, v.destination_url as string]))
   const controlVariantId = (variantRows ?? []).find((v) => v.is_control)?.id
+  const routeVariants = (variantRows ?? []).map((v) => ({ id: v.id, name: v.name, is_control: v.is_control, routes: v.variant_routes as VariantRoute[] }))
+  // Rules only route page tests (0084); the tab shows up once one exists.
+  const hasRoutes = test.test_type === 'page' && routeVariants.some((v) => v.routes.length > 0)
 
   if (reportError || !report || report.length === 0) {
     return (
@@ -453,7 +467,7 @@ export default async function TestReportPage({
       </div>
 
       <div className="order-first flex gap-1">
-        {REPORT_TABS.filter((option) => canEdit || option.value !== 'insight').map((option) => {
+        {REPORT_TABS.filter((option) => (canEdit || option.value !== 'insight') && (hasRoutes || option.value !== 'regras')).map((option) => {
           const query = new URLSearchParams()
           if (periodo) query.set('periodo', periodo)
           if (periodo === 'custom' && desde) query.set('desde', desde)
@@ -688,6 +702,7 @@ export default async function TestReportPage({
       </div>
         </>
       )}
+      {tab === 'regras' && hasRoutes && <RoutesPanel variants={routeVariants} segments={(segmentRows as SegmentRow[]) ?? []} />}
       {tab === 'criativos' && (
         <>
       <div className="mx-6 mb-6">
