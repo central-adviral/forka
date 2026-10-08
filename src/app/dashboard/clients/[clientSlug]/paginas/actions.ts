@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { assertClientRole } from '@/lib/repo/client-access-repo'
 import { MAX_PAGES_PER_CLIENT, isSafeProbeUrl } from '@/lib/domain/page-probe'
+import { PAGE_KINDS } from '@/lib/domain/project-wizard'
 import { findPageByUrl, type ExistingPage } from '@/lib/repo/pages-repo'
 import { PAGE_TO_PROBE_COLUMNS, probeClientPages, probePage, probePages, type PageToProbe, type ProbeResult } from '@/lib/pages/probe'
 
@@ -31,6 +32,7 @@ const urlSchema = z
 
 const pageSchema = z.object({
   label: z.string().trim().min(1, 'dê um nome para a página').max(60),
+  tipo: z.enum(PAGE_KINDS).nullable(),
   url: urlSchema,
   sales_funnel_id: z.uuid().nullable(),
   front_id: z.uuid().nullable(),
@@ -46,6 +48,7 @@ function readPageForm(formData: FormData) {
   }
   return pageSchema.safeParse({
     label: formData.get('label'),
+    tipo: text('tipo'),
     url: formData.get('url'),
     sales_funnel_id: text('sales_funnel_id'),
     front_id: text('front_id'),
