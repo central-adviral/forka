@@ -111,7 +111,10 @@ async function follow(url: string, deps: ProbeDeps, keepBody: boolean): Promise<
       const fail = (error: string): Landing => ({ ok: false, statusCode: status, ttfbMs: null, error, finalUrl: current, redirects, hop: null })
       if (redirects === MAX_REDIRECTS) return fail(`mais de ${MAX_REDIRECTS} redirecionamentos`)
       try {
-        current = new URL(location, current).toString()
+        const next = new URL(location, current)
+        // Some sites bounce https -> http -> https (e.g. adding a trailing slash); a browser upgrades that hop.
+        if (next.protocol === 'http:' && next.port === '') next.protocol = 'https:'
+        current = next.toString()
       } catch {
         return fail('redirecionamento inválido')
       }

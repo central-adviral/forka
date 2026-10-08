@@ -69,6 +69,14 @@ describe('probePage', () => {
     expect(toName).toHaveBeenCalledTimes(1)
   })
 
+  it('upgrades an http redirect hop to https, as a browser does', async () => {
+    const fetchImpl = web({
+      'https://www.exemplo.com.br/vendas': { status: 301, location: 'http://www.exemplo.com.br/vendas/' },
+      'https://www.exemplo.com.br/vendas/': { status: 200 },
+    })
+    expect(await probePage('https://www.exemplo.com.br/vendas', watchNothing, { deps: deps(fetchImpl) })).toMatchObject({ ok: true, redirects: 1, finalUrl: 'https://www.exemplo.com.br/vendas/' })
+  })
+
   it('does not request an address that is not a public https page', async () => {
     const fetchImpl = web({})
     expect(await probePage('https://127.0.0.1/admin', watchNothing, { deps: deps(fetchImpl) })).toMatchObject({ ok: false, error: 'endereço não permitido' })
