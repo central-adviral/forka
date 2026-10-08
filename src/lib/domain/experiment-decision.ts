@@ -4,15 +4,6 @@ import type { LinkVariantRead } from './backlog-readout'
 import { detectSampleRatioMismatch } from './srm-check'
 import { MIN_CYCLE_DAYS } from './test-trust'
 
-export interface TestVariantRow {
-  id: string
-  name: string
-  weight_pct: number
-  destination_url: string
-  thank_you_url: string | null
-  is_control: boolean
-}
-
 const normalize = (text: string) => text.trim().toLowerCase()
 
 /**
@@ -28,20 +19,6 @@ export function matchTestVariant(cardVariant: { key: string; name: string }, tes
     return name === key || new RegExp(`^${key}[\\s·\\-–:]`).test(name)
   })
   return byKey?.id ?? null
-}
-
-/**
- * The variant rows after the decision, ordered so one upsert never holds two controls: the rows
- * losing the control flag come before the winner gains it. Sending all traffic parks every other
- * variant at weight 0 (0067), keeping its history in the report.
- */
-export function decisionRows(variants: TestVariantRow[], winnerId: string, options: { sendAllTraffic: boolean; makeControl: boolean }): TestVariantRow[] {
-  const rows = variants.map((variant) => ({
-    ...variant,
-    weight_pct: options.sendAllTraffic ? (variant.id === winnerId ? 100 : 0) : variant.weight_pct,
-    is_control: options.makeControl ? variant.id === winnerId : variant.is_control,
-  }))
-  return [...rows.filter((row) => row.id !== winnerId), ...rows.filter((row) => row.id === winnerId)]
 }
 
 export interface VerdictCheck {

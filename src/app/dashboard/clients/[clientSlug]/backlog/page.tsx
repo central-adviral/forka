@@ -149,6 +149,7 @@ export default async function BacklogPage({
               stages={Object.entries(STAGES).map(([value, label]) => ({ value, label }))}
               methods={Object.entries(METHODS).map(([value, label]) => ({ value, label }))}
               serverError={erro}
+              defaultConversion={funnel.resultado === 'lead' ? 'thank_you_page' : 'hubla_webhook'}
             />
           )}
 
@@ -361,9 +362,14 @@ export default async function BacklogPage({
                     <span className="text-[12.5px] text-[var(--ct-text-2)]">{(abTests ?? []).find((test) => test.id === selected.abTestId)?.name ?? 'nenhum'}</span>
                   )}
                   {selectedTest && (
-                    <Link href={`/dashboard/clients/${client.slug}/tests/${selectedTest.slug}`} className="self-start text-[12.5px] text-[var(--ct-accent)]">
-                      Abrir o relatório do teste →
-                    </Link>
+                    <span className="flex flex-wrap gap-4 text-[12.5px]">
+                      <Link href={`/dashboard/clients/${client.slug}/tests/${selectedTest.slug}/link`} className="text-[var(--ct-accent)]">
+                        Pegar o link /r →
+                      </Link>
+                      <Link href={`/dashboard/clients/${client.slug}/tests/${selectedTest.slug}`} className="text-[var(--ct-accent)]">
+                        Abrir o relatório →
+                      </Link>
+                    </span>
                   )}
                   {selectedReadout?.link && (
                     <div className={`${mono} mt-1 grid grid-cols-[1fr_70px_70px_60px_70px] gap-x-2 gap-y-1.5 text-[12px]`}>
