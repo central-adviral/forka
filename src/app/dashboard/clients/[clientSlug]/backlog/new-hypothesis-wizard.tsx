@@ -75,6 +75,7 @@ export function NewHypothesisWizard({
   stages,
   methods,
   serverError,
+  defaultConversion,
 }: {
   action: (formData: FormData) => void | Promise<void>
   cancelHref: string
@@ -83,6 +84,8 @@ export function NewHypothesisWizard({
   methods: Option[]
   /** The error the server sent back on the last submit; its draft is restored when set. */
   serverError?: string
+  /** What counts as a conversion in this project: a Hubla sale, or a lead on the thank-you page. */
+  defaultConversion: 'hubla_webhook' | 'thank_you_page'
 }) {
   const [step, setStep] = useState(0)
   const [title, setTitle] = useState('')
@@ -93,6 +96,11 @@ export function NewHypothesisWizard({
   const [metric, setMetric] = useState('')
   const [owner, setOwner] = useState('')
   const [variants, setVariants] = useState('')
+  const [createLink, setCreateLink] = useState(true)
+  const [testType, setTestType] = useState<'page' | 'checkout'>('page')
+  const [salesPageUrl, setSalesPageUrl] = useState('')
+  const [conversionMethod, setConversionMethod] = useState(defaultConversion)
+  const [urls, setUrls] = useState<string[]>([])
   const [problem, setProblem] = useState<string | null>(serverError ?? null)
 
   // A failed submit redirects back with the error and remounts the form: the draft saved on submit
@@ -113,14 +121,20 @@ export function NewHypothesisWizard({
       setMetric(draft.metric ?? '')
       setOwner(draft.owner ?? '')
       setVariants(draft.variants ?? '')
+      setCreateLink(draft.createLink ?? true)
+      setTestType(draft.testType ?? 'page')
+      setSalesPageUrl(draft.salesPageUrl ?? '')
+      setConversionMethod(draft.conversionMethod ?? defaultConversion)
+      setUrls(draft.urls ?? [])
       setStep(STEPS.length - 1)
       /* eslint-enable react-hooks/set-state-in-effect */
     } catch {
       // No storage (private window) or a broken draft: start clean.
     }
-  }, [draftKey, serverError])
+  }, [draftKey, serverError, defaultConversion])
 
   const variantNames = variants.split('\n').map((name) => name.trim()).filter(Boolean).slice(0, 26)
+  const linkNow = method === 'link' && createLink
   const ice = Math.round(((scores.impact + scores.confidence + scores.ease) / 3) * 10) / 10
   const stageLabel = stages.find((option) => option.value === stage)?.label ?? stage
   const methodLabel = methods.find((option) => option.value === method)?.label ?? method
@@ -129,6 +143,11 @@ export function NewHypothesisWizard({
   function blocker(at: number): string | null {
     if (at === 0 && !title.trim()) return 'Dê um título para a hipótese.'
     if (at === 4 && variantNames.length < 2) return 'Liste pelo menos duas variantes: o controle e uma desafiante.'
+    if (at === 4 && linkNow) {
+      if (testType === 'checkout' && !/^https?:\/\//i.test(salesPageUrl)) return 'Informe a URL da página de vendas, com https://.'
+      const missing = variantNames.findIndex((_, index) => !/^https?:\/\//i.test(urls[index] ?? ''))
+      if (missing >= 0) return `Falta o link da variante ${String.fromCharCode(65 + missing)}, com https://.`
+    }
     return null
   }
 
@@ -158,7 +177,7 @@ export function NewHypothesisWizard({
           return
         }
         try {
-          sessionStorage.setItem(draftKey, JSON.stringify({ title, hypothesis, stage, method, scores, metric, owner, variants }))
+          sessionStorage.setItem(draftKey, JSON.stringify({ title, hypothesis, stage, method, scores, metric, owner, variants, createLink, testType, salesPageUrl, conversionMethod, urls }))
         } catch {
           // Without storage the form still submits; only the restore on error is lost.
         }
@@ -356,6 +375,57 @@ export function NewHypothesisWizard({
               )}
             </div>
           )}
+          {method === 'link' && (
+            <div className="flex flex-col gap-3 rounded-[14px] border border-[var(--ct-line)] px-4 py-4">
+              <label className="flex items-start gap-2 text-[13px]">
+                <input type="checkbox" name="create_link" checked={createLink} onChange={(event) => setCreateLink(event.target.checked)} className="mt-0.5" />
+                <span>
+                  <b>Criar o teste A/B e o link /r agora</b>
+                  <span className="block text-[12px] text-[var(--ct-text-3)]">
+                    As variantes acima viram as do teste, com pesos iguais. O link fica pausado (todos vão para o controle) até o card ir para Rodando.
+                  </span>
+                </span>
+              </label>
+              {createLink && (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                      Tipo
+                      <select name="test_type" value={testType} onChange={(event) => setTestType(event.target.value as 'page' | 'checkout')} className={field}>
+                        <option value="page">Teste de página</option>
+                        <option value="checkout">Teste de checkout</option>
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                      Conta como conversão
+                      <select name="conversion_method" value={conversionMethod} onChange={(event) => setConversionMethod(event.target.value as typeof conversionMethod)} className={field}>
+                        <option value="hubla_webhook">Venda confirmada (Hubla)</option>
+                        <option value="thank_you_page">Captura (página de obrigado)</option>
+                      </select>
+                    </label>
+                  </div>
+                  {testType === 'checkout' && (
+                    <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                      Página de vendas (a mesma para todos; o botão de comprar aponta para o /c)
+                      <input name="sales_page_url" value={salesPageUrl} onChange={(event) => setSalesPageUrl(event.target.value)} placeholder="https://" className={field} />
+                    </label>
+                  )}
+                  {variantNames.map((name, index) => (
+                    <label key={index} className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                      {String.fromCharCode(65 + index)} · {name} · {testType === 'checkout' ? 'link do checkout' : 'URL da página'}
+                      <input
+                        name={`url_${index}`}
+                        value={urls[index] ?? ''}
+                        onChange={(event) => setUrls((previous) => Object.assign([...previous], { [index]: event.target.value }))}
+                        placeholder="https://"
+                        className={field}
+                      />
+                    </label>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </section>
 
         <section hidden={step !== 5} className="flex flex-col gap-4">
@@ -409,7 +479,7 @@ export function NewHypothesisWizard({
             </button>
           ) : (
             <button type="submit" className="rounded-full bg-[var(--ct-accent)] px-5 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110">
-              Criar na fila
+              {linkNow ? 'Criar e gerar o link' : 'Criar na fila'}
             </button>
           )}
         </div>

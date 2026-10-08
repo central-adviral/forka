@@ -5,7 +5,10 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { COLUMNS, METHODS, RULE_LIMITS, STAGES, blockedMove, defaultGates, nextCode, type BacklogStatus, type Method, type TestRules } from '@/lib/domain/backlog'
-import { decisionRows, matchTestVariant, type TestVariantRow } from '@/lib/domain/experiment-decision'
+import { matchTestVariant } from '@/lib/domain/experiment-decision'
+import { equalWeights, experimentSlug, experimentVariantName } from '@/lib/domain/experiment-link'
+import { httpUrl } from '@/lib/domain/http-url-schema'
+import { layerConflict } from '@/lib/domain/test-layers'
 
 // Writes go through the user's session: the 0068 policies only let a gestor or owner change the
 // backlog. A write RLS refuses touches no row without raising, so every write selects what it
@@ -57,6 +60,11 @@ export async function createItem(context: BacklogContext, formData: FormData) {
   const names = result.data.variants.split('\n').map((name) => name.trim()).filter(Boolean).slice(0, 26)
   if (names.length < 2) back(context, 'erro', 'Liste pelo menos duas variantes, uma por linha (a primeira é o controle).', '&nova=1')
 
+  // A link hypothesis can create its A/B test right away: the variants are typed once, here. Checked
+  // before anything is written, so a bad link returns to the form with the draft.
+  const link = result.data.method === 'link' && formData.get('create_link') === 'on' ? readLinkFields(formData, names) : null
+  if (link && 'error' in link) back(context, 'erro', link.error, '&nova=1')
+
   const supabase = await createServerSupabaseClient()
   const { data: codes } = await supabase.from('backlog_items').select('code').eq('sales_funnel_id', context.sales_funnel_id)
   const code = nextCode((codes ?? []).map((row) => row.code as string))
@@ -87,8 +95,80 @@ export async function createItem(context: BacklogContext, formData: FormData) {
     defaultGates(result.data.method, code).map((label, index) => ({ item_id: item.id, client_id: context.client_id, label, position: index }))
   )
   if (gateError) back(context, 'erro', gateError.message)
+  let linkNote = ''
+  if (link && !('error' in link)) {
+    const created = await createExperimentTest(supabase, context, { itemId: item.id, code, title: result.data.title, names, ...link })
+    linkNote = created.ok
+      ? ' O teste A/B e o link /r foram criados: ele fica pausado (manda todos ao controle) até o card ir para Rodando.'
+      : ` O link não foi criado: ${created.error} Crie em Testes A/B e vincule no card.`
+  }
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
-  back(context, 'ok', `${code} entrou na fila.`, `&item=${code}`)
+  back(context, 'ok', `${code} entrou na fila.${linkNote}`, `&item=${code}`)
+}
+
+interface LinkFields {
+  testType: 'page' | 'checkout'
+  salesPageUrl: string | null
+  conversionMethod: 'hubla_webhook' | 'thank_you_page'
+  urls: string[]
+}
+
+function readLinkFields(formData: FormData, names: string[]): LinkFields | { error: string } {
+  const testType = formData.get('test_type') === 'checkout' ? 'checkout' : 'page'
+  const conversionMethod = formData.get('conversion_method') === 'thank_you_page' ? 'thank_you_page' : 'hubla_webhook'
+  const salesPage = String(formData.get('sales_page_url') ?? '').trim()
+  if (testType === 'checkout' && !httpUrl.safeParse(salesPage).success) return { error: 'Teste de checkout: informe a URL da página de vendas (com https://).' }
+  const urls = names.map((_, index) => String(formData.get(`url_${index}`) ?? '').trim())
+  const missing = urls.findIndex((url) => !httpUrl.safeParse(url).success)
+  if (missing >= 0) {
+    return { error: `Falta o link da variante ${String.fromCharCode(65 + missing)} (${names[missing]}): use um endereço com https://.` }
+  }
+  return { testType, salesPageUrl: testType === 'checkout' ? salesPage : null, conversionMethod, urls }
+}
+
+/**
+ * Creates the card's A/B test in its project, paused until the card runs (two running tests in one
+ * layer would split a sale, 0078), links it to the card and checks the "Link /r criado" gate.
+ */
+async function createExperimentTest(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  context: BacklogContext,
+  input: LinkFields & { itemId: string; code: string; title: string; names: string[] }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const weights = equalWeights(input.names.length)
+  const base = experimentSlug(input.code, input.title)
+  let testId: string | null = null
+  for (const slug of [base, `${base}-${Math.random().toString(36).slice(2, 6)}`]) {
+    const { data, error } = await supabase.rpc('create_test_with_variants', {
+      p_client_id: context.client_id,
+      p_name: `${input.code} · ${input.title}`,
+      p_slug: slug,
+      p_fallback_url: null,
+      p_conversion_method: input.conversionMethod,
+      p_test_type: input.testType,
+      p_sales_page_url: input.salesPageUrl,
+      p_variants: input.names.map((name, index) => ({
+        name: experimentVariantName(String.fromCharCode(65 + index), name),
+        weight_pct: weights[index],
+        destination_url: input.urls[index],
+        thank_you_url: null,
+      })),
+    })
+    if (!error) {
+      testId = data as string
+      break
+    }
+    // Only a taken slug is worth a second try with a suffix; anything else is the answer.
+    if (error.code !== '23505') return { ok: false, error: 'o teste A/B foi recusado.' }
+  }
+  if (!testId) return { ok: false, error: 'o endereço do link já está em uso.' }
+
+  const { error: placeError } = await supabase.from('tests').update({ status: 'paused', sales_funnel_id: context.sales_funnel_id }).eq('id', testId)
+  if (placeError) return { ok: false, error: 'o teste foi criado, mas não entrou no projeto.' }
+  const { error: linkError } = await supabase.from('backlog_items').update({ ab_test_id: testId }).eq('id', input.itemId)
+  if (linkError) return { ok: false, error: 'o teste foi criado, mas não ficou vinculado ao card.' }
+  await supabase.from('backlog_gates').update({ done_at: new Date().toISOString() }).eq('item_id', input.itemId).eq('label', 'Link /r criado')
+  return { ok: true }
 }
 
 export async function moveItem(context: BacklogContext & { item_id: string; code: string }, formData: FormData) {
@@ -97,13 +177,18 @@ export async function moveItem(context: BacklogContext & { item_id: string; code
   const supabase = await createServerSupabaseClient()
   const { data: item, error: readError } = await supabase
     .from('backlog_items')
-    .select('learning, started_at, backlog_gates(done_at)')
+    .select('learning, started_at, status, ab_test_id, backlog_gates(done_at)')
     .eq('id', context.item_id)
     .maybeSingle()
   if (readError || !item) back(context, 'erro', 'Não foi possível ler o teste para movê-lo.', `&item=${context.code}`)
   const gatesOpen = ((item?.backlog_gates ?? []) as { done_at: string | null }[]).filter((gate) => !gate.done_at).length
   const blocked = blockedMove(to, { gatesOpen, hasLearning: Boolean(item?.learning) })
   if (blocked) back(context, 'erro', blocked, `&item=${context.code}`)
+  // The card drives its A/B test: Rodando turns the link on, leaving Rodando parks it on the control.
+  if (item.ab_test_id && (to === 'running' || item.status === 'running') && to !== 'decided') {
+    const { error: testError } = await supabase.from('tests').update({ status: to === 'running' ? 'active' : 'paused' }).eq('id', item.ab_test_id).is('archived_at', null)
+    if (testError) back(context, 'erro', (layerConflict(testError) ?? testError).message, `&item=${context.code}`)
+  }
   // Leaving Rodando clears the start, so a test that goes live again is measured from the new start.
   const { data: moved, error } = await supabase
     .from('backlog_items')
@@ -157,46 +242,37 @@ export async function decideItem(context: BacklogContext & { item_id: string; co
     winnerCardVariant = variant
   }
 
-  // The decision acts where the evidence is: the A/B test that measured the card. Done first, so a
-  // refused traffic change leaves the card undecided instead of saying something that did not happen.
-  const actOnTest = winnerCardVariant && (parsed.data.send_traffic || parsed.data.make_control)
-  let trafficNote = ''
+  // The decision acts where the evidence is: the A/B test that measured the card. Here only the
+  // winner is found; the traffic, the control and the card change together in decide_experiment
+  // (0079), so the test and the card never disagree.
+  const actOnTest = Boolean(winnerCardVariant && (parsed.data.send_traffic || parsed.data.make_control))
+  let winnerVariantId: string | null = null
   if (actOnTest) {
     const { data: card } = await supabase.from('backlog_items').select('ab_test_id').eq('id', context.item_id).maybeSingle()
     if (!card?.ab_test_id) back(context, 'erro', 'Este card não tem teste A/B vinculado: não há tráfego para mudar.', `&item=${context.code}`)
-    const { data: testVariants, error: readError } = await supabase
-      .from('variants')
-      .select('id, name, weight_pct, destination_url, thank_you_url, is_control')
-      .eq('test_id', card.ab_test_id)
+    const { data: testVariants, error: readError } = await supabase.from('variants').select('id, name').eq('test_id', card.ab_test_id)
     if (readError || !testVariants?.length) back(context, 'erro', 'Não foi possível ler as variantes do teste A/B.', `&item=${context.code}`)
-    const winnerId = matchTestVariant(winnerCardVariant!, testVariants as TestVariantRow[])
-    if (!winnerId) {
+    winnerVariantId = matchTestVariant(winnerCardVariant!, testVariants)
+    if (!winnerVariantId) {
       back(context, 'erro', `Não achei no teste A/B a variante "${winnerCardVariant!.name}". Renomeie a variante do teste com o mesmo nome ou com a letra ${winnerKey}.`, `&item=${context.code}`)
     }
-    const rows = decisionRows(testVariants as TestVariantRow[], winnerId, { sendAllTraffic: parsed.data.send_traffic, makeControl: parsed.data.make_control })
-    const { error: upsertError } = await supabase.from('variants').upsert(rows.map((row) => ({ ...row, test_id: card.ab_test_id })))
-    if (upsertError) back(context, 'erro', 'O teste A/B recusou a mudança de tráfego. Só gestor ou owner pode alterar o teste.', `&item=${context.code}`)
-    trafficNote = [parsed.data.send_traffic && ' Todo o tráfego do link agora vai para a vencedora.', parsed.data.make_control && ' Ela é o novo controle.'].filter(Boolean).join('')
   }
-  const { data: decided, error } = await supabase
-    .from('backlog_items')
-    .update({
-      status: 'decided',
-      decided_at: new Date().toISOString(),
-      winner_key: winnerKey,
-      result: parsed.data.result || null,
-      learning: parsed.data.learning,
-      ...(parsed.data.publish ? { published: true } : {}),
-    })
-    .eq('id', context.item_id)
-    .select('id')
-  if (error || !decided?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode decidir testes.', `&item=${context.code}`)
-  const { error: resetError } = await supabase.from('backlog_variants').update({ status: 'active' }).eq('item_id', context.item_id).eq('status', 'winner')
-  if (resetError) back(context, 'erro', resetError.message, `&item=${context.code}`)
-  if (winnerKey) {
-    const { error: winnerError } = await supabase.from('backlog_variants').update({ status: 'winner' }).eq('item_id', context.item_id).eq('key', winnerKey)
-    if (winnerError) back(context, 'erro', winnerError.message, `&item=${context.code}`)
+  const { error } = await supabase.rpc('decide_experiment', {
+    p_item_id: context.item_id,
+    p_winner_key: winnerKey,
+    p_result: parsed.data.result,
+    p_learning: parsed.data.learning,
+    p_publish: parsed.data.publish,
+    p_winner_variant_id: winnerVariantId,
+    p_send_traffic: actOnTest && parsed.data.send_traffic,
+    p_make_control: actOnTest && parsed.data.make_control,
+  })
+  if (error) {
+    back(context, 'erro', error.message.includes('not allowed') ? 'Só gestor ou owner pode decidir o teste e mudar o tráfego. Nada foi alterado.' : `A decisão não foi gravada e nada mudou: ${error.message}`, `&item=${context.code}`)
   }
+  const trafficNote = actOnTest
+    ? [parsed.data.send_traffic && ' Todo o tráfego do link agora vai para a vencedora.', parsed.data.make_control && ' Ela é o novo controle.'].filter(Boolean).join('')
+    : ''
   let followUpNote = ''
   if (parsed.data.follow_up) {
     const { data: original } = await supabase.from('backlog_items').select('stage, method').eq('id', context.item_id).maybeSingle()
