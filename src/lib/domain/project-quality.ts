@@ -59,9 +59,9 @@ export function qualitySeals(row: ProjectQualityRow, links: { regras: string; pr
   if (Number(row.espelhos_sem_janela) > 0)
     seals.push({
       label: plural(row.espelhos_sem_janela, 'frente espelho sem janela', 'frentes espelho sem janela'),
-      detail: 'Sem data de início e fim, o espelho soma todos os dias do outro projeto.',
+      detail: 'Sem janela própria nem início e fim do projeto, o espelho soma todos os dias do outro projeto.',
       tone: 'warn',
-      href: links.edit,
+      href: links.regras,
     })
   if (Number(row.vigias_sem_avaliar) > 0)
     seals.push({

@@ -108,12 +108,15 @@ describe('seals', () => {
     )
   })
 
-  it('requires a source and the project window for a mirror front', () => {
-    const base = { ...named('1K LATAM'), products: { P: 'entrada' as const } }
-    const project = { ...base, fronts: [{ ...base.fronts[0], kind: 'espelho' as const }] }
-    const texts = seals(project, context).map((seal) => seal.text)
-    expect(texts).toContain('Frente espelho Captação sem projeto de origem.')
-    expect(texts).toContain('Frente espelho Captação sem janela: preencha início e fim do projeto.')
+  it('requires a source and its own date window for a mirror front, whatever the project dates', () => {
+    const base = { ...named('1K LATAM'), products: { P: 'entrada' as const }, startsOn: '2026-10-01', endsOn: '2026-10-31' }
+    const mirror = { ...base.fronts[0], kind: 'espelho' as const }
+    const texts = (front: typeof mirror) => seals({ ...base, fronts: [front] }, context).map((seal) => seal.text)
+    expect(texts(mirror)).toContain('Frente espelho Captação sem projeto de origem.')
+    expect(texts(mirror)).toContain('Frente espelho Captação sem janela de datas.')
+    expect(texts({ ...mirror, windowStart: '2026-10-10', windowEnd: '2026-10-05' })).toContain('Frente espelho Captação: o fim da janela vem antes do início.')
+    const ok = texts({ ...mirror, sourceProjectId: 'p1', windowStart: '2026-10-05', windowEnd: '2026-10-10' })
+    expect(ok.filter((text) => text.startsWith('Frente espelho'))).toEqual([])
   })
 
   it('finds a page already in another front, here or in another project', () => {
@@ -142,8 +145,9 @@ describe('duplicate', () => {
       primaryTarget: 150,
       secondaryTarget: 5,
       fronts: [
-        { code: 'CAP', name: 'Captação', sourceProjectId: null, includes: ['[TU1][CAP]'], primary: 'lead', primaryTarget: 4, secondary: 'alcance', secondaryTarget: 20, pages: [{ url: 'https://s.com/t15', label: 'Captura · Captação' }] },
-        { code: 'VND', name: 'Vendas', sourceProjectId: null, includes: ['[t15] vendas'], primary: null, primaryTarget: null, secondary: null, secondaryTarget: null, pages: [] },
+        { code: 'CAP', name: 'Captação', sourceProjectId: null, includes: ['[TU1][CAP]'], primary: 'lead', primaryTarget: 4, secondary: 'alcance', secondaryTarget: 20, pages: [{ url: 'https://s.com/t15', tipo: 'captura' }] },
+        { code: 'VND', name: 'Vendas', sourceProjectId: null, includes: ['[t15] vendas'], primary: null, primaryTarget: null, secondary: null, secondaryTarget: null, pages: [{ url: 'https://s.com/v', tipo: null }] },
+        { code: 'ESP', name: 'Espelho', sourceProjectId: 'p0', includes: [], primary: null, primaryTarget: null, secondary: null, secondaryTarget: null, pages: [] },
       ],
       products: [{ produto_nome: 'Curso', papel: 'entrada' }],
     })
@@ -151,6 +155,10 @@ describe('duplicate', () => {
     expect(project.fronts[0]).toMatchObject({ tag: '[TU1][CAP]', own: true, primary: 'lead', primaryTarget: 4 })
     expect(project.fronts[0].pages[0]).toMatchObject({ kind: 'captura', review: true })
     expect(project.fronts[1]).toMatchObject({ tag: '[t15] vendas', tagEdited: true, own: false })
+    // The kind comes from the page's column; a page without one is a sales page.
+    expect(project.fronts[1].pages[0]).toMatchObject({ kind: 'vendas' })
+    // The old project's window is not the new one's.
+    expect(project.fronts[2]).toMatchObject({ kind: 'espelho', sourceProjectId: 'p0', windowStart: '', windowEnd: '' })
     expect(project.products).toEqual({ Curso: 'entrada' })
     expect(project.duplicatedFrom).toBe('Turma 15')
   })

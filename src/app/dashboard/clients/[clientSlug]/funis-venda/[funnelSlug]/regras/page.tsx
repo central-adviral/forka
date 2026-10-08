@@ -27,6 +27,8 @@ interface FrontRow {
   position: number
   sales_funnel_id: string
   source_sales_funnel_id: string | null
+  janela_inicio: string | null
+  janela_fim: string | null
   metrica_principal: ProjectResult | null
   alvo_principal: number | null
   metrica_secundaria: ProjectResult | null
@@ -40,6 +42,9 @@ const PERIODS = [
   { value: '7d', label: '7 dias' },
   { value: '30d', label: '30 dias' },
 ] as const
+
+const day = (value: string) => value.split('-').reverse().join('/')
+const windowText = (start: string | null, end: string | null) => (start || end ? `${start ? day(start) : '…'} a ${end ? day(end) : '…'}` : 'sem datas: todos os dias')
 
 const currency = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -72,7 +77,7 @@ export default async function CampaignRulesPage({
   if (!(await canActAs(supabase, client.id, 'analista'))) notFound()
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, archived_at')
+    .select('id, name, slug, archived_at, starts_on, ends_on')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
@@ -83,7 +88,7 @@ export default async function CampaignRulesPage({
     canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
     supabase
       .from('project_fronts')
-      .select('id, code, name, position, sales_funnel_id, source_sales_funnel_id, metrica_principal, alvo_principal, metrica_secundaria, alvo_secundaria, archived_at, sales_funnels!project_fronts_sales_funnel_id_fkey!inner(name, client_id, archived_at), naming_rules(id, kind, value)')
+      .select('id, code, name, position, sales_funnel_id, source_sales_funnel_id, janela_inicio, janela_fim, metrica_principal, alvo_principal, metrica_secundaria, alvo_secundaria, archived_at, sales_funnels!project_fronts_sales_funnel_id_fkey!inner(name, client_id, archived_at), naming_rules(id, kind, value)')
       .eq('sales_funnels.client_id', client.id)
       .order('position'),
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: since, p_until: until }),
@@ -299,6 +304,18 @@ export default async function CampaignRulesPage({
                         Nome
                         <input name="name" required defaultValue={front.name} className={`${fieldClass} w-64`} />
                       </label>
+                      {sourceName && (
+                        <div className="flex basis-full flex-wrap items-end gap-2">
+                          <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
+                            Janela: início
+                            <input type="date" name="janela_inicio" required defaultValue={front.janela_inicio ?? funnel.starts_on ?? ''} className={fieldClass} />
+                          </label>
+                          <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
+                            Janela: fim
+                            <input type="date" name="janela_fim" required defaultValue={front.janela_fim ?? funnel.ends_on ?? ''} className={fieldClass} />
+                          </label>
+                        </div>
+                      )}
                       {(['principal', 'secundaria'] as const).map((role) => (
                         <div key={role} className="flex basis-full flex-wrap items-end gap-2">
                           <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
@@ -346,8 +363,9 @@ export default async function CampaignRulesPage({
               </p>
               {sourceName && (
                 <p className="text-[12.5px] text-[var(--ct-text-2)]">
-                  Lê as campanhas do projeto <b>{sourceName}</b>, só nos dias dentro da janela deste projeto. Não tem
-                  regras próprias: as campanhas continuam com um dono só.
+                  Lê as campanhas do projeto <b>{sourceName}</b>, só nos dias da janela{' '}
+                  <b>{windowText(front.janela_inicio ?? funnel.starts_on, front.janela_fim ?? funnel.ends_on)}</b>. Não tem regras próprias: as
+                  campanhas continuam com um dono só.
                 </p>
               )}
               {!sourceName && (
@@ -424,6 +442,14 @@ export default async function CampaignRulesPage({
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
+              Janela do espelho: início
+              <input type="date" name="janela_inicio" defaultValue={funnel.starts_on ?? ''} className={fieldClass} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
+              Janela do espelho: fim
+              <input type="date" name="janela_fim" defaultValue={funnel.ends_on ?? ''} className={fieldClass} />
             </label>
             <button type="submit" className="rounded-[8px] bg-[var(--ct-accent)] px-3.5 py-1.5 text-[12.5px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110">
               + Nova frente

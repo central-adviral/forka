@@ -37,6 +37,8 @@ const projectSchema = z.object({
         tag: z.string().max(120),
         tagEdited: z.boolean(),
         sourceProjectId: z.uuid().nullable(),
+        windowStart: day,
+        windowEnd: day,
         own: z.boolean(),
         primary: metric,
         primaryTarget: z.number(),
@@ -130,6 +132,8 @@ async function fillProject(
         name: front.name,
         position,
         source_sales_funnel_id: mirror ? front.sourceProjectId : null,
+        janela_inicio: mirror ? front.windowStart || null : null,
+        janela_fim: mirror ? front.windowEnd || null : null,
         metrica_principal: front.own ? front.primary : null,
         alvo_principal: front.own ? positive(front.primaryTarget) : null,
         metrica_secundaria: front.own ? front.secondary : null,
@@ -146,7 +150,7 @@ async function fillProject(
     const pages = front.pages.filter((page) => page.url.trim())
     if (pages.length) {
       const { error: pagesError } = await supabase.from('pages').insert(
-        pages.map((page) => ({ client_id: clientId, sales_funnel_id: funnelId, front_id: saved.id, url: page.url.trim(), label: `${PAGE_KIND_LABEL[page.kind]} · ${front.name}` }))
+        pages.map((page) => ({ client_id: clientId, sales_funnel_id: funnelId, front_id: saved.id, url: page.url.trim(), label: `${PAGE_KIND_LABEL[page.kind]} · ${front.name}`, tipo: page.kind }))
       )
       if (pagesError) return pagesError.code === '23505' ? `Uma página da frente ${front.name} já está na sonda.` : pagesError.message
     }
