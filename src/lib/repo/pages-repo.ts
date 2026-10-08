@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { AbDestination, PageCheck, PageWatch } from '@/lib/domain/page-probe'
+import { pageKey, type AbDestination, type PageCheck, type PageWatch } from '@/lib/domain/page-probe'
 
 export interface ProbedPage {
   id: string
@@ -7,6 +7,8 @@ export interface ProbedPage {
   url: string
   isActive: boolean
   salesFunnelId: string | null
+  /** Null is "sem frente · orgânico" (0093). */
+  frontId: string | null
   watch: PageWatch
   silencedUntil: string | null
   /** Newest first. */
@@ -16,7 +18,7 @@ export interface ProbedPage {
 const CHECK_COLUMNS = 'checked_at, ok, ttfb_ms, status_code, error, final_url, redirects, pixel_found, checkout_url, checkout_ok, text_found, cert_expires_at'
 
 /**
- * The client's pages with their latest checks (0066, 0089): the last `checksPerPage`, or every check
+ * The client's pages with their latest checks (0066, 0089, 0093): the last `checksPerPage`, or every check
  * of the last `sinceDays` days. One read per page, so a page rechecked every 5 minutes while down
  * never crowds out the others.
  */
@@ -27,7 +29,7 @@ export async function getPagesWithChecks(
 ): Promise<ProbedPage[]> {
   const { data: pages, error } = await db
     .from('pages')
-    .select('id, label, url, is_active, sales_funnel_id, watch_pixel, watch_checkout, required_text, silenced_until')
+    .select('id, label, url, is_active, sales_funnel_id, front_id, watch_pixel, watch_checkout, required_text, silenced_until')
     .eq('client_id', clientId)
     .order('created_at')
   if (error) throw error
@@ -63,6 +65,7 @@ export async function getPagesWithChecks(
     url: page.url,
     isActive: page.is_active,
     salesFunnelId: page.sales_funnel_id,
+    frontId: page.front_id,
     watch: { watchPixel: page.watch_pixel, watchCheckout: page.watch_checkout, requiredText: page.required_text },
     silencedUntil: page.silenced_until,
     checks: checks[index],
@@ -91,4 +94,22 @@ export async function getAbDestinations(db: SupabaseClient, clientId: string): P
       }))
     )
   )
+}
+
+export interface ExistingPage {
+  id: string
+  label: string
+  projectName: string | null
+  frontName: string | null
+}
+
+/** The client's page at this address (query, hash and trailing slash ignored), if the probe has it already. */
+export async function findPageByUrl(db: SupabaseClient, clientId: string, url: string, exceptId?: string): Promise<ExistingPage | null> {
+  const { data, error } = await db.from('pages').select('id, label, url, project:sales_funnels(name), front:project_fronts(name)').eq('client_id', clientId)
+  if (error) throw error
+  const key = pageKey(url)
+  const found = ((data ?? []) as unknown as { id: string; label: string; url: string; project: { name: string } | null; front: { name: string } | null }[]).find(
+    (page) => page.id !== exceptId && pageKey(page.url) === key
+  )
+  return found ? { id: found.id, label: found.label, projectName: found.project?.name ?? null, frontName: found.front?.name ?? null } : null
 }

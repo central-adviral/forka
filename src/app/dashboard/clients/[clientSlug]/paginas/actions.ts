@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { assertClientRole } from '@/lib/repo/client-access-repo'
 import { MAX_PAGES_PER_CLIENT, isSafeProbeUrl } from '@/lib/domain/page-probe'
+import { findPageByUrl, type ExistingPage } from '@/lib/repo/pages-repo'
 import { PAGE_TO_PROBE_COLUMNS, probeClientPages, probePage, probePages, type PageToProbe, type ProbeResult } from '@/lib/pages/probe'
 
 interface PagesContext {
@@ -32,6 +33,7 @@ const pageSchema = z.object({
   label: z.string().trim().min(1, 'dê um nome para a página').max(60),
   url: urlSchema,
   sales_funnel_id: z.uuid().nullable(),
+  front_id: z.uuid().nullable(),
   watch_pixel: z.boolean(),
   watch_checkout: z.boolean(),
   required_text: z.string().trim().max(120, 'o texto obrigatório tem até 120 caracteres').nullable(),
@@ -46,6 +48,7 @@ function readPageForm(formData: FormData) {
     label: formData.get('label'),
     url: formData.get('url'),
     sales_funnel_id: text('sales_funnel_id'),
+    front_id: text('front_id'),
     watch_pixel: formData.get('watch_pixel') === 'on',
     watch_checkout: formData.get('watch_checkout') === 'on',
     required_text: text('required_text'),
@@ -59,6 +62,11 @@ export async function savePage(context: PagesContext & { page_id?: string }, for
   if (!result.success) redirect(`${formUrl}?erro=${encodeURIComponent(result.error.issues.map((issue) => issue.message).join('; '))}`)
   const supabase = await createServerSupabaseClient()
   if (!context.page_id) {
+    // A page lives in one front only: the form offers to move the existing one instead.
+    if (await findPageByUrl(supabase, context.client_id, result.data.url)) {
+      const keep = new URLSearchParams({ url: result.data.url, projeto: result.data.sales_funnel_id ?? '', frente: result.data.front_id ?? '' })
+      redirect(`${formUrl}?${keep}`)
+    }
     const { count } = await supabase.from('pages').select('id', { count: 'exact', head: true }).eq('client_id', context.client_id).eq('is_active', true)
     if ((count ?? 0) >= MAX_PAGES_PER_CLIENT) back(context, 'erro', `A sonda acompanha até ${MAX_PAGES_PER_CLIENT} páginas por cliente. Tire uma para cadastrar outra.`)
   }
@@ -70,6 +78,7 @@ export async function savePage(context: PagesContext & { page_id?: string }, for
       error.code === '23505' ? 'Essa página já está na sonda.'
       : error.code === '42501' ? 'Só gestor ou owner pode cadastrar páginas.'
       : error.code === '23503' ? 'Esse projeto não é deste cliente.'
+      : error.code === '23514' ? 'Escolha uma frente do próprio projeto que tenha campanhas.'
       : error.message
     redirect(`${formUrl}?erro=${encodeURIComponent(message)}`)
   }
@@ -80,16 +89,40 @@ export async function savePage(context: PagesContext & { page_id?: string }, for
 export interface TestPageResult {
   error: string | null
   result: ProbeResult | null
+  /** The same address already in the probe, in another row. */
+  existing: ExistingPage | null
 }
 
 /** "Testar agora" on the add form: the full probe once, nothing saved. */
-export async function testPage(context: PagesContext, _previous: TestPageResult | null, formData: FormData): Promise<TestPageResult> {
+export async function testPage(context: PagesContext & { page_id?: string }, _previous: TestPageResult | null, formData: FormData): Promise<TestPageResult> {
   const supabase = await createServerSupabaseClient()
   // The probe makes requests from the server: only who can register pages can trigger one.
   await assertClientRole(supabase, context.client_id, 'gestor')
   const url = urlSchema.safeParse(formData.get('url'))
-  if (!url.success) return { error: url.error.issues[0].message, result: null }
-  return { error: null, result: await probePage(url.data, { watchPixel: true, watchCheckout: true, requiredText: null }, { readTitle: true }) }
+  if (!url.success) return { error: url.error.issues[0].message, result: null, existing: null }
+  const [result, existing] = await Promise.all([
+    probePage(url.data, { watchPixel: true, watchCheckout: true, requiredText: null }, { readTitle: true }),
+    findPageByUrl(supabase, context.client_id, url.data, context.page_id),
+  ])
+  return { error: null, result, existing }
+}
+
+const moveSchema = z.object({ sales_funnel_id: z.uuid().nullable(), front_id: z.uuid().nullable() })
+
+/** "Mudar de frente" and "Mover para esta frente": the page keeps its history and only changes project/front. */
+export async function movePage(context: PagesContext & { page_id: string }, formData: FormData) {
+  const text = (name: string) => {
+    const value = formData.get(name)
+    return typeof value === 'string' && value.trim() !== '' ? value : null
+  }
+  const result = moveSchema.safeParse({ sales_funnel_id: text('sales_funnel_id'), front_id: text('front_id') })
+  if (!result.success) back(context, 'erro', 'Projeto ou frente inválidos.')
+  const supabase = await createServerSupabaseClient()
+  const { data, error } = await supabase.from('pages').update(result.data).eq('id', context.page_id).eq('client_id', context.client_id).select('label')
+  if (error?.code === '23514') back(context, 'erro', 'Escolha uma frente do próprio projeto que tenha campanhas.', `#pagina-${context.page_id}`)
+  if (error || !data?.length) back(context, 'erro', 'Só gestor ou owner pode mudar a página de frente.')
+  refresh(context)
+  back(context, 'ok', `${data[0].label} ${result.data.front_id ? 'mudou de frente' : 'agora está sem frente'}.`, `#pagina-${context.page_id}`)
 }
 
 export async function removePage(context: PagesContext & { page_id: string }) {

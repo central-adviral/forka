@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from 'react'
 import { checkFindings, type PageSuggestion } from '@/lib/domain/page-probe'
-import type { TestPageResult } from './actions'
+import type { ExistingPage } from '@/lib/repo/pages-repo'
+import { movePage, type TestPageResult } from './actions'
 
 const field =
   'min-h-11 w-full rounded-[10px] border border-[var(--ct-line-2)] bg-[var(--ct-surface-2)] px-3 py-2 text-[13px] text-[var(--ct-text)] outline-none focus:border-[var(--ct-accent)]'
@@ -13,14 +14,33 @@ export interface PageFormValues {
   label: string
   url: string
   salesFunnelId: string | null
+  frontId: string | null
   watchPixel: boolean
   watchCheckout: boolean
   requiredText: string | null
 }
 
+export interface FrontOption {
+  id: string
+  salesFunnelId: string
+  code: string
+  name: string
+  /** Other pages already in this front. */
+  pageCount: number
+}
+
+function whereItIs(existing: ExistingPage): string {
+  if (existing.frontName && existing.projectName) return `na frente ${existing.frontName} do ${existing.projectName}`
+  if (existing.projectName) return `sem frente, no ${existing.projectName}`
+  return 'sem projeto'
+}
+
 export function PageForm({
   initial,
   projects,
+  fronts,
+  existing,
+  context,
   suggestions,
   slotsUsed,
   maxSlots,
@@ -30,6 +50,10 @@ export function PageForm({
 }: {
   initial: PageFormValues
   projects: { id: string; name: string }[]
+  fronts: FrontOption[]
+  /** A page already in the probe at the prefilled address, found by the server. */
+  existing: ExistingPage | null
+  context: { client_id: string; client_slug: string }
   suggestions: PageSuggestion[]
   /** Active pages counting this one once saved. */
   slotsUsed: number
@@ -41,6 +65,10 @@ export function PageForm({
   const [tested, runTest, testing] = useActionState(testAction, null)
   const [url, setUrl] = useState(initial.url)
   const [label, setLabel] = useState(initial.label)
+  const [projectId, setProjectId] = useState(initial.salesFunnelId ?? '')
+  const [frontId, setFrontId] = useState(initial.frontId ?? '')
+  const projectFronts = fronts.filter((front) => front.salesFunnelId === projectId)
+  const twin = tested ? tested.existing : url === initial.url ? existing : null
   const [seen, setSeen] = useState(tested)
   // The page's <title> fills the name once, only when the name is still empty.
   if (tested !== seen) {
@@ -110,14 +138,22 @@ export function PageForm({
         </section>
 
         <section className={step} aria-labelledby="passo-nome">
-          <h2 id="passo-nome" className={stepTitle}>2. Nome e projeto</h2>
+          <h2 id="passo-nome" className={stepTitle}>2. Nome, projeto e frente</h2>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Nome
             <input name="label" required maxLength={60} value={label} onChange={(event) => setLabel(event.target.value)} placeholder="ex.: Página de vendas 1K" className={field} />
           </label>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Projeto que manda tráfego para ela
-            <select name="sales_funnel_id" defaultValue={initial.salesFunnelId ?? ''} className={field}>
+            <select
+              name="sales_funnel_id"
+              value={projectId}
+              onChange={(event) => {
+                setProjectId(event.target.value)
+                setFrontId('')
+              }}
+              className={field}
+            >
               <option value="">Nenhum</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
@@ -127,6 +163,43 @@ export function PageForm({
             </select>
             <span>Com o projeto, a sonda mostra o gasto que chega à página e quanto custa uma queda.</span>
           </label>
+          {projectId && (
+            <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+              Frente cujos anúncios mandam para ela
+              <select name="front_id" value={frontId} onChange={(event) => setFrontId(event.target.value)} className={field}>
+                {projectFronts.map((front) => (
+                  <option key={front.id} value={front.id}>
+                    {front.name} ({front.code}){front.pageCount > 0 ? ` · já tem ${front.pageCount} ${front.pageCount === 1 ? 'página' : 'páginas'}` : ''}
+                  </option>
+                ))}
+                <option value="">Sem frente (orgânico)</option>
+              </select>
+              <span>
+                {projectFronts.length > 0
+                  ? 'Uma frente pode ter várias páginas; cada página fica em uma frente só.'
+                  : 'Este projeto ainda não tem frentes com campanhas próprias.'}
+              </span>
+            </label>
+          )}
+          <div aria-live="polite">
+            {twin && (
+              <div className="flex flex-col gap-2 rounded-[10px] border border-[var(--ct-warn)]/40 bg-[var(--ct-warn-soft)] px-4 py-3 text-[12.5px]">
+                <p>
+                  Esta página já está na sonda, {whereItIs(twin)}. Cada página fica em uma frente só.
+                </p>
+                {!editing && (
+                  <button
+                    type="submit"
+                    formAction={movePage.bind(null, { ...context, page_id: twin.id })}
+                    formNoValidate
+                    className="min-h-11 self-start rounded-[10px] border border-[var(--ct-line-2)] bg-[var(--ct-surface)] px-4 text-[13px] font-medium hover:border-[var(--ct-accent)]"
+                  >
+                    Mover para esta frente
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </section>
 
         <section className={step} aria-labelledby="passo-vigiar">
@@ -153,6 +226,7 @@ export function PageForm({
           </button>
           <span className="text-[12.5px] text-[var(--ct-text-3)]">
             {editing ? `${slotsUsed} de ${maxSlots} vagas usadas` : `Vai usar ${slotsUsed} de ${maxSlots} vagas`}
+            {!editing && frontId && ' · Entra na frente escolhida, junto das páginas que ela já tem'}
           </span>
         </div>
       </form>

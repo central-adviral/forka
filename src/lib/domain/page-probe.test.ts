@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   containsText,
   findCheckoutLink,
+  frontsWithoutPage,
+  groupPagesByFront,
   hasMetaPixel,
   isCritical,
   isPublicAddress,
@@ -11,6 +13,7 @@ import {
   outages,
   pageStatus,
   pageTitle,
+  spendPerHour,
   suggestPages,
   testsPointingTo,
   type PageCheck,
@@ -142,6 +145,47 @@ describe('outages and their cost', () => {
     // R$ 600 in the first 12 hours is R$ 50/h; 90 minutes down is R$ 75.
     expect(outageCost(600, 12, new Date('2026-10-08T13:30:00Z'), NOW)).toBe(75)
     expect(outageCost(0, 12, new Date('2026-10-08T13:30:00Z'), NOW)).toBe(0)
+  })
+
+  it('prices a fall at the front rate, not the whole project', () => {
+    // Project R$ 600 by noon, of which the page's front spent R$ 240: R$ 20/h, 90 minutes is R$ 30.
+    expect(spendPerHour(240, 12)).toBe(20)
+    expect(outageCost(240, 12, new Date('2026-10-08T13:30:00Z'), NOW)).toBe(30)
+    // Twenty minutes into the day counts as a whole hour.
+    expect(spendPerHour(50, 1 / 3)).toBe(50)
+  })
+})
+
+describe('fronts', () => {
+  const page = (id: string, salesFunnelId: string | null, frontId: string | null, isActive = true) => ({ id, salesFunnelId, frontId, isActive })
+
+  it('flags a front that spent in the last days with no active page', () => {
+    const fronts = [
+      { id: 'f1', spendRecent: 300 },
+      { id: 'f2', spendRecent: 120 },
+      { id: 'f3', spendRecent: 0 },
+      { id: 'f4', spendRecent: 80 },
+    ]
+    const pages = [page('a', 'p1', 'f1'), page('b', 'p1', 'f4', false)]
+    expect([...frontsWithoutPage(fronts, pages)]).toEqual(['f2', 'f4'])
+  })
+
+  it('groups pages by project then front, organic last in the project, loose pages last', () => {
+    const pages = [page('a', 'p1', 'f1'), page('b', 'p1', null), page('c', null, null), page('d', 'p1', 'f1'), page('e', 'p2', 'gone')]
+    const groups = groupPagesByFront(
+      pages,
+      [
+        { id: 'p1', frontIds: ['f1', 'f2', 'f3'] },
+        { id: 'p2', frontIds: ['g1'] },
+        { id: 'p3', frontIds: ['h1'] },
+      ],
+      new Set(['f2'])
+    )
+    expect(groups.map((group) => ({ project: group.projectId, fronts: group.fronts.map((front) => [front.frontId, front.pages.map((p) => p.id), front.unwatched]) }))).toEqual([
+      { project: 'p1', fronts: [['f1', ['a', 'd'], false], ['f2', [], true], [null, ['b'], false]] },
+      { project: 'p2', fronts: [[null, ['e'], false]] },
+      { project: null, fronts: [[null, ['c'], false]] },
+    ])
   })
 })
 

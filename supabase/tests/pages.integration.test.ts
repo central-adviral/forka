@@ -89,3 +89,60 @@ describe('page probe diagnosis (0089)', () => {
     expect(unlinked).toEqual({ sales_funnel_id: null, client_id: client!.id })
   })
 })
+
+describe('page per front (0093)', () => {
+  it('takes only an own front of the page project, unlinks on delete, and keeps RLS', async () => {
+    const owner = await signedIn('front-owner')
+    const gestor = await signedIn('front-gestor')
+    const cliente = await signedIn('front-cliente')
+    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    const { data: client } = await admin.from('clients').insert({ owner_id: owner.userId, name: 'Frentes', slug: `frentes-${stamp}` }).select().single()
+    await admin.from('memberships').insert([
+      { client_id: client!.id, user_id: gestor.userId, role: 'gestor' },
+      { client_id: client!.id, user_id: cliente.userId, role: 'cliente' },
+    ])
+    const { data: project } = await admin.from('sales_funnels').insert({ client_id: client!.id, name: '1K', slug: `1k-${stamp}` }).select().single()
+    const { data: otherProject } = await admin.from('sales_funnels').insert({ client_id: client!.id, name: 'Perpétuo', slug: `perpetuo-${stamp}` }).select().single()
+    const { data: front } = await admin.from('project_fronts').insert({ sales_funnel_id: project!.id, code: 'F1', name: 'Frio' }).select().single()
+    const { data: foreignFront } = await admin.from('project_fronts').insert({ sales_funnel_id: otherProject!.id, code: 'P1', name: 'Perpétuo frio' }).select().single()
+    const { data: mirror } = await admin
+      .from('project_fronts')
+      .insert({ sales_funnel_id: project!.id, code: 'ESP', name: 'Espelho', source_sales_funnel_id: otherProject!.id })
+      .select()
+      .single()
+
+    const { data: page, error } = await gestor.db
+      .from('pages')
+      .insert({ client_id: client!.id, label: 'Vendas', url: `https://www.exemplo.com.br/${stamp}`, sales_funnel_id: project!.id, front_id: front!.id })
+      .select()
+      .single()
+    expect(error).toBeNull()
+
+    const { error: otherProjectError } = await gestor.db.from('pages').update({ front_id: foreignFront!.id }).eq('id', page!.id)
+    expect(otherProjectError?.code).toBe('23514')
+    const { error: mirrorError } = await gestor.db.from('pages').update({ front_id: mirror!.id }).eq('id', page!.id)
+    expect(mirrorError?.code).toBe('23514')
+    const { error: noProjectError } = await gestor.db
+      .from('pages')
+      .insert({ client_id: client!.id, label: 'Solta', url: `https://www.exemplo.com.br/solta-${stamp}`, front_id: front!.id })
+    expect(noProjectError?.code).toBe('23514')
+
+    const { data: clienteWrite } = await cliente.db.from('pages').update({ front_id: null }).eq('id', page!.id).select('id')
+    expect(clienteWrite).toEqual([])
+    const { data: seen } = await cliente.db.from('pages').select('sales_funnel_id, front_id').eq('id', page!.id).single()
+    expect(seen).toEqual({ sales_funnel_id: project!.id, front_id: front!.id })
+
+    // Deleting the front unlinks the page; the page and its project stay.
+    await admin.from('project_fronts').delete().eq('id', front!.id)
+    const { data: unlinked } = await admin.from('pages').select('sales_funnel_id, front_id').eq('id', page!.id).single()
+    expect(unlinked).toEqual({ sales_funnel_id: project!.id, front_id: null })
+
+    // Deleting the project takes its fronts and unlinks both.
+    const { data: second } = await admin.from('project_fronts').insert({ sales_funnel_id: project!.id, code: 'F2', name: 'Quente' }).select().single()
+    const { error: moveError } = await gestor.db.from('pages').update({ front_id: second!.id }).eq('id', page!.id)
+    expect(moveError).toBeNull()
+    await admin.from('sales_funnels').delete().eq('id', project!.id)
+    const { data: orphan } = await admin.from('pages').select('sales_funnel_id, front_id').eq('id', page!.id).single()
+    expect(orphan).toEqual({ sales_funnel_id: null, front_id: null })
+  })
+})

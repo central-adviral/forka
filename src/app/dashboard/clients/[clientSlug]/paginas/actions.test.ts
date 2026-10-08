@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const role = vi.hoisted(() => ({ has: false, activePages: 0, inserted: [] as unknown[] }))
+const role = vi.hoisted(() => ({ has: false, activePages: 0, inserted: [] as unknown[], existing: [] as unknown[] }))
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabaseClient: async () => ({
     rpc: async () => ({ data: role.has, error: null }),
     from: () => ({
-      select: () => ({ eq: () => ({ eq: async () => ({ count: role.activePages }) }) }),
+      select: () => ({
+        eq: () => ({
+          eq: async () => ({ count: role.activePages }),
+          then: (resolve: (value: unknown) => void) => resolve({ data: role.existing, error: null }),
+        }),
+      }),
       insert: async (row: unknown) => {
         role.inserted.push(row)
         return { error: null }
@@ -56,6 +61,7 @@ describe('savePage', () => {
 
   beforeEach(() => {
     role.inserted = []
+    role.existing = []
   })
 
   it('refuses an 11th active page', async () => {
@@ -68,7 +74,14 @@ describe('savePage', () => {
     role.activePages = 9
     await expect(savePage(context, form())).rejects.toThrow(/redirect:.*ok=/)
     expect(role.inserted).toEqual([
-      { client_id: 'client-1', label: 'Vendas', url: 'https://www.exemplo.com.br/oferta', sales_funnel_id: null, watch_pixel: true, watch_checkout: false, required_text: null },
+      { client_id: 'client-1', label: 'Vendas', url: 'https://www.exemplo.com.br/oferta', sales_funnel_id: null, front_id: null, watch_pixel: true, watch_checkout: false, required_text: null },
     ])
+  })
+
+  it('sends an address already in the probe back to the form instead of adding it twice', async () => {
+    role.activePages = 1
+    role.existing = [{ id: 'page-1', label: 'Vendas', url: 'https://www.exemplo.com.br/oferta/?utm_source=x', project: { name: '1K' }, front: { name: 'Frio' } }]
+    await expect(savePage(context, form())).rejects.toThrow(/redirect:\/dashboard\/clients\/voe\/paginas\/nova\?url=/)
+    expect(role.inserted).toEqual([])
   })
 })
