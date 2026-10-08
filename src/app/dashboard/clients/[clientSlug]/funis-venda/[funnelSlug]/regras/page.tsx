@@ -15,6 +15,9 @@ import { addRule, createFront, setFrontArchived, pinCampaign, previewRule, remov
 import { RuleForm } from './rule-form'
 import { canActAs } from '@/lib/view-as'
 import { PageHeader } from '@/components/page-header'
+import { saoPauloDay } from '@/lib/repo/today-repo'
+import { ApplySincePanel } from '../apply-since-panel'
+import { applySince, previewApplySince } from '../apply-since-actions'
 
 interface FrontRow {
   id: string
@@ -51,10 +54,10 @@ export default async function CampaignRulesPage({
   searchParams,
 }: {
   params: Promise<{ clientSlug: string; funnelSlug: string }>
-  searchParams: Promise<{ periodo?: string; ok?: string; erro?: string }>
+  searchParams: Promise<{ periodo?: string; ok?: string; erro?: string; mudou?: string }>
 }) {
   const { clientSlug, funnelSlug } = await params
-  const { periodo: periodParam, ok, erro } = await searchParams
+  const { periodo: periodParam, ok, erro, mudou } = await searchParams
   const periodo = periodParam === '30d' ? '30d' : '7d'
   const supabase = await createServerSupabaseClient()
 
@@ -111,6 +114,7 @@ export default async function CampaignRulesPage({
   const base = `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`
   const context = { client_slug: client.slug, funnel_slug: funnel.slug, sales_funnel_id: funnel.id }
   const pinContext = { ...context, client_id: client.id as string }
+  const applyContext = { sales_funnel_id: funnel.id, path: `${base}/regras` }
 
   function frontLabel(frontId: string): { text: string; own: boolean } {
     const front = frontById.get(frontId)
@@ -124,7 +128,7 @@ export default async function CampaignRulesPage({
     <div className="flex max-w-[1180px] flex-col gap-8 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
         title="Regras de campanha"
-        note="Cada campanha tem um dono só: uma frente. O nome sugere o dono (contém todos os textos verdes e nenhum dos vermelhos) e o sync fixa essa escolha, então renomear a campanha no Gerenciador não muda o histórico. Você pode fixar o dono à mão na tabela. Uma frente também pode ler outro projeto, só dentro da janela deste."
+        note="Cada campanha tem um dono só: uma frente. O nome sugere o dono (contém todos os textos verdes e nenhum dos vermelhos) e o sync fixa essa escolha, então renomear a campanha no Gerenciador não muda o histórico. Mudar uma regra vale daqui pra frente: campanhas que já gastaram ficam com o dono que têm. Você pode fixar o dono à mão na tabela. Uma frente também pode ler outro projeto, só dentro da janela deste."
         actions={
           <div className="flex items-center gap-1 rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface)] p-[3px]" role="group" aria-label="Período">
               {PERIODS.map((period) => (
@@ -152,6 +156,15 @@ export default async function CampaignRulesPage({
         <p role="alert" className="rounded-[10px] bg-[var(--ct-crit-soft)] px-4 py-3 text-[13px] text-[var(--ct-crit)]">
           {erro}
         </p>
+      )}
+
+      {canEdit && mudou && (
+        <ApplySincePanel
+          previewAction={previewApplySince.bind(null, applyContext)}
+          applyAction={applySince.bind(null, applyContext)}
+          today={saoPauloDay()}
+          fieldClass={fieldClass}
+        />
       )}
 
       <div className="grid grid-cols-2 gap-[18px] lg:grid-cols-4">

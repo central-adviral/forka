@@ -158,7 +158,7 @@ describe('each project classifies its products (0061)', () => {
   const day = '2026-09-20'
   const next = '2026-09-21'
 
-  it('splits entry, bump and ascension sales, re-labels on a role change and keeps the sync list in step', async () => {
+  it('splits entry, bump and ascension sales, keeps past roles on a role change and keeps the sync list in step', async () => {
     const { data: user } = await admin.auth.admin.createUser({ email: `products-${Date.now()}@example.com`, password: 'password123', email_confirm: true })
     const { data: client } = await admin
       .from('clients')
@@ -205,15 +205,16 @@ describe('each project classifies its products (0061)', () => {
     const { data: cursor } = await admin.from('funnel_sync_state').select('entity').eq('sales_funnel_id', funnelId)
     expect(cursor).toEqual([])
 
+    // Role and product changes apply from now on (0101): the past day reads the same.
     await admin.from('project_products').update({ papel: 'entrada' }).eq('sales_funnel_id', funnelId).eq('produto_nome', 'Bump')
     row = await read()
-    expect([Number(row.vendas), Number(row.vendas_upsell)]).toEqual([3, 0])
+    expect([Number(row.vendas), Number(row.vendas_upsell)]).toEqual([2, 1])
 
     await admin.from('project_products').delete().eq('sales_funnel_id', funnelId).eq('produto_nome', 'Mentoria')
     row = await read()
-    expect(Number(row.vendas_ascensao)).toBe(0)
+    expect(Number(row.vendas_ascensao)).toBe(1)
     const { count } = await admin.from('sales').select('id', { count: 'exact', head: true }).eq('sales_funnel_id', funnelId)
-    expect(count).toBe(3)
+    expect(count).toBe(4)
   })
 })
 
