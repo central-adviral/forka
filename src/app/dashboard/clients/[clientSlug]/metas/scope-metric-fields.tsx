@@ -26,10 +26,21 @@ export function availableMetrics<T extends MetricOption>(scope: string, metrics:
   return metrics.filter((option) => !(isFrontScope(scope) && option.projectOnly) && !(resultado === 'lead' && option.salesOnly))
 }
 
-export function ScopeMetricFields({ projects, metrics, fieldClass }: { projects: ProjectOption[]; metrics: MetricOption[]; fieldClass: string }) {
-  const [funnelId, setFunnelId] = useState(projects.length === 1 ? projects[0].funnelId : '')
-  const [frontId, setFrontId] = useState('')
-  const [metric, setMetric] = useState(metrics[0]?.value ?? '')
+export function ScopeMetricFields({
+  projects,
+  metrics,
+  fieldClass,
+  initial,
+}: {
+  projects: ProjectOption[]
+  metrics: MetricOption[]
+  fieldClass: string
+  /** Prefills an edit; a new watcher starts empty. */
+  initial?: { funnelId: string; frontId: string; metric: string }
+}) {
+  const [funnelId, setFunnelId] = useState(initial?.funnelId ?? (projects.length === 1 ? projects[0].funnelId : ''))
+  const [frontId, setFrontId] = useState(initial?.frontId ?? '')
+  const [metric, setMetric] = useState(initial?.metric ?? metrics[0]?.value ?? '')
   const project = projects.find((option) => option.funnelId === funnelId)
   const scope = funnelId ? `${funnelId}|${frontId}` : ''
   const available = availableMetrics(scope, metrics, project?.resultado)

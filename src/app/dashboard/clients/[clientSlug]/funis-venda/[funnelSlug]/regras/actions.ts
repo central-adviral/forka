@@ -191,6 +191,28 @@ export async function previewRule(context: RulesContext & { front_id: string }, 
   return { text: parts.filter(Boolean).join(' '), error: null }
 }
 
+// naming_rules has no update policy (0053), so an edit adds the new rule and then removes the old
+// one: the same two steps a gestor would take by hand, in the order that loses nothing if the
+// new rule is refused (a duplicate, a missing role).
+export async function updateRule(context: RulesContext & { front_id: string; rule_id: string }, formData: FormData) {
+  const result = ruleSchema.safeParse({ kind: formData.get('kind'), value: formData.get('value') })
+  if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '))
+  const supabase = await createServerSupabaseClient()
+  const { data: current } = await supabase.from('naming_rules').select('kind, value').eq('id', context.rule_id).maybeSingle()
+  if (!current) back(context, 'erro', 'Regra não encontrada.')
+  if (current.kind === result.data.kind && current.value === result.data.value) back(context, 'ok', 'Nada mudou na regra.')
+  const { data: added, error } = await supabase
+    .from('naming_rules')
+    .insert({ front_id: context.front_id, kind: result.data.kind, value: result.data.value })
+    .select('id')
+  if (error) back(context, 'erro', databaseMessage(error, 'Essa regra já existe nesta frente.'))
+  if (!added?.length) back(context, 'erro', 'Só gestor ou owner pode alterar as regras.')
+  const { error: removeError } = await supabase.from('naming_rules').delete().eq('id', context.rule_id)
+  if (removeError) back(context, 'erro', databaseMessage(removeError, ''))
+  revalidatePath(rulesPath(context))
+  back(context, 'ok', 'Regra alterada. Campanhas que já gastaram ficam com o dono que têm; a regra decide as novas.', true)
+}
+
 export async function removeRule(context: RulesContext & { rule_id: string }) {
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase.from('naming_rules').delete().eq('id', context.rule_id).select('id')

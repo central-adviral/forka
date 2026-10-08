@@ -11,7 +11,7 @@ import {
   type ClassifiedCampaign,
 } from '@/lib/domain/campaign-rules'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { addRule, createFront, setFrontArchived, pinCampaign, previewRule, removeRule, unpinCampaign, updateFront } from './actions'
+import { addRule, createFront, setFrontArchived, pinCampaign, previewRule, removeRule, unpinCampaign, updateFront, updateRule } from './actions'
 import { RuleForm } from './rule-form'
 import { canActAs } from '@/lib/view-as'
 import { PageHeader } from '@/components/page-header'
@@ -59,10 +59,10 @@ export default async function CampaignRulesPage({
   searchParams,
 }: {
   params: Promise<{ clientSlug: string; funnelSlug: string }>
-  searchParams: Promise<{ periodo?: string; ok?: string; erro?: string; mudou?: string }>
+  searchParams: Promise<{ periodo?: string; ok?: string; erro?: string; mudou?: string; regra?: string }>
 }) {
   const { clientSlug, funnelSlug } = await params
-  const { periodo: periodParam, ok, erro, mudou } = await searchParams
+  const { periodo: periodParam, ok, erro, mudou, regra } = await searchParams
   const periodo = periodParam === '30d' ? '30d' : '7d'
   const supabase = await createServerSupabaseClient()
 
@@ -352,7 +352,22 @@ export default async function CampaignRulesPage({
               )}
               {!sourceName && (
               <div className="flex flex-wrap items-center gap-1.5">
-                {front.naming_rules.map((rule) => (
+                {front.naming_rules.map((rule) =>
+                  canEdit && regra === rule.id ? (
+                    <form key={rule.id} action={updateRule.bind(null, { ...frontContext, rule_id: rule.id })} className="flex flex-wrap items-center gap-2">
+                      <select name="kind" defaultValue={rule.kind} className={fieldClass} aria-label="Tipo da regra">
+                        <option value="include">contém</option>
+                        <option value="exclude">não contém</option>
+                      </select>
+                      <input name="value" required defaultValue={rule.value} autoFocus className={`${fieldClass} ${mono} min-w-[220px]`} aria-label="Texto da regra" />
+                      <button type="submit" className="text-[12.5px] font-medium text-[var(--ct-accent)] hover:underline">
+                        salvar
+                      </button>
+                      <Link href={`${base}/regras`} className="text-[12.5px] text-[var(--ct-text-2)] hover:underline">
+                        cancelar
+                      </Link>
+                    </form>
+                  ) : (
                   <span
                     key={rule.id}
                     className={`${mono} flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] ${
@@ -361,6 +376,11 @@ export default async function CampaignRulesPage({
                   >
                     {rule.kind === 'include' ? 'contém' : 'não contém'} {rule.value}
                     {canEdit && (
+                      <Link href={`${base}/regras?regra=${rule.id}`} aria-label={`Editar regra ${rule.value}`} className="opacity-60 hover:opacity-100 hover:underline">
+                        editar
+                      </Link>
+                    )}
+                    {canEdit && (
                       <form action={removeRule.bind(null, { ...context, rule_id: rule.id })}>
                         <button type="submit" aria-label={`Remover regra ${rule.value}`} className="opacity-60 hover:opacity-100">
                           ×
@@ -368,7 +388,8 @@ export default async function CampaignRulesPage({
                       </form>
                     )}
                   </span>
-                ))}
+                  )
+                )}
                 {includes.length === 0 && (
                   <span className="text-[12px] text-[var(--ct-text-3)]">sem “contém”, esta frente não pega nenhuma campanha</span>
                 )}

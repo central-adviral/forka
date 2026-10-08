@@ -83,3 +83,16 @@ export function alertActions(
   if (canEdit) actions.push({ label: 'Ajustar alvo', href: `${clientBase}/metas` })
   return actions
 }
+
+export type WatcherSource = 'plano' | 'frente' | 'livre'
+
+/** Who owns a watcher's metric: the Plano for a project plan watcher, the front's metrics for a front one (0094, 0102), or the watcher itself. */
+export function watcherSource(watcher: { planRole: 'principal' | 'secundaria' | null; frontId: string | null }): WatcherSource {
+  if (!watcher.planRole) return 'livre'
+  return watcher.frontId ? 'frente' : 'plano'
+}
+
+/** A number as the Metas inputs parse it back: a comma for decimals and no thousands dot. */
+export function decimalInput(value: number): string {
+  return String(value).replace('.', ',')
+}
