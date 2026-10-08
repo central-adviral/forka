@@ -6,7 +6,8 @@ import { getConfiguredSecrets } from '@/lib/repo/client-secrets-repo'
 import { notFound } from 'next/navigation'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
-import { saveDomain, verifyDomain, saveHublaToken, saveFunnelDataSource, saveMetaTax, testIntegrations } from './actions'
+import { saveDomain, verifyDomain, saveHublaToken, saveFunnelDataSource, saveMetaTax, removeMetaTax, testIntegrations } from './actions'
+import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { TestIntegrationsButton } from './test-integrations-button'
 import { VerifyDomainButton } from './verify-domain-button'
 import { canActAs } from '@/lib/view-as'
@@ -274,19 +275,37 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
           description="O gasto chega do Meta sem imposto. A taxa entra no investimento, no CPA e no ROAS a partir da data; os dias anteriores mantêm a taxa que valia antes."
           details={(taxRates ?? []).map((rate) => [`desde ${rate.valid_from.split('-').reverse().join('/')}`, percent(rate.factor)] as [string, ReactNode])}
           settings={
-            <form action={saveMetaTax.bind(null, context)} className="flex flex-wrap items-end gap-3">
-              <label className="flex w-24 flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-                Imposto (%)
-                <input name="percent" inputMode="decimal" required placeholder="13,8" className={`${field} ${mono}`} />
-              </label>
-              <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-                Vale a partir de
-                <input type="date" name="valid_from" required className={field} />
-              </label>
-              <button type="submit" className={primary}>
-                Salvar
-              </button>
-            </form>
+            <>
+              {(taxRates ?? []).length > 0 && (
+                <ul aria-label="Taxas cadastradas" className="flex flex-col gap-1.5 text-[12.5px]">
+                  {(taxRates ?? []).map((rate) => (
+                    <li key={rate.valid_from} className="flex flex-wrap items-center justify-between gap-3">
+                      <span className="text-[var(--ct-text-2)]">
+                        desde {rate.valid_from.split('-').reverse().join('/')} · <span className={mono}>{percent(rate.factor)}</span>
+                      </span>
+                      <ConfirmDeleteButton
+                        action={removeMetaTax.bind(null, { ...context, valid_from: rate.valid_from })}
+                        label="remover"
+                        warning="Remover esta taxa? Os dias dela passam a usar a taxa anterior, ou nenhuma."
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <form action={saveMetaTax.bind(null, context)} className="flex flex-wrap items-end gap-3">
+                <label className="flex w-24 flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                  Imposto (%)
+                  <input name="percent" inputMode="decimal" required placeholder="13,8" className={`${field} ${mono}`} />
+                </label>
+                <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                  Vale a partir de
+                  <input type="date" name="valid_from" required className={field} />
+                </label>
+                <button type="submit" className={primary}>
+                  Salvar
+                </button>
+              </form>
+            </>
           }
         />
 

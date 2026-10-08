@@ -179,6 +179,26 @@ export async function saveMetaTax(context: { client_id: string; client_slug: str
   revalidatePath(`/dashboard/clients/${result.data.client_slug}/integrations`)
 }
 
+const removeTaxSchema = z.object({ client_id: z.string().uuid(), client_slug: z.string(), valid_from: z.iso.date() })
+
+// The days a removed rate covered fall back to the rate before it, or to no tax: every reader
+// coalesces a missing rate to factor 1, so removing the last one is safe.
+export async function removeMetaTax(context: { client_id: string; client_slug: string; valid_from: string }) {
+  const parsed = removeTaxSchema.parse(context)
+  const supabase = await createServerSupabaseClient()
+  await assertClientRole(supabase, parsed.client_id, 'gestor')
+  const { data, error } = await supabase
+    .from('client_tax_rates')
+    .delete()
+    .eq('client_id', parsed.client_id)
+    .eq('valid_from', parsed.valid_from)
+    .select('valid_from')
+  if (error) throw error
+  if (!data || data.length === 0) throw new Error('Taxa não encontrada ou sem permissão para remover.')
+  // The investment of every project of the client reads this rate.
+  revalidatePath(`/dashboard/clients/${parsed.client_slug}`, 'layout')
+}
+
 export interface IntegrationCheck {
   name: string
   ok: boolean
