@@ -19,8 +19,8 @@ interface MetricOption {
 
 const isFrontScope = (scope: string) => scope !== '' && !scope.endsWith('|')
 
-// Sales belong to the project, not to a front, so a front only offers the media metrics; and a
-// lead project has no sales at all, so it never offers a CPA. The server action refuses both too;
+// A front's sales are the ones whose UTM ad runs in its campaigns (0086), so CPA geral stays
+// project-wide; and a lead project has no sales at all, so it never offers CPA or ROAS. The server action refuses both too;
 // this keeps them from being picked in the first place.
 export function availableMetrics<T extends MetricOption>(scope: string, metrics: T[], resultado: 'compra' | 'lead' = 'compra'): T[] {
   return metrics.filter((option) => !(isFrontScope(scope) && option.projectOnly) && !(resultado === 'lead' && option.salesOnly))
@@ -77,7 +77,7 @@ export function ScopeMetricFields({ projects, metrics, fieldClass }: { projects:
             </option>
           ))}
         </select>
-        <span className="text-[11px]">{frontId ? 'Só mídia: as vendas são do projeto, não de uma frente.' : 'Com vendas: vale para CPA.'}</span>
+        <span className="text-[11px]">{frontId ? 'Vendas da frente: as que a UTM liga a um anúncio dela (CPA de anúncio e ROAS).' : 'Com todas as vendas do projeto: vale para CPA e ROAS.'}</span>
       </label>
       <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
         Métrica
