@@ -3,7 +3,8 @@ import { PageHeader } from '@/components/page-header'
 import { notFound } from 'next/navigation'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { setSalesFunnelArchived } from './actions'
-import { SalesFunnelStatusToggle } from './sales-funnel-status-toggle'
+import { ProjectStatusActions } from './project-status'
+import { canActAs } from '@/lib/view-as'
 import { getFunnelSyncHealth } from '@/lib/repo/funnel-repo'
 import { SyncStatus } from '@/components/sync-status'
 
@@ -19,10 +20,11 @@ export default async function SalesFunnelsListPage({
 
   const { data: funnels } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, is_active, archived_at, launchops_operacao_ids, launchops_produto_nomes')
+    .select('id, name, slug, status, archived_at, launchops_operacao_ids, launchops_produto_nomes')
     .eq('client_id', client.id)
     .order('name')
 
+  const canEdit = await canActAs(supabase, client.id, 'gestor')
   const archived = (funnels ?? []).filter((funnel) => funnel.archived_at)
   const summaries = await Promise.all(
     (funnels ?? []).filter((funnel) => !funnel.archived_at).map(async (funnel) => {
@@ -57,7 +59,7 @@ export default async function SalesFunnelsListPage({
             key={funnel.id}
             className={`flex flex-wrap items-center gap-x-5 gap-y-3 bg-[var(--ct-surface)] px-4 py-5 sm:flex-nowrap sm:px-6 hover:bg-[var(--ct-surface-2)] ${
               index < summaries.length - 1 ? 'border-b border-[var(--ct-line)]' : ''
-            } ${!funnel.is_active ? 'opacity-70' : ''}`}
+            } ${funnel.status === 'encerrado' ? 'opacity-70' : ''}`}
           >
             <a
               href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`}
@@ -71,7 +73,7 @@ export default async function SalesFunnelsListPage({
               </div>
               <SyncStatus lastRunAt={funnel.lastSync} hasError={funnel.hasSyncError} />
             </a>
-            <SalesFunnelStatusToggle salesFunnelId={funnel.id} clientSlug={client.slug} isActive={funnel.is_active} />
+            <ProjectStatusActions salesFunnelId={funnel.id} status={funnel.status} canEdit={canEdit} />
             <ConfirmDeleteButton
               action={setSalesFunnelArchived.bind(null, funnel.id, true)}
               label="Arquivar"

@@ -34,8 +34,11 @@ const planSchema = z
     crit_pct: optionalNumber,
     min_spend: optionalNumber,
     daily_target: optionalNumber.refine((value) => value === null || (Number.isInteger(value) && value > 0), 'o volume por dia é um número inteiro maior que zero'),
+    metrica_secundaria: z.union([z.literal(''), z.enum(['compra', 'lead', 'roas', 'checkout', 'visita', 'alcance'])]).transform((value) => value || null),
+    secondary_target: optionalNumber.refine((value) => value === null || value > 0, 'o alvo da secundária precisa ser maior que zero'),
   })
   .refine((value) => (value.crit_pct ?? 40) >= (value.warn_pct ?? 20), 'o crítico precisa ser maior ou igual à atenção')
+  .refine((value) => value.metrica_secundaria !== value.resultado, 'a métrica secundária precisa ser diferente da principal')
 
 export async function savePlan(context: PlanContext, formData: FormData) {
   const parsed = planSchema.safeParse({
@@ -45,6 +48,8 @@ export async function savePlan(context: PlanContext, formData: FormData) {
     crit_pct: String(formData.get('crit_pct') ?? ''),
     min_spend: String(formData.get('min_spend') ?? ''),
     daily_target: String(formData.get('daily_target') ?? ''),
+    metrica_secundaria: String(formData.get('metrica_secundaria') ?? ''),
+    secondary_target: String(formData.get('secondary_target') ?? ''),
   })
   if (!parsed.success) back(context, 'erro', parsed.error.issues.map((issue) => issue.message).join('; '))
   const plan = parsed.data
@@ -56,6 +61,7 @@ export async function savePlan(context: PlanContext, formData: FormData) {
     .update({
       resultado: plan.resultado,
       daily_sales_target: plan.daily_target,
+      metrica_secundaria: plan.metrica_secundaria,
       updated_at: new Date().toISOString(),
     })
     .eq('id', context.sales_funnel_id)
@@ -92,6 +98,28 @@ export async function savePlan(context: PlanContext, formData: FormData) {
     const { error: watcherError } = keep
       ? await supabase.from('watchers').update(values).eq('id', keep.id)
       : await supabase.from('watchers').insert({ client_id: context.client_id, sales_funnel_id: context.sales_funnel_id, is_plan: true, ...values })
+    if (watcherError) back(context, 'erro', watcherError.message)
+  }
+
+  // The secondary metric (0102): a second project-wide watcher, marked by its role.
+  const { data: secondary, error: secondaryError } = await supabase
+    .from('watchers')
+    .select('id')
+    .eq('sales_funnel_id', context.sales_funnel_id)
+    .is('front_id', null)
+    .eq('plan_role', 'secundaria')
+    .maybeSingle()
+  if (secondaryError) back(context, 'erro', secondaryError.message)
+  if (plan.metrica_secundaria === null || plan.secondary_target === null) {
+    if (secondary) {
+      const { error: deleteError } = await supabase.from('watchers').delete().eq('id', secondary.id)
+      if (deleteError) back(context, 'erro', deleteError.message)
+    }
+  } else {
+    const values = { metric: PROJECT_RESULTS[plan.metrica_secundaria].costMetric, target: plan.secondary_target, is_active: true }
+    const { error: watcherError } = secondary
+      ? await supabase.from('watchers').update(values).eq('id', secondary.id)
+      : await supabase.from('watchers').insert({ client_id: context.client_id, sales_funnel_id: context.sales_funnel_id, plan_role: 'secundaria', ...values })
     if (watcherError) back(context, 'erro', watcherError.message)
   }
 

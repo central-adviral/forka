@@ -28,7 +28,7 @@ export default async function ProjectPlanPage({
   if (!client) notFound()
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, resultado, daily_sales_target')
+    .select('id, name, slug, resultado, daily_sales_target, metrica_secundaria')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
@@ -40,7 +40,7 @@ export default async function ProjectPlanPage({
   const [days, frontResult, watchersResult, canEdit] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
     supabase.rpc('get_project_front_daily', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
-    supabase.from('watchers').select('metric, target, warn_pct, crit_pct, min_spend').eq('sales_funnel_id', funnel.id).eq('is_plan', true),
+    supabase.from('watchers').select('metric, target, warn_pct, crit_pct, min_spend, plan_role').eq('sales_funnel_id', funnel.id).is('front_id', null).not('plan_role', 'is', null),
     canActAs(supabase, client.id, 'gestor'),
   ])
   if (frontResult.error) throw frontResult.error
@@ -71,7 +71,8 @@ export default async function ProjectPlanPage({
     PROJECT_RESULTS[result].higherIsBetter ? `${value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}x` : currency(value)
   const resultado = readResult(funnel.resultado)
   const current = found.find((option) => option.result === resultado)!
-  const watcher = (watchersResult.data ?? [])[0]
+  const watcher = (watchersResult.data ?? []).find((row) => row.plan_role === 'principal')
+  const secondaryWatcher = (watchersResult.data ?? []).find((row) => row.plan_role === 'secundaria')
   const context = { client_id: client.id as string, client_slug: client.slug as string, funnel_slug: funnel.slug as string, sales_funnel_id: funnel.id as string }
   const base = `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`
 
@@ -163,6 +164,23 @@ export default async function ProjectPlanPage({
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Gasto mínimo no dia para julgar
             <input name="min_spend" inputMode="decimal" defaultValue={watcher?.min_spend ?? ''} placeholder="300" className={`${field} ${mono}`} />
+          </label>
+          <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+            Métrica secundária
+            <select name="metrica_secundaria" defaultValue={funnel.metrica_secundaria ?? ''} className={field}>
+              <option value="">nenhuma</option>
+              {(Object.keys(PROJECT_RESULTS) as ProjectResult[]).map((option) => (
+                <option key={option} value={option} disabled={option === resultado}>
+                  {PROJECT_RESULTS[option].cost}
+                </option>
+              ))}
+            </select>
+            <span className="text-[11px]">A Visão geral destaca a principal e a secundária. Diferente da principal.</span>
+          </label>
+          <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+            Alvo da secundária
+            <input name="secondary_target" inputMode="decimal" defaultValue={secondaryWatcher ? String(secondaryWatcher.target).replace('.', ',') : ''} placeholder="ex.: 4,00" className={`${field} ${mono}`} />
+            <span className="text-[11px]">Vira um segundo vigia do projeto. Em branco, sem vigia.</span>
           </label>
           <p className="text-[12.5px] text-[var(--ct-text-2)] md:col-span-2">
             Num projeto de compra, o CPA-alvo também é o teto das Regras do jogo dos testes: muda aqui, muda lá.

@@ -9,6 +9,8 @@ export interface SidebarProject {
   name: string
   slug: string
   isActive: boolean
+  /** rascunho, rodando or encerrado (0102). */
+  status: string
 }
 
 interface Props {
@@ -118,7 +120,7 @@ export function Sidebar(props: Props) {
                 {activeClient.projects.map((item) => (
                   <PickerItem key={item.slug} href={props.projectHref(item.slug)} active={item.slug === project?.slug} onNavigate={props.onNavigate}>
                     <span className="truncate">{item.name}</span>
-                    {!item.isActive && <span className="ml-auto text-[11px] text-[var(--ct-text-3)]">pausado</span>}
+                    {item.status !== 'rodando' && <span className="ml-auto text-[11px] text-[var(--ct-text-3)]">{item.status}</span>}
                   </PickerItem>
                 ))}
                 <PickerItem href={`/dashboard/clients/${activeClient.slug}/funis-venda`} active={false} onNavigate={props.onNavigate}>

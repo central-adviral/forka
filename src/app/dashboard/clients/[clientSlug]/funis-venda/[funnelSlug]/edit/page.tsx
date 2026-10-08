@@ -45,14 +45,14 @@ export default async function EditSalesFunnelPage({
       >
         <h1 className="font-[family-name:var(--font-sora)] text-lg font-semibold">Editar funil — {funnel.name}</h1>
         <input required name="name" defaultValue={funnel.name} className={inputClass} />
-        <div>
-          <label className="mb-1 block text-xs text-[var(--ct-text-2)]">IDs de operação (separados por vírgula)</label>
-          <input
-            name="launchops_operacao_ids"
-            defaultValue={(funnel.launchops_operacao_ids ?? []).join(', ')}
-            className={inputClass}
-          />
-        </div>
+        <details open={(funnel.launchops_operacao_ids ?? []).length > 0 || undefined}>
+          <summary className="cursor-pointer text-xs font-medium text-[var(--ct-text-2)]">Histórico antigo</summary>
+          <label className="mb-1 mt-2 block text-xs text-[var(--ct-text-2)]">IDs de operação do LaunchOps (separados por vírgula)</label>
+          <input name="launchops_operacao_ids" defaultValue={(funnel.launchops_operacao_ids ?? []).join(', ')} className={inputClass} />
+          <p className="mt-1 text-xs text-[var(--ct-text-2)]">
+            Só para projetos com dias anteriores às campanhas sincronizadas. Com frentes, o gasto vem das campanhas pela etiqueta.
+          </p>
+        </details>
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-xs text-[var(--ct-text-2)]">
             Janela · início

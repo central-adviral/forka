@@ -20,9 +20,11 @@ import { headerAction } from '@/components/header-actions'
 import { FrontsPanel, type FrontDayRow, type FrontInfo } from './fronts-panel'
 import { readAnalysisTab } from '@/lib/domain/analysis-tabs'
 import { cpaSources, qualitySeals, type ProjectQualityRow } from '@/lib/domain/project-quality'
-import { PROJECT_RESULTS, readResult, resultUsesSales } from '@/lib/domain/project-plan'
+import { PROJECT_RESULTS, readResult, resultUsesSales, type ProjectResult, type ResultInputs } from '@/lib/domain/project-plan'
+import { ObjectivesPanel, type ObjectiveFront } from './objectives-panel'
 import { setSalesFunnelArchived } from '../actions'
 import { canActAs } from '@/lib/view-as'
+import { ProjectStatusActions } from '../project-status'
 
 export default async function SalesFunnelPage({
   params,
@@ -46,15 +48,16 @@ export default async function SalesFunnelPage({
 
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, resultado, archived_at')
+    .select('id, name, slug, resultado, archived_at, status, metrica_secundaria')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
   if (!funnel) notFound()
-  const canRestore = funnel.archived_at ? await canActAs(supabase, client.id, 'gestor') : false
+  const canEdit = await canActAs(supabase, client.id, 'gestor')
+  const canRestore = Boolean(funnel.archived_at) && canEdit
 
   const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
-  const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }, { data: frontRows }, { data: frontDays }, { data: qualityRows }, { data: frontSalesRows }, { data: crossRows }] = await Promise.all([
+  const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }, { data: frontRows }, { data: frontDays }, { data: qualityRows }, { data: frontSalesRows }, { data: crossRows }, { data: planRows }] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
     getFunnelSyncHealth(supabase, funnel.id),
     getPaymentMethodBreakdown(supabase, funnel.id, since, until),
@@ -69,20 +72,30 @@ export default async function SalesFunnelPage({
     supabase.from('client_tax_rates').select('valid_from', { count: 'exact', head: true }).eq('client_id', client.id),
     supabase
       .from('project_fronts')
-      .select('id, code, name, source:sales_funnels!project_fronts_source_sales_funnel_id_fkey(name)')
+      .select('id, code, name, metrica_principal, alvo_principal, metrica_secundaria, alvo_secundaria, source:sales_funnels!project_fronts_source_sales_funnel_id_fkey(name)')
       .eq('sales_funnel_id', funnel.id)
       .is('archived_at', null)
       .order('position'),
     supabase.rpc('get_project_front_daily', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
     supabase.rpc('get_project_data_quality', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
-    tab === 'frentes' && resultUsesSales(funnel.resultado)
+    // Visão geral prices each front's metrics, and CPA or ROAS of a front need its sales.
+    (tab === 'frentes' && resultUsesSales(funnel.resultado)) || tab === 'visao'
       ? supabase.rpc('get_project_front_sales', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until })
       : Promise.resolve({ data: null }),
     supabase.rpc('get_project_cross_sales', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
+    supabase.from('watchers').select('target, plan_role').eq('sales_funnel_id', funnel.id).is('front_id', null).not('plan_role', 'is', null),
   ])
-  const fronts: FrontInfo[] = ((frontRows ?? []) as unknown as { id: string; code: string; name: string; source: { name: string } | null }[]).map(
-    (front) => ({ id: front.id, code: front.code, name: front.name, sourceName: front.source?.name ?? null })
-  )
+  const frontList = (frontRows ?? []) as unknown as {
+    id: string
+    code: string
+    name: string
+    metrica_principal: ProjectResult | null
+    alvo_principal: number | null
+    metrica_secundaria: ProjectResult | null
+    alvo_secundaria: number | null
+    source: { name: string } | null
+  }[]
+  const fronts: FrontInfo[] = frontList.map((front) => ({ id: front.id, code: front.code, name: front.name, sourceName: front.source?.name ?? null }))
   if (creativeResult.error) {
     console.error('[funnel-creative-report-failed]', { salesFunnelId: funnel.id }, creativeResult.error)
   }
@@ -173,6 +186,47 @@ export default async function SalesFunnelPage({
     receitaLiquida: rows.map((row) => row.receitaLiquida),
     roas: rows.map((row) => (row.spendComImposto > 0 ? row.receitaLiquida / row.spendComImposto : 0)),
   }
+  const spendWithoutTax = rows.reduce((total, row) => total + row.spend, 0)
+  const taxFactor = totals.investimento > 0 && spendWithoutTax > 0 ? totals.investimento / spendWithoutTax : 1
+  const frontDayRows = (frontDays ?? []) as FrontDayRow[]
+  const frontSales = new Map(((frontSalesRows ?? []) as { front_id: string; vendas: number; receita_liquida: number }[]).map((row) => [row.front_id, row]))
+  const projectInputs: ResultInputs = {
+    spend: totals.investimento,
+    vendas: totals.vendas,
+    receita: totals.receitaLiquida,
+    leads: frontDayRows.reduce((sum, row) => sum + Number(row.leads ?? 0), 0),
+    checkouts: totals.initiateCheckout,
+    visitas: totals.landingPageViews,
+    impressions: totals.impressions,
+  }
+  const planTarget = (role: string) => {
+    const row = ((planRows ?? []) as { target: number; plan_role: string }[]).find((watcher) => watcher.plan_role === role)
+    return row ? Number(row.target) : null
+  }
+  const objectiveFronts: ObjectiveFront[] = frontList.map((front) => {
+    const days = frontDayRows.filter((row) => row.front_id === front.id)
+    const add = (key: keyof Omit<FrontDayRow, 'front_id'>) => days.reduce((total, row) => total + Number(row[key] ?? 0), 0)
+    return {
+      id: front.id,
+      code: front.code,
+      name: front.name,
+      own: front.metrica_principal
+        ? {
+            primary: { metric: front.metrica_principal, target: front.alvo_principal === null ? null : Number(front.alvo_principal) },
+            secondary: front.metrica_secundaria ? { metric: front.metrica_secundaria, target: front.alvo_secundaria === null ? null : Number(front.alvo_secundaria) } : null,
+          }
+        : null,
+      inputs: {
+        spend: add('spend') * taxFactor,
+        vendas: Number(frontSales.get(front.id)?.vendas ?? 0),
+        receita: Number(frontSales.get(front.id)?.receita_liquida ?? 0),
+        leads: add('leads'),
+        checkouts: add('initiate_checkout'),
+        visitas: add('landing_page_views'),
+        impressions: add('impressions'),
+      },
+    }
+  })
   const lastSyncAt = health.find((h) => h.lastRunAt)?.lastRunAt ?? null
   const partialToday = rows.find((row) => row.dadosAte)
   const timeBr = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
@@ -205,7 +259,8 @@ export default async function SalesFunnelPage({
             ) : (
               <>
                 <SyncStatus lastRunAt={lastSyncAt} hasError={hasSyncError} />
-                <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
+                {funnel.status === 'rodando' && <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />}
+                <ProjectStatusActions salesFunnelId={funnel.id} status={funnel.status} canEdit={canEdit} />
                 <a
                   href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/plano`}
                   className="rounded-full border border-[var(--ct-accent)] bg-[var(--ct-accent-soft)] px-4 py-2 text-[13px] font-medium text-[var(--ct-accent)]"
@@ -348,6 +403,14 @@ export default async function SalesFunnelPage({
             : '.'}
         </p>
       )}
+      {tab === 'visao' && (
+        <ObjectivesPanel
+          primary={{ metric: readResult(funnel.resultado), target: planTarget('principal') }}
+          secondary={funnel.metrica_secundaria ? { metric: readResult(funnel.metrica_secundaria), target: planTarget('secundaria') } : null}
+          inputs={projectInputs}
+          fronts={objectiveFronts}
+        />
+      )}
       <FunnelKpiCards
         totals={kpiTotals}
         currency={currency}
@@ -385,7 +448,7 @@ export default async function SalesFunnelPage({
         <FrontsPanel
           fronts={fronts}
           rows={(frontDays ?? []) as FrontDayRow[]}
-          taxFactor={totals.investimento > 0 && rows.reduce((t, row) => t + row.spend, 0) > 0 ? totals.investimento / rows.reduce((t, row) => t + row.spend, 0) : 1}
+          taxFactor={taxFactor}
           rulesHref={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`}
           currency={currency}
           sales={

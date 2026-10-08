@@ -66,14 +66,36 @@ export async function createFront(context: RulesContext, formData: FormData) {
   )
 }
 
-// Code and name only: a front's source decides who owns its campaigns, so changing it is remove and create.
+const frontMetric = z.union([z.literal(''), z.enum(['compra', 'lead', 'roas', 'checkout', 'visita', 'alcance'])]).transform((value) => value || null)
+const frontTarget = z
+  .string()
+  .trim()
+  .transform((value) => (value === '' ? null : Number(value.replace(/\./g, '').replace(',', '.'))))
+  .refine((value) => value === null || (Number.isFinite(value) && value > 0), 'o alvo da frente é um número maior que zero')
+
+// Code, name and the front's own metrics (0102); a trigger keeps the front's watchers in step. The
+// source decides who owns its campaigns, so changing it is remove and create.
+const updateFrontSchema = frontSchema
+  .pick({ code: true, name: true })
+  .extend({ metrica_principal: frontMetric, alvo_principal: frontTarget, metrica_secundaria: frontMetric, alvo_secundaria: frontTarget })
+  .refine((value) => !value.metrica_secundaria || value.metrica_principal, 'escolha a métrica principal da frente antes da secundária')
+  .refine((value) => !value.metrica_secundaria || value.metrica_secundaria !== value.metrica_principal, 'a métrica secundária precisa ser diferente da principal')
+
 export async function updateFront(context: RulesContext & { front_id: string }, formData: FormData) {
-  const result = frontSchema.pick({ code: true, name: true }).safeParse({ code: formData.get('code'), name: formData.get('name') })
+  const text = (name: string) => String(formData.get(name) ?? '')
+  const result = updateFrontSchema.safeParse({
+    code: formData.get('code'),
+    name: formData.get('name'),
+    metrica_principal: text('metrica_principal'),
+    alvo_principal: text('alvo_principal'),
+    metrica_secundaria: text('metrica_secundaria'),
+    alvo_secundaria: text('alvo_secundaria'),
+  })
   if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '))
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase
     .from('project_fronts')
-    .update({ code: result.data.code, name: result.data.name })
+    .update(result.data)
     .eq('id', context.front_id)
     .select('id')
   if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste projeto (veja também as arquivadas).`))

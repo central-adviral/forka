@@ -22,7 +22,8 @@ export async function listActiveFunnels(appDb: SupabaseClient): Promise<FunnelRo
   const { data, error } = await appDb
     .from('sales_funnels')
     .select('id, client_id, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url)')
-    .eq('is_active', true)
+    // A draft is still being set up and a closed project keeps its numbers frozen (0102).
+    .eq('status', 'rodando')
     // An archived project keeps the numbers it had: no sync writes into it any more (0100).
     .is('archived_at', null)
     .order('created_at')
