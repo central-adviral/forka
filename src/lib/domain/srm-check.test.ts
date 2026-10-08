@@ -53,4 +53,25 @@ describe('detectSampleRatioMismatch', () => {
     ])
     expect(skewed).toBe(true)
   })
+
+  it('leaves weight-0 variants out of the check, their visits and their degree of freedom', () => {
+    // 50/50 between the live variants; the paused one kept old visits from before its weight went to 0.
+    expect(
+      detectSampleRatioMismatch([
+        { weightPct: 50, visits: 505 },
+        { weightPct: 50, visits: 495 },
+        { weightPct: 0, visits: 400 },
+      ])
+    ).toBe(false)
+    // 40/40 after a third variant (20%) was paused: the live split is still even.
+    expect(
+      detectSampleRatioMismatch([
+        { weightPct: 40, visits: 498 },
+        { weightPct: 40, visits: 502 },
+        { weightPct: 0, visits: 250 },
+      ])
+    ).toBe(false)
+    // Only one live variant left: nothing to compare.
+    expect(detectSampleRatioMismatch([{ weightPct: 100, visits: 900 }, { weightPct: 0, visits: 300 }])).toBeNull()
+  })
 })

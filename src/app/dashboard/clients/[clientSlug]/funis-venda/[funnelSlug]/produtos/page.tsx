@@ -34,6 +34,8 @@ export default async function ProjectProductsPage({
 
   const { data: client } = await supabase.from('clients').select('id, slug, funnel_source_url').eq('slug', clientSlug).maybeSingle()
   if (!client) notFound()
+  // Configuration is internal to the agency: the client never reads it, even by typing the address.
+  if (!(await canActAs(supabase, client.id, 'analista'))) notFound()
   const { data: funnel } = await supabase
     .from('sales_funnels')
     .select('id, name, slug')

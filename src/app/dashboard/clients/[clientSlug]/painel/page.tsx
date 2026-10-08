@@ -104,7 +104,7 @@ export default async function PainelPage({
               if (!watcher) return null
               return (
                 <div key={alert.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-4 border-b border-[var(--ct-line)] px-6 py-5 last:border-b-0">
-                  <span className={`${mono} grid h-7 w-7 place-items-center rounded-lg text-xs ${alert.severity === 'crit' ? 'bg-[var(--ct-crit-soft)] text-[var(--ct-crit)]' : 'bg-[var(--ct-warn-soft)] text-[var(--ct-warn)]'}`}>
+                  <span aria-hidden="true" className={`${mono} grid h-7 w-7 place-items-center rounded-lg text-xs ${alert.severity === 'crit' ? 'bg-[var(--ct-crit-soft)] text-[var(--ct-crit)]' : 'bg-[var(--ct-warn-soft)] text-[var(--ct-warn)]'}`}>
                     {alert.severity === 'crit' ? '!' : '▲'}
                   </span>
                   <div className="min-w-0">

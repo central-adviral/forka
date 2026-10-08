@@ -46,12 +46,18 @@ export async function fetchLaunchOpsAdSpendRows(
 
 export async function fetchAllPages<T>(
   fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
-  pageSize = 1000
+  pageSize = 1000,
+  retryDelayMs = 1000
 ): Promise<T[]> {
   const rows: T[] = []
   let from = 0
   for (;;) {
-    const { data, error } = await fetchPage(from, from + pageSize - 1)
+    let { data, error } = await fetchPage(from, from + pageSize - 1)
+    // One retry absorbs a passing LaunchOps hiccup (timeout, connection reset) instead of failing the run.
+    if (error) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+      ;({ data, error } = await fetchPage(from, from + pageSize - 1))
+    }
     if (error) throw error
     const page = data ?? []
     rows.push(...page)

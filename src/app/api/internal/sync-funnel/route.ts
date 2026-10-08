@@ -4,6 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { syncOneFunnel, syncClientCampaigns } from '@/lib/launchops/sync-funnel'
 import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
 import { probeClientPages } from '@/lib/pages/probe'
+import { purgeOldClickIps } from '@/lib/repo/redirect-repo'
 
 // Under LEASE_SECONDS (sync-campaigns.ts), so a run the platform kills never outlives its lease.
 export const maxDuration = 240
@@ -38,28 +39,42 @@ export async function GET(request: NextRequest) {
   }
 
   let funnelsProcessed = 0
+  let funnelsFailed = 0
   const campaignsSyncedFor = new Set<string>()
   for (const funnel of (funnels ?? []) as unknown as FunnelRow[]) {
-    const sourceUrl = funnel.clients?.funnel_source_url
-    if (!sourceUrl) continue
-    const { funnelSourceServiceRoleKey } = await getClientSecrets(appDb, funnel.client_id)
-    if (!funnelSourceServiceRoleKey) continue
-    const launchopsDb = createLaunchOpsClient({ url: sourceUrl, serviceRoleKey: funnelSourceServiceRoleKey })
-    // Campaigns belong to the client, not to one funnel: one read per client per run. They go first
-    // because the creative spend of a project with fronts picks its ads from them.
-    if (!campaignsSyncedFor.has(funnel.client_id)) {
-      campaignsSyncedFor.add(funnel.client_id)
-      await syncClientCampaigns(appDb, launchopsDb, funnel.client_id)
-      // The page probe (0066) rides on the same hourly run; a failure here must not stop the sync.
-      try {
-        await probeClientPages(appDb, funnel.client_id)
-      } catch (err) {
-        console.error('[page-probe-failed]', { clientId: funnel.client_id }, err)
+    // One client's broken secret or source must not stop the clients after it in the same run.
+    try {
+      const sourceUrl = funnel.clients?.funnel_source_url
+      if (!sourceUrl) continue
+      const { funnelSourceServiceRoleKey } = await getClientSecrets(appDb, funnel.client_id)
+      if (!funnelSourceServiceRoleKey) continue
+      const launchopsDb = createLaunchOpsClient({ url: sourceUrl, serviceRoleKey: funnelSourceServiceRoleKey })
+      // Campaigns belong to the client, not to one funnel: one read per client per run. They go first
+      // because the creative spend of a project with fronts picks its ads from them.
+      if (!campaignsSyncedFor.has(funnel.client_id)) {
+        campaignsSyncedFor.add(funnel.client_id)
+        await syncClientCampaigns(appDb, launchopsDb, funnel.client_id)
+        // The page probe (0066) rides on the same hourly run; a failure here must not stop the sync.
+        try {
+          await probeClientPages(appDb, funnel.client_id)
+        } catch (err) {
+          console.error('[page-probe-failed]', { clientId: funnel.client_id }, err)
+        }
       }
+      await syncOneFunnel(appDb, launchopsDb, funnel)
+      funnelsProcessed++
+    } catch (err) {
+      funnelsFailed++
+      console.error('[sync-funnel-client-failed]', { salesFunnelId: funnel.id, clientId: funnel.client_id }, err)
     }
-    await syncOneFunnel(appDb, launchopsDb, funnel)
-    funnelsProcessed++
   }
 
-  return NextResponse.json({ ok: true, funnelsProcessed, clientsWithCampaigns: campaignsSyncedFor.size })
+  // Housekeeping rides on the hourly run; a failure here must not fail the sync it follows.
+  try {
+    await purgeOldClickIps(appDb)
+  } catch (err) {
+    console.error('[click-ip-purge-failed]', err)
+  }
+
+  return NextResponse.json({ ok: true, funnelsProcessed, funnelsFailed, clientsWithCampaigns: campaignsSyncedFor.size })
 }

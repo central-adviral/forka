@@ -73,6 +73,15 @@ export async function countRecentClickEventsByIp(
   return count ?? 0
 }
 
+// The click IP only feeds the one-hour rate limit above; past 30 days it is personal data with no use.
+export const CLICK_IP_RETENTION_DAYS = 30
+
+export async function purgeOldClickIps(db: SupabaseClient, now: Date = new Date()): Promise<void> {
+  const cutoff = new Date(now.getTime() - CLICK_IP_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString()
+  const { error } = await db.from('click_events').update({ ip: null }).not('ip', 'is', null).lt('created_at', cutoff)
+  if (error) throw error
+}
+
 export async function getOrAssignVariant(
   db: SupabaseClient,
   params: { testId: string; visitorId: string; candidateVariantId: string }

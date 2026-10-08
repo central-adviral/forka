@@ -80,12 +80,13 @@ export async function findConversionIdsByExternalEventId(
 }
 
 const RECONCILE_LOOKBACK_DAYS = 90
-const RECONCILE_ROW_LIMIT = 500
 
 // A sale that syncs before its conversion exists (webhook lands late, or the sale is synced
 // first) stays with conversion_id null forever: the incremental sync only revisits rows whose
-// updated_at moved. This second pass re-checks recent unmatched sales on every sync -- by client, so
-// a sale no project owns (0073) is linked to its click as well.
+// updated_at moved. This second pass re-checks the client's recent conversions on every sync -- by
+// client, so a sale no project owns (0073) is linked to its click as well. It starts from the
+// conversions because they are few (only A/B traffic has them) while unlinked sales are nearly all of
+// them: reading those with a cap left later sales unchecked once the cap filled.
 export async function reconcileUnmatchedSales(
   appDb: SupabaseClient,
   clientId: string,
@@ -93,32 +94,36 @@ export async function reconcileUnmatchedSales(
 ): Promise<{ reconciled: number }> {
   const since = new Date(now.getTime() - RECONCILE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
-  const { data: pending, error } = await appDb
-    .from('sales')
-    .select('id, transaction_id_plataforma')
-    .eq('client_id', clientId)
-    .is('conversion_id', null)
-    .not('transaction_id_plataforma', 'is', null)
-    .gte('data_venda', since)
-    .limit(RECONCILE_ROW_LIMIT)
-  if (error) throw error
-  if (!pending || pending.length === 0) return { reconciled: 0 }
-
-  const transactionIds = [
-    ...new Set(pending.map((row) => row.transaction_id_plataforma).filter((id): id is string => Boolean(id))),
-  ]
-  const conversionIdByTransactionId = await findConversionIdsByExternalEventId(appDb, transactionIds)
-  if (conversionIdByTransactionId.size === 0) return { reconciled: 0 }
+  const conversions = await fetchAllPages<{ id: string; external_event_id: string }>((from, to) =>
+    appDb
+      .from('conversions')
+      .select('id, external_event_id, click_events!inner(tests!inner(client_id))')
+      .eq('click_events.tests.client_id', clientId)
+      .not('external_event_id', 'is', null)
+      .gte('created_at', since)
+      .order('id')
+      .range(from, to)
+  )
+  if (conversions.length === 0) return { reconciled: 0 }
+  const conversionIdByTransactionId = new Map(conversions.map((c) => [c.external_event_id, c.id]))
+  const transactionIds = [...conversionIdByTransactionId.keys()]
 
   let reconciled = 0
-  for (const sale of pending) {
-    const conversionId = sale.transaction_id_plataforma
-      ? conversionIdByTransactionId.get(sale.transaction_id_plataforma)
-      : undefined
-    if (!conversionId) continue
-    const { error: updateError } = await appDb.from('sales').update({ conversion_id: conversionId }).eq('id', sale.id)
-    if (updateError) throw updateError
-    reconciled++
+  for (let i = 0; i < transactionIds.length; i += LOOKUP_CHUNK_SIZE) {
+    const { data: pending, error } = await appDb
+      .from('sales')
+      .select('id, transaction_id_plataforma')
+      .eq('client_id', clientId)
+      .is('conversion_id', null)
+      .in('transaction_id_plataforma', transactionIds.slice(i, i + LOOKUP_CHUNK_SIZE))
+    if (error) throw error
+    for (const sale of pending ?? []) {
+      const conversionId = conversionIdByTransactionId.get(sale.transaction_id_plataforma)
+      if (!conversionId) continue
+      const { error: updateError } = await appDb.from('sales').update({ conversion_id: conversionId }).eq('id', sale.id)
+      if (updateError) throw updateError
+      reconciled++
+    }
   }
   return { reconciled }
 }

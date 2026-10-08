@@ -54,6 +54,9 @@ const ICONS = {
     </>
   ),
   plus: <path d="M8 3v10M3 8h10" />,
+  painel: <path d="M2 13a6 6 0 1 1 12 0M8 13l3-4" />,
+  analises: <path d="M2.5 13.5h11M4.5 11V8M8 11V4M11.5 11V6.5" />,
+  testes: <path d="M6 2v4.5L2.8 12.2A1.2 1.2 0 0 0 3.9 14h8.2a1.2 1.2 0 0 0 1.1-1.8L10 6.5V2M5 2h6" />,
   rules: <path d="M2.5 4h11M4.5 8h7M6.5 12h3" />,
   targets: (
     <>
@@ -179,10 +182,6 @@ function ThemeToggle() {
       Tema claro / escuro
     </button>
   )
-}
-
-function Dot({ color }: { color: string }) {
-  return <span className="mx-[4.5px] h-[7px] w-[7px] flex-none rounded-full" style={{ background: color }} />
 }
 
 function SubNav({ items }: { items: { href: string; label: string; active?: boolean }[] }) {
@@ -407,7 +406,7 @@ export function DashboardShell({
 
               <GroupLabel>Ferramentas</GroupLabel>
               <NavLink href={`${base}/painel`} active={pathname.startsWith(`${base}/painel`)} count={activeClient.openAlerts || undefined} tone="crit">
-                <Dot color="var(--ct-painel)" />
+                <Icon>{ICONS.painel}</Icon>
                 Painel de Controle
               </NavLink>
               {inPainel && (
@@ -420,7 +419,7 @@ export function DashboardShell({
                 />
               )}
               <NavLink href={`${base}/funis-venda`} active={inAnalyses && !onAnalysisTabs && !pathname.endsWith('/regras')}>
-                <Dot color="var(--ct-an)" />
+                <Icon>{ICONS.analises}</Icon>
                 Análises
               </NavLink>
               {inAnalyses && activeProject && (
@@ -433,7 +432,7 @@ export function DashboardShell({
                 />
               )}
               <NavLink href={`${base}/backlog`} active={false} count={activeClient.testsCount} tone="ab">
-                <Dot color="var(--ct-ab)" />
+                <Icon>{ICONS.testes}</Icon>
                 Testes
               </NavLink>
               {inTests && (

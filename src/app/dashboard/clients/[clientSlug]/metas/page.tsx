@@ -24,6 +24,8 @@ export default async function MetasPage({
   const supabase = await createServerSupabaseClient()
   const { data: client } = await supabase.from('clients').select('id, name, slug').eq('slug', clientSlug).maybeSingle()
   if (!client) notFound()
+  // Configuration is internal to the agency: the client never reads it, even by typing the address.
+  if (!(await canActAs(supabase, client.id, 'analista'))) notFound()
 
   const [watchers, { data: funnels }, { data: fronts }, { data: canEdit }] = await Promise.all([
     getWatchers(supabase, client.id),
