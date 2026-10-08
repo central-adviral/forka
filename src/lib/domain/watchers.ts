@@ -1,7 +1,7 @@
 // The metric catalog shared by Metas e alvos, the Painel de Controle and the Hoje queue. The
 // evaluation itself runs in SQL (evaluate_watchers, 0059); this file only names and formats.
 
-export type WatcherMetric = 'cpa_geral' | 'cpa_anuncio' | 'cpl' | 'cpm' | 'ctr' | 'connect_rate' | 'investimento' | 'frequencia'
+export type WatcherMetric = 'cpa_geral' | 'cpa_anuncio' | 'cpl' | 'cpm' | 'ctr' | 'connect_rate' | 'investimento' | 'frequencia' | 'roas'
 export type WatcherStatus = 'ok' | 'warn' | 'crit' | 'sem_volume' | 'sem_dado'
 
 interface MetricInfo {
@@ -17,7 +17,8 @@ interface MetricInfo {
 
 export const METRICS: Record<WatcherMetric, MetricInfo> = {
   cpa_geral: { label: 'CPA geral', unit: 'brl', bad: 'sobe', projectOnly: true, salesOnly: true, hint: 'investimento ÷ todas as vendas de entrada' },
-  cpa_anuncio: { label: 'CPA de anúncio', unit: 'brl', bad: 'sobe', projectOnly: true, salesOnly: true, hint: 'investimento ÷ vendas que a UTM liga ao anúncio' },
+  cpa_anuncio: { label: 'CPA de anúncio', unit: 'brl', bad: 'sobe', projectOnly: false, salesOnly: true, hint: 'investimento ÷ vendas que a UTM liga ao anúncio' },
+  roas: { label: 'ROAS', unit: 'x', bad: 'cai', projectOnly: false, salesOnly: true, hint: 'receita líquida ÷ investimento' },
   cpl: { label: 'CPL', unit: 'brl', bad: 'sobe', projectOnly: false, salesOnly: false, hint: 'investimento ÷ leads pagos' },
   cpm: { label: 'CPM', unit: 'brl', bad: 'sobe', projectOnly: false, salesOnly: false, hint: 'custo por mil impressões' },
   ctr: { label: 'CTR', unit: 'pct', bad: 'cai', projectOnly: false, salesOnly: false, hint: 'cliques no link ÷ impressões' },
@@ -64,7 +65,7 @@ export function alertActions(
   canEdit: boolean
 ): AlertAction[] {
   const query = new URLSearchParams({ periodo: '7d' })
-  const costMetric = watcher.metric === 'cpa_geral' || watcher.metric === 'cpa_anuncio' || watcher.metric === 'cpl'
+  const costMetric = watcher.metric === 'cpa_geral' || watcher.metric === 'cpa_anuncio' || watcher.metric === 'cpl' || watcher.metric === 'roas'
   // A front-scoped watcher opens on its front: that is where the number came from.
   if (watcher.frontId) {
     query.set('aba', 'frentes')

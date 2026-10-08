@@ -115,3 +115,51 @@ describe('watchers on a front, frequency and the 14-day trail (0065, 0070)', () 
     expect(error).not.toBeNull()
   })
 })
+
+describe('CPA de anúncio per front and ROAS (0086)', () => {
+  const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+
+  it("counts on a front only the sales whose UTM ad runs in the front's campaigns", async () => {
+    const { data: user } = await admin.auth.admin.createUser({ email: `front-cpa-${Date.now()}@example.com`, password: 'password123', email_confirm: true })
+    const { data: client } = await admin.from('clients').insert({ owner_id: user!.user!.id, name: 'FrontCpa', slug: `front-cpa-${Date.now()}` }).select().single()
+    const { data: funnel } = await admin.from('sales_funnels').insert({ client_id: client!.id, name: 'P', slug: 'p' }).select().single()
+    const { data: escala } = await admin.from('project_fronts').insert({ sales_funnel_id: funnel!.id, code: 'ESC', name: 'Escala' }).select().single()
+    const { data: rmk } = await admin.from('project_fronts').insert({ sales_funnel_id: funnel!.id, code: 'RMK', name: 'Remarketing' }).select().single()
+    await admin.from('naming_rules').insert([
+      { front_id: escala!.id, kind: 'include', value: 'Escala' },
+      { front_id: rmk!.id, kind: 'include', value: 'RMK' },
+    ])
+    await admin.from('campaign_daily').insert([
+      { client_id: client!.id, data: yesterday, campaign_id: 'fe', campaign_name: '[1K] Escala', spend: 300, impressions: 30000 },
+      { client_id: client!.id, data: yesterday, campaign_id: 'fr', campaign_name: '[1K] RMK', spend: 100, impressions: 5000 },
+    ])
+    await admin.from('ad_creative_spend_daily').insert([
+      { sales_funnel_id: funnel!.id, source: 'launchops_sync', data: yesterday, ad_id: '880000000001', ad_name: 'Escala v1', campaign_id: 'fe', spend: 300 },
+      { sales_funnel_id: funnel!.id, source: 'launchops_sync', data: yesterday, ad_id: '880000000002', ad_name: 'RMK v1', campaign_id: 'fr', spend: 100 },
+    ])
+    const sale = (id: string, ad: string, value: number) => ({
+      sales_funnel_id: funnel!.id,
+      external_id: `${id}-${Date.now()}`,
+      data_venda: `${yesterday}T15:00:00Z`,
+      status: 'aprovada',
+      utm_campaign: ad,
+      is_upsell: false,
+      valor_liquido: value,
+    })
+    const { error: salesError } = await admin.from('sales').insert([sale('a', '880000000001', 200), sale('b', '880000000001', 200), sale('c', '880000000002', 300)])
+    expect(salesError).toBeNull()
+
+    const watcher = async (metric: string, frontId: string | null, target: number) =>
+      (await admin.from('watchers').insert({ client_id: client!.id, sales_funnel_id: funnel!.id, front_id: frontId, metric, target }).select().single()).data!
+    const dayOf = async (id: string) => (await admin.rpc('watcher_day', { p_watcher_id: id, p_day: yesterday })).data[0]
+
+    // Escala: 300 of spend over its 2 sales; RMK's sale stays out.
+    expect(await dayOf((await watcher('cpa_anuncio', escala!.id, 150)).id)).toMatchObject({ value: 150, status: 'ok' })
+    // ROAS of the front: 400 ÷ 300, 33% under 2: under target is the bad side, atenção under 40%.
+    const frontRoas = await dayOf((await watcher('roas', escala!.id, 2)).id)
+    expect(Number(frontRoas.value)).toBeCloseTo(400 / 300)
+    expect(frontRoas.status).toBe('warn')
+    // ROAS of the project: every sale, 700 ÷ 400.
+    expect(Number((await dayOf((await watcher('roas', null, 1.5)).id)).value)).toBeCloseTo(1.75)
+  })
+})
