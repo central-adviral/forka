@@ -11,6 +11,11 @@ export interface ClientDay {
   /** Today only: the last Meta pull; today's sales are cut there (0058). */
   dadosAte: string | null
   vendasAposDados: number
+  /** Spend by the owner project's result (0090): CPA uses compra, CPL uses lead. */
+  spendCompraComImposto: number
+  spendLeadComImposto: number
+  spendSemFrenteComImposto: number
+  vendasSemProjeto: number
 }
 
 export async function getClientDaily(db: SupabaseClient, clientId: string, since: string, until: string): Promise<ClientDay[]> {
@@ -26,6 +31,10 @@ export async function getClientDaily(db: SupabaseClient, clientId: string, since
     receita_liquida: number
     dados_ate: string | null
     vendas_apos_dados: number
+    spend_compra_com_imposto: number
+    spend_lead_com_imposto: number
+    spend_sem_frente_com_imposto: number
+    vendas_sem_projeto: number
   }[]).map((row) => ({
     data: row.data,
     spend: Number(row.spend),
@@ -36,6 +45,10 @@ export async function getClientDaily(db: SupabaseClient, clientId: string, since
     receitaLiquida: Number(row.receita_liquida),
     dadosAte: row.dados_ate,
     vendasAposDados: Number(row.vendas_apos_dados),
+    spendCompraComImposto: Number(row.spend_compra_com_imposto),
+    spendLeadComImposto: Number(row.spend_lead_com_imposto),
+    spendSemFrenteComImposto: Number(row.spend_sem_frente_com_imposto),
+    vendasSemProjeto: Number(row.vendas_sem_projeto),
   }))
 }
 

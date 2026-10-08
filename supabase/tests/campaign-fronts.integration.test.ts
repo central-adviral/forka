@@ -135,7 +135,11 @@ describe('campaign fronts and naming rules (0053)', () => {
     expect(renamed.assignment).toBe('auto')
 
     const { data: preFront } = await admin.from('project_fronts').select('id').eq('sales_funnel_id', funnelId).eq('code', 'PRE').single()
+    // A rule that cannot touch this campaign leaves its owner alone (0090).
     await owner.db.from('naming_rules').insert({ front_id: preFront!.id, kind: 'exclude', value: 'renomeada-nunca' })
+    expect((await campaigns(owner.db)).get('ger-1')!.assignment).toBe('auto')
+    // A rule whose text is in its name releases it, to be decided again by the rules.
+    await owner.db.from('naming_rules').insert({ front_id: preFront!.id, kind: 'include', value: 'renomeada' })
     const released = (await campaigns(owner.db)).get('ger-1')!
     expect(released.assignment).toBe('nome')
     expect(released.front_ids).toEqual([preFront!.id])
@@ -145,7 +149,7 @@ describe('campaign fronts and naming rules (0053)', () => {
       .update({ campaign_name: '07 - [MTV-T15][GER][CAPTACAO] - Escala' })
       .eq('client_id', clientId)
       .eq('campaign_id', 'ger-1')
-    await admin.from('naming_rules').delete().eq('front_id', preFront!.id).eq('value', 'renomeada-nunca')
+    await admin.from('naming_rules').delete().eq('front_id', preFront!.id).in('value', ['renomeada-nunca', 'renomeada'])
   })
 
   it('lets a front read another project only inside its own window, without a second owner (0054)', async () => {
