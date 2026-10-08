@@ -31,4 +31,19 @@ describe('buildInsightPrompt', () => {
     expect(prompt).toContain('sem markdown')
     expect(prompt).toContain('100 visitas')
   })
+
+  it('passes the report quality so the model does not call an early test', () => {
+    const prompt = buildInsightPrompt(
+      [
+        { name: 'A', isControl: true, visits: 800, conversions: 16, revenueCents: 0, confidencePct: null },
+        { name: 'B', isControl: false, visits: 790, conversions: 30, revenueCents: 0, confidencePct: 97 },
+      ],
+      { trust: 'Falta amostra.', trustworthy: false, daysRunning: 3, neededPerArm: 7716, ownLayer: false }
+    )
+    expect(prompt).toContain('ainda não confiável. Falta amostra.')
+    expect(prompt).toContain('Amostra mínima por variante: 7716')
+    expect(prompt).toContain('pode ter contado em outro teste')
+    expect(prompt).toContain('nunca declarar vencedora')
+  })
 })
+

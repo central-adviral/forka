@@ -71,3 +71,33 @@ export function probabilityToBeatControl(
   }
   return wins / samples
 }
+
+/**
+ * Chance, per variant, that it is the best of all of them. With three or more variants, each one
+ * against the control alone crowns false winners (several comparisons, each a chance to get lucky);
+ * this is one draw over all of them, summing to 1. Null for a variant without visits.
+ */
+export function probabilityToBeBest(
+  variants: { visits: number; conversions: number }[],
+  rand?: () => number,
+  samples = 10000
+): (number | null)[] {
+  const live = variants.map((variant, index) => ({ index, visits: variant.visits, conversions: Math.min(variant.conversions, variant.visits) })).filter((variant) => variant.visits > 0)
+  if (live.length === 0) return variants.map(() => null)
+  rand ??= seededRandom(seedFromCounts(...live.flatMap((variant) => [variant.visits, variant.conversions])))
+  const normal = makeSeededNormal(rand)
+  const wins = new Array<number>(variants.length).fill(0)
+  for (let i = 0; i < samples; i++) {
+    let best = -1
+    let bestRate = -1
+    for (const variant of live) {
+      const rate = sampleBeta(variant.conversions + 1, variant.visits - variant.conversions + 1, rand, normal)
+      if (rate > bestRate) {
+        bestRate = rate
+        best = variant.index
+      }
+    }
+    wins[best]++
+  }
+  return variants.map((variant, index) => (variant.visits > 0 ? wins[index] / samples : null))
+}

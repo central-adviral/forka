@@ -28,6 +28,7 @@ export default function NewTestPage() {
   const [salesPageUrl, setSalesPageUrl] = useState('')
   const [funnels, setFunnels] = useState<{ id: string; name: string }[]>([])
   const [salesFunnelId, setSalesFunnelId] = useState('')
+  const [occupant, setOccupant] = useState<{ key: string; name: string } | null>(null)
   const [variants, setVariants] = useState<VariantForm[]>([
     { name: 'A', weight_pct: '50', destination_url: '', thank_you_url: '' },
     { name: 'B', weight_pct: '50', destination_url: '', thank_you_url: '' },
@@ -53,6 +54,29 @@ export default function NewTestPage() {
         setClientLoading(false)
       })
   }, [params.clientSlug])
+
+  // One active test per layer in a project (0078): say which test holds it before the save fails.
+  // The answer is kept with the project and type it was asked for, so a stale one never shows.
+  const layerKey = `${salesFunnelId}:${testType}`
+  useEffect(() => {
+    if (!salesFunnelId) return
+    let cancelled = false
+    createBrowserSupabaseClient()
+      .from('tests')
+      .select('name')
+      .eq('sales_funnel_id', salesFunnelId)
+      .eq('test_type', testType)
+      .eq('status', 'active')
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setOccupant(data ? { key: `${salesFunnelId}:${testType}`, name: data.name } : null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [salesFunnelId, testType])
+  const layerTakenBy = salesFunnelId && occupant?.key === layerKey ? occupant.name : null
 
   const weightsValid = weightsSumTo100(variants.map((v) => Number(v.weight_pct)))
 
@@ -154,6 +178,12 @@ export default function NewTestPage() {
             </option>
           ))}
         </select>
+        {layerTakenBy && (
+          <p role="alert" className="-mt-2 rounded-[10px] bg-[var(--ct-warn-soft)] px-3 py-2 text-xs text-[var(--ct-warn)]">
+            Este projeto já tem um teste de {testType === 'checkout' ? 'checkout' : 'página'} ativo: <b>{layerTakenBy}</b>. Dois na mesma camada dividiriam a
+            mesma venda. Pause o outro antes, escolha outro projeto ou junte as variantes num teste só.
+          </p>
+        )}
         <p className="-mt-2 text-xs text-[var(--ct-text-2)]">
           Com projeto, a venda só conta para os testes dele, e um teste de página e um de checkout rodam juntos: quem
           entra pela página e clica em comprar já entra no teste de checkout. Um teste ativo de cada tipo por projeto.

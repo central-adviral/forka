@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { probabilityToBeatControl } from '@/lib/domain/significance'
+import { probabilityToBeBest, probabilityToBeatControl } from '@/lib/domain/significance'
 import { detectSampleRatioMismatch } from '@/lib/domain/srm-check'
 import { reportTrust } from '@/lib/domain/test-trust'
 import { testLeader } from '@/lib/domain/test-leader'
@@ -392,10 +392,15 @@ export default async function TestReportPage({
   const assetLabel = test.test_type === 'checkout' ? 'Checkout' : 'Página'
   const assetArticle = test.test_type === 'checkout' ? 'o' : 'a'
 
+  const bestChances = rows.length >= 3 ? probabilityToBeBest(rows) : null
   const confidenceLabelById = new Map(
-    rows.map((row) => [
+    rows.map((row, index) => [
       row.variant_id,
-      row.variant_id === control?.variant_id
+      bestChances
+        ? bestChances[index] !== null
+          ? `${Math.round(bestChances[index]! * 100)}% de ser a melhor de todas`
+          : 'dados insuficientes'
+        : row.variant_id === control?.variant_id
         ? 'controle'
         : row.confidencePct !== null
           ? `${row.confidencePct}% de ser melhor que ${assetArticle} ${assetLabel} ${control?.variant_name}`

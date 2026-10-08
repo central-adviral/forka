@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { probabilityToBeatControl } from './significance'
+import { probabilityToBeBest, probabilityToBeatControl } from './significance'
 
 function mulberry32(seed: number) {
   return () => {
@@ -55,3 +55,27 @@ describe('probabilityToBeatControl', () => {
     expect(probabilityToBeatControl(control, { visits: 4450, conversions: 129 })).not.toBe(first)
   })
 })
+
+describe('probabilityToBeBest', () => {
+  it('splits the chance among all variants, summing to 1, the clear winner on top', () => {
+    const chances = probabilityToBeBest([
+      { visits: 2000, conversions: 40 },
+      { visits: 2000, conversions: 42 },
+      { visits: 2000, conversions: 70 },
+    ])
+    expect(chances.reduce((sum, chance) => sum! + chance!, 0)).toBeCloseTo(1, 5)
+    expect(chances[2]!).toBeGreaterThan(0.95)
+  })
+
+  it('does not crown a winner among four near-identical variants', () => {
+    const chances = probabilityToBeBest(Array.from({ length: 4 }, (_, index) => ({ visits: 3000, conversions: 60 + index })))
+    expect(Math.max(...chances.map((chance) => chance!))).toBeLessThan(0.6)
+  })
+
+  it('is stable for the same data and leaves a variant without visits out', () => {
+    const data = [{ visits: 500, conversions: 10 }, { visits: 0, conversions: 0 }, { visits: 500, conversions: 14 }]
+    expect(probabilityToBeBest(data)).toEqual(probabilityToBeBest(data))
+    expect(probabilityToBeBest(data)[1]).toBeNull()
+  })
+})
+
