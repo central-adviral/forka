@@ -1,5 +1,28 @@
 import { describe, it, expect } from 'vitest'
-import { PROJECT_RESULTS, readResult, resultUsesSales, suggestedCost, suggestedVolume } from './project-plan'
+import { PROJECT_RESULTS, formatResult, meetsTarget, readResult, resultUsesSales, resultValue, suggestedCost, suggestedVolume } from './project-plan'
+
+describe('resultValue and meetsTarget', () => {
+  const inputs = { spend: 1000, vendas: 10, receita: 2500, leads: 250, checkouts: 40, visitas: 800, impressions: 50000 }
+
+  it('prices each objective from the same period', () => {
+    expect(resultValue('compra', inputs)).toBe(100)
+    expect(resultValue('lead', inputs)).toBe(4)
+    expect(resultValue('roas', inputs)).toBe(2.5)
+    expect(resultValue('checkout', inputs)).toBe(25)
+    expect(resultValue('visita', inputs)).toBe(1.25)
+    expect(resultValue('alcance', inputs)).toBe(20)
+    expect(resultValue('compra', { ...inputs, vendas: 0 })).toBeNull()
+  })
+
+  it('judges costs from below and returns from above', () => {
+    expect(meetsTarget('compra', 100, 120)).toBe(true)
+    expect(meetsTarget('compra', 130, 120)).toBe(false)
+    expect(meetsTarget('roas', 2.5, 3)).toBe(false)
+    expect(meetsTarget('roas', null, 3)).toBeNull()
+    expect(meetsTarget('lead', 4, null)).toBeNull()
+    expect(formatResult('roas', 2.5)).toBe('2,50x')
+  })
+})
 
 describe('project plan', () => {
   it('reads the result, defaulting to compra, and picks the cost metric from it', () => {

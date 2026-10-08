@@ -50,6 +50,49 @@ export function suggestedCost(days: { spend: number; results: number }[], higher
   return Math.round(median * 100) / 100
 }
 
+/** What a period produced, enough to price any objective: spend with tax and the counts it bought. */
+export interface ResultInputs {
+  spend: number
+  vendas: number
+  receita: number
+  leads: number
+  checkouts: number
+  visitas: number
+  impressions: number
+}
+
+/** The objective's metric over a period (CPA, CPL, ROAS...), null when nothing was produced. */
+export function resultValue(result: ProjectResult, inputs: ResultInputs): number | null {
+  const per = (count: number) => (count > 0 ? inputs.spend / count : null)
+  switch (result) {
+    case 'compra':
+      return per(inputs.vendas)
+    case 'lead':
+      return per(inputs.leads)
+    case 'roas':
+      return inputs.spend > 0 ? inputs.receita / inputs.spend : null
+    case 'checkout':
+      return per(inputs.checkouts)
+    case 'visita':
+      return per(inputs.visitas)
+    case 'alcance':
+      return inputs.impressions > 0 ? (inputs.spend / inputs.impressions) * 1000 : null
+  }
+}
+
+/** Whether the value meets the target, in the metric's good direction; null with no value or no target. */
+export function meetsTarget(result: ProjectResult, value: number | null, target: number | null): boolean | null {
+  if (value === null || !target) return null
+  return PROJECT_RESULTS[result].higherIsBetter ? value >= target : value <= target
+}
+
+export function formatResult(result: ProjectResult, value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return '—'
+  return PROJECT_RESULTS[result].higherIsBetter
+    ? `${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x`
+    : value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
 /** Median results per day over the days with spend, rounded: the starting point for the daily volume. */
 export function suggestedVolume(days: { spend: number; results: number }[]): number | null {
   const volumes = days.filter((day) => day.spend > 0).map((day) => day.results).sort((a, b) => a - b)
