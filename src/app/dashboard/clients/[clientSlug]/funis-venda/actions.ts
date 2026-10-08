@@ -87,11 +87,13 @@ export async function createSalesFunnel(context: { client_id: string; client_slu
   redirect(`/dashboard/clients/${parsed.client_slug}/funis-venda/${parsed.slug}/configurar`)
 }
 
-export async function deleteSalesFunnel(salesFunnelId: string, clientSlug: string) {
+// Archive, never delete: deleting cascaded the project's fronts and watchers and left its sales without a project (0100).
+export async function setSalesFunnelArchived(salesFunnelId: string, archived: boolean) {
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('sales_funnels').delete().eq('id', salesFunnelId)
-  if (error) throw error
-  revalidatePath(`/dashboard/clients/${clientSlug}/funis-venda`)
+  const { error } = await supabase.rpc('set_project_archived', { p_sales_funnel_id: salesFunnelId, p_archived: archived })
+  if (error) throw new Error(error.message.includes('access denied') ? 'Só gestor ou owner pode arquivar projetos.' : error.message)
+  // The sidebar, the lists and the project page all show the archive state.
+  revalidatePath('/dashboard', 'layout')
 }
 
 const toggleSalesFunnelStatusSchema = z.object({
@@ -171,12 +173,13 @@ export async function syncFunnelNow(context: { sales_funnel_id: string; client_s
   const supabase = await createServerSupabaseClient()
   const { data: funnel, error } = await supabase
     .from('sales_funnels')
-    .select('id, client_id, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url)')
+    .select('id, client_id, archived_at, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url)')
     .eq('id', context.sales_funnel_id)
     .single()
   // This select runs on the user's session, so RLS proves they can see the funnel; seeing is not
   // enough to write a sync with the service role, which bypasses RLS, so the role is checked too.
   if (error || !funnel) throw new Error('Funil não encontrado')
+  if (funnel.archived_at) throw new Error('Projeto arquivado: restaure para atualizar.')
   await assertClientRole(supabase, funnel.client_id, 'gestor')
 
   const sourceUrl = (funnel.clients as unknown as { funnel_source_url: string | null } | null)?.funnel_source_url

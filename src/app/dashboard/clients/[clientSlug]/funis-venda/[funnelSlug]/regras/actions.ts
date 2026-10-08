@@ -54,7 +54,7 @@ export async function createFront(context: RulesContext, formData: FormData) {
     source_sales_funnel_id: result.data.source_sales_funnel_id,
     position: count ?? 0,
   })
-  if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste projeto.`))
+  if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste projeto (veja também as arquivadas).`))
   revalidatePath(rulesPath(context))
   back(
     context,
@@ -75,7 +75,7 @@ export async function updateFront(context: RulesContext & { front_id: string }, 
     .update({ code: result.data.code, name: result.data.name })
     .eq('id', context.front_id)
     .select('id')
-  if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste projeto.`))
+  if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste projeto (veja também as arquivadas).`))
   if (!data || data.length === 0) back(context, 'erro', 'Só gestor ou owner pode editar frentes.')
   revalidatePath(rulesPath(context))
   back(context, 'ok', `Frente ${result.data.code} atualizada.`)
@@ -112,13 +112,19 @@ export async function unpinCampaign(context: RulesContext & { client_id: string;
   back(context, 'ok', 'Campanha solta. Ela volta a seguir as regras de nome.')
 }
 
-export async function deleteFront(context: RulesContext & { front_id: string }) {
+// Archive, never delete: the front keeps the campaigns it owns and their history, and claims no new one (0100).
+export async function setFrontArchived(context: RulesContext & { front_id: string; code: string }, archived: boolean) {
   const supabase = await createServerSupabaseClient()
-  const { data, error } = await supabase.from('project_fronts').delete().eq('id', context.front_id).select('id')
-  if (error) back(context, 'erro', databaseMessage(error, ''))
-  if (!data || data.length === 0) back(context, 'erro', 'Só gestor ou owner pode remover frentes.')
-  revalidatePath(rulesPath(context))
-  back(context, 'ok', 'Frente removida.')
+  const { error } = await supabase.rpc('set_front_archived', { p_front_id: context.front_id, p_archived: archived })
+  if (error) back(context, 'erro', error.message.includes('access denied') ? 'Só gestor ou owner pode arquivar frentes.' : error.message)
+  revalidatePath(`/dashboard/clients/${context.client_slug}/funis-venda/${context.funnel_slug}`, 'layout')
+  back(
+    context,
+    'ok',
+    archived
+      ? `Frente ${context.code} arquivada. As campanhas dela continuam no histórico; campanhas novas não entram mais nela.`
+      : `Frente ${context.code} restaurada.`
+  )
 }
 
 const ruleSchema = z.object({

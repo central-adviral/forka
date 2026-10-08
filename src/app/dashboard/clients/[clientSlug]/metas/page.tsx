@@ -32,8 +32,8 @@ export default async function MetasPage({
 
   const [watchers, { data: funnels }, { data: fronts }, { data: canEdit }] = await Promise.all([
     getWatchers(supabase, client.id),
-    supabase.from('sales_funnels').select('id, name, slug, resultado').eq('client_id', client.id).order('name'),
-    supabase.from('project_fronts').select('id, name, sales_funnel_id, naming_rules(kind, value), sales_funnels!project_fronts_sales_funnel_id_fkey!inner(client_id)').eq('sales_funnels.client_id', client.id).order('position'),
+    supabase.from('sales_funnels').select('id, name, slug, resultado').eq('client_id', client.id).is('archived_at', null).order('name'),
+    supabase.from('project_fronts').select('id, name, sales_funnel_id, naming_rules(kind, value), sales_funnels!project_fronts_sales_funnel_id_fkey!inner(client_id)').eq('sales_funnels.client_id', client.id).is('archived_at', null).order('position'),
     canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
   ])
   const context = { client_id: client.id as string, client_slug: client.slug as string }

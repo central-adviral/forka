@@ -2,7 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/page-header'
 import { notFound } from 'next/navigation'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { deleteSalesFunnel } from './actions'
+import { setSalesFunnelArchived } from './actions'
 import { SalesFunnelStatusToggle } from './sales-funnel-status-toggle'
 import { getFunnelSyncHealth } from '@/lib/repo/funnel-repo'
 import { SyncStatus } from '@/components/sync-status'
@@ -19,12 +19,13 @@ export default async function SalesFunnelsListPage({
 
   const { data: funnels } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, is_active, launchops_operacao_ids, launchops_produto_nomes')
+    .select('id, name, slug, is_active, archived_at, launchops_operacao_ids, launchops_produto_nomes')
     .eq('client_id', client.id)
     .order('name')
 
+  const archived = (funnels ?? []).filter((funnel) => funnel.archived_at)
   const summaries = await Promise.all(
-    (funnels ?? []).map(async (funnel) => {
+    (funnels ?? []).filter((funnel) => !funnel.archived_at).map(async (funnel) => {
       const health = await getFunnelSyncHealth(supabase, funnel.id)
       return {
         ...funnel,
@@ -71,11 +72,38 @@ export default async function SalesFunnelsListPage({
               <SyncStatus lastRunAt={funnel.lastSync} hasError={funnel.hasSyncError} />
             </a>
             <SalesFunnelStatusToggle salesFunnelId={funnel.id} clientSlug={client.slug} isActive={funnel.is_active} />
-            <ConfirmDeleteButton action={deleteSalesFunnel.bind(null, funnel.id, client.slug)} />
+            <ConfirmDeleteButton
+              action={setSalesFunnelArchived.bind(null, funnel.id, true)}
+              label="Arquivar"
+              warning="Arquivar? Os números ficam, vendas novas não entram."
+            />
           </div>
         ))}
         {summaries.length === 0 && <div className="px-6 py-8 text-sm text-[var(--ct-text-2)]">Nenhum projeto ainda.</div>}
       </div>
+
+      {archived.length > 0 && (
+        <details className="group">
+          <summary className="cursor-pointer text-[13px] font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
+            Arquivados ({archived.length})
+          </summary>
+          <ul className="mt-3 flex flex-col overflow-hidden rounded-2xl border border-[var(--ct-line)]">
+            {archived.map((funnel) => (
+              <li key={funnel.id} className="flex items-center gap-4 border-b border-[var(--ct-line)] bg-[var(--ct-surface)] px-4 py-3 last:border-b-0 sm:px-6">
+                <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`} className="min-w-0 flex-1 text-[14px] text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
+                  {funnel.name}
+                  <span className="ml-2 text-xs text-[var(--ct-text-3)]">arquivado em {new Date(funnel.archived_at!).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' })}</span>
+                </a>
+                <form action={setSalesFunnelArchived.bind(null, funnel.id, false)}>
+                  <button type="submit" className="text-xs font-semibold text-[var(--ct-accent)] hover:underline">
+                    Restaurar
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   )
 }

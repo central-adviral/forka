@@ -48,7 +48,7 @@ export default function NewTestPage() {
           setError('Não foi possível carregar o cliente. Recarregue a página.')
         } else {
           setClientId(data?.id ?? null)
-          const { data: projects } = await supabase.from('sales_funnels').select('id, name').eq('client_id', data.id).order('name')
+          const { data: projects } = await supabase.from('sales_funnels').select('id, name').eq('client_id', data.id).is('archived_at', null).order('name')
           setFunnels(projects ?? [])
         }
         setClientLoading(false)

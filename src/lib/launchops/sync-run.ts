@@ -23,6 +23,8 @@ export async function listActiveFunnels(appDb: SupabaseClient): Promise<FunnelRo
     .from('sales_funnels')
     .select('id, client_id, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url)')
     .eq('is_active', true)
+    // An archived project keeps the numbers it had: no sync writes into it any more (0100).
+    .is('archived_at', null)
     .order('created_at')
   if (error) throw error
   return (data ?? []) as unknown as FunnelRow[]
