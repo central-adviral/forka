@@ -1,3 +1,5 @@
+import { probabilityToBeBest } from './significance'
+
 /** One row of get_test_report_by_ad: a single creative on a single page/checkout. */
 export interface CreativeVariantRow {
   adName: string
@@ -27,7 +29,14 @@ export interface CreativeMatrixRow {
   /** Variant leading each metric. They disagree often: the page that converts best is
       frequently not the one that bills most, and the panel has to be able to say so. */
   winners: Record<MetricKey, string | null>
+  /** Chance, in %, that each page converts best for this creative; null for a page it never reached. */
+  chanceBest: Record<string, number | null>
+  /** Pages this creative sent too few people to for their number to mean anything yet. */
+  thin: Record<string, boolean>
 }
+
+/** People a page needs from one creative before its conversion rate stops being mostly luck. */
+export const THIN_CELL_VISITORS = 300
 
 interface Counters {
   clicks: number
@@ -101,6 +110,19 @@ export function buildCreativeMatrix(
       winners[key] = best > 0 ? winner : null
     }
 
-    return { adName, byVariantId, totals: derive(pooled), winners }
+    // Per cell, the chance of being the best page for this creative: the matrix splits the traffic
+    // into many small cells, and a 5% on 120 people reads as a winner when it is only luck.
+    const best = probabilityToBeBest(variantIds.map((id) => {
+      const counters = perVariant.get(id) ?? emptyCounters()
+      return { visits: counters.visitors, conversions: counters.conversions }
+    }))
+    const chanceBest: Record<string, number | null> = {}
+    const thin: Record<string, boolean> = {}
+    variantIds.forEach((id, index) => {
+      chanceBest[id] = best[index] === null ? null : Math.round(best[index]! * 100)
+      thin[id] = (perVariant.get(id)?.visitors ?? 0) < THIN_CELL_VISITORS
+    })
+
+    return { adName, byVariantId, totals: derive(pooled), winners, chanceBest, thin }
   })
 }

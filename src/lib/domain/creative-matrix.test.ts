@@ -92,4 +92,22 @@ describe('buildCreativeMatrix', () => {
   it('returns nothing when there are no rows to chart', () => {
     expect(buildCreativeMatrix([], VARIANTS)).toEqual([])
   })
+
+  it('gives each page its chance of being the best for that creative, and flags thin cells', () => {
+    const [row] = buildCreativeMatrix(
+      [
+        { adName: 'UGC dor', variantId: 'a', clicks: 2600, visitors: 2400, conversions: 74, revenueCents: 0 },
+        { adName: 'UGC dor', variantId: 'b', clicks: 2600, visitors: 2400, conversions: 106, revenueCents: 0 },
+        { adName: 'Carrossel', variantId: 'a', clicks: 130, visitors: 120, conversions: 6, revenueCents: 0 },
+      ],
+      ['a', 'b']
+    ).filter((candidate) => candidate.adName === 'UGC dor')
+    expect(row.chanceBest.b!).toBeGreaterThan(95)
+    expect(row.thin).toEqual({ a: false, b: false })
+
+    const carousel = buildCreativeMatrix([{ adName: 'Carrossel', variantId: 'a', clicks: 130, visitors: 120, conversions: 6, revenueCents: 0 }], ['a', 'b'])[0]
+    expect(carousel.thin).toEqual({ a: true, b: true })
+    expect(carousel.chanceBest.b).toBeNull()
+  })
 })
+
