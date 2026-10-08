@@ -74,6 +74,16 @@ export async function syncOneFunnel(appDb: SupabaseClient, launchopsDb: Supabase
   await syncSalesEntity(appDb, launchopsDb, funnel)
   await syncAdSpendEntity(appDb, launchopsDb, funnel)
   await syncAdCreativeSpendEntity(appDb, launchopsDb, funnel)
+  // With this hour's ads known, a sale left without project for lack of its ad gets a project (0090).
+  if (funnel.client_id) {
+    try {
+      const { data: reattributed, error } = await appDb.rpc('reattribute_pending_sales', { p_client_id: funnel.client_id })
+      if (error) throw error
+      if (reattributed > 0) console.log('[sync-funnel-sales-reattributed]', { salesFunnelId: funnel.id, reattributed })
+    } catch (err) {
+      console.error('[sync-funnel-reattribute-failed]', { salesFunnelId: funnel.id }, err)
+    }
+  }
 }
 
 async function syncSalesEntity(appDb: SupabaseClient, launchopsDb: SupabaseClient, funnel: SyncableFunnel) {

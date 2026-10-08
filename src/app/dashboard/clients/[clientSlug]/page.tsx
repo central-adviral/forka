@@ -40,7 +40,7 @@ const currency = (value: number) => value.toLocaleString('pt-BR', { style: 'curr
 const currency2 = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const timeBr = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
 
-function sum(days: ClientDay[], key: 'spendComImposto' | 'leads' | 'vendas' | 'vendasAnuncio' | 'receitaLiquida'): number {
+function sum(days: ClientDay[], key: Exclude<keyof ClientDay, 'data' | 'dadosAte'>): number {
   return days.reduce((total, day) => total + day[key], 0)
 }
 
@@ -82,6 +82,15 @@ export default async function TodayPage({
   const partial = period !== 'ontem' && Boolean(todayRow?.dadosAte)
 
   const spend = sum(periodDays, 'spendComImposto')
+  // CPA divides the spend of purchase projects and CPL the spend of lead projects (0090). A client
+  // with no front yet has no owner for any campaign, so its whole spend stays the base, as before.
+  const spendCompra = sum(periodDays, 'spendCompraComImposto')
+  const spendLead = sum(periodDays, 'spendLeadComImposto')
+  const spendSemFrente = sum(periodDays, 'spendSemFrenteComImposto')
+  const classified = spendCompra + spendLead > 0
+  const cpaBase = classified ? spendCompra : spend
+  const cplBase = classified ? spendLead : spend
+  const vendasSemProjeto = sum(periodDays, 'vendasSemProjeto')
   const vendas = sum(periodDays, 'vendas')
   const vendasAnuncio = sum(periodDays, 'vendasAnuncio')
   const leads = sum(periodDays, 'leads')
@@ -100,11 +109,25 @@ export default async function TodayPage({
   const weekdayLabel = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit' })
   const sparkOf = (key: 'spendComImposto' | 'vendas' | 'leads') => weekDays.map((day) => day[key])
   const kpis = [
-    { label: 'Investimento', tag: 'c/ imposto', value: currency(spend), foot: `${currency(sum(weekDays, 'spendComImposto'))} em 7 dias`, spark: sparkOf('spendComImposto'), color: 'var(--ct-an)' },
+    {
+      label: 'Investimento',
+      tag: 'c/ imposto',
+      value: currency(spend),
+      foot: classified && spendSemFrente > 0 ? `${currency(spendSemFrente)} sem frente, fora do CPA e do CPL` : `${currency(sum(weekDays, 'spendComImposto'))} em 7 dias`,
+      spark: sparkOf('spendComImposto'),
+      color: 'var(--ct-an)',
+    },
     { label: 'Vendas de entrada', tag: salesTag, value: vendas.toLocaleString('pt-BR'), foot: salesFoot, spark: sparkOf('vendas'), color: 'var(--ct-ok)' },
-    { label: 'CPA geral', tag: partial ? 'parcial' : 'todas', value: vendas > 0 ? currency2(spend / vendas) : '—', foot: vendasAnuncio > 0 ? `de anúncio ${currency2(spend / vendasAnuncio)}` : 'sem venda de anúncio', spark: [], color: '' },
+    {
+      label: 'CPA geral',
+      tag: partial ? 'parcial' : 'todas',
+      value: vendas > 0 ? currency2(cpaBase / vendas) : '—',
+      foot: [vendasAnuncio > 0 ? `de anúncio ${currency2(cpaBase / vendasAnuncio)}` : 'sem venda de anúncio', vendasSemProjeto > 0 ? `${vendasSemProjeto} sem projeto` : null].filter(Boolean).join(' · '),
+      spark: [],
+      color: '',
+    },
     { label: 'Leads', tag: 'pagos', value: leads.toLocaleString('pt-BR'), foot: 'leads de anúncio, sem duplicata', spark: sparkOf('leads'), color: 'var(--ct-painel)' },
-    { label: 'CPL', tag: partial ? 'parcial' : 'pagos', value: leads > 0 ? currency2(spend / leads) : '—', foot: 'investimento ÷ leads', spark: [], color: '' },
+    { label: 'CPL', tag: partial ? 'parcial' : 'pagos', value: leads > 0 ? currency2(cplBase / leads) : '—', foot: classified ? 'investimento dos projetos de lead ÷ leads' : 'investimento ÷ leads', spark: [], color: '' },
   ]
 
   const maxVendas = Math.max(...weekDays.map((day) => day.vendas), 1)
