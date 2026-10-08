@@ -64,21 +64,20 @@ describe('buildNav: what each role sees', () => {
     expect(subIds(nav(), 'cliente')).toEqual(['integracoes', 'membros'])
     // Integrações and Membros answer 404 below owner, so the section has nothing left for an analista.
     expect(sectionIds(nav({ role: 'analista' }))).not.toContain('cliente')
-    expect(subIds(nav({ role: 'analista' }), 'testes')).toEqual(['quadro', 'ab'])
-    expect(subIds(nav({ role: 'gestor' }), 'testes')).toEqual(['quadro', 'ab', 'regras-jogo'])
+    expect(subIds(nav({ role: 'analista' }), 'testes')).toEqual(['quadro', 'ab', 'aprendizados'])
+    expect(subIds(nav({ role: 'gestor' }), 'testes')).toEqual(['quadro', 'ab', 'aprendizados', 'regras-jogo'])
   })
 
   it('never shows the subsections that do not exist yet', () => {
     const all = nav().flatMap((group) => group.sections).flatMap((section) => section.subs.map((sub) => sub.label))
     expect(all).not.toContain('Resumo para o cliente')
-    expect(all).not.toContain('Aprendizados')
     expect(subIds(nav(), 'hoje')).toEqual(['fila', 'ritmo'])
   })
 
   it('leaves out what needs a project when the client has none', () => {
     const groups = nav({ project: null })
     expect(sectionIds(groups)).not.toContain('desempenho')
-    expect(subIds(groups, 'testes')).toEqual(['ab'])
+    expect(subIds(groups, 'testes')).toEqual(['ab', 'aprendizados'])
     expect(subIds(groups, 'projeto')).toEqual(['metas'])
   })
 })
