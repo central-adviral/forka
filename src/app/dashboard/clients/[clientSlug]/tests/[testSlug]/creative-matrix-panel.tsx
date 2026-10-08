@@ -80,7 +80,7 @@ export function CreativeMatrixPanel({ adRows, variants, assetLabel }: Props) {
   const hidden = ordered.length - VISIBLE_BLOCKS
 
   return (
-    <div className="mb-8 overflow-hidden rounded-2xl border border-[var(--ct-line)]">
+    <div className="mb-8 overflow-x-auto rounded-2xl border border-[var(--ct-line)]">
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
         <h2 className="font-[family-name:var(--font-sora)] text-lg font-semibold">Score de Criativos</h2>
         <span className="rounded-full border border-dashed border-[var(--ct-warn)]/50 bg-[var(--ct-warn)]/[0.08] px-2.5 py-1 font-[family-name:var(--font-geist-mono)] text-[10px] text-[var(--ct-warn)]">

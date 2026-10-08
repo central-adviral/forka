@@ -33,13 +33,31 @@ function sampleBeta(alpha: number, beta: number, rand: () => number, normal: () 
   return x / (x + y)
 }
 
+// mulberry32: a tiny deterministic generator, so a seed always yields the same draws.
+function seededRandom(seed: number): () => number {
+  let state = seed >>> 0
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0
+    let t = state
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/** A seed from the four counts: the same data gives the same chance on every screen and every reload. */
+function seedFromCounts(...counts: number[]): number {
+  return counts.reduce((hash, n) => Math.imul(hash ^ Math.round(n), 0x9e3779b1) >>> 0, 0x811c9dc5)
+}
+
 export function probabilityToBeatControl(
   control: { visits: number; conversions: number },
   variant: { visits: number; conversions: number },
-  rand: () => number = Math.random,
+  rand?: () => number,
   samples = 10000
 ): number | null {
   if (control.visits === 0 || variant.visits === 0) return null
+  rand ??= seededRandom(seedFromCounts(control.visits, control.conversions, variant.visits, variant.conversions))
   // Since 0050 one click can carry several conversions (upsell, renewal), so conversions can pass
   // visits. A Beta needs both shapes above zero; past that point the variant converted every visit.
   const controlConversions = Math.min(control.conversions, control.visits)

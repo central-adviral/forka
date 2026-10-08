@@ -46,4 +46,12 @@ describe('probabilityToBeatControl', () => {
     expect(Number.isNaN(p)).toBe(false)
     expect(p!).toBeGreaterThan(0.05)
   })
+
+  it('gives the same chance for the same data on every call, without a generator passed in', () => {
+    const control = { visits: 4470, conversions: 108 }
+    const variant = { visits: 4450, conversions: 128 }
+    const first = probabilityToBeatControl(control, variant)
+    for (let i = 0; i < 5; i++) expect(probabilityToBeatControl(control, variant)).toBe(first)
+    expect(probabilityToBeatControl(control, { visits: 4450, conversions: 129 })).not.toBe(first)
+  })
 })

@@ -9,7 +9,7 @@ const variants = [
 
 describe('computeReportLayout', () => {
   it('lays out one node column per variant, stacked without overlap', () => {
-    const layout = computeReportLayout(variants, false)
+    const layout = computeReportLayout(variants, false, null)
     expect(layout.variants).toHaveLength(3)
     for (let i = 1; i < layout.variants.length; i++) {
       const prevBottom = layout.variants[i - 1].node.y + layout.variants[i - 1].node.h
@@ -17,15 +17,15 @@ describe('computeReportLayout', () => {
     }
   })
 
-  it('marks the variant with the highest conversion rate as leader', () => {
-    const layout = computeReportLayout(variants, false)
+  it('marks only the leader it is given, not the highest raw rate', () => {
+    const layout = computeReportLayout(variants, false, 'b')
     const leaders = layout.variants.filter((v) => v.isLeader)
     expect(leaders).toHaveLength(1)
     expect(leaders[0].id).toBe('b')
   })
 
   it('colors the leader conversion edge amber and others teal', () => {
-    const layout = computeReportLayout(variants, false)
+    const layout = computeReportLayout(variants, false, 'b')
     const leader = layout.variants.find((v) => v.id === 'b')!
     const other = layout.variants.find((v) => v.id === 'a')!
     expect(leader.conversionEdge.color).toBe('#F5B94D')
@@ -33,38 +33,37 @@ describe('computeReportLayout', () => {
   })
 
   it('gives thicker traffic edges to variants with more visits', () => {
-    const layout = computeReportLayout(variants, false)
+    const layout = computeReportLayout(variants, false, null)
     const a = layout.variants.find((v) => v.id === 'a')!
     const c = layout.variants.find((v) => v.id === 'c')!
     expect(a.trafficEdge.strokeWidth).toBeGreaterThan(c.trafficEdge.strokeWidth)
   })
 
-  it('declares no leader when no variant has any visits', () => {
-    const noVisits = variants.map((v) => ({ ...v, visits: 0, conversions: 0 }))
-    const layout = computeReportLayout(noVisits, false)
+  it('declares no leader when there is none', () => {
+    const layout = computeReportLayout(variants, false, null)
     expect(layout.variants.every((v) => !v.isLeader)).toBe(true)
   })
 
   it('passes revenueCents through unchanged', () => {
-    const layout = computeReportLayout(variants, false)
+    const layout = computeReportLayout(variants, false, null)
     expect(layout.variants.find((v) => v.id === 'a')!.revenueCents).toBe(435000)
   })
 
   it('passes uniqueVisitors through unchanged', () => {
-    const layout = computeReportLayout(variants, false)
+    const layout = computeReportLayout(variants, false, null)
     expect(layout.variants.find((v) => v.id === 'a')!.uniqueVisitors).toBe(1500)
   })
 
   it('omits the fallback node when not configured', () => {
-    expect(computeReportLayout(variants, false).fallback).toBeNull()
+    expect(computeReportLayout(variants, false, null).fallback).toBeNull()
   })
 
   it('includes a fallback node when configured', () => {
-    expect(computeReportLayout(variants, true).fallback).not.toBeNull()
+    expect(computeReportLayout(variants, true, null).fallback).not.toBeNull()
   })
 
   it('throws on an empty variant list', () => {
-    expect(() => computeReportLayout([], false)).toThrow()
+    expect(() => computeReportLayout([], false, null)).toThrow()
   })
 
   it('grows the canvas height to fit 5+ variants without clipping', () => {
@@ -78,7 +77,7 @@ describe('computeReportLayout', () => {
       revenueCents: 5000,
       destinationUrl: 'https://example.com',
     }))
-    const layout = computeReportLayout(many, false)
+    const layout = computeReportLayout(many, false, null)
     const lastVariant = layout.variants[layout.variants.length - 1]
     expect(lastVariant.node.y + lastVariant.node.h).toBeLessThanOrEqual(layout.canvasHeight)
     expect(layout.variants[0].node.y).toBeGreaterThanOrEqual(0)

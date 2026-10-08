@@ -57,8 +57,9 @@ export async function createTest(input: z.infer<typeof createTestSchema>) {
 
 export async function deleteTest(testId: string, clientSlug: string) {
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('tests').delete().eq('id', testId)
+  const { data, error } = await supabase.from('tests').delete().eq('id', testId).select('id')
   if (error) throw error
+  if (!data || data.length === 0) throw new Error('Teste não encontrado ou você não tem permissão para alterá-lo.')
   revalidatePath(`/dashboard/clients/${clientSlug}/tests`)
 }
 
@@ -78,7 +79,7 @@ export async function toggleTestStatus(input: z.infer<typeof toggleTestStatusSch
     .eq('id', parsed.test_id)
     .select('id')
   if (error) throw error
-  if (!data || data.length === 0) throw new Error('Test not found or not authorized to update')
+  if (!data || data.length === 0) throw new Error('Teste não encontrado ou você não tem permissão para alterá-lo.')
 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests`)
 }

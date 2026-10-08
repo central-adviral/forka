@@ -35,6 +35,19 @@ const VERDICT: Record<Verdict, { text: string; tone: string }> = {
 }
 const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+// The card pill takes the verdict's color: green for a win, red for a cut, amber when the days
+// ran out without one (only then is there a summary without a win or a cut).
+const PILL = {
+  win: 'bg-[var(--ct-ok-soft)] text-[var(--ct-ok)]',
+  cut: 'bg-[var(--ct-crit-soft)] text-[var(--ct-crit)]',
+  decide: 'bg-[var(--ct-warn-soft)] text-[var(--ct-warn)]',
+}
+
+function pillTone(readout: Readout): string {
+  const verdicts = [...(readout.meta ?? []), ...(readout.link ?? [])].map((v) => v.verdict)
+  return verdicts.includes('win') ? PILL.win : verdicts.includes('cut') ? PILL.cut : PILL.decide
+}
+
 interface Readout {
   summary: string | null
   meta?: ReturnType<typeof readMetaTest>
@@ -215,7 +228,7 @@ export default async function BacklogPage({
                         </span>
                         <span className={`text-[11.5px] ${status.tone}`}>{status.text}</span>
                         {readouts.get(item.id)?.summary && (
-                          <span className="rounded-[8px] bg-[var(--ct-warn-soft)] px-2 py-1 text-[11.5px] font-medium text-[var(--ct-warn)]">{readouts.get(item.id)!.summary}</span>
+                          <span className={`rounded-[8px] px-2 py-1 text-[11.5px] font-medium ${pillTone(readouts.get(item.id)!)}`}>{readouts.get(item.id)!.summary}</span>
                         )}
                       </Link>
                     )

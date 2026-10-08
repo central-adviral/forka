@@ -125,7 +125,7 @@ describe('GET /r/[slug]', () => {
     expect(response.status).toBe(404)
   })
 
-  it('redirects to the fallback url when the test is paused', async () => {
+  it('redirects to the fallback url, keeping the ad utms, when the test is paused', async () => {
     vi.mocked(getTestBySlug).mockResolvedValue({
       id: 'test-1',
       slug: 'oferta-x',
@@ -135,10 +135,34 @@ describe('GET /r/[slug]', () => {
       sales_page_url: null,
       variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
     })
-    const request = new NextRequest('https://ir.example.com/r/oferta-x')
+    const request = new NextRequest('https://ir.example.com/r/oferta-x?utm_source=facebookads')
     const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     expect(response.status).toBe(302)
-    expect(response.headers.get('location')).toBe('https://example.com/fallback')
+    expect(response.headers.get('location')).toBe('https://example.com/fallback?utm_source=facebookads')
+    expect(insertClickEvent).not.toHaveBeenCalled()
+  })
+
+  it('sends a paused test without fallback to the control, with the utms and no tracking id', async () => {
+    vi.mocked(getTestBySlug).mockResolvedValue({
+      id: 'test-1',
+      slug: 'oferta-x',
+      status: 'paused',
+      fallback_url: null,
+      test_type: 'page',
+      sales_page_url: null,
+      variants: [
+        { id: 'v1', name: 'A', weight_pct: 50, destination_url: 'https://example.com/a', is_control: false },
+        { id: 'v2', name: 'B', weight_pct: 50, destination_url: 'https://example.com/b', is_control: true },
+      ],
+    })
+    const request = new NextRequest('https://ir.example.com/r/oferta-x?utm_source=facebookads')
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
+    expect(response.status).toBe(302)
+    const location = new URL(response.headers.get('location')!)
+    expect(location.origin + location.pathname).toBe('https://example.com/b')
+    expect(location.searchParams.get('utm_source')).toBe('facebookads')
+    expect(location.searchParams.get('utm_content')).toBeNull()
+    expect(insertClickEvent).not.toHaveBeenCalled()
   })
 
   it('reuses the previously assigned variant from the cookie', async () => {
@@ -210,7 +234,7 @@ describe('GET /r/[slug]', () => {
     expect(response.cookies.get('ir_vid')).toBeUndefined()
   })
 
-  it('redirects a known bot to the fallback url when set, still recording the click as a bot', async () => {
+  it('sends a known bot to the control page people see, not to the fallback, recording it on the control', async () => {
     vi.mocked(getTestBySlug).mockResolvedValue({
       id: 'test-1',
       slug: 'oferta-x',
@@ -218,15 +242,18 @@ describe('GET /r/[slug]', () => {
       fallback_url: 'https://example.com/fallback',
       test_type: 'page',
       sales_page_url: null,
-      variants: [{ id: 'v1', name: 'A', weight_pct: 100, destination_url: 'https://example.com/page', is_control: false }],
+      variants: [
+        { id: 'v1', name: 'A', weight_pct: 50, destination_url: 'https://example.com/a', is_control: false },
+        { id: 'v2', name: 'B', weight_pct: 50, destination_url: 'https://example.com/b', is_control: true },
+      ],
     })
     const request = new NextRequest('https://ir.example.com/r/oferta-x', {
       headers: { 'user-agent': 'curl/8.4.0' },
     })
     const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
-    expect(response.headers.get('location')).toBe('https://example.com/fallback')
+    expect(response.headers.get('location')).toBe('https://example.com/b')
     expect(insertClickEvent).toHaveBeenCalledOnce()
-    expect(insertClickEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ isBot: true }))
+    expect(insertClickEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ isBot: true, variantId: 'v2' }))
   })
 
   it('sends a checkout test to the shared sales page, not to the variant checkout link', async () => {

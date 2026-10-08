@@ -95,7 +95,7 @@ export function requiredVisitsPerArm(controlRate: number, confPct: number, mdePc
  * rate calls for (never below the visitor floor) and, for a win, the rules' minimum conversions;
  * then a challenger wins or is cut at the confidence.
  */
-export function readLinkTest(rows: LinkRow[], controlVariantId: string | undefined, rules: TestRules, rand: () => number = Math.random): LinkVariantRead[] {
+export function readLinkTest(rows: LinkRow[], controlVariantId: string | undefined, rules: TestRules, rand?: () => number): LinkVariantRead[] {
   const control = rows.find((row) => row.variant_id === controlVariantId) ?? rows[0]
   const controlVisits = Number(control?.visits ?? 0)
   const controlRate = controlVisits > 0 ? Number(control?.conversions ?? 0) / controlVisits : 0
