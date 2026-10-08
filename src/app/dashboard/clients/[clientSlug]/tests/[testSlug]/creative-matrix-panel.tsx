@@ -1,4 +1,4 @@
-import { buildCreativeMatrix, METRIC_KEYS, type MetricKey } from '@/lib/domain/creative-matrix'
+import { buildCreativeMatrix, METRIC_KEYS, THIN_CELL_VISITORS, type MetricKey } from '@/lib/domain/creative-matrix'
 import { scoreCreatives } from '@/lib/domain/creative-score'
 
 interface PanelAdRow {
@@ -240,6 +240,32 @@ function CreativeBlock({
             </div>
           )
         })}
+
+        {/* Per cell, the chance of being the best page for this creative, with thin cells
+            called out: many small cells make a lucky 5% on 120 people look like a winner. */}
+        <div className="border-t border-[var(--ct-line)] px-4 py-2 text-[11.5px] text-[var(--ct-text-2)]">Chance de ser a melhor</div>
+        {variants.map((v) => {
+          const chance = row.chanceBest[v.id]
+          const thin = row.thin[v.id]
+          return (
+            <div key={v.id} className="border-t border-[var(--ct-line)] px-4 py-2">
+              <div
+                title={thin ? `Menos de ${THIN_CELL_VISITORS} pessoas deste criativo nesta ${assetLabel.toLowerCase()}: o número ainda é muito sorte.` : undefined}
+                className={`rounded-md text-right font-[family-name:var(--font-geist-mono)] text-[13px] tabular-nums ${
+                  thin
+                    ? 'border border-dashed border-[var(--ct-warn)]/55 px-2 text-[var(--ct-text-3)]'
+                    : chance !== null && chance >= 95
+                      ? 'bg-[var(--ct-ok)]/10 px-2 font-bold text-[var(--ct-ok)]'
+                      : 'text-[var(--ct-text-2)]'
+                }`}
+              >
+                {chance === null ? '—' : `${chance}%`}
+                {thin && <span className="block text-[10px] text-[var(--ct-warn)]">amostra pequena</span>}
+              </div>
+            </div>
+          )
+        })}
+        <div className="border-l border-t border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-4 py-2" />
       </div>
     </div>
   )
