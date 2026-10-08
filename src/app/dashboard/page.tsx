@@ -4,6 +4,15 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { SuccessBanner } from '@/components/success-banner'
 import { resolvePeriodDateRange } from '@/lib/domain/report-period'
 import type { ClientRole } from '@/lib/repo/client-access-repo'
+import { isCritical } from '@/lib/domain/page-probe'
+
+interface PageNow {
+  client_id: string
+  silenced: boolean
+  last_ok: boolean | null
+  last_redirects: number | null
+  prev_ok: boolean | null
+}
 
 interface UsageStats {
   total_clients: number
@@ -60,13 +69,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     data: { user },
   } = await supabase.auth.getUser()
   const { since } = resolvePeriodDateRange('7d', undefined, undefined)
-  const [{ data: clients }, { data: summary, error: summaryError }, { data: memberships }, { data: funnels }, { data: usage }, { data: staffRow }] = await Promise.all([
+  const [{ data: clients }, { data: summary, error: summaryError }, { data: memberships }, { data: funnels }, { data: usage }, { data: staffRow }, { data: pagesNow, error: pagesError }] = await Promise.all([
     supabase.from('clients').select('id, name, slug').order('name'),
     supabase.rpc('get_portfolio_summary', { p_since: since }) as unknown as Promise<{ data: PortfolioRow[] | null; error: unknown }>,
     supabase.from('memberships').select('client_id, role').eq('user_id', user?.id ?? ''),
     supabase.from('sales_funnels').select('client_id'),
     supabase.rpc('get_usage_stats').single() as unknown as Promise<{ data: UsageStats | null }>,
     supabase.from('staff').select('role').eq('user_id', user?.id ?? '').maybeSingle(),
+    supabase.rpc('get_pages_now') as unknown as Promise<{ data: PageNow[] | null; error: unknown }>,
   ])
   // Without the summary every client would read R$ 0 and 0 sales. The list stays, the numbers show a
   // dash and a banner says why: better than hiding every client behind one failed read.
@@ -77,7 +87,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const projectsByClient = new Map<string, number>()
   for (const row of funnels ?? []) projectsByClient.set(row.client_id, (projectsByClient.get(row.client_id) ?? 0) + 1)
 
-  const crit = (row: { summary?: PortfolioRow }) => Number(row.summary?.alerts_crit ?? 0)
+  // Pages down for real (0089) count as critical here too, unless silenced for maintenance.
+  if (pagesError) console.error('[portfolio-pages-failed]', pagesError)
+  const pagesDownByClient = new Map<string, number>()
+  for (const page of pagesNow ?? []) {
+    if (page.silenced || page.last_ok === null) continue
+    const checks = [{ ok: page.last_ok, redirects: page.last_redirects ?? 0 }, ...(page.prev_ok === null ? [] : [{ ok: page.prev_ok, redirects: 0 }])]
+    if (isCritical(checks)) pagesDownByClient.set(page.client_id, (pagesDownByClient.get(page.client_id) ?? 0) + 1)
+  }
+  const crit = (row: { id: string; summary?: PortfolioRow }) => Number(row.summary?.alerts_crit ?? 0) + (pagesDownByClient.get(row.id) ?? 0)
   const warn = (row: { summary?: PortfolioRow }) => Number(row.summary?.alerts_warn ?? 0)
   // Whoever needs attention comes first: critical alerts, then attention, then the biggest spend.
   const allRows = (clients ?? [])
@@ -88,7 +106,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const totalSpend = rows.reduce((sum, row) => sum + Number(row.summary?.spend ?? 0), 0)
   const totalToday = rows.reduce((sum, row) => sum + Number(row.summary?.spend_today ?? 0), 0)
   const totalSales = rows.reduce((sum, row) => sum + Number(row.summary?.entry_sales ?? 0), 0)
-  const totalCrit = rows.reduce((sum, row) => sum + Number(row.summary?.alerts_crit ?? 0), 0)
+  const totalCrit = rows.reduce((sum, row) => sum + crit(row), 0)
   const totalWarn = rows.reduce((sum, row) => sum + Number(row.summary?.alerts_warn ?? 0), 0)
 
   return (
@@ -202,10 +220,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                       <span className="block text-[11.5px] text-[var(--ct-text-3)]">você: {role ? ROLE_LABEL[role] : 'Staff'}</span>
                     </td>
                     <td className="px-5 py-3.5">
-                      {Number(row.summary?.alerts_crit ?? 0) + Number(row.summary?.alerts_warn ?? 0) === 0 ? (
+                      {crit(row) + warn(row) === 0 ? (
                         <span className="text-[var(--ct-text-3)]">—</span>
                       ) : (
-                        <Link href={`/dashboard/clients/${row.slug}/painel`} className="relative z-10 flex flex-wrap gap-1.5">
+                        <span className="relative z-10 flex flex-wrap gap-1.5">
+                          {(pagesDownByClient.get(row.id) ?? 0) > 0 && (
+                            <Link href={`/dashboard/clients/${row.slug}/paginas`} className="rounded-full bg-[var(--ct-crit-soft)] px-2 py-0.5 text-[11.5px] font-semibold text-[var(--ct-crit)]">
+                              {pagesDownByClient.get(row.id) === 1 ? '1 página fora do ar' : `${pagesDownByClient.get(row.id)} páginas fora do ar`}
+                            </Link>
+                          )}
+                          <Link href={`/dashboard/clients/${row.slug}/painel`} className="flex flex-wrap gap-1.5">
                           {Number(row.summary?.alerts_crit ?? 0) > 0 && (
                             <span className="rounded-full bg-[var(--ct-crit-soft)] px-2 py-0.5 text-[11.5px] font-semibold text-[var(--ct-crit)]">
                               {row.summary?.alerts_crit} crítico{Number(row.summary?.alerts_crit) > 1 ? 's' : ''}
@@ -216,7 +240,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                               {row.summary?.alerts_warn} atenção
                             </span>
                           )}
-                        </Link>
+                          </Link>
+                        </span>
                       )}
                     </td>
                     <td className="px-5 py-3.5 text-right font-[family-name:var(--font-geist-mono)]">{money(row.summary?.spend_today)}</td>

@@ -1,0 +1,74 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+const role = vi.hoisted(() => ({ has: false, activePages: 0, inserted: [] as unknown[] }))
+vi.mock('@/lib/supabase/server', () => ({
+  createServerSupabaseClient: async () => ({
+    rpc: async () => ({ data: role.has, error: null }),
+    from: () => ({
+      select: () => ({ eq: () => ({ eq: async () => ({ count: role.activePages }) }) }),
+      insert: async (row: unknown) => {
+        role.inserted.push(row)
+        return { error: null }
+      },
+    }),
+  }),
+}))
+vi.mock('@/lib/supabase/service-role', () => ({ createServiceRoleClient: vi.fn(() => ({})) }))
+vi.mock('@/lib/pages/probe', () => ({ probeClientPages: vi.fn(async () => 1) }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  redirect: (to: string) => {
+    throw new Error(`redirect:${to}`)
+  },
+}))
+
+import { checkPagesNow, savePage } from './actions'
+import { probeClientPages } from '@/lib/pages/probe'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
+
+const context = { client_id: 'client-1', client_slug: 'voe' }
+
+describe('checkPagesNow', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('refuses a member below gestor before touching the service role', async () => {
+    role.has = false
+    await expect(checkPagesNow(context)).rejects.toThrow('Cliente não encontrado')
+    expect(createServiceRoleClient).not.toHaveBeenCalled()
+    expect(probeClientPages).not.toHaveBeenCalled()
+  })
+
+  it('runs the probe for a gestor', async () => {
+    role.has = true
+    await expect(checkPagesNow(context)).rejects.toThrow(/redirect:.*ok=/)
+    expect(probeClientPages).toHaveBeenCalledOnce()
+  })
+})
+
+describe('savePage', () => {
+  const form = () => {
+    const data = new FormData()
+    data.set('label', 'Vendas')
+    data.set('url', 'https://www.exemplo.com.br/oferta')
+    data.set('watch_pixel', 'on')
+    return data
+  }
+
+  beforeEach(() => {
+    role.inserted = []
+  })
+
+  it('refuses an 11th active page', async () => {
+    role.activePages = 10
+    await expect(savePage(context, form())).rejects.toThrow(/redirect:.*erro=.*10%20p%C3%A1ginas/)
+    expect(role.inserted).toEqual([])
+  })
+
+  it('adds the page with what it watches while there is a free slot', async () => {
+    role.activePages = 9
+    await expect(savePage(context, form())).rejects.toThrow(/redirect:.*ok=/)
+    expect(role.inserted).toEqual([
+      { client_id: 'client-1', label: 'Vendas', url: 'https://www.exemplo.com.br/oferta', sales_funnel_id: null, watch_pixel: true, watch_checkout: false, required_text: null },
+    ])
+  })
+})

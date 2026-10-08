@@ -91,7 +91,7 @@ export const NAV_SECTIONS: SectionDef[] = [
     subs: [
       { id: 'abertos', label: 'Abertos', desc: 'Fora da faixa agora', exists: true, href: (c) => `${c.base}/painel#atencao` },
       { id: 'vigias', label: 'Vigias', desc: 'Métricas observadas', exists: true, href: (c) => `${c.base}/painel#vigias` },
-      { id: 'paginas', label: 'Páginas', desc: 'No ar e rápidas', exists: true, href: (c) => `${c.base}/painel#paginas` },
+      { id: 'paginas', label: 'Páginas', desc: 'No ar, rápidas e vendendo', exists: true, href: (c) => `${c.base}/paginas` },
     ],
   },
   {
@@ -175,7 +175,9 @@ export function resolveActive(pathname: string, search: string, hash: string, cl
   if (rest.length === 0) return { section: 'hoje', sub: anchor === 'ritmo' ? 'ritmo' : 'fila' }
   switch (rest[0]) {
     case 'painel':
-      return { section: 'alertas', sub: anchor === 'vigias' ? 'vigias' : anchor === 'paginas' ? 'paginas' : 'abertos' }
+      return { section: 'alertas', sub: anchor === 'vigias' ? 'vigias' : 'abertos' }
+    case 'paginas':
+      return { section: 'alertas', sub: rest.length === 1 ? 'paginas' : null }
     case 'backlog':
       return { section: 'testes', sub: aba === 'regras' ? 'regras-jogo' : 'quadro' }
     case 'tests':

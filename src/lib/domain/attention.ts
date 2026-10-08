@@ -26,7 +26,7 @@ export interface AttentionInput {
   /** Sales of the last days no project owns (0073): a product in several projects with no ad, or in none. */
   unattributed?: { count: number; revenue: number }
   /** Open watcher alerts (0059), already worded. */
-  watcherAlerts?: { severity: 'warn' | 'crit'; title: string; detail: string }[]
+  watcherAlerts?: { severity: 'warn' | 'crit'; title: string; detail: string; href?: string }[]
   /** Running backlog cards whose rules already speak: a win, a cut or a saturated creative. */
   testVerdicts?: { code: string; title: string; summary: string; kind: 'win' | 'cut' | 'decide'; projectSlug: string; daysRunning: number }[]
   /** Active tests whose traffic does not split by the weights since the last weight change. */
@@ -83,7 +83,7 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
   }
 
   for (const alert of input.watcherAlerts ?? []) {
-    items.push({ severity: alert.severity, title: alert.title, detail: alert.detail, tool: 'painel', href: `${input.base}/painel` })
+    items.push({ severity: alert.severity, title: alert.title, detail: alert.detail, tool: 'painel', href: alert.href ?? `${input.base}/painel` })
   }
 
   if (input.conflicts.length > 0) {
