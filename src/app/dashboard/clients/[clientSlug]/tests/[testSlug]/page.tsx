@@ -9,6 +9,8 @@ import { experimentTimeline } from '@/lib/domain/experiment-timeline'
 import { readLinkTest, type LinkRow } from '@/lib/domain/backlog-readout'
 import { readRules } from '@/lib/domain/backlog'
 import { ExperimentBand } from './experiment-band'
+import { ChanceChart } from './chance-chart'
+import { dailyChance, type DailyRow } from '@/lib/domain/daily-chance'
 import { computeReportLayout } from '@/lib/domain/report-layout'
 import { resolveRedirectDomain } from '@/lib/domain/redirect-domain'
 import { CopyButton } from '@/components/copy-button'
@@ -252,6 +254,7 @@ export default async function TestReportPage({
     { data: changeRows },
     { data: measuredCards },
     { data: firstClick },
+    { data: dailyRows },
   ] = await Promise.all([
     supabase.from('variants').select('id, destination_url, is_control').eq('test_id', test.id),
     supabase.rpc('get_test_report', period),
@@ -268,6 +271,7 @@ export default async function TestReportPage({
       .order('created_at', { ascending: false })
       .limit(1),
     supabase.from('click_events').select('created_at').eq('test_id', test.id).eq('is_bot', false).order('created_at').limit(1).maybeSingle(),
+    tab === 'desempenho' ? supabase.rpc('get_test_daily', { p_test_id: test.id, p_since: sinceIso }) : skip,
   ])
   const changes = ((changeRows ?? []) as unknown as { created_at: string; field: 'weight_pct' | 'destination_url'; old_value: string | null; new_value: string | null; variants: { name: string } | null }[]).map(
     (row) => ({ ...row, variant_name: row.variants?.name ?? null })
@@ -688,6 +692,18 @@ export default async function TestReportPage({
         confidenceLabelById={confidenceLabelById}
         assetLabel={assetLabel}
       />
+      {control && (
+        <div className="mx-6 mb-6 rounded-2xl border border-[var(--ct-line)] p-5">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[var(--ct-text-2)]">
+            {rows.length >= 3 ? 'Chance de ser a melhor, dia a dia' : `Chance de vencer ${assetArticle} ${assetLabel.toLowerCase()} controle, dia a dia`}
+          </h3>
+          <ChanceChart
+            points={dailyChance((dailyRows as DailyRow[] | null) ?? [], rows.map((row) => row.variant_id), control.variant_id)}
+            series={rows.filter((row) => rows.length >= 3 || row.variant_id !== control.variant_id).map((row) => ({ id: row.variant_id, name: row.variant_name }))}
+            bar={readRules(measuredCard?.sales_funnels?.test_rules).conf}
+          />
+        </div>
+      )}
       <div className="mx-6 mb-6 grid grid-cols-1 divide-y divide-[var(--ct-line)] rounded-2xl border border-[var(--ct-line)] md:grid-cols-3 md:divide-x md:divide-y-0">
         <div className="p-5">
           <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-[var(--ct-text-2)]">

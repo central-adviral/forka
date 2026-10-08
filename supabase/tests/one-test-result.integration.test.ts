@@ -52,5 +52,13 @@ describe('get_test_report returns one count for the whole report (0077)', () => 
     const row = (id: string) => report!.find((r: { variant_id: string }) => r.variant_id === id)
     expect(row(a)).toMatchObject({ visits: 1, conversions: 1, clicks: 2, sales: 2, revenue_cents: 23400 })
     expect(row(b)).toMatchObject({ visits: 1, conversions: 0, clicks: 1, sales: 0, revenue_cents: 0 })
+
+    // 0081: the day by day series sums to the same people and buyers, on the São Paulo day.
+    const { data: daily, error: dailyError } = await owner.rpc('get_test_daily', { p_test_id: test!.id, p_since: null })
+    expect(dailyError).toBeNull()
+    expect(daily).toEqual([
+      { day: '2026-10-01', variant_id: a, people: 1, buyers: 1 },
+      { day: '2026-10-01', variant_id: b, people: 1, buyers: 0 },
+    ].sort((x, y) => x.variant_id.localeCompare(y.variant_id)))
   })
 })
