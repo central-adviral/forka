@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { getClientSecrets } from '@/lib/repo/client-secrets-repo'
 import { assertClientRole } from '@/lib/repo/client-access-repo'
+import { archivedProjectError } from '@/lib/repo/project-archive-repo'
 import { createLaunchOpsClient } from '@/lib/launchops/client'
 import { syncOneFunnel, syncClientCampaigns } from '@/lib/launchops/sync-funnel'
 
@@ -105,6 +106,8 @@ export async function editSalesFunnel(
   const parsed = result.data
 
   const supabase = await createServerSupabaseClient()
+  const archived = await archivedProjectError(supabase, parsed.sales_funnel_id)
+  if (archived) throw new Error(archived)
   await assertNoDuplicateLaunchOpsMapping(supabase, parsed.client_id, parsed.launchops_operacao_ids, parsed.sales_funnel_id)
   const { error } = await supabase
     .from('sales_funnels')

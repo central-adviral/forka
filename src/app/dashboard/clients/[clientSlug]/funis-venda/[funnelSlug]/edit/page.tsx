@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { canActAs } from '@/lib/view-as'
 import { editSalesFunnel } from '../../actions'
+import { ArchivedProjectBanner } from '../../archived-project-banner'
 
 const inputClass =
   'w-full rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-3.5 py-2.5 text-sm text-[var(--ct-text)] placeholder:text-[var(--ct-text-2)] outline-none focus:border-[var(--ct-accent)]'
@@ -17,7 +19,7 @@ export default async function EditSalesFunnelPage({
 
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, launchops_operacao_ids, starts_on, ends_on')
+    .select('id, name, slug, launchops_operacao_ids, starts_on, ends_on, archived_at')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
@@ -34,6 +36,17 @@ export default async function EditSalesFunnelPage({
         </svg>
         {funnel.name}
       </a>
+      {funnel.archived_at ? (
+        <div className="max-w-xl space-y-4">
+          <h1 className="font-[family-name:var(--font-sora)] text-lg font-semibold">Editar funil — {funnel.name}</h1>
+          <ArchivedProjectBanner
+            salesFunnelId={funnel.id}
+            archivedAt={funnel.archived_at}
+            canRestore={await canActAs(supabase, client.id, 'gestor')}
+            note="Restaure o projeto para editar."
+          />
+        </div>
+      ) : (
       <form
         action={editSalesFunnel.bind(null, {
           sales_funnel_id: funnel.id,
@@ -71,6 +84,7 @@ export default async function EditSalesFunnelPage({
           Salvar alterações
         </button>
       </form>
+      )}
     </div>
   )
 }

@@ -56,12 +56,15 @@ export default async function MetasPage({
   // Configuration is internal to the agency: the client never reads it, even by typing the address.
   if (!(await canActAs(supabase, client.id, 'analista'))) notFound()
 
-  const [watchers, { data: funnels }, { data: fronts }, { data: canEdit }] = await Promise.all([
+  const [allWatchers, { data: funnels }, { data: fronts }, { data: canEdit }] = await Promise.all([
     getWatchers(supabase, client.id),
     supabase.from('sales_funnels').select('id, name, slug, resultado').eq('client_id', client.id).is('archived_at', null).order('name'),
     supabase.from('project_fronts').select('id, name, sales_funnel_id, naming_rules(kind, value), sales_funnels!project_fronts_sales_funnel_id_fkey!inner(client_id)').eq('sales_funnels.client_id', client.id).is('archived_at', null).order('position'),
     canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
   ])
+  // Watchers of archived projects or fronts are not evaluated (0100): listed apart, read-only.
+  const watchers = allWatchers.filter((watcher) => !watcher.archived)
+  const archivedWatchers = allWatchers.filter((watcher) => watcher.archived)
   const context = { client_id: client.id as string, client_slug: client.slug as string }
   const ruleLabel = (front: { naming_rules: { kind: string; value: string }[] | null }) =>
     (front.naming_rules ?? []).filter((rule) => rule.kind === 'include').map((rule) => rule.value).join(' + ')
@@ -219,6 +222,27 @@ export default async function MetasPage({
           </tbody>
         </table>
       </div>
+
+      {archivedWatchers.length > 0 && (
+        <details className="-mt-5">
+          <summary className="cursor-pointer text-[12.5px] font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
+            Vigias de projetos/frentes arquivados ({archivedWatchers.length})
+          </summary>
+          <p className="mt-2 text-[12px] text-[var(--ct-text-3)]">Não são avaliados enquanto o projeto ou a frente estiver arquivado. Restaure para voltar a mexer neles.</p>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {archivedWatchers.map((watcher) => (
+              <li key={watcher.id} className="flex flex-wrap items-baseline gap-x-3 text-[12.5px] text-[var(--ct-text-2)]">
+                <b className="font-semibold text-[var(--ct-text)]">{METRICS[watcher.metric].label}</b>
+                <span>
+                  {watcher.projectName}
+                  {watcher.frontName ? ` · frente ${watcher.frontName}` : ''}
+                </span>
+                <span className={mono}>alvo {formatMetric(watcher.metric, watcher.target)}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {canEdit && (
         <form action={createWatcher.bind(null, context)} className={`card-shadow ${formGrid} rounded-[18px] border border-dashed border-[var(--ct-line-2)] px-6 py-5`}>

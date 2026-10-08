@@ -11,6 +11,7 @@ import { canActAs } from '@/lib/view-as'
 import { saoPauloDay } from '@/lib/repo/today-repo'
 import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
 import { PageHeader } from '@/components/page-header'
+import { ArchivedProjectBanner } from '../../archived-project-banner'
 import { ApplySincePanel } from '../apply-since-panel'
 import { applySince, previewApplySince } from '../apply-since-actions'
 
@@ -40,14 +41,14 @@ export default async function ProjectProductsPage({
   if (!(await canActAs(supabase, client.id, 'analista'))) notFound()
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug')
+    .select('id, name, slug, archived_at')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
   if (!funnel) notFound()
 
   const since = brtDayBoundaryUtc(saoPauloDay(-LOOKBACK_DAYS))
-  const [{ data: canEdit }, { data: productRows, error: productsError }, { data: unattributedRows, error: unattributedError }] = await Promise.all([
+  const [{ data: canEditClient }, { data: productRows, error: productsError }, { data: unattributedRows, error: unattributedError }] = await Promise.all([
     canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
     supabase.from('project_products').select('produto_nome, papel').eq('sales_funnel_id', funnel.id).order('produto_nome'),
     // Sales of the client no project owns (0073): a product listed in several projects with no ad
@@ -55,6 +56,7 @@ export default async function ProjectProductsPage({
     supabase.from('sales').select('produto, valor_liquido').eq('client_id', client.id).is('sales_funnel_id', null).is('reembolsado_em', null).gte('data_venda', since),
   ])
   if (productsError) throw productsError
+  const canEdit = canEditClient && !funnel.archived_at
   if (unattributedError) throw unattributedError
   const unattributed = (unattributedRows ?? []) as { produto: string | null; valor_liquido: number | null }[]
   const unattributedRevenue = unattributed.reduce((sum, row) => sum + Number(row.valor_liquido ?? 0), 0)
@@ -118,6 +120,10 @@ export default async function ProjectProductsPage({
           </>
         }
       />
+
+      {funnel.archived_at && (
+        <ArchivedProjectBanner salesFunnelId={funnel.id} archivedAt={funnel.archived_at} canRestore={canEditClient} note="Os produtos ficam só para leitura." />
+      )}
 
       {unattributed.length > 0 && (
         <p className="rounded-[10px] bg-[var(--ct-warn-soft)] px-4 py-3 text-[13px] text-[var(--ct-warn)]">

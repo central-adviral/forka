@@ -11,6 +11,7 @@ const db = vi.hoisted(() => ({
   calls: [] as Call[],
   watcher: null as { id: string; front_id: string | null; plan_role: string | null } | null,
   resultado: 'compra' as string,
+  archivedTable: null as string | null,
   updated: [{ id: 'w-1' }] as { id: string }[],
 }))
 
@@ -29,7 +30,10 @@ function from(table: string) {
       call.filters.push([column, value])
       return builder
     },
-    maybeSingle: async () => ({ data: table === 'watchers' ? db.watcher : { resultado: db.resultado }, error: null }),
+    maybeSingle: async () => ({
+      data: table === 'watchers' ? db.watcher : { resultado: db.resultado, archived_at: db.archivedTable === table ? '2026-10-01T12:00:00Z' : null },
+      error: null,
+    }),
     then: (resolve: (value: unknown) => void) => resolve({ data: db.updated, error: null }),
   }
   return builder
@@ -45,7 +49,7 @@ vi.mock('next/navigation', () => ({
   },
 }))
 
-import { updateWatcher } from './actions'
+import { createWatcher, updateWatcher } from './actions'
 
 const context = { client_id: 'client-1', client_slug: 'voe', watcher_id: 'w-1' }
 const funnel = '11111111-1111-1111-1111-111111111111'
@@ -64,6 +68,7 @@ describe('updateWatcher', () => {
     vi.clearAllMocks()
     db.calls = []
     db.resultado = 'compra'
+    db.archivedTable = null
     db.updated = [{ id: 'w-1' }]
   })
 
@@ -118,6 +123,26 @@ describe('updateWatcher', () => {
     db.updated = []
     await expect(updateWatcher(context, form({ target: '80' }))).rejects.toThrow(/erro=Só gestor ou owner pode editar vigias/)
     expect(evaluate).not.toHaveBeenCalled()
+  })
+
+  it('refuses editing a watcher of an archived project', async () => {
+    db.watcher = { id: 'w-1', front_id: null, plan_role: 'principal' }
+    db.archivedTable = 'sales_funnels'
+    await expect(updateWatcher(context, form({ target: '80' }))).rejects.toThrow(/erro=Projeto arquivado/)
+    expect(updates('watchers')).toEqual([])
+  })
+
+  it('refuses editing a watcher of an archived front', async () => {
+    db.watcher = { id: 'w-1', front_id: front, plan_role: 'secundaria' }
+    db.archivedTable = 'project_fronts'
+    await expect(updateWatcher(context, form({ target: '4' }))).rejects.toThrow(/erro=Frente arquivada/)
+    expect(updates('project_fronts')).toEqual([])
+    expect(updates('watchers')).toEqual([])
+  })
+
+  it('refuses creating a watcher on an archived front', async () => {
+    db.archivedTable = 'project_fronts'
+    await expect(createWatcher(context, form({ scope: `${funnel}|${front}`, metric: 'cpm', target: '15' }))).rejects.toThrow(/erro=Frente arquivada/)
   })
 
   it('refuses a band where crítico comes before atenção', async () => {

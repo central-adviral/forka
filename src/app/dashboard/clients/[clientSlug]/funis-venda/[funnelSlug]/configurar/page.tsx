@@ -10,6 +10,7 @@ import type { ProjectQualityRow } from '@/lib/domain/project-quality'
 import { saoPauloDay } from '@/lib/repo/today-repo'
 import { ProjectMap, type MapFront } from './project-map'
 import { setFrontArchived } from '../regras/actions'
+import { ArchivedProjectBanner } from '../../archived-project-banner'
 
 // Projeto › Visão geral: the setup steps as cards, in order. Read-only; each card links to the
 // screen that already edits that step.
@@ -79,13 +80,17 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
             : `${funnel.name}: ${status.done} de ${status.steps.length} passos prontos. ${missing === 1 ? 'Falta 1 passo' : `Faltam ${missing} passos`} para os números do projeto ficarem confiáveis.`
         }
         actions={
-          next && stepHref[next.id] ? (
+          !funnel.archived_at && next && stepHref[next.id] ? (
             <Link href={stepHref[next.id]!} className="rounded-[10px] bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110">
               Continuar: {next.label}
             </Link>
           ) : undefined
         }
       />
+
+      {funnel.archived_at && (
+        <ArchivedProjectBanner salesFunnelId={funnel.id} archivedAt={funnel.archived_at} canRestore={canEdit} note="A configuração fica só para leitura." />
+      )}
 
       <ol className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(230px,1fr))]">
         {status.steps.map((step, index) => {

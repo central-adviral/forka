@@ -14,7 +14,7 @@ import { LANES, cardProgress, laneOf, recentlyDecided } from '@/lib/domain/board
 import { PLAYBOOK, PLAYBOOK_DONTS, playbookStep } from '@/lib/domain/playbook'
 import { Board, type BoardLane } from './board'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { createItem, decideItem, deleteItem, dropItem, linkAbTest, moveItem, saveRules, toggleGate, togglePublished } from './actions'
+import { createItem, decideItem, deleteItem, dropItem, editItem, linkAbTest, moveItem, saveRules, toggleGate, togglePublished } from './actions'
 import { PageHeader } from '@/components/page-header'
 import { headerPrimaryAction } from '@/components/header-actions'
 
@@ -297,6 +297,42 @@ export default async function BacklogPage({
                 <p className="text-[12.5px] text-[var(--ct-text-2)]">
                   <span className="text-[var(--ct-text-3)]">Decide por:</span> {selected.metric}
                 </p>
+              )}
+              {canEdit && (
+                <details>
+                  <summary className="cursor-pointer text-[12.5px] font-medium text-[var(--ct-accent)]">Editar texto</summary>
+                  <form action={editItem.bind(null, { ...context, item_id: selected.id, code: selected.code })} className="mt-3 flex flex-col gap-3">
+                    <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                      Título
+                      <input name="title" required maxLength={120} defaultValue={selected.title} className={field} />
+                    </label>
+                    <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                      Hipótese
+                      <textarea name="hypothesis" rows={3} maxLength={1000} defaultValue={selected.hypothesis} className={field} />
+                    </label>
+                    <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                      Decide por
+                      <input name="metric" maxLength={120} defaultValue={selected.metric} className={field} />
+                    </label>
+                    <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                      Responsável
+                      <input name="owner" maxLength={60} defaultValue={selected.owner ?? ''} className={field} />
+                    </label>
+                    {selected.abTestId ? (
+                      <p className="text-[11.5px] text-[var(--ct-text-3)]">Os nomes das variantes ficam como estão: o teste A/B vinculado os usa para achar a vencedora.</p>
+                    ) : (
+                      selected.variants.map((variant) => (
+                        <label key={variant.id} className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                          Variante {variant.key}
+                          <input name={`variant_${variant.id}`} required maxLength={200} defaultValue={variant.name} className={field} />
+                        </label>
+                      ))
+                    )}
+                    <button type="submit" className="self-start rounded-full bg-[var(--ct-accent)] px-3.5 py-1.5 text-[12.5px] font-semibold text-[var(--ct-on-accent)]">
+                      Salvar texto
+                    </button>
+                  </form>
+                </details>
               )}
 
               {selected.status === 'running' && selectedReadout?.summary && (

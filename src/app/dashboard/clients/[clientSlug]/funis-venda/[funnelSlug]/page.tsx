@@ -22,7 +22,7 @@ import { readAnalysisTab } from '@/lib/domain/analysis-tabs'
 import { cpaSources, qualitySeals, type ProjectQualityRow } from '@/lib/domain/project-quality'
 import { PROJECT_RESULTS, readResult, resultUsesSales, type ProjectResult, type ResultInputs } from '@/lib/domain/project-plan'
 import { ObjectivesPanel, type ObjectiveFront } from './objectives-panel'
-import { setSalesFunnelArchived } from '../actions'
+import { ArchivedProjectBanner } from '../archived-project-banner'
 import { canActAs } from '@/lib/view-as'
 import { ProjectStatusActions } from '../project-status'
 
@@ -286,21 +286,7 @@ export default async function SalesFunnelPage({
       </div>
 
       {funnel.archived_at && (
-        <div role="status" className="-mt-5 mb-7 flex flex-wrap items-center gap-3 rounded-[12px] bg-[var(--ct-surface-2)] px-5 py-3 text-[13px] text-[var(--ct-text-2)]">
-          <span>
-            <b className="text-[var(--ct-text)]">
-              Projeto arquivado em {new Date(funnel.archived_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' })}.
-            </b>{' '}
-            Os números ficam como estavam; vendas novas, sync e vigias não entram mais.
-          </span>
-          {canRestore && (
-            <form action={setSalesFunnelArchived.bind(null, funnel.id, false)} className="ml-auto">
-              <button type="submit" className="text-[13px] font-semibold text-[var(--ct-accent)] hover:underline">
-                Restaurar
-              </button>
-            </form>
-          )}
-        </div>
+        <ArchivedProjectBanner salesFunnelId={funnel.id} archivedAt={funnel.archived_at} canRestore={canRestore} className="-mt-5 mb-7" />
       )}
 
       {seals.length > 0 && (
