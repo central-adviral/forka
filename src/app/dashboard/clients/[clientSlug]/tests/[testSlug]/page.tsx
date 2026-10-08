@@ -22,6 +22,8 @@ import { REPORT_PERIODS, resolvePeriodSince, resolvePeriodUntil, resolveDateRang
 import { RefreshButton } from './refresh-button'
 import { CreativeMatrixPanel } from './creative-matrix-panel'
 import { RoutesPanel } from './routes-panel'
+import { DataHealthPanel } from './data-health-panel'
+import type { DataHealthRow } from '@/lib/domain/data-health'
 import type { SegmentRow } from '@/lib/domain/route-readout'
 import type { VariantRoute } from '@/lib/domain/routing'
 import { InsightPanel } from './insight-panel'
@@ -140,6 +142,7 @@ export default async function TestReportPage({
     { data: firstClick },
     { data: dailyRows },
     { data: segmentRows, error: segmentReportError },
+    { data: healthRows },
   ] = await Promise.all([
     supabase
       .from('variants')
@@ -162,6 +165,8 @@ export default async function TestReportPage({
     supabase.from('click_events').select('created_at').eq('test_id', test.id).eq('is_bot', false).order('created_at').limit(1).maybeSingle(),
     tab === 'desempenho' ? supabase.rpc('get_test_daily', { p_test_id: test.id, p_since: sinceIso }) : skip,
     tab === 'regras' ? supabase.rpc('get_test_report_by_segment', period) : skip,
+    // Only a Hubla test has sales to follow; a thank-you page test counts its own page loads.
+    tab === 'desempenho' && test.conversion_method === 'hubla_webhook' ? supabase.rpc('get_test_data_health', { p_test_id: test.id, p_since: sinceIso }) : skip,
   ])
   const changes = ((changeRows ?? []) as unknown as { created_at: string; field: 'weight_pct' | 'destination_url'; old_value: string | null; new_value: string | null; variants: { name: string } | null }[]).map(
     (row) => ({ ...row, variant_name: row.variants?.name ?? null })
@@ -640,12 +645,14 @@ export default async function TestReportPage({
         <h2 className="mb-2 mt-8 font-[family-name:var(--font-sora)] text-lg font-semibold">Total por {assetLabel.toLowerCase()}</h2>
         <TotalsTable rows={rows} previousByVariant={previousByVariant} assetLabel={assetLabel} />
       </div>
+      {(healthRows as DataHealthRow[] | null)?.[0] && <DataHealthPanel row={(healthRows as DataHealthRow[])[0]} />}
         </>
       )}
       {tab === 'origens' && (
         <>
       <div className="mx-6 mb-6">
-        <h2 className="mb-2 mt-8 font-[family-name:var(--font-sora)] text-lg font-semibold">Por origem (UTM)</h2>
+        <h2 className="mb-1 mt-8 font-[family-name:var(--font-sora)] text-lg font-semibold">Por origem (UTM)</h2>
+        <p className="mb-3 text-[12px] text-[var(--ct-text-3)]">Contado por clique: a venda fica no clique que levou o código ao checkout. Quem clicou mais de uma vez aparece em mais de uma linha, então a soma pode passar do total do teste, que conta cada pessoa uma vez.</p>
         {(() => {
           const sourceRows = (sourceReport as SourceReportRow[]) ?? []
           const maxClicks = Math.max(1, ...sourceRows.map((r) => r.clicks))
@@ -714,7 +721,8 @@ export default async function TestReportPage({
           }))}
           assetLabel={assetLabel}
         />
-        <h2 className="mb-2 mt-8 font-[family-name:var(--font-sora)] text-lg font-semibold">Por anúncio</h2>
+        <h2 className="mb-1 mt-8 font-[family-name:var(--font-sora)] text-lg font-semibold">Por anúncio</h2>
+        <p className="mb-3 text-[12px] text-[var(--ct-text-3)]">Contado por clique: a venda fica no clique que levou o código ao checkout. Quem clicou mais de uma vez aparece em mais de uma linha, então a soma pode passar do total do teste, que conta cada pessoa uma vez.</p>
         {(() => {
           const adRows = (adReport as AdReportRow[]) ?? []
           const maxClicks = Math.max(1, ...adRows.map((r) => r.clicks))

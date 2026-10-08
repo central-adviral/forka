@@ -13,6 +13,7 @@ vi.mock('@/lib/repo/conversion-repo', () => ({
   insertConversionIfNew: vi.fn(),
   refundHublaConversion: vi.fn(),
   wasRefunded: vi.fn(async () => false),
+  recordHublaEvent: vi.fn(async () => undefined),
 }))
 // Table-aware on purpose: the token lives in client_secrets, and a mock that answered every table
 // with the same row would keep passing if the route went back to reading it off `clients`.
@@ -34,7 +35,7 @@ let mockSecretsRow: { hubla_webhook_token: string | null } | null
 
 import { POST } from './route'
 import { verifyHublaToken, parseHublaPaymentSucceeded, parseHublaRefund, HublaIrrelevantEventError, HublaMalformedPayloadError } from '@/lib/domain/hubla'
-import { getClickEventByTrackingId, insertConversionIfNew, refundHublaConversion, wasRefunded } from '@/lib/repo/conversion-repo'
+import { recordHublaEvent, getClickEventByTrackingId, insertConversionIfNew, refundHublaConversion, wasRefunded } from '@/lib/repo/conversion-repo'
 
 function makeRequest(body: unknown, token = 'valid-token') {
   return new NextRequest('https://ir.example.com/api/webhooks/hubla/gustavo-voe', {
@@ -154,6 +155,23 @@ describe('POST /api/webhooks/hubla/[clientSlug]', () => {
     const response = await POST(makeRequest({}), { params: Promise.resolve({ clientSlug: 'gustavo-voe' }) })
     const json = await response.json()
     expect(json).toEqual({ ok: true, attributed: true, result: 'inserted' })
+    expect(recordHublaEvent).toHaveBeenCalledWith(expect.anything(), {
+      clientId: 'client-1',
+      invoiceId: 'inv_1',
+      kind: 'payment',
+      outcome: 'counted',
+      clickEventId: 'click_1',
+      valueCents: 1000,
+    })
+  })
+
+  it('keeps a payment without the click id on record, so the loss can be measured', async () => {
+    vi.mocked(verifyHublaToken).mockReturnValue(true)
+    vi.mocked(parseHublaPaymentSucceeded).mockReturnValue({ trackingId: null, externalEventId: 'inv_2', valueCents: 500 })
+
+    const response = await POST(makeRequest({}), { params: Promise.resolve({ clientSlug: 'gustavo-voe' }) })
+    expect(await response.json()).toEqual({ ok: true, attributed: false })
+    expect(recordHublaEvent).toHaveBeenCalledWith(expect.anything(), { clientId: 'client-1', invoiceId: 'inv_2', kind: 'payment', outcome: 'no_tracking', valueCents: 500 })
   })
 
   it('takes a refunded sale out of the test, by its invoice, without touching the payment path', async () => {

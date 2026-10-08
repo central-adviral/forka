@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllPages } from './sync-ad-spend'
+import { refundHublaConversion } from '@/lib/repo/conversion-repo'
 
 export interface LaunchOpsSaleRow {
   id: string
@@ -145,6 +146,12 @@ export async function syncSalesForFunnel(
     const { data: funnel, error: funnelError } = await appDb.from('sales_funnels').select('client_id').eq('id', salesFunnelId).single()
     if (funnelError) throw funnelError
     clientId = funnel.client_id as string
+  }
+  // A sale that left 'aprovada' (refund, chargeback) leaves the A/B test too, even when the Hubla
+  // refund webhook never came (0083 does the move; it does nothing when no conversion holds it).
+  const refundedInvoices = rows.filter((row) => row.status !== APPROVED_STATUS && row.transaction_id_plataforma).map((row) => row.transaction_id_plataforma as string)
+  for (const invoice of refundedInvoices) {
+    await refundHublaConversion(appDb, { clientId: clientId!, externalEventId: invoice, refundedAt: new Date().toISOString() })
   }
   for (let i = 0; i < removedIds.length; i += LOOKUP_CHUNK_SIZE) {
     const { error } = await appDb
