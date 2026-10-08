@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { httpUrl } from '@/lib/domain/http-url-schema'
+import { layerConflict } from '@/lib/domain/test-layers'
 
 const variantSchema = z.object({
   name: z.string().min(1),
@@ -22,6 +23,7 @@ const createTestSchema = z
     conversion_method: z.enum(['hubla_webhook', 'thank_you_page']),
     test_type: z.enum(['page', 'checkout']),
     sales_page_url: httpUrl.optional().or(z.literal('')),
+    sales_funnel_id: z.string().uuid().optional().or(z.literal('')),
     variants: z.array(variantSchema).min(2),
   })
   .refine((data) => data.test_type !== 'checkout' || Boolean(data.sales_page_url), {
@@ -45,6 +47,7 @@ export async function createTest(input: z.infer<typeof createTestSchema>) {
     p_conversion_method: parsed.conversion_method,
     p_test_type: parsed.test_type,
     p_sales_page_url: parsed.sales_page_url || null,
+    p_sales_funnel_id: parsed.sales_funnel_id || null,
     p_variants: parsed.variants.map((v) => ({
       name: v.name,
       weight_pct: v.weight_pct,
@@ -52,7 +55,7 @@ export async function createTest(input: z.infer<typeof createTestSchema>) {
       thank_you_url: v.thank_you_url || null,
     })),
   })
-  if (error) throw error
+  if (error) throw layerConflict(error) ?? error
 }
 
 // Archived, never deleted: the clicks and conversions stay for late sales, and the slug stays
@@ -84,7 +87,7 @@ export async function toggleTestStatus(input: z.infer<typeof toggleTestStatusSch
     .update({ status: parsed.next_status })
     .eq('id', parsed.test_id)
     .select('id')
-  if (error) throw error
+  if (error) throw layerConflict(error) ?? error
   if (!data || data.length === 0) throw new Error('Teste não encontrado ou você não tem permissão para alterá-lo.')
 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests`)

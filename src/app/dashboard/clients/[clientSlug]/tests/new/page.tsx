@@ -26,6 +26,8 @@ export default function NewTestPage() {
   const [conversionMethod, setConversionMethod] = useState<'hubla_webhook' | 'thank_you_page'>('hubla_webhook')
   const [testType, setTestType] = useState<'page' | 'checkout'>('page')
   const [salesPageUrl, setSalesPageUrl] = useState('')
+  const [funnels, setFunnels] = useState<{ id: string; name: string }[]>([])
+  const [salesFunnelId, setSalesFunnelId] = useState('')
   const [variants, setVariants] = useState<VariantForm[]>([
     { name: 'A', weight_pct: '50', destination_url: '', thank_you_url: '' },
     { name: 'B', weight_pct: '50', destination_url: '', thank_you_url: '' },
@@ -40,11 +42,13 @@ export default function NewTestPage() {
       .select('id')
       .eq('slug', params.clientSlug)
       .single()
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error) {
           setError('Não foi possível carregar o cliente. Recarregue a página.')
         } else {
           setClientId(data?.id ?? null)
+          const { data: projects } = await supabase.from('sales_funnels').select('id, name').eq('client_id', data.id).order('name')
+          setFunnels(projects ?? [])
         }
         setClientLoading(false)
       })
@@ -82,6 +86,7 @@ export default function NewTestPage() {
         conversion_method: conversionMethod,
         test_type: testType,
         sales_page_url: testType === 'checkout' ? salesPageUrl : '',
+        sales_funnel_id: salesFunnelId,
         variants: variants.map((v) => ({
           name: v.name,
           weight_pct: Number(v.weight_pct),
@@ -139,6 +144,19 @@ export default function NewTestPage() {
         <p className="-mt-2 text-xs text-[var(--ct-text-2)]">
           Página: cada variante é uma página de vendas diferente. Checkout: mesma página pra todos, cada
           variante é um checkout diferente
+        </p>
+
+        <select value={salesFunnelId} onChange={(e) => setSalesFunnelId(e.target.value)} className={inputClass}>
+          <option value="">Sem projeto</option>
+          {funnels.map((funnel) => (
+            <option key={funnel.id} value={funnel.id}>
+              Projeto {funnel.name}
+            </option>
+          ))}
+        </select>
+        <p className="-mt-2 text-xs text-[var(--ct-text-2)]">
+          Com projeto, a venda só conta para os testes dele, e um teste de página e um de checkout rodam juntos: quem
+          entra pela página e clica em comprar já entra no teste de checkout. Um teste ativo de cada tipo por projeto.
         </p>
 
         {testType === 'checkout' && (

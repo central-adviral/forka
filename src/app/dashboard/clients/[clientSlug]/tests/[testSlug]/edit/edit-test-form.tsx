@@ -19,6 +19,7 @@ const inputClass =
 export function EditTestForm({
   clientSlug,
   test,
+  funnels,
   variants: initialVariants,
 }: {
   clientSlug: string
@@ -29,12 +30,15 @@ export function EditTestForm({
     fallback_url: string | null
     test_type: 'page' | 'checkout'
     sales_page_url: string | null
+    sales_funnel_id: string | null
   }
+  funnels: { id: string; name: string }[]
   variants: { id: string; name: string; weight_pct: number; destination_url: string; thank_you_url: string | null }[]
 }) {
   const router = useRouter()
   const [fallbackUrl, setFallbackUrl] = useState(test.fallback_url ?? '')
   const [salesPageUrl, setSalesPageUrl] = useState(test.sales_page_url ?? '')
+  const [salesFunnelId, setSalesFunnelId] = useState(test.sales_funnel_id ?? '')
   const [variants, setVariants] = useState<VariantForm[]>(
     initialVariants.map((v) => ({
       id: v.id,
@@ -69,6 +73,7 @@ export function EditTestForm({
         fallback_url: fallbackUrl,
         test_type: test.test_type,
         sales_page_url: salesPageUrl,
+        sales_funnel_id: salesFunnelId,
         variants: variants.map((v) => ({
           id: v.id,
           weight_pct: Number(v.weight_pct),
@@ -115,6 +120,22 @@ export function EditTestForm({
           <p className="rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-3.5 py-2.5 text-sm text-[var(--ct-text-2)]">
             {test.test_type === 'checkout' ? 'Teste de checkout' : 'Teste de página'} — não pode ser alterado
             depois de criado
+          </p>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-[13px] font-medium text-[var(--ct-text-2)]">Projeto</label>
+          <select value={salesFunnelId} onChange={(e) => setSalesFunnelId(e.target.value)} className={inputClass}>
+            <option value="">Sem projeto</option>
+            {funnels.map((funnel) => (
+              <option key={funnel.id} value={funnel.id}>
+                Projeto {funnel.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-[var(--ct-text-2)]">
+            Com projeto, a venda só conta para os testes dele, e um teste de página e um de checkout rodam juntos. Um teste
+            ativo de cada tipo por projeto.
           </p>
         </div>
 

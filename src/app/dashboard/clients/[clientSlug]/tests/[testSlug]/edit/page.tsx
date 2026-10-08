@@ -12,7 +12,7 @@ export default async function EditTestPage({
   const supabase = await createServerSupabaseClient()
   const { data: test } = await supabase
     .from('tests')
-    .select('id, name, slug, client_id, archived_at, fallback_url, test_type, sales_page_url, clients(slug)')
+    .select('id, name, slug, client_id, archived_at, fallback_url, test_type, sales_page_url, sales_funnel_id, clients(slug)')
     .eq('slug', testSlug)
     .maybeSingle()
 
@@ -20,11 +20,10 @@ export default async function EditTestPage({
   if (!test || testClientSlug !== clientSlug) notFound()
   if (test.archived_at || !(await canActAs(supabase, test.client_id, 'gestor'))) notFound()
 
-  const { data: variants } = await supabase
-    .from('variants')
-    .select('id, name, weight_pct, destination_url, thank_you_url')
-    .eq('test_id', test.id)
-    .order('name')
+  const [{ data: variants }, { data: funnels }] = await Promise.all([
+    supabase.from('variants').select('id, name, weight_pct, destination_url, thank_you_url').eq('test_id', test.id).order('name'),
+    supabase.from('sales_funnels').select('id, name').eq('client_id', test.client_id).order('name'),
+  ])
 
-  return <EditTestForm clientSlug={clientSlug} test={test} variants={variants ?? []} />
+  return <EditTestForm clientSlug={clientSlug} test={test} funnels={funnels ?? []} variants={variants ?? []} />
 }
