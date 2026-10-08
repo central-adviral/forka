@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { assertClientRole } from '@/lib/repo/client-access-repo'
 import { METRICS, type WatcherMetric } from '@/lib/domain/watchers'
+import { resultUsesSales } from '@/lib/domain/project-plan'
 
 // Writes run on the user's session: the 0059 policies only let a gestor or owner change watchers.
 
@@ -52,7 +53,7 @@ export async function createWatcher(context: MetasContext, formData: FormData) {
   const supabase = await createServerSupabaseClient()
   if (METRICS[result.data.metric].salesOnly) {
     const { data: funnel } = await supabase.from('sales_funnels').select('resultado').eq('id', funnelId).maybeSingle()
-    if (funnel?.resultado === 'lead') back(context, 'erro', `${METRICS[result.data.metric].label} precisa de vendas, e este projeto mede leads. Use CPL.`)
+    if (!resultUsesSales(funnel?.resultado)) back(context, 'erro', `${METRICS[result.data.metric].label} precisa de vendas, e o objetivo deste projeto não conta vendas.`)
   }
   const { error } = await supabase.from('watchers').insert({
     client_id: context.client_id,

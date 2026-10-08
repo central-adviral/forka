@@ -9,6 +9,7 @@ import { loadTodayAttention } from '@/lib/repo/today-attention-repo'
 import { projectDay } from '@/lib/domain/day-pace'
 import { canActAs } from '@/lib/view-as'
 import { PageHeader } from '@/components/page-header'
+import { resultUsesSales } from '@/lib/domain/project-plan'
 
 const PERIODS = [
   { value: 'hoje', label: 'Hoje' },
@@ -98,7 +99,7 @@ export default async function TodayPage({
   // The day's target is the sum of the active projects' targets; the projection uses the sales up
   // to the last Meta pull, the same cut the partial CPA uses.
   // The day's pace counts entry sales, so only purchase projects add to the target (0071).
-  const dailyTarget = (funnels ?? []).filter((funnel) => funnel.is_active && funnel.resultado !== 'lead').reduce((total, funnel) => total + (funnel.daily_sales_target ?? 0), 0)
+  const dailyTarget = (funnels ?? []).filter((funnel) => funnel.is_active && resultUsesSales(funnel.resultado)).reduce((total, funnel) => total + (funnel.daily_sales_target ?? 0), 0)
   const projected = period === 'hoje' ? projectDay(vendas, metaDataAt ? new Date(metaDataAt) : new Date()) : null
   const salesFoot =
     dailyTarget > 0 && period !== '7d'

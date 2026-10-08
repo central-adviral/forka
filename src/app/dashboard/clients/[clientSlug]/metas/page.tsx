@@ -9,6 +9,7 @@ import { ScopeMetricFields } from './scope-metric-fields'
 import { canActAs } from '@/lib/view-as'
 import { PageHeader } from '@/components/page-header'
 import { headerAction } from '@/components/header-actions'
+import { resultUsesSales } from '@/lib/domain/project-plan'
 
 const mono = 'font-[family-name:var(--font-geist-mono)]'
 const field =
@@ -129,7 +130,7 @@ export default async function MetasPage({
               funnelId: funnel.id as string,
               funnelName: funnel.name as string,
               rulesHref: `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`,
-              resultado: funnel.resultado === 'lead' ? 'lead' : 'compra',
+              resultado: resultUsesSales(funnel.resultado) ? 'compra' : 'lead',
               fronts: (fronts ?? [])
                 .filter((front) => front.sales_funnel_id === funnel.id)
                 .map((front) => ({ id: front.id as string, name: front.name as string, rule: ruleLabel(front) })),

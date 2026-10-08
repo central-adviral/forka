@@ -28,7 +28,7 @@ const optionalNumber = z
 
 const planSchema = z
   .object({
-    resultado: z.enum(['compra', 'lead']),
+    resultado: z.enum(['compra', 'lead', 'roas', 'checkout', 'visita', 'alcance']),
     cost_target: optionalNumber.refine((value) => value === null || value > 0, 'o custo-alvo precisa ser maior que zero'),
     warn_pct: optionalNumber,
     crit_pct: optionalNumber,
@@ -68,8 +68,7 @@ export async function savePlan(context: PlanContext, formData: FormData) {
     .from('watchers')
     .select('id, metric')
     .eq('sales_funnel_id', context.sales_funnel_id)
-    .is('front_id', null)
-    .in('metric', ['cpa_geral', 'cpl'])
+    .eq('is_plan', true)
   if (watchersError) back(context, 'erro', watchersError.message)
   const [keep, ...extra] = existing ?? []
   if (extra.length > 0) {
@@ -92,7 +91,7 @@ export async function savePlan(context: PlanContext, formData: FormData) {
     }
     const { error: watcherError } = keep
       ? await supabase.from('watchers').update(values).eq('id', keep.id)
-      : await supabase.from('watchers').insert({ client_id: context.client_id, sales_funnel_id: context.sales_funnel_id, ...values })
+      : await supabase.from('watchers').insert({ client_id: context.client_id, sales_funnel_id: context.sales_funnel_id, is_plan: true, ...values })
     if (watcherError) back(context, 'erro', watcherError.message)
   }
 

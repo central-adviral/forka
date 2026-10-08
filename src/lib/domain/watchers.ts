@@ -1,7 +1,7 @@
 // The metric catalog shared by Metas e alvos, the Painel de Controle and the Hoje queue. The
 // evaluation itself runs in SQL (evaluate_watchers, 0059); this file only names and formats.
 
-export type WatcherMetric = 'cpa_geral' | 'cpa_anuncio' | 'cpl' | 'cpm' | 'ctr' | 'connect_rate' | 'investimento' | 'frequencia' | 'roas'
+export type WatcherMetric = 'cpa_geral' | 'cpa_anuncio' | 'cpl' | 'cpm' | 'ctr' | 'connect_rate' | 'investimento' | 'frequencia' | 'roas' | 'custo_checkout' | 'custo_visita'
 export type WatcherStatus = 'ok' | 'warn' | 'crit' | 'sem_volume' | 'sem_dado'
 
 interface MetricInfo {
@@ -19,6 +19,8 @@ export const METRICS: Record<WatcherMetric, MetricInfo> = {
   cpa_geral: { label: 'CPA geral', unit: 'brl', bad: 'sobe', projectOnly: true, salesOnly: true, hint: 'investimento ÷ todas as vendas de entrada' },
   cpa_anuncio: { label: 'CPA de anúncio', unit: 'brl', bad: 'sobe', projectOnly: false, salesOnly: true, hint: 'investimento ÷ vendas que a UTM liga ao anúncio' },
   roas: { label: 'ROAS', unit: 'x', bad: 'cai', projectOnly: false, salesOnly: true, hint: 'receita líquida ÷ investimento' },
+  custo_checkout: { label: 'Custo por checkout', unit: 'brl', bad: 'sobe', projectOnly: false, salesOnly: false, hint: 'investimento ÷ checkouts iniciados' },
+  custo_visita: { label: 'Custo por visita', unit: 'brl', bad: 'sobe', projectOnly: false, salesOnly: false, hint: 'investimento ÷ visitas na página' },
   cpl: { label: 'CPL', unit: 'brl', bad: 'sobe', projectOnly: false, salesOnly: false, hint: 'investimento ÷ leads pagos' },
   cpm: { label: 'CPM', unit: 'brl', bad: 'sobe', projectOnly: false, salesOnly: false, hint: 'custo por mil impressões' },
   ctr: { label: 'CTR', unit: 'pct', bad: 'cai', projectOnly: false, salesOnly: false, hint: 'cliques no link ÷ impressões' },
