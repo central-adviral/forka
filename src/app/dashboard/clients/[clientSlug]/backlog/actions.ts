@@ -355,6 +355,43 @@ export async function linkAbTest(context: BacklogContext & { item_id: string; co
   back(context, 'ok', testId ? `${context.code} agora é medido pelo teste A/B vinculado.` : `${context.code} ficou sem teste A/B vinculado.`, `&item=${context.code}`)
 }
 
+const textSchema = itemSchema.pick({ title: true, hypothesis: true, metric: true, owner: true })
+const variantName = z.string().trim().min(1, 'nenhuma variante pode ficar sem nome').max(200)
+
+// Only the words of a card change here; method, stage and ICE shape the board and the readout.
+// Variant names are left alone once an A/B test is linked: the decision matches them by name.
+export async function editItem(context: BacklogContext & { item_id: string; code: string }, formData: FormData) {
+  const result = textSchema.safeParse({
+    title: formData.get('title'),
+    hypothesis: formData.get('hypothesis') ?? '',
+    metric: formData.get('metric') ?? '',
+    owner: formData.get('owner') ?? '',
+  })
+  if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '), `&item=${context.code}`)
+  const variants: { id: string; name: string }[] = []
+  for (const [field, value] of formData.entries()) {
+    if (!field.startsWith('variant_')) continue
+    const name = variantName.safeParse(value)
+    if (!name.success) back(context, 'erro', name.error.issues[0].message, `&item=${context.code}`)
+    variants.push({ id: field.slice('variant_'.length), name: name.data })
+  }
+  const supabase = await createServerSupabaseClient()
+  const { data, error } = await supabase
+    .from('backlog_items')
+    .update({ ...result.data, owner: result.data.owner || null })
+    .eq('id', context.item_id)
+    .select('id, ab_test_id')
+  if (error || !data?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode editar hipóteses.', `&item=${context.code}`)
+  if (!data[0].ab_test_id) {
+    for (const variant of variants) {
+      const { error: variantError } = await supabase.from('backlog_variants').update({ name: variant.name }).eq('id', variant.id).eq('item_id', context.item_id)
+      if (variantError) back(context, 'erro', variantError.message, `&item=${context.code}`)
+    }
+  }
+  revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
+  back(context, 'ok', `${context.code} atualizado.`, `&item=${context.code}`)
+}
+
 export async function deleteItem(context: BacklogContext & { item_id: string; code: string }) {
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase.from('backlog_items').delete().eq('id', context.item_id).select('id')
