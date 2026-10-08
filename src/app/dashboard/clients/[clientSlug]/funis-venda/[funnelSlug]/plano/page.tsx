@@ -7,6 +7,7 @@ import { canActAs } from '@/lib/view-as'
 import { PROJECT_RESULTS, readResult, suggestedCost, suggestedVolume, type ProjectResult } from '@/lib/domain/project-plan'
 import { savePlan } from './actions'
 import { PageHeader } from '@/components/page-header'
+import { ArchivedProjectBanner } from '../../archived-project-banner'
 
 const LOOKBACK_DAYS = 30
 const mono = 'font-[family-name:var(--font-geist-mono)]'
@@ -28,7 +29,7 @@ export default async function ProjectPlanPage({
   if (!client) notFound()
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, resultado, daily_sales_target, metrica_secundaria')
+    .select('id, name, slug, resultado, daily_sales_target, metrica_secundaria, archived_at')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
@@ -37,13 +38,14 @@ export default async function ProjectPlanPage({
   // The last closed days, today left out: a partial day would drag every median down.
   const since = saoPauloDay(-LOOKBACK_DAYS)
   const until = saoPauloDay(0)
-  const [days, frontResult, watchersResult, canEdit] = await Promise.all([
+  const [days, frontResult, watchersResult, canEditClient] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
     supabase.rpc('get_project_front_daily', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
     supabase.from('watchers').select('metric, target, warn_pct, crit_pct, min_spend, plan_role').eq('sales_funnel_id', funnel.id).is('front_id', null).not('plan_role', 'is', null),
     canActAs(supabase, client.id, 'gestor'),
   ])
   if (frontResult.error) throw frontResult.error
+  const canEdit = canEditClient && !funnel.archived_at
   if (watchersResult.error) throw watchersResult.error
 
   const leadsByDay = new Map<string, number>()
@@ -90,6 +92,9 @@ export default async function ProjectPlanPage({
         }
       />
 
+      {funnel.archived_at && (
+        <ArchivedProjectBanner salesFunnelId={funnel.id} archivedAt={funnel.archived_at} canRestore={canEditClient} note="O plano fica só para leitura." />
+      )}
       {ok && <p role="status" className="rounded-[10px] bg-[var(--ct-ok-soft)] px-4 py-3 text-[13px] text-[var(--ct-ok)]">{ok}</p>}
       {erro && <p role="alert" className="rounded-[10px] bg-[var(--ct-crit-soft)] px-4 py-3 text-[13px] text-[var(--ct-crit)]">{erro}</p>}
 
@@ -192,7 +197,7 @@ export default async function ProjectPlanPage({
             Salvar plano
           </button>
         ) : (
-          <p className="text-[12.5px] text-[var(--ct-text-3)]">Só gestor ou owner pode mudar o plano.</p>
+          !funnel.archived_at && <p className="text-[12.5px] text-[var(--ct-text-3)]">Só gestor ou owner pode mudar o plano.</p>
         )}
       </form>
     </div>

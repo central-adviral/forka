@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { archivedProjectError } from '@/lib/repo/project-archive-repo'
 import { PRODUCT_ROLES } from '@/lib/domain/product-roles'
 
 // Writes go through the user's session: the 0061 policies only let a gestor or owner change a
@@ -33,6 +34,8 @@ export async function setProductRole(context: ProductsContext, formData: FormDat
   const result = productSchema.safeParse({ produto_nome: formData.get('produto_nome'), papel: formData.get('papel') })
   if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '))
   const supabase = await createServerSupabaseClient()
+  const archived = await archivedProjectError(supabase, context.sales_funnel_id)
+  if (archived) back(context, 'erro', archived)
   const { data, error } = await supabase
     .from('project_products')
     .upsert({ sales_funnel_id: context.sales_funnel_id, ...result.data }, { onConflict: 'sales_funnel_id,produto_nome' })
@@ -44,6 +47,8 @@ export async function setProductRole(context: ProductsContext, formData: FormDat
 
 export async function removeProduct(context: ProductsContext & { produto_nome: string }) {
   const supabase = await createServerSupabaseClient()
+  const archived = await archivedProjectError(supabase, context.sales_funnel_id)
+  if (archived) back(context, 'erro', archived)
   const { data, error } = await supabase
     .from('project_products')
     .delete()

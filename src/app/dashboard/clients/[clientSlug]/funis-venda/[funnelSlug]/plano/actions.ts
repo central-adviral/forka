@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { archivedProjectError } from '@/lib/repo/project-archive-repo'
 import { PROJECT_RESULTS } from '@/lib/domain/project-plan'
 
 // Writes run on the user's session: the policies of sales_funnels and watchers only let a gestor
@@ -55,6 +56,8 @@ export async function savePlan(context: PlanContext, formData: FormData) {
   const plan = parsed.data
   const costMetric = PROJECT_RESULTS[plan.resultado].costMetric
   const supabase = await createServerSupabaseClient()
+  const archived = await archivedProjectError(supabase, context.sales_funnel_id)
+  if (archived) back(context, 'erro', archived)
 
   const { data: saved, error } = await supabase
     .from('sales_funnels')

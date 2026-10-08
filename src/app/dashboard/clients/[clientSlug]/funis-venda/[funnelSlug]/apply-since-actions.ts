@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { archivedProjectError } from '@/lib/repo/project-archive-repo'
 
 // Changes to products and naming rules apply from now on (0101). "Aplicar desde" is the one
 // explicit way to change the past, always previewed first.
@@ -80,6 +81,8 @@ export async function applySince(context: ApplySinceContext, formData: FormData)
   const result = sinceSchema.safeParse(formData.get('since'))
   if (!result.success) redirect(`${context.path}?erro=${encodeURIComponent('Escolha a data antes de aplicar.')}`)
   const supabase = await createServerSupabaseClient()
+  const archived = await archivedProjectError(supabase, context.sales_funnel_id)
+  if (archived) redirect(`${context.path}?erro=${encodeURIComponent(archived)}`)
   const { data, error } = await supabase.rpc('apply_config_since', { p_sales_funnel_id: context.sales_funnel_id, p_since: result.data })
   if (error) redirect(`${context.path}?erro=${encodeURIComponent(errorMessage(error))}`)
   revalidatePath(context.path)
