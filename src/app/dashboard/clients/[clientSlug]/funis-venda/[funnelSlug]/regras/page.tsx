@@ -11,7 +11,8 @@ import {
   type ClassifiedCampaign,
 } from '@/lib/domain/campaign-rules'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { addRule, createFront, deleteFront, pinCampaign, removeRule, unpinCampaign, updateFront } from './actions'
+import { addRule, createFront, deleteFront, pinCampaign, previewRule, removeRule, unpinCampaign, updateFront } from './actions'
+import { RuleForm } from './rule-form'
 import { canActAs } from '@/lib/view-as'
 import { PageHeader } from '@/components/page-header'
 
@@ -315,16 +316,7 @@ export default async function CampaignRulesPage({
               </div>
               )}
               {canEdit && !sourceName && (
-                <form action={addRule.bind(null, frontContext)} className="flex flex-wrap items-center gap-2">
-                  <select name="kind" defaultValue="include" className={fieldClass} aria-label="Tipo da regra">
-                    <option value="include">contém</option>
-                    <option value="exclude">não contém</option>
-                  </select>
-                  <input name="value" required placeholder="ex: [MTV-T15][GER]" className={`${fieldClass} ${mono} min-w-[220px]`} aria-label="Texto da regra" />
-                  <button type="submit" className="text-[12.5px] font-medium text-[var(--ct-accent)] hover:underline">
-                    + regra
-                  </button>
-                </form>
+                <RuleForm addAction={addRule.bind(null, frontContext)} previewAction={previewRule.bind(null, frontContext)} fieldClass={fieldClass} mono={mono} />
               )}
             </div>
           )

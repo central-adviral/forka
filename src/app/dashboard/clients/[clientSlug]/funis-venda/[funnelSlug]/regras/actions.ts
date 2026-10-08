@@ -138,6 +138,30 @@ export async function addRule(context: RulesContext & { front_id: string }, form
   back(context, 'ok', 'Regra adicionada.')
 }
 
+export interface RulePreview {
+  text: string | null
+  error: string | null
+}
+
+/** What the rule would take before it is saved (0092): campaigns of the last 30 days, spend, disputes. */
+export async function previewRule(context: RulesContext & { front_id: string }, _previous: RulePreview | null, formData: FormData): Promise<RulePreview> {
+  const result = ruleSchema.safeParse({ kind: formData.get('kind'), value: formData.get('value') })
+  if (!result.success) return { text: null, error: result.error.issues.map((issue) => issue.message).join('; ') }
+  const supabase = await createServerSupabaseClient()
+  const { data, error } = await supabase.rpc('preview_naming_rule', { p_front_id: context.front_id, p_kind: result.data.kind, p_value: result.data.value })
+  if (error) return { text: null, error: error.message.includes('access denied') ? 'Só gestor ou owner pode prever regras.' : error.message }
+  const row = (data as { campaigns: number; spend: number; disputed: number; released_from_others: number }[])[0]
+  const campaigns = Number(row.campaigns)
+  const spend = Number(row.spend).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+  const parts = [
+    campaigns === 0 ? 'Com esta regra a frente não pega nenhuma campanha dos últimos 30 dias.' : `Com esta regra a frente pega ${campaigns} ${campaigns === 1 ? 'campanha' : 'campanhas'} dos últimos 30 dias, ${spend}.`,
+    Number(row.disputed) > 0 ? `${row.disputed} passa${Number(row.disputed) === 1 ? '' : 'm'} a bater também em outra frente e fica${Number(row.disputed) === 1 ? '' : 'm'} em disputa.` : null,
+    Number(row.released_from_others) > 0 ? `${row.released_from_others} hoje ${Number(row.released_from_others) === 1 ? 'é' : 'são'} de outra frente e ${Number(row.released_from_others) === 1 ? 'é decidida' : 'são decididas'} de novo.` : null,
+    'Campanhas que a regra não toca ficam como estão.',
+  ]
+  return { text: parts.filter(Boolean).join(' '), error: null }
+}
+
 export async function removeRule(context: RulesContext & { rule_id: string }) {
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase.from('naming_rules').delete().eq('id', context.rule_id).select('id')

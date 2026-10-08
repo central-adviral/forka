@@ -6,6 +6,9 @@ import { getProjectSetupStatus } from '@/lib/repo/project-setup-repo'
 import { canActAs } from '@/lib/view-as'
 import { PageHeader } from '@/components/page-header'
 import type { SetupStepId } from '@/lib/domain/project-setup'
+import type { ProjectQualityRow } from '@/lib/domain/project-quality'
+import { saoPauloDay } from '@/lib/repo/today-repo'
+import { ProjectMap, type MapFront } from './project-map'
 
 // Projeto › Visão geral: the five setup steps as cards, in order. Read-only; each card links to the
 // screen that already edits that step.
@@ -19,12 +22,18 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
   if (!client) notFound()
   // Configuration is internal to the agency, like the screens these cards lead to.
   if (!(await canActAs(supabase, client.id, 'analista'))) notFound()
-  const { data: funnel } = await supabase.from('sales_funnels').select('id, name, slug').eq('client_id', client.id).eq('slug', funnelSlug).maybeSingle()
+  const { data: funnel } = await supabase.from('sales_funnels').select('id, name, slug, resultado').eq('client_id', client.id).eq('slug', funnelSlug).maybeSingle()
   if (!funnel) notFound()
 
-  const [status, isOwner] = await Promise.all([
+  const window = { p_sales_funnel_id: funnel.id, p_since: saoPauloDay(-30), p_until: saoPauloDay(1) }
+  const [status, isOwner, { data: fronts }, { data: frontDays }, { data: products }, { data: productSales }, { data: qualityRows }] = await Promise.all([
     getProjectSetupStatus(supabase, createServiceRoleClient(), client.id, funnel.id),
     canActAs(supabase, client.id, 'owner'),
+    supabase.from('project_fronts').select('id, code, name, source:sales_funnels!project_fronts_source_sales_funnel_id_fkey(name)').eq('sales_funnel_id', funnel.id).order('position'),
+    supabase.rpc('get_project_front_daily', window),
+    supabase.from('project_products').select('produto_nome, papel').eq('sales_funnel_id', funnel.id),
+    supabase.rpc('get_funnel_sales_by_product', window),
+    supabase.rpc('get_project_data_quality', window),
   ])
   if (!status) notFound()
 
@@ -37,6 +46,20 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
     plano: `${base}/funis-venda/${funnel.slug}/plano`,
     metas: `${base}/metas`,
   }
+  const spendByFront = new Map<string, number>()
+  for (const day of (frontDays ?? []) as { front_id: string; spend: number }[]) spendByFront.set(day.front_id, (spendByFront.get(day.front_id) ?? 0) + Number(day.spend))
+  const mapFronts: MapFront[] = ((fronts ?? []) as unknown as { id: string; code: string; name: string; source: { name: string } | null }[]).map((front) => ({
+    name: front.name,
+    code: front.code,
+    mirrorOf: front.source?.name ?? null,
+    spend: spendByFront.get(front.id) ?? 0,
+  }))
+  const salesByProduct = new Map(((productSales ?? []) as { produto: string; sales_count: number }[]).map((row) => [row.produto, Number(row.sales_count)]))
+  const mapProducts = ((products ?? []) as { produto_nome: string; papel: string }[]).map((product) => ({
+    name: product.produto_nome,
+    role: product.papel,
+    sales: salesByProduct.get(product.produto_nome) ?? 0,
+  }))
   const next = status.steps.find((step) => !step.done)
   const missing = status.steps.length - status.done
 
@@ -97,6 +120,8 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
           )
         })}
       </ol>
+
+      <ProjectMap fronts={mapFronts} products={mapProducts} quality={((qualityRows ?? []) as ProjectQualityRow[])[0] ?? null} resultado={funnel.resultado ?? 'compra'} />
     </div>
   )
 }

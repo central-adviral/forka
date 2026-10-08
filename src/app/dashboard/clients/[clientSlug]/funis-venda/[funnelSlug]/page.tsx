@@ -19,6 +19,7 @@ import { PageHeader } from '@/components/page-header'
 import { headerAction } from '@/components/header-actions'
 import { FrontsPanel, type FrontDayRow, type FrontInfo } from './fronts-panel'
 import { readAnalysisTab } from '@/lib/domain/analysis-tabs'
+import { cpaSources, qualitySeals, type ProjectQualityRow } from '@/lib/domain/project-quality'
 
 export default async function SalesFunnelPage({
   params,
@@ -49,7 +50,7 @@ export default async function SalesFunnelPage({
   if (!funnel) notFound()
 
   const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
-  const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }, { data: frontRows }, { data: frontDays }] = await Promise.all([
+  const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }, { data: frontRows }, { data: frontDays }, { data: qualityRows }] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
     getFunnelSyncHealth(supabase, funnel.id),
     getPaymentMethodBreakdown(supabase, funnel.id, since, until),
@@ -68,6 +69,7 @@ export default async function SalesFunnelPage({
       .eq('sales_funnel_id', funnel.id)
       .order('position'),
     supabase.rpc('get_project_front_daily', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
+    supabase.rpc('get_project_data_quality', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
   ])
   const fronts: FrontInfo[] = ((frontRows ?? []) as unknown as { id: string; code: string; name: string; source: { name: string } | null }[]).map(
     (front) => ({ id: front.id, code: front.code, name: front.name, sourceName: front.source?.name ?? null })
@@ -166,6 +168,11 @@ export default async function SalesFunnelPage({
   const partialToday = rows.find((row) => row.dadosAte)
   const timeBr = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
   const hasSyncError = health.some((h) => h.lastResult === 'error')
+  const projectBase = `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`
+  const quality = ((qualityRows ?? []) as ProjectQualityRow[])[0]
+  const seals = quality
+    ? qualitySeals(quality, { regras: `${projectBase}/regras`, produtos: `${projectBase}/produtos`, edit: `${projectBase}/edit`, metas: `/dashboard/clients/${client.slug}/metas` })
+    : []
 
   return (
     <div className="flex max-w-[1440px] flex-col px-4 md:px-14 pb-24 pt-12">
@@ -206,6 +213,25 @@ export default async function SalesFunnelPage({
           }
         />
       </div>
+
+      {seals.length > 0 && (
+        <ul aria-label="Qualidade dos dados" className="-mt-5 mb-7 flex flex-wrap gap-2">
+          {seals.map((seal) => (
+            <li key={seal.label}>
+              <a
+                href={seal.href}
+                title={seal.detail}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium ${
+                  seal.tone === 'crit' ? 'bg-[var(--ct-crit-soft)] text-[var(--ct-crit)]' : 'bg-[var(--ct-warn-soft)] text-[var(--ct-warn)]'
+                }`}
+              >
+                {seal.label}
+                <span className="sr-only">: {seal.detail}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="mb-6 flex flex-wrap gap-1.5">
         {REPORT_PERIODS.map((option) => {
@@ -305,6 +331,23 @@ export default async function SalesFunnelPage({
             : undefined
         }
       />
+      {quality && funnel.resultado !== 'lead' && (
+        <details className="-mt-3 mb-6 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-5 py-3">
+          <summary className="cursor-pointer text-[13px] font-medium text-[var(--ct-text-2)]">De onde vem o CPA</summary>
+          <dl className="mt-3 grid gap-x-6 gap-y-1.5 text-[13px] sm:grid-cols-[minmax(0,1fr)_auto]">
+            {cpaSources(quality).map((line) => (
+              <div key={line.label} className="contents">
+                <dt className="text-[var(--ct-text-2)]">{line.label}</dt>
+                <dd className="font-[family-name:var(--font-geist-mono)] tabular-nums sm:text-right">{line.value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 text-[12px] text-[var(--ct-text-3)]">
+            CPA geral = investimento com imposto ÷ vendas de entrada do projeto. O CPA de anúncio divide pelas vendas que a UTM diz que vieram de anúncio; por frente e
+            nos Criativos só conta a venda que traz o id do anúncio, porque é ele que liga a venda à campanha.
+          </p>
+        </details>
+      )}
 
 
       {tab === 'frentes' && (
