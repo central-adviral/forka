@@ -51,3 +51,32 @@ export function thresholds(metric: WatcherMetric, target: number, warnPct: numbe
   const sign = METRICS[metric].bad === 'sobe' ? 1 : -1
   return { warn: target * (1 + (sign * warnPct) / 100), crit: target * (1 + (sign * critPct) / 100) }
 }
+
+export interface AlertAction {
+  label: string
+  href: string
+}
+
+/** Where to go from an alert: the analysis tab that explains the metric, already filtered, and the target. */
+export function alertActions(
+  watcher: { metric: WatcherMetric; projectSlug: string; frontId: string | null },
+  clientBase: string,
+  canEdit: boolean
+): AlertAction[] {
+  const query = new URLSearchParams({ periodo: '7d' })
+  const costMetric = watcher.metric === 'cpa_geral' || watcher.metric === 'cpa_anuncio' || watcher.metric === 'cpl'
+  // A front-scoped watcher opens on its front: that is where the number came from.
+  if (watcher.frontId) {
+    query.set('aba', 'frentes')
+    query.set('frente', watcher.frontId)
+  } else {
+    query.set('aba', costMetric ? 'criativos' : 'trafego')
+  }
+  const project = `${clientBase}/funis-venda/${watcher.projectSlug}`
+  const actions: AlertAction[] = [
+    { label: watcher.frontId ? 'Ver a frente' : costMetric ? 'Ver criativos' : 'Ver tráfego', href: `${project}?${query.toString()}` },
+    { label: 'Abrir projeto', href: `${project}?periodo=7d` },
+  ]
+  if (canEdit) actions.push({ label: 'Ajustar alvo', href: `${clientBase}/metas` })
+  return actions
+}

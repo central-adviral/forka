@@ -59,15 +59,15 @@ export function CommandPalette({ items }: { items: CommandItem[] }) {
           setCursor(0)
           setOpen(true)
         }}
-        className="flex min-w-[240px] items-center gap-2.5 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] py-1.5 pl-3 pr-1.5 text-[12.5px] text-[var(--ct-text-3)] hover:border-[var(--ct-line-2)] hover:text-[var(--ct-text-2)]"
+        className="flex items-center gap-2.5 rounded-[14px] sm:min-w-[240px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] py-1.5 pl-3 pr-1.5 text-[12.5px] text-[var(--ct-text-3)] hover:border-[var(--ct-line-2)] hover:text-[var(--ct-text-2)]"
         aria-label="Buscar cliente, projeto ou tela"
       >
         <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
           <circle cx="7" cy="7" r="4.5" />
           <path d="m10.5 10.5 3 3" />
         </svg>
-        Buscar cliente, projeto, tela…
-        <kbd className="ml-auto rounded-[5px] border border-[var(--ct-line-2)] px-1.5 font-[family-name:var(--font-geist-mono)] text-[10.5px]">⌘K</kbd>
+        <span className="hidden sm:inline">Buscar cliente, projeto, tela…</span>
+        <kbd className="ml-auto hidden rounded-[5px] sm:inline border border-[var(--ct-line-2)] px-1.5 font-[family-name:var(--font-geist-mono)] text-[10.5px]">⌘K</kbd>
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[14vh]" onClick={() => setOpen(false)}>

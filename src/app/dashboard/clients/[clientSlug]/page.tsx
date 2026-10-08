@@ -178,7 +178,7 @@ export default async function TodayPage({
   const maxVendas = Math.max(...weekDays.map((day) => day.vendas), 1)
 
   return (
-    <div className="flex max-w-[1320px] flex-col gap-9 px-14 pb-24 pt-12">
+    <div className="flex max-w-[1320px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <div className="flex flex-wrap items-end gap-4 border-b border-[var(--ct-line)] pb-7">
         <div>
           <span className={`${mono} text-[10.5px] uppercase tracking-[0.08em] text-[var(--ct-text-3)]`}>

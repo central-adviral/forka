@@ -153,7 +153,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ c
   const context = { client_id: client.id as string, client_slug: client.slug as string }
 
   return (
-    <div className="flex max-w-[1320px] flex-col gap-9 px-14 pb-24 pt-12">
+    <div className="flex max-w-[1320px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
         tool="config"
         eyebrow={client.name}

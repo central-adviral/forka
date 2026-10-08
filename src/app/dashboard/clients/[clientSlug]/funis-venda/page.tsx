@@ -35,7 +35,7 @@ export default async function SalesFunnelsListPage({
   )
 
   return (
-    <div className="flex max-w-[1240px] flex-col gap-9 px-14 pb-24 pt-12">
+    <div className="flex max-w-[1240px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
         tool="an"
         eyebrow={client.name}
@@ -55,13 +55,13 @@ export default async function SalesFunnelsListPage({
         {summaries.map((funnel, index) => (
           <div
             key={funnel.id}
-            className={`flex items-center gap-5 bg-[var(--ct-surface)] px-6 py-5 hover:bg-[var(--ct-surface-2)] ${
+            className={`flex flex-wrap items-center gap-x-5 gap-y-3 bg-[var(--ct-surface)] px-4 py-5 sm:flex-nowrap sm:px-6 hover:bg-[var(--ct-surface-2)] ${
               index < summaries.length - 1 ? 'border-b border-[var(--ct-line)]' : ''
             } ${!funnel.is_active ? 'opacity-70' : ''}`}
           >
             <a
               href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`}
-              className="flex min-w-0 flex-1 items-center gap-5"
+              className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-x-5 gap-y-1 sm:basis-auto sm:flex-nowrap"
             >
               <div className="min-w-0 flex-1">
                 <div className="font-[family-name:var(--font-sora)] text-[15px] font-semibold">{funnel.name}</div>

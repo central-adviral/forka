@@ -113,7 +113,7 @@ export default async function CampaignRulesPage({
   }
 
   return (
-    <div className="flex max-w-[1180px] flex-col gap-8 px-14 pb-24 pt-12">
+    <div className="flex max-w-[1180px] flex-col gap-8 px-4 md:px-14 pb-24 pt-12">
       <div className="flex flex-wrap items-end gap-4">
         <div>
           <Link href={base} className="text-xs text-[var(--ct-text-3)] hover:text-[var(--ct-text)]">

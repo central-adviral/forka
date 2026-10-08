@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getAlerts, getWatchers } from '@/lib/repo/watchers-repo'
-import { METRICS, formatMetric, watcherScope } from '@/lib/domain/watchers'
+import { METRICS, alertActions, formatMetric, watcherScope } from '@/lib/domain/watchers'
 import { WatcherTrail, type TrailPoint } from './watcher-trail'
 import { getPagesWithChecks } from '@/lib/repo/pages-repo'
 import { PAGE_SLOW_MS, isOutage, pageHealth, type PageHealth } from '@/lib/domain/page-probe'
@@ -71,7 +71,7 @@ export default async function PainelPage({
   const lastDay = watchers.find((watcher) => watcher.lastDay)?.lastDay
 
   return (
-    <div className="flex max-w-[1240px] flex-col gap-9 px-14 pb-24 pt-12">
+    <div className="flex max-w-[1240px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <div className="flex flex-wrap items-end gap-4 border-b border-[var(--ct-line)] pb-7">
         <div>
           <span className="flex items-center gap-2.5">
@@ -115,6 +115,21 @@ export default async function PainelPage({
                       <span className={mono}>{formatMetric(watcher.metric, alert.value)}</span> contra alvo de{' '}
                       <span className={mono}>{formatMetric(watcher.metric, watcher.target)}</span> em {dayBr(alert.day)}.
                     </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {alertActions(watcher, `/dashboard/clients/${client.slug}`, canEdit).map((action, index) => (
+                        <Link
+                          key={action.label}
+                          href={action.href}
+                          className={
+                            index === 0
+                              ? 'rounded-[9px] bg-[var(--ct-accent)] px-3 py-1.5 text-[12.5px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110'
+                              : 'rounded-[9px] border border-[var(--ct-line-2)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]'
+                          }
+                        >
+                          {action.label}
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                   <span className={`${mono} whitespace-nowrap text-[11px] text-[var(--ct-text-3)]`}>aberto {when(alert.openedAt)}</span>
                 </div>

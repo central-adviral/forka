@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CommandPalette, type CommandItem } from './command-palette'
@@ -286,6 +287,8 @@ export function DashboardShell({
   const activeTestSlug = activeClient ? pathname.match(new RegExp(`^${base}/tests/([^/]+)`))?.[1] : undefined
   const activeProjectSlug = activeClient ? pathname.match(new RegExp(`^${base}/funis-venda/([^/]+)`))?.[1] : undefined
   const activeProject = activeClient?.projects.find((project) => project.slug === activeProjectSlug)
+  // Below lg the menu is a drawer: closed by default, opened from the top bar.
+  const [menuOpen, setMenuOpen] = useState(false)
   const realRole = activeClient?.role
   const canPreview = realRole === 'owner' || realRole === 'gestor'
   // While previewing, the shell shows what a client user would see; nothing else changes.
@@ -344,7 +347,17 @@ export function DashboardShell({
 
   return (
     <div className="flex h-screen font-[family-name:var(--font-manrope)] text-[var(--ct-text)]">
-      <aside className="m-3.5 mr-0 flex w-[276px] flex-none flex-col gap-[18px] overflow-y-auto rounded-[24px] border border-[var(--ct-line)] bg-[var(--ct-glass)] px-3 py-[18px] shadow-[var(--ct-shadow)] backdrop-blur-xl">
+      {menuOpen && (
+        <button type="button" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-30 bg-black/50 lg:hidden" />
+      )}
+      <aside
+        id="menu-lateral"
+        // Any link inside navigates away, so it also closes the drawer.
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest('a')) setMenuOpen(false)
+        }}
+        className={`${menuOpen ? 'fixed inset-y-0 left-0 z-40 flex' : 'hidden'} m-3.5 mr-0 w-[276px] flex-none flex-col gap-[18px] overflow-y-auto rounded-[24px] border border-[var(--ct-line)] bg-[var(--ct-glass)] px-3 py-[18px] shadow-[var(--ct-shadow)] backdrop-blur-xl max-lg:bg-[var(--ct-surface)] lg:static lg:flex`}
+      >
         <Link href="/dashboard" className="flex items-center gap-2.5 px-2 py-0.5">
           <span
             className="grid h-[30px] w-[30px] flex-none place-items-center rounded-[9px]"
@@ -540,7 +553,19 @@ export function DashboardShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="mx-8 mt-3.5 flex flex-none items-center gap-3 rounded-full border border-[var(--ct-line)] bg-[var(--ct-glass)] px-6 py-3 shadow-[var(--ct-shadow)] backdrop-blur-md">
+        <div className="mx-3 mt-3.5 flex flex-none items-center gap-3 rounded-full border border-[var(--ct-line)] bg-[var(--ct-glass)] px-4 py-3 shadow-[var(--ct-shadow)] backdrop-blur-md lg:mx-8 lg:px-6">
+          <button
+            type="button"
+            aria-label="Abrir menu"
+            aria-controls="menu-lateral"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(true)}
+            className="grid h-8 w-8 flex-none place-items-center rounded-full text-[var(--ct-text-2)] hover:bg-[var(--ct-surface-2)] hover:text-[var(--ct-text)] lg:hidden"
+          >
+            <Icon>
+              <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />
+            </Icon>
+          </button>
           <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-[13px] text-[var(--ct-text-3)]">
             <span>Black Sheep</span>
             {activeClient && (
@@ -572,7 +597,7 @@ export function DashboardShell({
         {previewing && (
           <div
             role="status"
-            className="mx-8 mt-4 flex flex-none items-center gap-2.5 rounded-[14px] border border-[color-mix(in_srgb,var(--ct-accent)_30%,transparent)] bg-[var(--ct-accent-soft)] px-4 py-2.5 text-[13px] font-medium text-[var(--ct-accent)]"
+            className="mx-3 mt-4 flex flex-none items-center gap-2.5 rounded-[14px] lg:mx-8 border border-[color-mix(in_srgb,var(--ct-accent)_30%,transparent)] bg-[var(--ct-accent-soft)] px-4 py-2.5 text-[13px] font-medium text-[var(--ct-accent)]"
           >
             <Icon>{ICONS.eye}</Icon>
             Você está vendo a Central como o cliente vê: sem configuração, sem ações de edição.

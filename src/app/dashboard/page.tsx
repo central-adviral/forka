@@ -92,7 +92,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const totalWarn = rows.reduce((sum, row) => sum + Number(row.summary?.alerts_warn ?? 0), 0)
 
   return (
-    <div className="flex max-w-[1320px] flex-col gap-10 px-14 pb-24 pt-12">
+    <div className="flex max-w-[1320px] flex-col gap-10 px-4 md:px-14 pb-24 pt-12">
       <Suspense fallback={null}>
         <SuccessBanner param="created" message="Cliente criado com sucesso." />
       </Suspense>

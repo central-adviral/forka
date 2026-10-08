@@ -61,11 +61,13 @@ export interface TestRules {
   conf: number
   /** Link A/B: minimum visitors per variant before a win counts. */
   minVisits: number
+  /** Link A/B: smallest lift worth detecting, in % over the control's rate; sets the sample each side needs. */
+  mde: number
   /** Days a creative can run before it asks for a decision. */
   sat: number
 }
 
-export const DEFAULT_RULES: TestRules = { teto: 55, mult: 1.5, min: 10, conf: 95, minVisits: 500, sat: 10 }
+export const DEFAULT_RULES: TestRules = { teto: 55, mult: 1.5, min: 10, conf: 95, minVisits: 500, mde: 30, sat: 10 }
 
 export const RULE_LIMITS: Record<keyof TestRules, [number, number, boolean]> = {
   teto: [1, 100000, false],
@@ -73,7 +75,17 @@ export const RULE_LIMITS: Record<keyof TestRules, [number, number, boolean]> = {
   min: [1, 1000, true],
   conf: [50, 99, true],
   minVisits: [50, 100000, true],
+  mde: [5, 200, true],
   sat: [1, 90, true],
+}
+
+/**
+ * The test ceiling of a purchase project is its CPA target, read live from the project's cost
+ * watcher (the one the Plano and Metas edit), so a target changed in one place is the ceiling
+ * everywhere. Only a lead project, or one without a target, keeps the ceiling stored in its rules.
+ */
+export function withPlanTeto(rules: TestRules, costTarget: number | null, resultado: string): TestRules {
+  return resultado === 'compra' && costTarget !== null && costTarget > 0 ? { ...rules, teto: costTarget } : rules
 }
 
 /** Reads the project's rules, falling back to the default for any missing or out-of-range number. */

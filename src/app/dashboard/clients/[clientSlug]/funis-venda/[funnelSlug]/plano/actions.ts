@@ -5,7 +5,6 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { PROJECT_RESULTS } from '@/lib/domain/project-plan'
-import { readRules } from '@/lib/domain/backlog'
 
 // Writes run on the user's session: the policies of sales_funnels and watchers only let a gestor
 // or owner change them, and every write selects what it changed so a refused one is reported.
@@ -35,7 +34,6 @@ const planSchema = z
     crit_pct: optionalNumber,
     min_spend: optionalNumber,
     daily_target: optionalNumber.refine((value) => value === null || (Number.isInteger(value) && value > 0), 'o volume por dia é um número inteiro maior que zero'),
-    teto_from_cost: z.boolean(),
   })
   .refine((value) => (value.crit_pct ?? 40) >= (value.warn_pct ?? 20), 'o crítico precisa ser maior ou igual à atenção')
 
@@ -47,23 +45,17 @@ export async function savePlan(context: PlanContext, formData: FormData) {
     crit_pct: String(formData.get('crit_pct') ?? ''),
     min_spend: String(formData.get('min_spend') ?? ''),
     daily_target: String(formData.get('daily_target') ?? ''),
-    teto_from_cost: formData.get('teto_from_cost') === 'on',
   })
   if (!parsed.success) back(context, 'erro', parsed.error.issues.map((issue) => issue.message).join('; '))
   const plan = parsed.data
   const costMetric = PROJECT_RESULTS[plan.resultado].costMetric
   const supabase = await createServerSupabaseClient()
 
-  const { data: funnel, error: readError } = await supabase.from('sales_funnels').select('test_rules').eq('id', context.sales_funnel_id).maybeSingle()
-  if (readError || !funnel) back(context, 'erro', 'Projeto não encontrado.')
-  // The test ceiling is a CPA: it follows the cost target only on a purchase project.
-  const followsTeto = plan.teto_from_cost && plan.resultado === 'compra' && plan.cost_target !== null
   const { data: saved, error } = await supabase
     .from('sales_funnels')
     .update({
       resultado: plan.resultado,
       daily_sales_target: plan.daily_target,
-      ...(followsTeto ? { test_rules: { ...readRules(funnel.test_rules), teto: plan.cost_target } } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('id', context.sales_funnel_id)
@@ -105,5 +97,5 @@ export async function savePlan(context: PlanContext, formData: FormData) {
   }
 
   revalidatePath(`/dashboard/clients/${context.client_slug}`, 'layout')
-  back(context, 'ok', followsTeto ? 'Plano salvo. O teto dos testes acompanha o CPA-alvo.' : 'Plano salvo.')
+  back(context, 'ok', 'Plano salvo.')
 }

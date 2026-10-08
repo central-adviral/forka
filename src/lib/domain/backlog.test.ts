@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { blockedMove, DEFAULT_RULES, defaultGates, nextCode, readRules } from './backlog'
+import { blockedMove, DEFAULT_RULES, defaultGates, nextCode, readRules, withPlanTeto } from './backlog'
 
 describe('backlog', () => {
   it('gives the next free code, one past the highest in use', () => {
@@ -22,5 +22,14 @@ describe('backlog', () => {
   it('reads the rules, falling back to the default for anything missing or out of range', () => {
     expect(readRules(null)).toEqual(DEFAULT_RULES)
     expect(readRules({ teto: 40, mult: 99, min: 2.5, conf: 90 })).toEqual({ ...DEFAULT_RULES, teto: 40, conf: 90 })
+  })
+})
+
+describe('withPlanTeto', () => {
+  it('reads the ceiling from the live CPA target of a purchase project, and keeps the stored one otherwise', () => {
+    const stored = { ...DEFAULT_RULES, teto: 55 }
+    expect(withPlanTeto(stored, 60, 'compra').teto).toBe(60)
+    expect(withPlanTeto(stored, null, 'compra').teto).toBe(55)
+    expect(withPlanTeto(stored, 8, 'lead').teto).toBe(55)
   })
 })
