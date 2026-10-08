@@ -33,7 +33,7 @@ export function FunnelPaymentPie({
   return (
     <div className="card-shadow rounded-2xl border border-[var(--ct-line)] p-5">
       <h2 className="mb-1 font-[family-name:var(--font-sora)] text-base font-semibold">Receita por método</h2>
-      <p className="mb-5 text-[12px] text-[var(--ct-text-2)]">Como o cliente escolheu pagar</p>
+      <p className="mb-5 text-[12px] text-[var(--ct-text-2)]">Como o cliente escolheu pagar · receita líquida, sem ascensão</p>
       <div className="flex items-center gap-8">
         <svg width="120" height="120" viewBox="0 0 100 100" className="-rotate-90 flex-shrink-0">
           <circle cx="50" cy="50" r={radius} fill="none" style={{ stroke: 'var(--ct-surface)' }} strokeWidth="16" />

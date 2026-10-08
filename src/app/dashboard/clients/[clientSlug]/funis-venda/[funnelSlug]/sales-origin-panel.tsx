@@ -48,7 +48,7 @@ export function SalesOriginPanel({ origins, currency }: { origins: SalesByOrigin
             <th className="py-1.5 text-right font-medium">Vendas</th>
             <th className="py-1.5 text-right font-medium">Fatia</th>
             <th className="py-1.5 text-right font-medium">Upsell</th>
-            <th className="py-1.5 text-right font-medium">Receita bruta</th>
+            <th className="py-1.5 text-right font-medium">Receita líquida</th>
           </tr>
         </thead>
         <tbody>
@@ -67,7 +67,7 @@ export function SalesOriginPanel({ origins, currency }: { origins: SalesByOrigin
                   {((row.vendas / total) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%
                 </td>
                 <td className="py-2 text-right font-[family-name:var(--font-geist-mono)] tabular-nums">{row.vendasUpsell.toLocaleString('pt-BR')}</td>
-                <td className="py-2 text-right font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(row.receitaBruta)}</td>
+                <td className="py-2 text-right font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(row.receitaLiquida)}</td>
               </tr>
             )
           })}

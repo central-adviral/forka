@@ -83,7 +83,8 @@ export async function createSalesFunnel(context: { client_id: string; client_slu
     if (productsError) throw productsError
   }
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/funis-venda`)
-  redirect(`/dashboard/clients/${parsed.client_slug}/funis-venda`)
+  // A new project has no numbers yet: it opens on what is left to configure.
+  redirect(`/dashboard/clients/${parsed.client_slug}/funis-venda/${parsed.slug}/configurar`)
 }
 
 export async function deleteSalesFunnel(salesFunnelId: string, clientSlug: string) {

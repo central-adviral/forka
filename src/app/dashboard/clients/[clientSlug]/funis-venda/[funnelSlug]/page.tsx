@@ -390,7 +390,7 @@ export default async function SalesFunnelPage({
 
           <div className="card-shadow rounded-2xl border border-[var(--ct-line)] p-5">
             <h2 className="mb-1 font-[family-name:var(--font-sora)] text-base font-semibold">Por produto</h2>
-            <p className="mb-4 text-[12px] text-[var(--ct-text-2)]">Onde a receita do funil se concentra</p>
+            <p className="mb-4 text-[12px] text-[var(--ct-text-2)]">Onde a receita do funil se concentra · líquida, com ascensão</p>
             {products.length === 0 ? (
               <p className="text-[13px] text-[var(--ct-text-2)]">Nenhuma venda no período.</p>
             ) : (
@@ -572,7 +572,7 @@ export default async function SalesFunnelPage({
               <th className="p-3">Vendas de entrada</th>
               <th className="p-3">De anúncio</th>
               <th className="p-3">Upsell</th>
-              <th className="p-3">Receita bruta</th>
+              <th className="p-3">Receita líquida</th>
               <th className="p-3">CPA geral</th>
               <th className="p-3">CPA de anúncio</th>
               <th className="p-3">ROAS</th>
@@ -593,7 +593,7 @@ export default async function SalesFunnelPage({
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.vendas}</td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.vendasAnuncio}</td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.vendasUpsell}</td>
-                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(row.receitaBruta)}</td>
+                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(row.receitaLiquida)}</td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.cac !== null ? currency(row.cac) : '—'}</td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">
                   {row.vendasAnuncio > 0 ? currency(row.spendComImposto / row.vendasAnuncio) : '—'}

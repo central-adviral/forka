@@ -82,7 +82,8 @@ describe('funnel-repo', () => {
     const breakdown = await getPaymentMethodBreakdown(db, salesFunnelId, '2026-09-01', '2026-09-02')
     const pix = breakdown.find((b) => b.metodo === 'pix')
     const cartao = breakdown.find((b) => b.metodo === 'credit_card')
-    expect(pix?.receita).toBe(50)
-    expect(cartao?.receita).toBe(20)
+    // Net revenue since 0091, like every other revenue on the project page.
+    expect(pix?.receita).toBe(45)
+    expect(cartao?.receita).toBe(18)
   })
 })

@@ -22,15 +22,19 @@ export async function getProjectSetupStatus(
   if (projectError) throw projectError
   if (!client || !project) return null
 
-  const [secrets, products, rules, watchers] = await Promise.all([
+  const [secrets, products, rules, watchers, fronts] = await Promise.all([
     getConfiguredSecrets(serviceDb, clientId),
     db.from('project_products').select('produto_nome', { count: 'exact', head: true }).eq('sales_funnel_id', projectId).eq('papel', 'entrada'),
     db.from('naming_rules').select('id, project_fronts!inner(sales_funnel_id)', { count: 'exact', head: true }).eq('project_fronts.sales_funnel_id', projectId),
     db.from('watchers').select('metric, front_id, target').eq('sales_funnel_id', projectId),
+    db.from('project_fronts').select('source_sales_funnel_id, naming_rules(kind)').eq('sales_funnel_id', projectId),
   ])
   if (products.error) throw products.error
   if (rules.error) throw rules.error
   if (watchers.error) throw watchers.error
+  if (fronts.error) throw fronts.error
+  const frontRows = (fronts.data ?? []) as { source_sales_funnel_id: string | null; naming_rules: { kind: string }[] }[]
+  const own = frontRows.filter((front) => front.source_sales_funnel_id === null)
 
   const resultado = readResult(project.resultado)
   const costMetric = PROJECT_RESULTS[resultado].costMetric
@@ -41,6 +45,9 @@ export async function getProjectSetupStatus(
     hublaConnected: secrets.hasHublaToken,
     entryProducts: products.count ?? 0,
     namingRules: rules.count ?? 0,
+    ownFronts: own.length,
+    ownFrontsWithInclude: own.filter((front) => front.naming_rules.some((rule) => rule.kind === 'include')).length,
+    mirrorFronts: frontRows.length - own.length,
     resultado: project.resultado ?? null,
     costTarget: costWatcher ? Number(costWatcher.target) : null,
     extraWatchers: (watchers.data ?? []).filter((row) => !isCostWatcher(row)).length,
