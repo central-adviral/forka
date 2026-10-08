@@ -28,11 +28,12 @@ describe('buildAttention', () => {
       input({
         lastRun: { finishedAt: '2026-10-06T16:12:00Z', error: 'timeout' },
         conflicts: [{ name: '12 - Remarketing', spend: 150 }],
-        bestVariant: { testName: 'Página de vendas', variantName: 'Página B', liftPct: 55 },
+        bestVariant: { testName: 'Página de vendas', testSlug: 'pagina-de-vendas', variantName: 'Página B', liftPct: 55 },
       })
     )
     expect(items.map((item) => item.severity)).toEqual(['crit', 'warn', 'ok'])
     expect(items[1].href).toBe('/dashboard/clients/voe/funis-venda/t15/regras')
+    expect(items[2].href).toBe('/dashboard/clients/voe/tests/pagina-de-vendas')
   })
 
   it('flags Meta data older than two hours during business hours', () => {
@@ -72,5 +73,22 @@ describe('buildAttention with watcher alerts', () => {
     expect(items[0]).toMatchObject({ severity: 'warn', title: 'Vendas sem projeto', tool: 'config' })
     expect(items[0].detail).toMatch(/^3 vendas \(R\$\s?591\)/)
     expect(buildAttention(input({ unattributed: { count: 0, revenue: 0 } }))).toEqual([])
+  })
+
+  it('brings the backlog verdicts to the queue, a cut as critical, each opening its own card', () => {
+    const items = buildAttention(
+      input({
+        testVerdicts: [
+          { code: 'T5', title: 'Preço ancorado', summary: 'vencedora pelas regras: B', kind: 'win', projectSlug: '1k-latam', daysRunning: 12 },
+          { code: 'T4', title: 'Carrossel de bônus', summary: 'cortar: B', kind: 'cut', projectSlug: '1k-latam', daysRunning: 5 },
+        ],
+      })
+    )
+    expect(items.map((item) => [item.severity, item.title])).toEqual([
+      ['crit', 'T4 · cortar: B'],
+      ['warn', 'T5 · vencedora pelas regras: B'],
+    ])
+    expect(items[1]).toMatchObject({ tool: 'ab', action: 'Decidir', href: '/dashboard/clients/voe/backlog?projeto=1k-latam&item=T5' })
+    expect(items[1].detail).toContain('12 dias rodando')
   })
 })

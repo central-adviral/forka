@@ -8,6 +8,7 @@ export const MIN_CHANCE_FOR_LEAD = 0.9
 
 export interface BestVariant {
   testName: string
+  testSlug: string
   variantName: string
   liftPct: number
 }
@@ -21,7 +22,7 @@ interface TestReportRow {
 
 export async function findBestVariant(
   db: SupabaseClient,
-  tests: { id: string; name: string }[],
+  tests: { id: string; name: string; slug: string }[],
   since: string,
   until: string
 ): Promise<BestVariant | null> {
@@ -47,7 +48,7 @@ export async function findBestVariant(
         if ((probabilityToBeatControl(control, row) ?? 0) < MIN_CHANCE_FOR_LEAD) continue
         const liftPct = ((row.conversions / row.visits - controlRate) / controlRate) * 100
         if (!best || liftPct > best.liftPct) {
-          best = { testName: test.name, variantName: row.variant_name, liftPct }
+          best = { testName: test.name, testSlug: test.slug, variantName: row.variant_name, liftPct }
         }
       }
       return best

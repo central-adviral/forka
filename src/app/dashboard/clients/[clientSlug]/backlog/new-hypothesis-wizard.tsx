@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 // "Nova hipótese" as a guided setup: one step per decision, each saying what it is and why it
@@ -74,12 +74,15 @@ export function NewHypothesisWizard({
   nextCode,
   stages,
   methods,
+  serverError,
 }: {
   action: (formData: FormData) => void | Promise<void>
   cancelHref: string
   nextCode: string
   stages: Option[]
   methods: Option[]
+  /** The error the server sent back on the last submit; its draft is restored when set. */
+  serverError?: string
 }) {
   const [step, setStep] = useState(0)
   const [title, setTitle] = useState('')
@@ -90,7 +93,32 @@ export function NewHypothesisWizard({
   const [metric, setMetric] = useState('')
   const [owner, setOwner] = useState('')
   const [variants, setVariants] = useState('')
-  const [problem, setProblem] = useState<string | null>(null)
+  const [problem, setProblem] = useState<string | null>(serverError ?? null)
+
+  // A failed submit redirects back with the error and remounts the form: the draft saved on submit
+  // brings back what was typed. Any other open starts clean and drops an old draft.
+  const draftKey = `ct-hypothesis-draft:${cancelHref}`
+  useEffect(() => {
+    try {
+      const saved = serverError ? sessionStorage.getItem(draftKey) : null
+      sessionStorage.removeItem(draftKey)
+      if (!saved) return
+      const draft = JSON.parse(saved)
+      /* eslint-disable react-hooks/set-state-in-effect -- sessionStorage only exists after mount */
+      setTitle(draft.title ?? '')
+      setHypothesis(draft.hypothesis ?? '')
+      setStage(draft.stage ?? 'pagina')
+      setMethod(draft.method ?? 'meta')
+      setScores(draft.scores ?? { impact: 5, confidence: 5, ease: 5 })
+      setMetric(draft.metric ?? '')
+      setOwner(draft.owner ?? '')
+      setVariants(draft.variants ?? '')
+      setStep(STEPS.length - 1)
+      /* eslint-enable react-hooks/set-state-in-effect */
+    } catch {
+      // No storage (private window) or a broken draft: start clean.
+    }
+  }, [draftKey, serverError])
 
   const variantNames = variants.split('\n').map((name) => name.trim()).filter(Boolean).slice(0, 26)
   const ice = Math.round(((scores.impact + scores.confidence + scores.ease) / 3) * 10) / 10
@@ -127,6 +155,12 @@ export function NewHypothesisWizard({
         if (reason) {
           event.preventDefault()
           setProblem(reason)
+          return
+        }
+        try {
+          sessionStorage.setItem(draftKey, JSON.stringify({ title, hypothesis, stage, method, scores, metric, owner, variants }))
+        } catch {
+          // Without storage the form still submits; only the restore on error is lost.
         }
       }}
       className="grid items-start gap-4 lg:grid-cols-[250px_minmax(0,1fr)]"
