@@ -11,6 +11,7 @@ export interface Watcher {
   isActive: boolean
   projectName: string
   projectSlug: string
+  frontId: string | null
   frontName: string | null
   /** Only the client's campaigns whose name contains this (0065). */
   lastDay: string | null
@@ -32,7 +33,7 @@ export async function getWatchers(db: SupabaseClient, clientId: string): Promise
   const { data, error } = await db
     .from('watchers')
     .select(
-      'id, metric, target, warn_pct, crit_pct, min_spend, is_active, last_day, last_value, last_status, project:sales_funnels!inner(name, slug), front:project_fronts(name)'
+      'id, metric, target, warn_pct, crit_pct, min_spend, is_active, last_day, last_value, last_status, project:sales_funnels!inner(name, slug), front:project_fronts(id, name)'
     )
     .eq('client_id', clientId)
     .order('created_at')
@@ -49,7 +50,7 @@ export async function getWatchers(db: SupabaseClient, clientId: string): Promise
     last_value: number | null
     last_status: WatcherStatus | null
     project: { name: string; slug: string }
-    front: { name: string } | null
+    front: { id: string; name: string } | null
   }[]).map((row) => ({
     id: row.id,
     metric: row.metric,
@@ -60,6 +61,7 @@ export async function getWatchers(db: SupabaseClient, clientId: string): Promise
     isActive: row.is_active,
     projectName: row.project.name,
     projectSlug: row.project.slug,
+    frontId: row.front?.id ?? null,
     frontName: row.front?.name ?? null,
     lastDay: row.last_day,
     lastValue: row.last_value === null ? null : Number(row.last_value),
