@@ -27,11 +27,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: 'failed to list funnels' }, { status: 500 })
   }
 
+  // The cron calls the deployment's own URL, which Deployment Protection puts behind a login page;
+  // the production domain is public, so the fan-out goes there.
+  const origin = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : request.nextUrl.origin
   const results = await Promise.allSettled(
     clientIds.map(async (clientId) => {
-      const url = new URL('/api/internal/sync-client', request.nextUrl.origin)
+      const url = new URL('/api/internal/sync-client', origin)
       url.searchParams.set('client', clientId)
-      const response = await fetch(url, { headers: { authorization: authHeader }, cache: 'no-store' })
+      const response = await fetch(url, { headers: { authorization: authHeader }, cache: 'no-store', redirect: 'manual' })
       if (!response.ok) throw new Error(`sync-client ${clientId} answered ${response.status}`)
       return (await response.json()) as SyncRunResult
     })

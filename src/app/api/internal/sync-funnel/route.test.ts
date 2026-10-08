@@ -264,6 +264,27 @@ describe('GET /api/internal/sync-funnel', () => {
     expect(body).toEqual({ ok: true, funnelsProcessed: 1, funnelsFailed: 0, clientsWithCampaigns: 1, clientsFailed: 1 })
   })
 
+  it('fans out through the public production domain, not the protected deployment URL', async () => {
+    listMock.mockReturnValue([
+      { id: 'funnel-a', client_id: 'client-a', launchops_operacao_ids: null, launchops_produto_nomes: null, clients: { funnel_source_url: 'https://client-a.example.com' } },
+    ])
+    secretsByClientId['client-a'] = 'key-a'
+    process.env.VERCEL_PROJECT_PRODUCTION_URL = 'central.example.com'
+    const called: string[] = []
+    vi.stubGlobal('fetch', async (url: URL, init?: RequestInit) => {
+      called.push(url.origin)
+      return syncClientGET(new NextRequest(url, init as ConstructorParameters<typeof NextRequest>[1]))
+    })
+    const request = new NextRequest('https://app-abc123-team.vercel.app/api/internal/sync-funnel', {
+      headers: { authorization: 'Bearer test-secret' },
+    })
+    const body = await (await GET(request)).json()
+    delete process.env.VERCEL_PROJECT_PRODUCTION_URL
+
+    expect(called).toEqual(['https://central.example.com'])
+    expect(body).toMatchObject({ ok: true, clientsFailed: 0 })
+  })
+
   it('refuses a per-client sync without a client', async () => {
     const request = new NextRequest('https://app.example.com/api/internal/sync-client', {
       headers: { authorization: 'Bearer test-secret' },
