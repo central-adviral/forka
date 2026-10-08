@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { SampleCalculator } from './sample-calculator'
+import { similarLearnings, type Learning } from '@/lib/domain/similar-learnings'
 
 // "Novo experimento" on one page (Testes 2.0): the idea, how it is measured and its variants, with
 // the help inside each block and a calculator of what the test costs in people and days.
@@ -77,6 +78,7 @@ export function NewHypothesisWizard({
   serverError,
   defaultConversion,
   rules,
+  learnings,
 }: {
   action: (formData: FormData) => void | Promise<void>
   cancelHref: string
@@ -89,6 +91,8 @@ export function NewHypothesisWizard({
   defaultConversion: 'hubla_webhook' | 'thank_you_page'
   /** The project's rules of the game: the calculator sizes the sample the way the verdict will. */
   rules: { conf: number; mde: number; minVisits: number }
+  /** The project's decided tests, to point at a learning that may already answer the new idea. */
+  learnings: Learning[]
 }) {
   const [title, setTitle] = useState('')
   const [hypothesis, setHypothesis] = useState('')
@@ -187,6 +191,12 @@ export function NewHypothesisWizard({
             Título curto (aparece no card do quadro)
             <input name="title" maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="ex.: Prova social acima da dobra" className={field} />
           </label>
+          {similarLearnings(title, learnings).map((learning) => (
+            <p key={learning.code} className="rounded-[10px] border-l-[3px] border-[var(--ct-warn)] bg-[var(--ct-surface-2)] px-3 py-2 text-[12.5px] text-[var(--ct-text-2)]">
+              <b className="text-[var(--ct-text)]">Aprendizado parecido: {learning.code} &quot;{learning.title}&quot;</b>
+              {learning.result ? ` (${learning.result})` : ''}. {learning.learning}
+            </p>
+          ))}
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Hipótese
             <textarea

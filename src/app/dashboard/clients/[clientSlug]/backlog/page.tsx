@@ -11,6 +11,7 @@ import { type Verdict } from '@/lib/domain/backlog-readout'
 import { findTaggedCards, loadReadouts, readoutKind, type Readout, type VerdictKind } from '@/lib/repo/backlog-readout-repo'
 import { linkVerdict, matchTestVariant } from '@/lib/domain/experiment-decision'
 import { LANES, cardProgress, laneOf, recentlyDecided } from '@/lib/domain/board'
+import { PLAYBOOK, PLAYBOOK_DONTS, playbookStep } from '@/lib/domain/playbook'
 import { Board, type BoardLane } from './board'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { createItem, decideItem, deleteItem, dropItem, linkAbTest, moveItem, saveRules, toggleGate, togglePublished } from './actions'
@@ -65,10 +66,10 @@ export default async function BacklogPage({
   searchParams,
 }: {
   params: Promise<{ clientSlug: string }>
-  searchParams: Promise<{ projeto?: string; aba?: string; item?: string; nova?: string; ok?: string; erro?: string; decididos?: string }>
+  searchParams: Promise<{ projeto?: string; aba?: string; item?: string; nova?: string; ok?: string; erro?: string; decididos?: string; metodo?: string }>
 }) {
   const { clientSlug } = await params
-  const { projeto, aba, item: itemCode, nova, ok, erro, decididos } = await searchParams
+  const { projeto, aba, item: itemCode, nova, ok, erro, decididos, metodo } = await searchParams
   const supabase = await createServerSupabaseClient()
   const { data: client } = await supabase.from('clients').select('id, name, slug').eq('slug', clientSlug).maybeSingle()
   if (!client) notFound()
@@ -121,7 +122,10 @@ export default async function BacklogPage({
     ? (selected!.variants.find((variant) => matchTestVariant(variant, [{ id: 'winner', name: verdict.winnerName }]) === 'winner')?.key ?? '')
     : (selectedReadout?.meta?.find((variant) => variant.verdict === 'win')?.key ?? '')
   const context = { client_id: client.id as string, client_slug: client.slug as string, sales_funnel_id: funnel.id as string, funnel_slug: funnel.slug as string }
-  const href = (extra: string) => `${base}?projeto=${funnel.slug}${extra}`
+  // The board can show one method at a time; the filter rides along every link of the board.
+  const methodFilter = (Object.keys(METHODS) as Method[]).find((method) => method === metodo) ?? null
+  const href = (extra: string) => `${base}?projeto=${funnel.slug}${methodFilter ? `&metodo=${methodFilter}` : ''}${extra}`
+  const decidedWithLearning = items.filter((item) => item.status === 'decided' && item.learning)
   const running = items.filter((item) => item.status === 'running').length
   // The board: "Pede decisão" collects running cards whose rules spoke; Decidido keeps the last 30
   // days unless every decision was asked for.
@@ -132,7 +136,7 @@ export default async function BacklogPage({
     ...column,
     hint: column.lane === 'decided' && showAllDecided ? 'todos os decididos' : column.hint,
     cards: items
-      .filter((item) => laneOf(item, Boolean(readouts.get(item.id)?.summary)) === column.lane && (showAllDecided || recentlyDecided(item, now)))
+      .filter((item) => (!methodFilter || item.method === methodFilter) && laneOf(item, Boolean(readouts.get(item.id)?.summary)) === column.lane && (showAllDecided || recentlyDecided(item, now)))
       .map((item) => {
         const readout = readouts.get(item.id)
         return {
@@ -178,13 +182,25 @@ export default async function BacklogPage({
 
       {tab === 'backlog' && (
         <>
-          <div className="flex flex-wrap gap-2">
-            {COLUMNS.map((column) => (
-              <span key={column.status} className="rounded-full border border-[var(--ct-line)] bg-[var(--ct-surface-2)] px-3 py-1 text-[12.5px] text-[var(--ct-text-2)]">
-                {column.label} <b className={`${mono} font-medium text-[var(--ct-text)]`}>{items.filter((item) => item.status === column.status).length}</b>
-              </span>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            {[{ value: null, label: 'Todos' }, ...(Object.entries(METHODS) as [Method, string][]).map(([value, label]) => ({ value, label }))].map((option) => {
+              const count = items.filter((item) => !option.value || item.method === option.value).length
+              const active = option.value === methodFilter
+              return (
+                <Link
+                  key={option.label}
+                  href={`${base}?projeto=${funnel.slug}${option.value ? `&metodo=${option.value}` : ''}`}
+                  aria-current={active ? 'true' : undefined}
+                  className={`rounded-full border px-3 py-1 text-[12.5px] ${active ? 'border-[var(--ct-accent)] text-[var(--ct-accent)]' : 'border-[var(--ct-line)] bg-[var(--ct-surface-2)] text-[var(--ct-text-2)]'}`}
+                >
+                  {option.label} <b className={`${mono} font-medium`}>{count}</b>
+                </Link>
+              )
+            })}
             {running > 0 && <span className="rounded-full bg-[var(--ct-ab-soft)] px-3 py-1 text-[12.5px] text-[var(--ct-ab)]">{running} rodando agora</span>}
+            <Link href={`/dashboard/clients/${client.slug}/aprendizados?todos=1&periodo=tudo`} className="ml-auto text-[12.5px] text-[var(--ct-accent)]">
+              Aprendizados ({decidedWithLearning.length}) →
+            </Link>
           </div>
 
           {nova === '1' && canEdit && (
@@ -197,6 +213,7 @@ export default async function BacklogPage({
               serverError={erro}
               defaultConversion={funnel.resultado === 'lead' ? 'thank_you_page' : 'hubla_webhook'}
               rules={rules}
+              learnings={decidedWithLearning.map((item) => ({ code: item.code, title: item.title, learning: item.learning!, result: item.result }))}
             />
           )}
 
@@ -313,6 +330,24 @@ export default async function BacklogPage({
                   )}
                 </div>
               )}
+
+              {selected.status === 'running' && (() => {
+                const step = playbookStep(selectedDays)
+                return (
+                  <div className="flex flex-col gap-2 rounded-[14px] border border-[var(--ct-line)] px-4 py-3">
+                    <span className="text-[12.5px] font-semibold">Calendário do teste · dia {selectedDays}</span>
+                    <ol className="flex flex-col gap-1 text-[12px]">
+                      {PLAYBOOK.map((item, index) => (
+                        <li key={item.label} className={index === step ? 'text-[var(--ct-text)]' : 'text-[var(--ct-text-3)]'}>
+                          <b className={index === step ? 'text-[var(--ct-accent)]' : ''}>{index < step ? '✓ ' : index === step ? '→ ' : ''}{item.label}</b>
+                          {index === step && <span className="block text-[var(--ct-text-2)]">{item.text}</span>}
+                        </li>
+                      ))}
+                    </ol>
+                    <p className="text-[11.5px] text-[var(--ct-text-3)]">Enquanto roda, não: {PLAYBOOK_DONTS.join(' · ')}.</p>
+                  </div>
+                )
+              })()}
 
               <div className="flex flex-col">
                 <span className={`${mono} mb-1 text-[10.5px] uppercase tracking-[0.08em] text-[var(--ct-text-3)]`}>Variantes</span>

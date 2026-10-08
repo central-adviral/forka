@@ -65,6 +65,19 @@ export default async function LearningsPage({
   const { data, error } = await query
   if (error) console.error('[learnings-read-failed]', { clientId: client.id }, error)
 
+  // How the team's testing is going, from what the board already records (team view only): days
+  // from idea to decision, how many tests that went live reached a decision, and how many found a winner.
+  const { data: flow } = isTeam
+    ? await supabase.from('backlog_items').select('status, created_at, started_at, decided_at, winner_key').eq('client_id', client.id)
+    : { data: null }
+  const flowRows = (flow ?? []) as { status: string; created_at: string; started_at: string | null; decided_at: string | null; winner_key: string | null }[]
+  const decidedFlow = flowRows.filter((row) => row.status === 'decided' && row.decided_at)
+  const ideaToDecision = decidedFlow.map((row) => (new Date(row.decided_at!).getTime() - new Date(row.created_at).getTime()) / 86_400_000).sort((a, b) => a - b)
+  const medianDays = ideaToDecision.length > 0 ? Math.round(ideaToDecision[Math.floor((ideaToDecision.length - 1) / 2)]) : null
+  const wentLive = flowRows.filter((row) => row.started_at || row.status === 'decided').length
+  const completion = wentLive > 0 ? Math.round((decidedFlow.length / wentLive) * 100) : null
+  const winRate = decidedFlow.length > 0 ? Math.round((decidedFlow.filter((row) => row.winner_key).length / decidedFlow.length) * 100) : null
+
   const term = (q ?? '').trim().toLowerCase()
   const stories = ((data ?? []) as unknown as Story[]).filter((story) => {
     if (story.status === 'decided' && since && (!story.decided_at || story.decided_at < since)) return false
@@ -131,6 +144,22 @@ export default async function LearningsPage({
           </div>
         ))}
       </div>
+
+      {isTeam && flowRows.length > 0 && (
+        <div className="grid gap-3 rounded-2xl border border-dashed border-[var(--ct-line-2)] px-5 py-4 sm:grid-cols-3">
+          <span className="col-span-full text-[11px] uppercase tracking-[0.08em] text-[var(--ct-text-3)]">Como o time está testando · só a equipe vê</span>
+          {[
+            [medianDays !== null ? `${medianDays} dias` : '—', 'da ideia à decisão (mediana)'],
+            [completion !== null ? `${completion}%` : '—', `dos testes que rodaram chegaram à decisão (${decidedFlow.length} de ${wentLive})`],
+            [winRate !== null ? `${winRate}%` : '—', 'das decisões tiveram vencedora'],
+          ].map(([value, label]) => (
+            <div key={label}>
+              <b className={`${mono} text-[20px]`}>{value}</b>
+              <p className="text-[12px] text-[var(--ct-text-2)]">{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {stories.length === 0 && (
         <p className="rounded-2xl border border-dashed border-[var(--ct-line-2)] px-5 py-8 text-center text-[13px] text-[var(--ct-text-3)]">
