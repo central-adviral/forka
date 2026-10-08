@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const role = vi.hoisted(() => ({ has: false, activePages: 0, inserted: [] as unknown[], existing: [] as unknown[] }))
+const role = vi.hoisted(() => ({
+  has: false,
+  activePages: 0,
+  inserted: [] as unknown[],
+  existing: [] as unknown[],
+  updated: [] as unknown[],
+  updateResult: { data: [{ id: 'page-1' }] as unknown[] | null, error: null as { code: string; message: string } | null },
+}))
 vi.mock('@/lib/supabase/server', () => ({
   createServerSupabaseClient: async () => ({
     rpc: async () => ({ data: role.has, error: null }),
@@ -11,6 +18,10 @@ vi.mock('@/lib/supabase/server', () => ({
           then: (resolve: (value: unknown) => void) => resolve({ data: role.existing, error: null }),
         }),
       }),
+      update: (row: unknown) => {
+        role.updated.push(row)
+        return { eq: () => ({ eq: () => ({ select: async () => role.updateResult }) }) }
+      },
       insert: async (row: unknown) => {
         role.inserted.push(row)
         return { error: null }
@@ -27,9 +38,10 @@ vi.mock('next/navigation', () => ({
   },
 }))
 
-import { checkPagesNow, savePage } from './actions'
+import { checkPagesNow, linkPage, savePage } from './actions'
 import { probeClientPages } from '@/lib/pages/probe'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
+import { revalidatePath } from 'next/cache'
 
 const context = { client_id: 'client-1', client_slug: 'voe' }
 
@@ -83,5 +95,45 @@ describe('savePage', () => {
     role.existing = [{ id: 'page-1', label: 'Vendas', url: 'https://www.exemplo.com.br/oferta/?utm_source=x', project: { name: '1K' }, front: { name: 'Frio' } }]
     await expect(savePage(context, form())).rejects.toThrow(/redirect:\/dashboard\/clients\/voe\/paginas\/nova\?url=/)
     expect(role.inserted).toEqual([])
+  })
+})
+
+describe('linkPage', () => {
+  const pageContext = { ...context, page_id: 'page-1' }
+  const projectId = '11111111-1111-4111-8111-111111111111'
+  const frontId = '22222222-2222-4222-8222-222222222222'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    role.updated = []
+    role.updateResult = { data: [{ id: 'page-1' }], error: null }
+  })
+
+  it('sets project and front together and refreshes the list', async () => {
+    await expect(linkPage(pageContext, { sales_funnel_id: projectId, front_id: frontId })).resolves.toEqual({ error: null })
+    expect(role.updated).toEqual([{ sales_funnel_id: projectId, front_id: frontId }])
+    expect(revalidatePath).toHaveBeenCalledWith('/dashboard/clients/voe/paginas')
+  })
+
+  it('unlinks the page from any project', async () => {
+    await expect(linkPage(pageContext, { sales_funnel_id: null, front_id: null })).resolves.toEqual({ error: null })
+    expect(role.updated).toEqual([{ sales_funnel_id: null, front_id: null }])
+  })
+
+  it('refuses a front without its project before writing', async () => {
+    await expect(linkPage(pageContext, { sales_funnel_id: null, front_id: frontId })).resolves.toEqual({ error: 'Projeto ou frente inválidos.' })
+    expect(role.updated).toEqual([])
+  })
+
+  it('reports a front of another project', async () => {
+    role.updateResult = { data: null, error: { code: '23514', message: 'front cannot own page' } }
+    await expect(linkPage(pageContext, { sales_funnel_id: projectId, front_id: frontId })).resolves.toEqual({ error: 'Essa frente não é deste projeto.' })
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('reports a role below gestor, whose update touches no row', async () => {
+    role.updateResult = { data: [], error: null }
+    await expect(linkPage(pageContext, { sales_funnel_id: projectId, front_id: null })).resolves.toEqual({ error: 'Só gestor ou owner pode ligar a página.' })
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })
