@@ -37,4 +37,18 @@ describe('testLeader', () => {
   it('has no leader before any visit', () => {
     expect(testLeader([{ variant_id: 'a', variant_name: 'Controle', visits: 0, conversions: 0 }], 'a')).toBeNull()
   })
+
+  it('with three or more variants, leads with the best of all and its chance of being the best', () => {
+    const leader = testLeader(
+      [
+        { variant_id: 'a', variant_name: 'Controle', visits: 2000, conversions: 40 },
+        { variant_id: 'b', variant_name: 'B', visits: 2000, conversions: 52 },
+        { variant_id: 'c', variant_name: 'C', visits: 2000, conversions: 75 },
+      ],
+      'a'
+    )
+    expect(leader!.variantId).toBe('c')
+    expect(leader!.confidencePct).toBeGreaterThan(95)
+  })
 })
+

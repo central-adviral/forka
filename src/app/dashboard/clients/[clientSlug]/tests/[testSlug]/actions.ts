@@ -8,6 +8,9 @@ import { layerConflict } from '@/lib/domain/test-layers'
 import { weightsSumTo100 } from '@/lib/domain/validate-weights'
 import { buildInsightPrompt, type InsightVariantStat } from '@/lib/domain/insight-prompt'
 import { probabilityToBeatControl } from '@/lib/domain/significance'
+import { detectSampleRatioMismatch } from '@/lib/domain/srm-check'
+import { reportTrust } from '@/lib/domain/test-trust'
+import { daysRunningSince } from '@/lib/domain/report-period'
 import { createAnthropicClient } from '@/lib/anthropic/client'
 import { assertClientRole } from '@/lib/repo/client-access-repo'
 
@@ -42,6 +45,7 @@ const generateInsightSchema = z.object({
 interface InsightReportRow {
   variant_id: string
   variant_name: string
+  weight_pct: number
   visits: number
   conversions: number
   revenue_cents: number
@@ -52,7 +56,7 @@ export async function generateInsight(input: z.infer<typeof generateInsightSchem
   const supabase = await createServerSupabaseClient()
 
   // The insight is a paid model call: only who runs the test may trigger it, not the client.
-  const { data: testRow, error: testRowError } = await supabase.from('tests').select('client_id').eq('id', parsed.test_id).maybeSingle()
+  const { data: testRow, error: testRowError } = await supabase.from('tests').select('client_id, sales_funnel_id, created_at').eq('id', parsed.test_id).maybeSingle()
   if (testRowError) throw testRowError
   if (!testRow) throw new Error('Teste não encontrado.')
   await assertClientRole(supabase, testRow.client_id, 'gestor')
@@ -94,11 +98,20 @@ export async function generateInsight(input: z.infer<typeof generateInsightSchem
     }
   })
 
+  // The same seal the report shows, so the model reads the test with the same caution.
+  const daysRunning = daysRunningSince(testRow.created_at)
+  const trust = reportTrust(
+    detectSampleRatioMismatch(reportRows.map((row) => ({ weightPct: Number(row.weight_pct), visits: row.visits }))),
+    reportRows.map((row) => ({ isControl: row.variant_id === controlRow.variant_id, weightPct: Number(row.weight_pct), visits: row.visits, conversions: row.conversions })),
+    daysRunning
+  )
+  const quality = { trust: trust.explain, trustworthy: trust.trustworthy, daysRunning, neededPerArm: trust.needed, ownLayer: Boolean(testRow.sales_funnel_id) }
+
   const anthropic = createAnthropicClient()
   const response = await anthropic.messages.create({
     model: 'claude-haiku-4-5',
     max_tokens: 400,
-    messages: [{ role: 'user', content: buildInsightPrompt(variants) }],
+    messages: [{ role: 'user', content: buildInsightPrompt(variants, quality) }],
   })
 
   const textBlock = response.content.find((block) => block.type === 'text')

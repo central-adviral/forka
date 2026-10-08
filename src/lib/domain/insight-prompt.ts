@@ -7,7 +7,19 @@ export interface InsightVariantStat {
   confidencePct: number | null
 }
 
-export function buildInsightPrompt(variants: InsightVariantStat[]): string {
+/** What the report's trust seal knows, so the model never recommends deciding a test that is not ready. */
+export interface InsightQuality {
+  /** The seal's own words: why the read can or cannot be trusted yet. */
+  trust: string
+  trustworthy: boolean
+  daysRunning: number
+  /** People each live side needs; null while the control has no conversion. */
+  neededPerArm: number | null
+  /** The test belongs to a project, so no other test of its layer shares its sales. */
+  ownLayer: boolean
+}
+
+export function buildInsightPrompt(variants: InsightVariantStat[], quality?: InsightQuality): string {
   const lines = variants.map((variant) => {
     const rate = variant.visits > 0 ? ((variant.conversions / variant.visits) * 100).toFixed(1) : '0.0'
     const revenue = (variant.revenueCents / 100).toFixed(2)
@@ -23,6 +35,16 @@ export function buildInsightPrompt(variants: InsightVariantStat[]): string {
     'Você é um analista de teste A/B para um gestor de tráfego pago brasileiro.',
     'Escreva 2 a 3 frases em português, direto ao ponto, sem markdown, resumindo o resultado do teste abaixo e recomendando a próxima ação.',
     'Se a amostra de qualquer variante for pequena (menos de 100 visitas), avise que ainda é cedo para decidir em vez de recomendar declarar vencedora.',
+    ...(quality
+      ? [
+          `Qualidade da leitura: ${quality.trustworthy ? 'confiável' : 'ainda não confiável'}. ${quality.trust}`,
+          `Dias rodando: ${quality.daysRunning}. Amostra mínima por variante: ${quality.neededPerArm !== null ? quality.neededPerArm : 'ainda sem cálculo (o controle não converteu)'}.`,
+          quality.ownLayer
+            ? 'O teste está num projeto com camada própria: nenhuma outra variante divide as vendas dele.'
+            : 'O teste não está num projeto: a mesma venda pode ter contado em outro teste do cliente.',
+          'Se a leitura não for confiável, diga o que falta e recomende continuar rodando, nunca declarar vencedora.',
+        ]
+      : []),
     'Dados do teste:',
     ...lines,
   ].join('\n')

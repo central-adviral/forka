@@ -66,4 +66,31 @@ describe('backlog readout', () => {
     expect(readoutSummary([{ label: 'A', verdict: 'measuring' }], 12, DEFAULT_RULES, 'meta')).toBe('12 dias rodando, pede decisão')
     expect(readoutSummary([{ label: 'A', verdict: 'measuring' }], 12, DEFAULT_RULES, 'link')).toBeNull()
   })
+
+  it('with three variants, a win needs the chance of being the best of all, not of beating the control', () => {
+    // B and C both beat the control clearly, but neither is clearly the best of the two: no winner yet.
+    const close = readLinkTest(
+      [
+        { variant_id: 'a', variant_name: 'Atual', visits: 9000, conversions: 180 },
+        { variant_id: 'b', variant_name: 'B', visits: 9000, conversions: 270 },
+        { variant_id: 'c', variant_name: 'C', visits: 9000, conversions: 272 },
+      ],
+      'a',
+      DEFAULT_RULES
+    )
+    expect(close.map((variant) => variant.verdict)).toEqual(['measuring', 'measuring', 'measuring'])
+    // C pulls away from B: now it is the best of all.
+    const clear = readLinkTest(
+      [
+        { variant_id: 'a', variant_name: 'Atual', visits: 9000, conversions: 180 },
+        { variant_id: 'b', variant_name: 'B', visits: 9000, conversions: 200 },
+        { variant_id: 'c', variant_name: 'C', visits: 9000, conversions: 290 },
+      ],
+      'a',
+      DEFAULT_RULES
+    )
+    expect(clear[2].verdict).toBe('win')
+    expect(clear[1].verdict).toBe('measuring')
+  })
 })
+

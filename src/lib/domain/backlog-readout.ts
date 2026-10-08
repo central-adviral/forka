@@ -1,5 +1,5 @@
 import type { Method, TestRules } from './backlog'
-import { probabilityToBeatControl } from './significance'
+import { probabilityToBeBest, probabilityToBeatControl } from './significance'
 
 // Reads a running backlog test against the project's rules. It only suggests: the gestor decides.
 
@@ -103,13 +103,18 @@ export function readLinkTest(rows: LinkRow[], controlVariantId: string | undefin
   const controlRate = controlVisits > 0 ? Number(control?.conversions ?? 0) / controlVisits : 0
   const sample = requiredVisitsPerArm(controlRate, rules.conf, rules.mde)
   const needed = sample === null ? null : Math.max(rules.minVisits, sample)
-  return rows.map((row) => {
+  // With three or more variants a win needs the chance of being the best of all, not of beating the
+  // control alone: several duels with the control each give a lucky variant a way to "win".
+  const best = rows.length >= 3 ? probabilityToBeBest(rows, rand) : null
+  return rows.map((row, index) => {
     const isControl = row.variant_id === control?.variant_id
-    const chance = isControl ? null : probabilityToBeatControl(control, row, rand)
+    // A cut is still "loses to the control"; only the win asks for the best of all.
+    const versusControl = isControl ? null : probabilityToBeatControl(control, row, rand)
+    const chance = isControl ? null : best ? best[index] : versusControl
     const enough = needed !== null && Number(row.visits) >= needed && controlVisits >= needed
     let verdict: Verdict = Number(row.visits) === 0 ? 'no_data' : 'measuring'
     if (chance !== null && enough && chance * 100 >= rules.conf && Number(row.conversions) >= rules.min) verdict = 'win'
-    else if (chance !== null && enough && (1 - chance) * 100 >= rules.conf) verdict = 'cut'
+    else if (versusControl !== null && enough && (1 - versusControl) * 100 >= rules.conf) verdict = 'cut'
     return { name: row.variant_name, isControl, weightPct: Number(row.weight_pct ?? 0), visits: Number(row.visits), conversions: Number(row.conversions), chance, needed, verdict }
   })
 }
