@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { COLUMNS, METHODS, RULE_LIMITS, STAGES, blockedMove, defaultGates, nextCode, type BacklogStatus, type Method, type TestRules } from '@/lib/domain/backlog'
+import { AUTO_LINK_GATE, COLUMNS, METHODS, RULE_LIMITS, STAGES, blockedMove, defaultGates, nextCode, type BacklogStatus, type Method, type TestRules } from '@/lib/domain/backlog'
 import { matchTestVariant } from '@/lib/domain/experiment-decision'
 import { equalWeights, experimentSlug, experimentVariantName } from '@/lib/domain/experiment-link'
 import { httpUrl } from '@/lib/domain/http-url-schema'
@@ -167,7 +167,7 @@ async function createExperimentTest(
   if (placeError) return { ok: false, error: 'o teste foi criado, mas não entrou no projeto.' }
   const { error: linkError } = await supabase.from('backlog_items').update({ ab_test_id: testId }).eq('id', input.itemId)
   if (linkError) return { ok: false, error: 'o teste foi criado, mas não ficou vinculado ao card.' }
-  await supabase.from('backlog_gates').update({ done_at: new Date().toISOString() }).eq('item_id', input.itemId).eq('label', 'Link /r criado')
+  await supabase.from('backlog_gates').update({ done_at: new Date().toISOString() }).eq('item_id', input.itemId).eq('label', AUTO_LINK_GATE)
   return { ok: true }
 }
 
@@ -198,6 +198,13 @@ export async function moveItem(context: BacklogContext & { item_id: string; code
   if (error || !moved?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode mover hipóteses.', `&item=${context.code}`)
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
   back(context, 'ok', `${context.code} foi para ${COLUMNS.find((column) => column.status === to)!.label}.`, `&item=${context.code}`)
+}
+
+/** A card dropped on another lane of the board: the same move, the same rules, as the drawer's select. */
+export async function dropItem(context: BacklogContext, itemId: string, code: string, to: 'queue' | 'ready' | 'running') {
+  const formData = new FormData()
+  formData.set('to', to)
+  await moveItem({ ...context, item_id: itemId, code }, formData)
 }
 
 export async function toggleGate(context: BacklogContext & { gate_id: string; done: boolean; code: string }) {
@@ -330,6 +337,8 @@ export async function linkAbTest(context: BacklogContext & { item_id: string; co
   }
   const { data, error } = await supabase.from('backlog_items').update({ ab_test_id: testId || null }).eq('id', context.item_id).select('id')
   if (error || !data?.length) back(context, 'erro', 'Só gestor ou owner pode vincular o teste A/B.', `&item=${context.code}`)
+  // "Link /r criado" is a fact the Central knows, not a box to tick: it follows the link.
+  await supabase.from('backlog_gates').update({ done_at: testId ? new Date().toISOString() : null }).eq('item_id', context.item_id).eq('label', AUTO_LINK_GATE)
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
   back(context, 'ok', testId ? `${context.code} agora é medido pelo teste A/B vinculado.` : `${context.code} ficou sem teste A/B vinculado.`, `&item=${context.code}`)
 }

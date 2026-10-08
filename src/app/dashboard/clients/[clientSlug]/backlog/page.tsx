@@ -4,14 +4,16 @@ import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { canActAs } from '@/lib/view-as'
 import { getBacklog, type BacklogItem } from '@/lib/repo/backlog-repo'
-import { COLUMNS, METHODS, STAGES, nextCode, readRules, withPlanTeto, type Method } from '@/lib/domain/backlog'
+import { AUTO_LINK_GATE, COLUMNS, METHODS, STAGES, nextCode, readRules, withPlanTeto, type Method } from '@/lib/domain/backlog'
 import { NewHypothesisWizard } from './new-hypothesis-wizard'
 import { daysRunningSince } from '@/lib/domain/report-period'
 import { type Verdict } from '@/lib/domain/backlog-readout'
 import { loadReadouts, readoutKind, type Readout, type VerdictKind } from '@/lib/repo/backlog-readout-repo'
 import { linkVerdict, matchTestVariant } from '@/lib/domain/experiment-decision'
+import { LANES, cardProgress, laneOf, recentlyDecided } from '@/lib/domain/board'
+import { Board, type BoardLane } from './board'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { createItem, decideItem, deleteItem, linkAbTest, moveItem, saveRules, toggleGate, togglePublished } from './actions'
+import { createItem, decideItem, deleteItem, dropItem, linkAbTest, moveItem, saveRules, toggleGate, togglePublished } from './actions'
 import { PageHeader } from '@/components/page-header'
 import { headerPrimaryAction } from '@/components/header-actions'
 
@@ -63,10 +65,10 @@ export default async function BacklogPage({
   searchParams,
 }: {
   params: Promise<{ clientSlug: string }>
-  searchParams: Promise<{ projeto?: string; aba?: string; item?: string; nova?: string; ok?: string; erro?: string }>
+  searchParams: Promise<{ projeto?: string; aba?: string; item?: string; nova?: string; ok?: string; erro?: string; decididos?: string }>
 }) {
   const { clientSlug } = await params
-  const { projeto, aba, item: itemCode, nova, ok, erro } = await searchParams
+  const { projeto, aba, item: itemCode, nova, ok, erro, decididos } = await searchParams
   const supabase = await createServerSupabaseClient()
   const { data: client } = await supabase.from('clients').select('id, name, slug').eq('slug', clientSlug).maybeSingle()
   if (!client) notFound()
@@ -111,6 +113,40 @@ export default async function BacklogPage({
   const context = { client_id: client.id as string, client_slug: client.slug as string, sales_funnel_id: funnel.id as string, funnel_slug: funnel.slug as string }
   const href = (extra: string) => `${base}?projeto=${funnel.slug}${extra}`
   const running = items.filter((item) => item.status === 'running').length
+  // The board: "Pede decisão" collects running cards whose rules spoke; Decidido keeps the last 30
+  // days unless every decision was asked for.
+  const now = new Date()
+  const showAllDecided = decididos === 'todos'
+  const hiddenDecided = items.filter((item) => !recentlyDecided(item, now)).length
+  const lanes: BoardLane[] = LANES.map((column) => ({
+    ...column,
+    hint: column.lane === 'decided' && showAllDecided ? 'todos os decididos' : column.hint,
+    cards: items
+      .filter((item) => laneOf(item, Boolean(readouts.get(item.id)?.summary)) === column.lane && (showAllDecided || recentlyDecided(item, now)))
+      .map((item) => {
+        const readout = readouts.get(item.id)
+        return {
+          id: item.id,
+          code: item.code,
+          title: item.title,
+          href: href(`&item=${item.code}`),
+          selected: selected?.id === item.id,
+          methodColor: METHOD_DOT[item.method],
+          methodLabel: METHODS[item.method],
+          ice: item.ice.toLocaleString('pt-BR'),
+          meta: `${STAGES[item.stage]}${item.owner ? ` · ${item.owner}` : ''}${item.published ? ' · publicado' : ''}`,
+          status: cardStatus(item),
+          pill: readout?.summary ? { text: readout.summary, tone: pillTone(readout) } : null,
+          progress: item.status === 'running' ? cardProgress(readout, rules) : null,
+        }
+      }),
+    footer:
+      column.lane === 'decided' && (hiddenDecided > 0 || showAllDecided)
+        ? showAllDecided
+          ? { text: 'Mostrar só os últimos 30 dias', href: href('') }
+          : { text: `+ ${hiddenDecided} ${hiddenDecided === 1 ? 'decidido antigo' : 'decididos antigos'}`, href: href('&decididos=todos') }
+        : undefined,
+  }))
 
   return (
     <div className="flex max-w-[1440px] flex-col gap-7 px-10 pb-24 pt-10">
@@ -153,46 +189,7 @@ export default async function BacklogPage({
             />
           )}
 
-          <div className="grid gap-3 overflow-x-auto pb-2 [grid-template-columns:repeat(4,minmax(220px,1fr))]">
-            {COLUMNS.map((column) => {
-              const cards = items.filter((item) => item.status === column.status)
-              return (
-                <div key={column.status} className="flex min-h-[240px] flex-col gap-2 rounded-[14px] bg-[var(--ct-surface-2)] p-2">
-                  <div className="flex items-baseline gap-2 px-1.5 pt-1">
-                    <b className="text-[12.5px]">{column.label}</b>
-                    <span className={`${mono} ml-auto text-[11px] text-[var(--ct-text-3)]`}>{cards.length}</span>
-                  </div>
-                  <span className="-mt-1 px-1.5 text-[11px] text-[var(--ct-text-3)]">{column.hint}</span>
-                  {cards.length === 0 && <div className="rounded-[14px] border border-dashed border-[var(--ct-line-2)] p-3 text-center text-[12px] text-[var(--ct-text-3)]">vazio</div>}
-                  {cards.map((item) => {
-                    const status = cardStatus(item)
-                    return (
-                      <Link
-                        key={item.id}
-                        href={href(`&item=${item.code}`)}
-                        aria-current={selected?.id === item.id ? 'true' : undefined}
-                        className={`flex flex-col gap-1.5 rounded-[14px] border bg-[var(--ct-surface)] px-3 py-3 ${selected?.id === item.id ? 'border-[var(--ct-accent)]' : 'border-[var(--ct-line)] hover:border-[var(--ct-line-2)]'}`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span className={`${mono} text-[11px] text-[var(--ct-text-3)]`}>{item.code}</span>
-                          <span className="h-[7px] w-[7px] rounded-full" style={{ background: METHOD_DOT[item.method] }} title={METHODS[item.method]} />
-                          <span className={`${mono} ml-auto text-[11px] text-[var(--ct-text-3)]`}>ICE {item.ice.toLocaleString('pt-BR')}</span>
-                        </span>
-                        <b className="text-[13px] leading-snug">{item.title}</b>
-                        <span className="text-[11.5px] text-[var(--ct-text-3)]">
-                          {STAGES[item.stage]}{item.owner ? ` · ${item.owner}` : ''}{item.published ? ' · publicado' : ''}
-                        </span>
-                        <span className={`text-[11.5px] ${status.tone}`}>{status.text}</span>
-                        {readouts.get(item.id)?.summary && (
-                          <span className={`rounded-[8px] px-2 py-1 text-[11.5px] font-medium ${pillTone(readouts.get(item.id)!)}`}>{readouts.get(item.id)!.summary}</span>
-                        )}
-                      </Link>
-                    )
-                  })}
-                </div>
-              )
-            })}
-          </div>
+          <Board lanes={lanes} move={canEdit ? dropItem.bind(null, context) : null} />
           <div className="flex flex-wrap gap-4 text-[12px] text-[var(--ct-text-3)]">
             {(Object.keys(METHODS) as Method[]).map((method) => (
               <span key={method} className="flex items-center gap-1.5">
@@ -410,7 +407,13 @@ export default async function BacklogPage({
                     Pré-requisitos · {selected.gates.filter((gate) => gate.doneAt).length}/{selected.gates.length}
                   </span>
                   {selected.gates.map((gate) =>
-                    canEdit ? (
+                    gate.label === AUTO_LINK_GATE ? (
+                      <span key={gate.id} className="flex items-center gap-2.5 py-2 text-[12.5px] text-[var(--ct-text-2)]">
+                        <span className={`grid h-4 w-4 place-items-center rounded border ${gate.doneAt ? 'border-[var(--ct-ok)] bg-[var(--ct-ok)] text-[var(--ct-on-accent)]' : 'border-[var(--ct-line-2)]'}`}>{gate.doneAt ? '✓' : ''}</span>
+                        <span className={gate.doneAt ? 'text-[var(--ct-text-3)] line-through' : ''}>{gate.label}</span>
+                        <span className={`${mono} ml-auto rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[10.5px] text-[var(--ct-text-3)]`} title="A Central marca sozinha quando o card tem teste A/B vinculado">auto</span>
+                      </span>
+                    ) : canEdit ? (
                       <form key={gate.id} action={toggleGate.bind(null, { ...context, gate_id: gate.id, done: !gate.doneAt, code: selected.code })}>
                         <button type="submit" className="flex w-full items-center gap-2.5 py-2 text-left text-[12.5px] text-[var(--ct-text-2)]">
                           <span className={`grid h-4 w-4 place-items-center rounded border ${gate.doneAt ? 'border-[var(--ct-accent)] bg-[var(--ct-accent)] text-[var(--ct-on-accent)]' : 'border-[var(--ct-line-2)]'}`}>{gate.doneAt ? '✓' : ''}</span>
