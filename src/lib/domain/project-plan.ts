@@ -1,20 +1,49 @@
-// The project's plan (0071): what the project produces and what it costs at most to produce it.
-// The result picks the cost metric every screen shows and every alert judges.
+// The project's plan (0071, 0094): what the project produces and what it costs at most to produce it.
+// The objective picks the metric every screen shows and every alert judges.
 
-export type ProjectResult = 'compra' | 'lead'
+export type ProjectResult = 'compra' | 'lead' | 'roas' | 'checkout' | 'visita' | 'alcance'
 
-export const PROJECT_RESULTS: Record<ProjectResult, { label: string; unit: string; perDay: string; cost: string; costMetric: 'cpa_geral' | 'cpl' }> = {
-  compra: { label: 'Compra', unit: 'vendas de entrada', perDay: 'vendas por dia', cost: 'CPA', costMetric: 'cpa_geral' },
-  lead: { label: 'Lead', unit: 'leads pagos', perDay: 'leads por dia', cost: 'CPL', costMetric: 'cpl' },
+export interface ResultInfo {
+  label: string
+  unit: string
+  perDay: string
+  /** The metric's short name: CPA, CPL, ROAS, CPM... */
+  cost: string
+  costMetric: 'cpa_geral' | 'cpl' | 'roas' | 'custo_checkout' | 'custo_visita' | 'cpm'
+  /** Compra and ROAS count sales; the others come from the campaigns. */
+  sales: boolean
+  /** ROAS is a return: higher is better, and the target is a minimum. */
+  higherIsBetter: boolean
+  description: string
+}
+
+export const PROJECT_RESULTS: Record<ProjectResult, ResultInfo> = {
+  compra: { label: 'Compra', unit: 'vendas de entrada', perDay: 'vendas por dia', cost: 'CPA', costMetric: 'cpa_geral', sales: true, higherIsBetter: false, description: 'Custo por venda de entrada. Mostra ROAS junto.' },
+  lead: { label: 'Lead', unit: 'leads pagos', perDay: 'leads por dia', cost: 'CPL', costMetric: 'cpl', sales: false, higherIsBetter: false, description: 'Custo por lead. Produto é opcional.' },
+  roas: { label: 'Receita (ROAS)', unit: 'de receita líquida', perDay: 'vendas por dia', cost: 'ROAS', costMetric: 'roas', sales: true, higherIsBetter: true, description: 'Receita por real gasto. Perpétuo, alto valor, otimização por valor.' },
+  checkout: { label: 'Checkout iniciado', unit: 'checkouts iniciados', perDay: 'checkouts por dia', cost: 'custo por checkout', costMetric: 'custo_checkout', sales: false, higherIsBetter: false, description: 'Oferta nova, antes de ter volume de venda.' },
+  visita: { label: 'Visita na página', unit: 'visitas na página', perDay: 'visitas por dia', cost: 'custo por visita', costMetric: 'custo_visita', sales: false, higherIsBetter: false, description: 'Tráfego para conteúdo ou captura fria.' },
+  alcance: { label: 'Alcance', unit: 'mil impressões', perDay: 'mil impressões por dia', cost: 'CPM', costMetric: 'cpm', sales: false, higherIsBetter: false, description: 'Distribuir conteúdo antes do lançamento.' },
 }
 
 export function readResult(raw: unknown): ProjectResult {
-  return raw === 'lead' ? 'lead' : 'compra'
+  return typeof raw === 'string' && raw in PROJECT_RESULTS ? (raw as ProjectResult) : 'compra'
 }
 
-/** Median daily cost per result over the days that had results: the starting point for a target. */
-export function suggestedCost(days: { spend: number; results: number }[]): number | null {
-  const costs = days.filter((day) => day.results > 0 && day.spend > 0).map((day) => day.spend / day.results).sort((a, b) => a - b)
+/** Whether the project's objective is read from sales (compra, ROAS) rather than from the campaigns. */
+export function resultUsesSales(raw: unknown): boolean {
+  return PROJECT_RESULTS[readResult(raw)].sales
+}
+
+/**
+ * Median daily cost per result over the days that had results: the starting point for a target.
+ * For a return (ROAS) it is the median of results per real spent.
+ */
+export function suggestedCost(days: { spend: number; results: number }[], higherIsBetter = false): number | null {
+  const costs = days
+    .filter((day) => day.results > 0 && day.spend > 0)
+    .map((day) => (higherIsBetter ? day.results / day.spend : day.spend / day.results))
+    .sort((a, b) => a - b)
   if (costs.length === 0) return null
   const middle = Math.floor(costs.length / 2)
   const median = costs.length % 2 ? costs[middle] : (costs[middle - 1] + costs[middle]) / 2

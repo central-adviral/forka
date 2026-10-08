@@ -1,3 +1,5 @@
+import { PROJECT_RESULTS, readResult, resultUsesSales } from './project-plan'
+
 // The five steps that make a project's numbers trustworthy, in the order each one uses the previous.
 // Built only from facts the Central already stores; nothing here writes.
 
@@ -68,10 +70,10 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
       id: 'produtos',
       label: 'Produtos',
       // A lead project's cost is the CPL: it counts leads, not sales, so it needs no entry product.
-      done: facts.resultado === 'lead' || facts.entryProducts > 0,
+      done: !resultUsesSales(facts.resultado) || facts.entryProducts > 0,
       text:
-        facts.resultado === 'lead'
-          ? 'Projeto de leads: o custo é o CPL, sem produto de entrada.'
+        !resultUsesSales(facts.resultado)
+          ? `Objetivo ${PROJECT_RESULTS[readResult(facts.resultado)].label.toLowerCase()}: o ${PROJECT_RESULTS[readResult(facts.resultado)].cost} sai das campanhas, sem produto de entrada.`
           : facts.entryProducts > 0
             ? `${plural(facts.entryProducts, 'produto', 'produtos')} de entrada.`
             : 'Nenhum produto com papel de entrada: o CPA não tem venda para contar.',

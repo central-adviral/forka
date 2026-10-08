@@ -1,4 +1,5 @@
 import type { ProjectQualityRow } from '@/lib/domain/project-quality'
+import { PROJECT_RESULTS, readResult, resultUsesSales } from '@/lib/domain/project-plan'
 
 // "Mapa do projeto": campaigns → fronts → project → products → sales, with the last 30 days in
 // each box and a red box where something is empty, so the why of every number is one picture.
@@ -69,15 +70,15 @@ export function ProjectMap({ fronts, products, quality, resultado }: { fronts: M
         <Box title="Projeto" empty={null}>
           <p className="font-[family-name:var(--font-geist-mono)] text-[20px] font-semibold tabular-nums">{brl(spend)}</p>
           <p className="text-[12.5px] text-[var(--ct-text-2)]">
-            {resultado === 'lead'
-              ? 'investimento das frentes ÷ leads = CPL'
+            {!PROJECT_RESULTS[readResult(resultado)].sales
+              ? `objetivo ${PROJECT_RESULTS[readResult(resultado)].label.toLowerCase()}: ${PROJECT_RESULTS[readResult(resultado)].cost} sai das campanhas`
               : `investimento ÷ ${entries.toLocaleString('pt-BR')} vendas de entrada = ${entries > 0 ? brl(spend / entries) : '—'} de CPA geral`}
           </p>
         </Box>
         <Arrow />
         <Box
           title="Produtos e papel"
-          empty={resultado !== 'lead' && !products.some((product) => product.role === 'entrada') ? 'Nenhum produto de entrada: o CPA não tem venda para contar.' : null}
+          empty={resultUsesSales(resultado) && !products.some((product) => product.role === 'entrada') ? 'Nenhum produto de entrada: o CPA não tem venda para contar.' : null}
         >
           <ul className="flex flex-col gap-1.5 text-[13px]">
             {products.map((product) => (
@@ -91,7 +92,7 @@ export function ProjectMap({ fronts, products, quality, resultado }: { fronts: M
           </ul>
         </Box>
         <Arrow />
-        <Box title="De onde veio o comprador" empty={quality && entries === 0 && resultado !== 'lead' ? 'Nenhuma venda de entrada no período.' : null}>
+        <Box title="De onde veio o comprador" empty={quality && entries === 0 && resultUsesSales(resultado) ? 'Nenhuma venda de entrada no período.' : null}>
           {quality && (
             <ul className="flex flex-col gap-1.5 text-[13px]">
               <li className="flex justify-between gap-3">

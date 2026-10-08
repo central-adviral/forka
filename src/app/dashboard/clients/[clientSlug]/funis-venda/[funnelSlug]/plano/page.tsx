@@ -40,7 +40,7 @@ export default async function ProjectPlanPage({
   const [days, frontResult, watchersResult, canEdit] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
     supabase.rpc('get_project_front_daily', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
-    supabase.from('watchers').select('metric, target, warn_pct, crit_pct, min_spend').eq('sales_funnel_id', funnel.id).is('front_id', null).in('metric', ['cpa_geral', 'cpl']),
+    supabase.from('watchers').select('metric, target, warn_pct, crit_pct, min_spend').eq('sales_funnel_id', funnel.id).eq('is_plan', true),
     canActAs(supabase, client.id, 'gestor'),
   ])
   if (frontResult.error) throw frontResult.error
@@ -53,15 +53,25 @@ export default async function ProjectPlanPage({
   const series: Record<ProjectResult, { spend: number; results: number }[]> = {
     compra: days.map((day) => ({ spend: day.spendComImposto, results: day.vendas })),
     lead: days.map((day) => ({ spend: day.spendComImposto, results: leadsByDay.get(day.data) ?? 0 })),
+    roas: days.map((day) => ({ spend: day.spendComImposto, results: day.receitaLiquida })),
+    checkout: days.map((day) => ({ spend: day.spendComImposto, results: day.initiateCheckout })),
+    visita: days.map((day) => ({ spend: day.spendComImposto, results: day.landingPageViews })),
+    alcance: days.map((day) => ({ spend: day.spendComImposto, results: day.impressions / 1000 })),
   }
+  // ROAS's daily volume is still sales; its series above is revenue, for the return.
+  const volumeSeries = (result: ProjectResult) => (result === 'roas' ? series.compra : series[result])
   const found = (Object.keys(PROJECT_RESULTS) as ProjectResult[]).map((result) => {
+    const info = PROJECT_RESULTS[result]
     const total = series[result].reduce((sum, day) => sum + day.results, 0)
     const spend = series[result].reduce((sum, day) => sum + day.spend, 0)
-    return { result, total, cost: total > 0 ? spend / total : null, suggestedCost: suggestedCost(series[result]), suggestedVolume: suggestedVolume(series[result]) }
+    const cost = total > 0 && spend > 0 ? (info.higherIsBetter ? total / spend : spend / total) : null
+    return { result, total, cost, suggestedCost: suggestedCost(series[result], info.higherIsBetter), suggestedVolume: suggestedVolume(volumeSeries(result)) }
   })
+  const metricText = (result: ProjectResult, value: number) =>
+    PROJECT_RESULTS[result].higherIsBetter ? `${value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}x` : currency(value)
   const resultado = readResult(funnel.resultado)
   const current = found.find((option) => option.result === resultado)!
-  const watcher = (watchersResult.data ?? []).find((row) => row.metric === PROJECT_RESULTS[resultado].costMetric) ?? (watchersResult.data ?? [])[0]
+  const watcher = (watchersResult.data ?? [])[0]
   const context = { client_id: client.id as string, client_slug: client.slug as string, funnel_slug: funnel.slug as string, sales_funnel_id: funnel.id as string }
   const base = `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`
 
@@ -89,7 +99,7 @@ export default async function ProjectPlanPage({
             <b className="text-[15px]">1 · Resultado</b>
             <span className={`${mono} text-[11.5px] text-[var(--ct-text-3)]`}>encontrado nos últimos {LOOKBACK_DAYS} dias fechados</span>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {found.map((option) => (
               <label
                 key={option.result}
@@ -100,9 +110,10 @@ export default async function ProjectPlanPage({
                   <b className="text-[14px]">{PROJECT_RESULTS[option.result].label}</b>
                   <span className="text-[12px] text-[var(--ct-text-3)]">mede {PROJECT_RESULTS[option.result].cost}</span>
                 </span>
+                <span className="text-[12px] text-[var(--ct-text-3)]">{PROJECT_RESULTS[option.result].description}</span>
                 <span className={`${mono} text-[12.5px] text-[var(--ct-text-2)]`}>
-                  {option.total.toLocaleString('pt-BR')} {PROJECT_RESULTS[option.result].unit}
-                  {option.cost !== null ? ` · ${PROJECT_RESULTS[option.result].cost} ${currency(option.cost)}` : ''}
+                  {option.result === 'roas' ? currency(option.total) : Math.round(option.total).toLocaleString('pt-BR')} {PROJECT_RESULTS[option.result].unit}
+                  {option.cost !== null ? ` · ${PROJECT_RESULTS[option.result].cost} ${metricText(option.result, option.cost)}` : ''}
                 </span>
                 {option.total === 0 && <span className="text-[11.5px] text-[var(--ct-warn)]">sem dado no período</span>}
               </label>
@@ -121,7 +132,7 @@ export default async function ProjectPlanPage({
             <span className={`${mono} text-[11.5px] text-[var(--ct-text-3)]`}>sugestão = mediana dos dias fechados</span>
           </div>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-            Custo-alvo por resultado ({PROJECT_RESULTS[resultado].cost})
+            {PROJECT_RESULTS[resultado].higherIsBetter ? `${PROJECT_RESULTS[resultado].cost} mínimo (x)` : `Custo-alvo por resultado (${PROJECT_RESULTS[resultado].cost})`}
             <input
               name="cost_target"
               inputMode="decimal"

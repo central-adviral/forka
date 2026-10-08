@@ -20,6 +20,7 @@ import { headerAction } from '@/components/header-actions'
 import { FrontsPanel, type FrontDayRow, type FrontInfo } from './fronts-panel'
 import { readAnalysisTab } from '@/lib/domain/analysis-tabs'
 import { cpaSources, qualitySeals, type ProjectQualityRow } from '@/lib/domain/project-quality'
+import { PROJECT_RESULTS, readResult, resultUsesSales } from '@/lib/domain/project-plan'
 
 export default async function SalesFunnelPage({
   params,
@@ -180,7 +181,7 @@ export default async function SalesFunnelPage({
         <PageHeader
           note={
             <>
-              {funnel.resultado === 'lead' ? 'projeto de lead' : 'projeto de compra'}
+              {`objetivo: ${PROJECT_RESULTS[readResult(funnel.resultado)].label.toLowerCase()}`}
               {rows.length > 0 ? ` · investimento das ${rows[0].spendSource === 'frentes' ? 'regras de campanha' : 'operações do LaunchOps'}` : ''}
             </>
           }
@@ -331,7 +332,7 @@ export default async function SalesFunnelPage({
             : undefined
         }
       />
-      {quality && funnel.resultado !== 'lead' && (
+      {quality && resultUsesSales(funnel.resultado) && (
         <details className="-mt-3 mb-6 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-5 py-3">
           <summary className="cursor-pointer text-[13px] font-medium text-[var(--ct-text-2)]">De onde vem o CPA</summary>
           <dl className="mt-3 grid gap-x-6 gap-y-1.5 text-[13px] sm:grid-cols-[minmax(0,1fr)_auto]">
