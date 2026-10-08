@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { checkFindings, type PageSuggestion } from '@/lib/domain/page-probe'
+import { PAGE_KINDS, PAGE_KIND_LABEL, type PageKind } from '@/lib/domain/project-wizard'
 import type { ExistingPage } from '@/lib/repo/pages-repo'
 import { movePage, type TestPageResult } from './actions'
 
@@ -12,6 +13,7 @@ const stepTitle = 'text-[14px] font-semibold'
 
 export interface PageFormValues {
   label: string
+  tipo: PageKind | null
   url: string
   salesFunnelId: string | null
   frontId: string | null
@@ -142,6 +144,17 @@ export function PageForm({
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Nome
             <input name="label" required maxLength={60} value={label} onChange={(event) => setLabel(event.target.value)} placeholder="ex.: Página de vendas 1K" className={field} />
+          </label>
+          <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+            Tipo
+            <select name="tipo" defaultValue={initial.tipo ?? ''} className={field}>
+              <option value="">Sem tipo</option>
+              {PAGE_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {PAGE_KIND_LABEL[kind]}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Projeto que manda tráfego para ela

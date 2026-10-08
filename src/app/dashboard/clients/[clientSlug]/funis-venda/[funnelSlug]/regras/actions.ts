@@ -29,12 +29,23 @@ function databaseMessage(error: { code?: string; message: string }, duplicate: s
   return error.message
 }
 
+const windowDay = z.union([z.literal(''), z.iso.date()]).transform((value) => value || null)
+// A mirror reads the other project only inside its own window (0104): both dates, in order.
+const mirrorWindow = z
+  .object({ janela_inicio: windowDay, janela_fim: windowDay })
+  .refine((value) => value.janela_inicio && value.janela_fim, 'a frente espelho precisa da janela: início e fim')
+  .refine((value) => !value.janela_inicio || !value.janela_fim || value.janela_fim >= value.janela_inicio, 'o fim da janela vem antes do início')
+
 const frontSchema = z.object({
   code: z.string().trim().min(1, 'informe o código da frente').max(24).transform((value) => value.toUpperCase()),
   name: z.string().trim().min(1, 'informe o nome da frente').max(60),
   // Empty = the front owns campaigns through name rules; a project id = the front reads that project (0054).
   source_sales_funnel_id: z.union([z.literal(''), z.string().uuid()]).transform((value) => value || null),
 })
+
+function readWindow(formData: FormData) {
+  return mirrorWindow.safeParse({ janela_inicio: formData.get('janela_inicio') ?? '', janela_fim: formData.get('janela_fim') ?? '' })
+}
 
 export async function createFront(context: RulesContext, formData: FormData) {
   const result = frontSchema.safeParse({
@@ -43,6 +54,8 @@ export async function createFront(context: RulesContext, formData: FormData) {
     source_sales_funnel_id: formData.get('source_sales_funnel_id') ?? '',
   })
   if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '))
+  const dates = result.data.source_sales_funnel_id ? readWindow(formData) : null
+  if (dates && !dates.success) back(context, 'erro', dates.error.issues.map((issue) => issue.message).join('; '))
   const supabase = await createServerSupabaseClient()
   const { count } = await supabase
     .from('project_fronts')
@@ -53,6 +66,7 @@ export async function createFront(context: RulesContext, formData: FormData) {
     code: result.data.code,
     name: result.data.name,
     source_sales_funnel_id: result.data.source_sales_funnel_id,
+    ...dates?.data,
     position: count ?? 0,
   })
   if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste projeto (veja também as arquivadas).`))
@@ -61,7 +75,7 @@ export async function createFront(context: RulesContext, formData: FormData) {
     context,
     'ok',
     result.data.source_sales_funnel_id
-      ? `Frente ${result.data.code} criada. Ela lê o outro projeto dentro da janela deste.`
+      ? `Frente ${result.data.code} criada. Ela lê o outro projeto só dentro da janela dela.`
       : `Frente ${result.data.code} criada. Agora adicione as regras de nome.`
   )
 }
@@ -92,10 +106,13 @@ export async function updateFront(context: RulesContext & { front_id: string }, 
     alvo_secundaria: text('alvo_secundaria'),
   })
   if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '))
+  // Only a mirror's form carries the window.
+  const dates = formData.has('janela_inicio') ? readWindow(formData) : null
+  if (dates && !dates.success) back(context, 'erro', dates.error.issues.map((issue) => issue.message).join('; '))
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase
     .from('project_fronts')
-    .update(result.data)
+    .update({ ...result.data, ...dates?.data })
     .eq('id', context.front_id)
     .select('id')
   if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste projeto (veja também as arquivadas).`))

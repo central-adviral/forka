@@ -234,7 +234,7 @@ export function ProjectWizard(props: Props) {
               <input aria-label="Nome da frente" value={front.name} maxLength={60} onChange={(event) => setFront(index, { name: event.target.value })} className={`${field} min-w-0 flex-1 basis-40`} />
               <div className="flex rounded-full border border-[var(--ct-line-2)] p-0.5" role="group" aria-label="Tipo da frente">
                 {(['propria', 'espelho'] as const).map((kind) => (
-                  <button key={kind} type="button" aria-pressed={front.kind === kind} onClick={() => setFront(index, { kind })} className={`min-h-[34px] rounded-full px-3 text-[12.5px] ${front.kind === kind ? 'bg-[var(--ct-text)] text-[var(--ct-surface)]' : ''}`}>
+                  <button key={kind} type="button" aria-pressed={front.kind === kind} onClick={() => setFront(index, kind === 'espelho' && !front.windowStart && !front.windowEnd ? { kind, windowStart: project.startsOn, windowEnd: project.endsOn } : { kind })} className={`min-h-[34px] rounded-full px-3 text-[12.5px] ${front.kind === kind ? 'bg-[var(--ct-text)] text-[var(--ct-surface)]' : ''}`}>
                     {kind === 'propria' ? 'Própria' : 'Espelho'}
                   </button>
                 ))}
@@ -300,9 +300,17 @@ export function ProjectWizard(props: Props) {
                         ))}
                       </select>
                     </label>
-                    <span className="text-[12px] text-[var(--ct-text-3)]">
-                      O espelho só soma gasto, dentro da janela do projeto ({project.startsOn && project.endsOn ? `${project.startsOn} a ${project.endsOn}` : 'preencha início e fim no passo 1'}). As vendas ficam com o projeto dono.
-                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className={label}>
+                        Janela: início
+                        <input type="date" value={front.windowStart} onChange={(event) => setFront(index, { windowStart: event.target.value })} className={field} />
+                      </label>
+                      <label className={label}>
+                        Janela: fim
+                        <input type="date" value={front.windowEnd} onChange={(event) => setFront(index, { windowEnd: event.target.value })} className={field} />
+                      </label>
+                    </div>
+                    <span className="text-[12px] text-[var(--ct-text-3)]">O espelho só soma o gasto do outro projeto nos dias dentro desta janela. As vendas ficam com o projeto dono.</span>
                   </>
                 )}
               </div>

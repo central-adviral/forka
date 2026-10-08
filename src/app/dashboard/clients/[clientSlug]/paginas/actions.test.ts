@@ -66,6 +66,7 @@ describe('savePage', () => {
   const form = () => {
     const data = new FormData()
     data.set('label', 'Vendas')
+    data.set('tipo', 'vendas')
     data.set('url', 'https://www.exemplo.com.br/oferta')
     data.set('watch_pixel', 'on')
     return data
@@ -86,7 +87,7 @@ describe('savePage', () => {
     role.activePages = 9
     await expect(savePage(context, form())).rejects.toThrow(/redirect:.*ok=/)
     expect(role.inserted).toEqual([
-      { client_id: 'client-1', label: 'Vendas', url: 'https://www.exemplo.com.br/oferta', sales_funnel_id: null, front_id: null, watch_pixel: true, watch_checkout: false, required_text: null },
+      { client_id: 'client-1', label: 'Vendas', tipo: 'vendas', url: 'https://www.exemplo.com.br/oferta', sales_funnel_id: null, front_id: null, watch_pixel: true, watch_checkout: false, required_text: null },
     ])
   })
 

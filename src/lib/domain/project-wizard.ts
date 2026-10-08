@@ -32,6 +32,9 @@ export interface WizardFront {
   tagEdited: boolean
   /** The project a mirror front reads. */
   sourceProjectId: string | null
+  /** A mirror's own date window (YYYY-MM-DD, '' when empty): it reads spend only inside it. */
+  windowStart: string
+  windowEnd: string
   /** Own metrics: off follows the project and has no alert of its own. */
   own: boolean
   primary: ProjectResult
@@ -137,6 +140,8 @@ export function newFront(projectName: string, preset: Partial<FrontPreset> & { n
     tag: frontTag(projectName, preset.code),
     tagEdited: false,
     sourceProjectId: null,
+    windowStart: '',
+    windowEnd: '',
     own: preset.own ?? false,
     primary,
     primaryTarget: DEFAULT_TARGET[primary],
@@ -318,7 +323,8 @@ export function seals(project: WizardProject, context: SealContext): Seal[] {
       if (preview.campaigns.length && !front.pages.some((page) => page.url.trim())) out.push({ tone: 'warn', text: `Frente ${front.name} recebe anúncio e não tem página vigiada.`, step: 1 })
     } else {
       if (!front.sourceProjectId) out.push({ tone: 'crit', text: `Frente espelho ${front.name} sem projeto de origem.`, step: 1 })
-      if (!project.startsOn || !project.endsOn) out.push({ tone: 'crit', text: `Frente espelho ${front.name} sem janela: preencha início e fim do projeto.`, step: 0, draftOk: true })
+      if (!front.windowStart || !front.windowEnd) out.push({ tone: 'crit', text: `Frente espelho ${front.name} sem janela de datas.`, step: 1, draftOk: true })
+      else if (front.windowEnd < front.windowStart) out.push({ tone: 'crit', text: `Frente espelho ${front.name}: o fim da janela vem antes do início.`, step: 1 })
     }
     if (front.own && front.primary === front.secondary) out.push({ tone: 'crit', text: `Frente ${front.name}: a métrica secundária precisa ser diferente da principal.`, step: 1 })
     if (front.own && (!(front.primaryTarget > 0) || !(front.secondaryTarget > 0))) out.push({ tone: 'crit', text: `Frente ${front.name}: preencha os alvos das métricas próprias.`, step: 1, draftOk: true })
@@ -357,16 +363,15 @@ export interface SourceProject {
     primaryTarget: number | null
     secondary: ProjectResult | null
     secondaryTarget: number | null
-    pages: { url: string; label: string }[]
+    pages: { url: string; tipo: PageKind | null }[]
   }[]
   products: { produto_nome: string; papel: ProductRole }[]
 }
 
-const kindFromLabel = (label: string): PageKind => PAGE_KINDS.find((kind) => label.toLowerCase().startsWith(kind)) ?? 'vendas'
-
 /**
  * "Duplicar de um projeto anterior": fronts, metrics, targets, products and pages. The old project's
- * tag in each front's rule becomes the new project's; pages come marked for review.
+ * tag in each front's rule becomes the new project's; pages come marked for review. A mirror's
+ * window is not copied: the old dates belong to the old project.
  */
 export function duplicateProject(project: WizardProject, source: SourceProject): WizardProject {
   const name = project.name.trim() ? project.name : `${source.name} (cópia)`
@@ -387,7 +392,7 @@ export function duplicateProject(project: WizardProject, source: SourceProject):
       primaryTarget: front.primaryTarget ?? base.primaryTarget,
       secondary: front.secondary ?? base.secondary,
       secondaryTarget: front.secondaryTarget ?? base.secondaryTarget,
-      pages: front.pages.map((page) => ({ kind: kindFromLabel(page.label), url: page.url, review: true })),
+      pages: front.pages.map((page) => ({ kind: page.tipo ?? 'vendas', url: page.url, review: true })),
     }
   })
   return {

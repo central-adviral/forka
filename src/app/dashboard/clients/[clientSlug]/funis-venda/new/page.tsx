@@ -8,7 +8,7 @@ import { saoPauloDay } from '@/lib/repo/today-repo'
 import { canActAs } from '@/lib/view-as'
 import { readResult, type ProjectResult } from '@/lib/domain/project-plan'
 import type { ClassifiedCampaign } from '@/lib/domain/campaign-rules'
-import type { ExistingPage, PreviewCampaign, ProjectModel, SourceProject } from '@/lib/domain/project-wizard'
+import type { ExistingPage, PageKind, PreviewCampaign, ProjectModel, SourceProject } from '@/lib/domain/project-wizard'
 import type { ProductRole } from '@/lib/domain/product-roles'
 import { PageHeader } from '@/components/page-header'
 import { ProjectWizard } from './project-wizard'
@@ -47,7 +47,7 @@ export default async function NewProjectPage({ params }: { params: Promise<{ cli
       .order('position'),
     supabase.from('watchers').select('sales_funnel_id, target, plan_role').eq('client_id', client.id).is('front_id', null).not('plan_role', 'is', null),
     supabase.from('project_products').select('sales_funnel_id, produto_nome, papel, sales_funnels!inner(client_id)').eq('sales_funnels.client_id', client.id),
-    supabase.from('pages').select('url, label, is_active, front_id, sales_funnel_id').eq('client_id', client.id),
+    supabase.from('pages').select('url, tipo, is_active, front_id, sales_funnel_id').eq('client_id', client.id),
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: saoPauloDay(-LOOKBACK_DAYS), p_until: saoPauloDay(1) }),
   ])
   for (const result of [projects, fronts, watchers, products, pages, campaigns]) if (result.error) throw result.error
@@ -56,7 +56,7 @@ export default async function NewProjectPage({ params }: { params: Promise<{ cli
   const frontRows = (fronts.data ?? []) as unknown as FrontRow[]
   const projectName = new Map(projectRows.map((project) => [project.id, project.name]))
   const frontById = new Map(frontRows.map((front) => [front.id, front]))
-  const pageRows = (pages.data ?? []) as { url: string; label: string; is_active: boolean; front_id: string | null; sales_funnel_id: string | null }[]
+  const pageRows = (pages.data ?? []) as { url: string; tipo: PageKind | null; is_active: boolean; front_id: string | null; sales_funnel_id: string | null }[]
 
   const previewCampaigns: PreviewCampaign[] = ((campaigns.data ?? []) as ClassifiedCampaign[]).map((campaign) => {
     const owner = campaign.front_ids[0] ? frontById.get(campaign.front_ids[0]) : undefined
@@ -90,7 +90,7 @@ export default async function NewProjectPage({ params }: { params: Promise<{ cli
           primaryTarget: front.alvo_principal,
           secondary: front.metrica_secundaria,
           secondaryTarget: front.alvo_secundaria,
-          pages: pageRows.filter((page) => page.front_id === front.id).map((page) => ({ url: page.url, label: page.label })),
+          pages: pageRows.filter((page) => page.front_id === front.id).map((page) => ({ url: page.url, tipo: page.tipo })),
         })),
       products: productRows.filter((row) => row.sales_funnel_id === project.id).map((row) => ({ produto_nome: row.produto_nome, papel: row.papel })),
     }))
