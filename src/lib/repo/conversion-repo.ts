@@ -45,3 +45,18 @@ export async function insertConversionIfNew(
   }
   return 'inserted'
 }
+
+/** Whether this invoice was refunded (0083): a re-delivered payment must not bring it back. */
+export async function wasRefunded(db: SupabaseClient, externalEventId: string): Promise<boolean> {
+  const { count, error } = await db.from('conversion_refunds').select('conversion_id', { count: 'exact', head: true }).eq('external_event_id', externalEventId)
+  if (error) throw error
+  return (count ?? 0) > 0
+}
+
+/** Moves a refunded Hubla sale out of the test's numbers (0083). False when nothing matched. */
+export async function refundHublaConversion(db: SupabaseClient, params: { clientId: string; externalEventId: string; refundedAt: string }): Promise<boolean> {
+  const { data, error } = await db.rpc('refund_hubla_conversion', { p_client_id: params.clientId, p_external_event_id: params.externalEventId, p_refunded_at: params.refundedAt })
+  if (error) throw error
+  return data === true
+}
+

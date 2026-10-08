@@ -33,7 +33,7 @@ describe('linkVerdict', () => {
     expect(verdict.winnerName).toBe('B · ancorado')
     expect(verdict.chancePct).toBe(96)
     expect(verdict.liftPct).toBe(21)
-    expect(verdict.checks.filter((check) => check.ok).map((check) => check.label)).toEqual(['Amostra', 'Sorteio no peso', 'Ciclo de 7+ dias', 'Sem outro teste na camada'])
+    expect(verdict.checks.filter((check) => check.ok).map((check) => check.label)).toEqual(['Amostra', 'Sorteio no peso', 'Ciclo de 7+ dias', 'Sem outro teste na camada', 'Reembolsos'])
   })
 
   it('flags a short cycle and a test outside a project', () => {

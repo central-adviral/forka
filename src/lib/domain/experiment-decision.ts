@@ -59,7 +59,7 @@ export function linkVerdict(read: LinkVariantRead[], daysRunning: number, hasPro
       { ok: srm === 'ok', label: 'Sorteio no peso', value: srm === 'ok' ? 'ok' : srm === 'mismatch' ? 'fora do peso' : 'não conferido' },
       { ok: daysRunning >= MIN_CYCLE_DAYS, label: `Ciclo de ${MIN_CYCLE_DAYS}+ dias`, value: `${daysRunning} ${daysRunning === 1 ? 'dia' : 'dias'}` },
       { ok: hasProject, label: 'Sem outro teste na camada', value: hasProject ? 'teste no projeto' : 'teste sem projeto: a venda pode contar em outro' },
-      { ok: false, label: 'Reembolsos', value: 'ainda não entram na conta' },
+      { ok: true, label: 'Reembolsos', value: 'descontados (webhook da Hubla)' },
     ],
   }
 }
