@@ -109,7 +109,7 @@ export async function toggleSalesFunnelStatus(input: z.infer<typeof toggleSalesF
     .eq('id', parsed.sales_funnel_id)
     .select('id')
   if (error) throw error
-  if (!data || data.length === 0) throw new Error('Sales funnel not found or not authorized to update')
+  if (!data || data.length === 0) throw new Error('Projeto não encontrado ou você não tem permissão para alterá-lo.')
 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/funis-venda`)
 }

@@ -433,7 +433,7 @@ export default async function TestReportPage({
     : null
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col pb-20 sm:pb-0">
       <div className="flex flex-shrink-0 flex-wrap items-start justify-between gap-4 border-b border-[var(--ct-line)] px-8 py-4">
         <div>
           <a
@@ -734,7 +734,29 @@ export default async function TestReportPage({
           const perPerson = (row: ReportRow) => (row.visits > 0 ? Number(row.revenue_cents) / row.visits / 100 : 0)
           const buyerRate = (row: ReportRow) => (row.visits > 0 ? (row.conversions / row.visits) * 100 : 0)
           return (
-            <div className="overflow-x-auto rounded-2xl border border-[var(--ct-line)]">
+            <>
+            {/* Below 640px each row is a card with the numbers that decide; nothing gets cut. */}
+            <div className="flex flex-col gap-2 sm:hidden">
+              {rows.map((row) => (
+                <div key={row.variant_id} className="grid grid-cols-3 gap-2 rounded-2xl border border-[var(--ct-line)] bg-[var(--ct-surface)] px-4 py-3">
+                  <b className="col-span-3 text-[14px]">{row.variant_name}</b>
+                  {[
+                    ['pessoas', row.visits.toLocaleString('pt-BR')],
+                    ['compradores', row.conversions.toLocaleString('pt-BR')],
+                    ['taxa', `${buyerRate(row).toFixed(1)}%`],
+                    ['vendas', Number(row.sales).toLocaleString('pt-BR')],
+                    ['faturamento', `R$ ${(Number(row.revenue_cents) / 100).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`],
+                    ['R$/pessoa', `R$ ${perPerson(row).toFixed(2)}`],
+                  ].map(([label, value]) => (
+                    <span key={label} className="flex flex-col">
+                      <span className="font-[family-name:var(--font-geist-mono)] text-[13px]">{value}</span>
+                      <span className="text-[11px] text-[var(--ct-text-3)]">{label}</span>
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto rounded-2xl border border-[var(--ct-line)] sm:block">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-[var(--ct-line)] bg-[var(--ct-surface-2)] text-left">
@@ -798,6 +820,7 @@ export default async function TestReportPage({
                 </tbody>
               </table>
             </div>
+            </>
           )
         })()}
       </div>
@@ -954,6 +977,26 @@ export default async function TestReportPage({
       <InsightPanel testId={test.id} sinceIso={sinceIso} untilIso={untilIso} />
         </>
       )}
+
+      {/* On a phone the two things a gestor does in the field stay under the thumb. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-2 border-t border-[var(--ct-line)] bg-[var(--ct-surface)]/95 px-4 py-3 backdrop-blur sm:hidden">
+        <span className="min-w-0 flex-1 truncate font-[family-name:var(--font-geist-mono)] text-[11.5px] text-[var(--ct-text-2)]">{redirectUrl}</span>
+        <CopyButton text={redirectUrl} />
+        {canEdit && !archived && (
+          <form
+            action={toggleTestStatus.bind(null, {
+              test_id: test.id,
+              next_status: test.status === 'active' ? 'paused' : 'active',
+              client_slug: clientSlug,
+              test_slug: test.slug,
+            })}
+          >
+            <button type="submit" className="h-8 rounded-[9px] border border-[var(--ct-line-2)] px-3 text-[12.5px] font-medium text-[var(--ct-text-2)]">
+              {test.status === 'active' ? 'Pausar' : 'Ativar'}
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   )
 }
