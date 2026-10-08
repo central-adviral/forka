@@ -15,7 +15,7 @@ export const PLAYBOOK_DONTS = [
   'mudar o peso das variantes',
   'pausar uma variante "que está perdendo"',
   'decidir antes de 7 dias',
-  'rodar outro teste na mesma camada',
+  'mandar o mesmo anúncio para dois testes do mesmo tipo',
 ] as const
 
 /** The step of the calendar the test is in, by days running (day 0 is the day it went live). */

@@ -60,12 +60,11 @@ async function buyersOf(db: SupabaseClient, testId: string) {
   return (data as { conversions: number }[]).reduce((sum, row) => sum + Number(row.conversions), 0)
 }
 
-describe('0078: one active test per layer in a project, credit inside the project', () => {
-  it('refuses a second active page test in a project, takes a checkout test beside it, and still creates without a project', async () => {
+describe('0078/0087: tests in a project, credit inside the project', () => {
+  it('runs several active tests of one type in a project (0087), a checkout test beside them, and still creates without a project', async () => {
     const { owner, clientId, f } = await setup()
     expect((await createTest(owner, clientId, 'page', f)).error).toBeNull()
-    const second = await createTest(owner, clientId, 'page', f)
-    expect(second.error?.message).toContain('tests_one_active_per_layer')
+    expect((await createTest(owner, clientId, 'page', f)).error).toBeNull()
     expect((await createTest(owner, clientId, 'checkout', f)).error).toBeNull()
     // A call without the project, as code deployed before 0078 makes it.
     expect((await createTest(owner, clientId, 'page', null)).error).toBeNull()

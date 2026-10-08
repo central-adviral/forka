@@ -9,7 +9,6 @@ import { matchTestVariant } from '@/lib/domain/experiment-decision'
 import { equalWeights, experimentSlug, experimentVariantName } from '@/lib/domain/experiment-link'
 import { findTaggedCards } from '@/lib/repo/backlog-readout-repo'
 import { httpUrl } from '@/lib/domain/http-url-schema'
-import { layerConflict } from '@/lib/domain/test-layers'
 
 // Writes go through the user's session: the 0068 policies only let a gestor or owner change the
 // backlog. A write RLS refuses touches no row without raising, so every write selects what it
@@ -131,8 +130,8 @@ function readLinkFields(formData: FormData, names: string[]): LinkFields | { err
 }
 
 /**
- * Creates the card's A/B test in its project, paused until the card runs (two running tests in one
- * layer would split a sale, 0078), links it to the card and checks the "Link /r criado" gate.
+ * Creates the card's A/B test in its project, paused until the card runs, links it to the card and
+ * checks the "Link /r criado" gate.
  */
 async function createExperimentTest(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
@@ -200,7 +199,7 @@ export async function moveItem(context: BacklogContext & { item_id: string; code
   // The card drives its A/B test: Rodando turns the link on, leaving Rodando parks it on the control.
   if (item.ab_test_id && (to === 'running' || item.status === 'running') && to !== 'decided') {
     const { error: testError } = await supabase.from('tests').update({ status: to === 'running' ? 'active' : 'paused' }).eq('id', item.ab_test_id).is('archived_at', null)
-    if (testError) back(context, 'erro', (layerConflict(testError) ?? testError).message, `&item=${context.code}`)
+    if (testError) back(context, 'erro', testError.message, `&item=${context.code}`)
   }
   // Leaving Rodando clears the start, so a test that goes live again is measured from the new start.
   const { data: moved, error } = await supabase

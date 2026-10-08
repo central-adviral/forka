@@ -4,7 +4,6 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { httpUrl } from '@/lib/domain/http-url-schema'
-import { layerConflict } from '@/lib/domain/test-layers'
 
 const variantSchema = z.object({
   name: z.string().min(1),
@@ -55,7 +54,7 @@ export async function createTest(input: z.infer<typeof createTestSchema>) {
       thank_you_url: v.thank_you_url || null,
     })),
   })
-  if (error) throw layerConflict(error) ?? error
+  if (error) throw error
 }
 
 // Archived, never deleted: the clicks and conversions stay for late sales, and the slug stays
@@ -87,7 +86,7 @@ export async function toggleTestStatus(input: z.infer<typeof toggleTestStatusSch
     .update({ status: parsed.next_status })
     .eq('id', parsed.test_id)
     .select('id')
-  if (error) throw layerConflict(error) ?? error
+  if (error) throw error
   if (!data || data.length === 0) throw new Error('Teste não encontrado ou você não tem permissão para alterá-lo.')
 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests`)
