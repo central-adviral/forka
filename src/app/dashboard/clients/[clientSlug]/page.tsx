@@ -20,7 +20,7 @@ type Period = (typeof PERIODS)[number]['value']
 const TOOL_LABEL: Record<AttentionItem['tool'], string> = {
   painel: 'Painel de Controle',
   analises: 'Análises',
-  ab: 'Teste A/B',
+  ab: 'Testes',
   config: 'Configurar',
 }
 const TOOL_TONE: Record<AttentionItem['tool'], string> = {
@@ -235,7 +235,7 @@ export default async function TodayPage({
         <div className="grid gap-5 md:grid-cols-3">
           {[
             { href: `${base}/funis-venda`, title: 'Análises', color: 'var(--ct-an)', stat: `${(funnels ?? []).filter((f) => f.is_active).length} projetos ativos`, text: 'Frentes, funil, origem das vendas e criativos de cada projeto.' },
-            { href: `${base}/tests`, title: 'Teste A/B', color: 'var(--ct-ab)', stat: `${(activeTests ?? []).length} testes rodando`, text: 'Sorteio no clique, venda devolvida ao anúncio e veredito com probabilidade.' },
+            { href: `${base}/tests`, title: 'Testes', color: 'var(--ct-ab)', stat: `${(activeTests ?? []).length} testes rodando`, text: 'Sorteio no clique, venda devolvida ao anúncio e veredito com probabilidade.' },
             { href: firstProject ? `${base}/funis-venda/${firstProject.slug}/regras` : `${base}/funis-venda`, title: 'Regras de campanha', color: 'var(--ct-painel)', stat: `${conflicts.length + orphans.length} campanhas sem dono`, text: 'Quem é dono de cada campanha, e o que fica em Não classificado.' },
           ].map((door) => (
             <Link

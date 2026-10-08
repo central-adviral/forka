@@ -103,7 +103,7 @@ export async function createItem(context: BacklogContext, formData: FormData) {
       revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
       redirect(`/dashboard/clients/${context.client_slug}/tests/${created.slug}/link`)
     }
-    linkNote = ` O link não foi criado: ${created.error} Crie em Testes A/B e vincule no card.`
+    linkNote = ` O link não foi criado: ${created.error} Crie em Testes › A/B de link e vincule no card.`
   }
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
   back(context, 'ok', `${code} entrou na fila.${linkNote}`, `&item=${code}`)
