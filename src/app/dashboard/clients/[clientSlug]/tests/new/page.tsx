@@ -133,160 +133,221 @@ export default function NewTestPage() {
     setVariants((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const testTypes = [
+    { value: 'page' as const, title: 'Teste de página', text: 'Cada variante é uma página de vendas diferente.', glyph: '▤' },
+    { value: 'checkout' as const, title: 'Teste de checkout', text: 'Mesma página para todos; cada variante é um checkout.', glyph: '▣' },
+  ]
+  const methods = [
+    { value: 'hubla_webhook' as const, title: 'Venda', text: 'A Hubla avisa cada compra pelo webhook.' },
+    { value: 'thank_you_page' as const, title: 'Captura', text: 'Conta quem chega na página de obrigado.' },
+  ]
+
   return (
-    <div className="p-8">
-      <form onSubmit={handleSubmit} className="max-w-xl space-y-4">
-        <h1 className="font-[family-name:var(--font-sora)] text-lg font-semibold">Novo teste</h1>
-        <input required placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
-        <input
-          required
-          placeholder="Slug (ex: oferta-x)"
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          className={inputClass}
-        />
-        <p className="-mt-2 text-xs text-[var(--ct-text-2)]">
-          Vira o link que você cola no anúncio: seudominio.com/r/slug — escolha algo curto e reconhecível
-        </p>
-        <input
-          placeholder="URL de fallback (opcional)"
-          value={fallbackUrl}
-          onChange={(e) => setFallbackUrl(e.target.value)}
-          className={inputClass}
-        />
-        <p className="-mt-2 text-xs text-[var(--ct-text-2)]">
-          Pra onde mandar o visitante se o teste for pausado (opcional)
-        </p>
-        <select
-          value={testType}
-          onChange={(e) => setTestType(e.target.value as 'page' | 'checkout')}
-          className={inputClass}
-        >
-          <option value="page">Teste de página</option>
-          <option value="checkout">Teste de checkout</option>
-        </select>
-        <p className="-mt-2 text-xs text-[var(--ct-text-2)]">
-          Página: cada variante é uma página de vendas diferente. Checkout: mesma página pra todos, cada
-          variante é um checkout diferente
-        </p>
+    <div className="px-4 py-8 sm:px-8">
+      <form onSubmit={handleSubmit} className="mx-auto flex max-w-[760px] flex-col gap-5 pb-24">
+        <div>
+          <h1 className="font-[family-name:var(--font-sora)] text-[22px] font-semibold">Novo teste</h1>
+          <p className="mt-1 text-[13px] text-[var(--ct-text-2)]">Um link que sorteia cada pessoa entre as variantes e mede qual vende mais.</p>
+        </div>
 
-        <select value={salesFunnelId} onChange={(e) => setSalesFunnelId(e.target.value)} className={inputClass}>
-          <option value="">Sem projeto</option>
-          {funnels.map((funnel) => (
-            <option key={funnel.id} value={funnel.id}>
-              Projeto {funnel.name}
-            </option>
-          ))}
-        </select>
-        {layerTakenBy && (
-          <p role="alert" className="-mt-2 rounded-[10px] bg-[var(--ct-warn-soft)] px-3 py-2 text-xs text-[var(--ct-warn)]">
-            Este projeto já tem um teste de {testType === 'checkout' ? 'checkout' : 'página'} ativo: <b>{layerTakenBy}</b>. Dois na mesma camada dividiriam a
-            mesma venda. Pause o outro antes, escolha outro projeto ou junte as variantes num teste só.
-          </p>
-        )}
-        <p className="-mt-2 text-xs text-[var(--ct-text-2)]">
-          Com projeto, a venda só conta para os testes dele, e um teste de página e um de checkout rodam juntos: quem
-          entra pela página e clica em comprar já entra no teste de checkout. Um teste ativo de cada tipo por projeto.
-        </p>
+        <Section step={1} title="O teste">
+          <Field label="Nome">
+            <input required placeholder="ex: Selo de garantia na oferta" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+          </Field>
+          <Field label="Link do anúncio" hint="Curto e reconhecível. É o que vai no anúncio.">
+            <div className="flex items-stretch overflow-hidden rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] focus-within:border-[var(--ct-accent)]">
+              <span className="flex items-center border-r border-[var(--ct-line)] px-3 font-[family-name:var(--font-geist-mono)] text-[12.5px] text-[var(--ct-text-3)]">/r/</span>
+              <input
+                required
+                placeholder="oferta-x"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                className="w-full bg-transparent px-3 py-2.5 font-[family-name:var(--font-geist-mono)] text-sm text-[var(--ct-text)] outline-none placeholder:text-[var(--ct-text-3)]"
+              />
+            </div>
+          </Field>
+          <Field
+            label="Projeto"
+            hint="Com projeto, a venda só conta para os testes dele, e um teste de página e um de checkout rodam juntos. Um teste ativo de cada tipo por projeto."
+          >
+            <select value={salesFunnelId} onChange={(e) => setSalesFunnelId(e.target.value)} className={inputClass}>
+              <option value="">Sem projeto</option>
+              {funnels.map((funnel) => (
+                <option key={funnel.id} value={funnel.id}>
+                  {funnel.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {layerTakenBy && (
+            <p role="alert" className="rounded-[10px] bg-[var(--ct-warn-soft)] px-3 py-2 text-xs text-[var(--ct-warn)]">
+              Este projeto já tem um teste de {testType === 'checkout' ? 'checkout' : 'página'} ativo: <b>{layerTakenBy}</b>. Dois na mesma camada dividiriam a
+              mesma venda. Pause o outro antes, escolha outro projeto ou junte as variantes num teste só.
+            </p>
+          )}
+        </Section>
 
-        {testType === 'checkout' && (
-          <>
-            <input
-              placeholder="URL da página de vendas (única para todas as variantes)"
-              value={salesPageUrl}
-              onChange={(e) => setSalesPageUrl(e.target.value)}
-              className={inputClass}
-            />
-            <p className="-mt-2 text-xs text-[var(--ct-text-2)]">A única página de vendas usada por todas as variantes</p>
-          </>
-        )}
-
-        <select
-          value={conversionMethod}
-          onChange={(e) => setConversionMethod(e.target.value as typeof conversionMethod)}
-          className={inputClass}
-        >
-          <option value="hubla_webhook">Venda (webhook Hubla)</option>
-          <option value="thank_you_page">Captura (thank-you page)</option>
-        </select>
-
-        {variants.map((variant, index) => (
-          <fieldset key={index} className="space-y-2 rounded-[10px] border border-[var(--ct-line)] p-3">
-            <legend className="flex items-center gap-2 px-1 text-sm font-medium text-[var(--ct-text-2)]">
-              Variante {variant.name}
-              {index === 0 && (
-                <span className="rounded-full bg-[var(--ct-accent)]/15 px-2 py-0.5 text-[10.5px] font-medium text-[var(--ct-accent)]">
-                  controle
+        <Section step={2} title="O que você vai testar">
+          <div role="radiogroup" aria-label="Tipo de teste" className="grid gap-3 sm:grid-cols-2">
+            {testTypes.map((option) => (
+              <Choice key={option.value} name="test_type" checked={testType === option.value} onChange={() => setTestType(option.value)}>
+                <span className="text-[20px] leading-none text-[var(--ct-accent)]" aria-hidden>
+                  {option.glyph}
                 </span>
-              )}
-              {variants.length > 2 && (
-                <button
-                  type="button"
-                  onClick={() => removeVariant(index)}
-                  className="text-xs font-medium text-[var(--ct-crit)] hover:underline"
-                >
-                  Remover
-                </button>
-              )}
-            </legend>
-            <input
-              placeholder="Peso %"
-              value={variant.weight_pct}
-              onChange={(e) => updateVariant(index, 'weight_pct', e.target.value)}
-              className={inputClass}
-            />
-            <p className="-mt-1 text-xs text-[var(--ct-text-2)]">
-              Porcentagem do tráfego pra essa variante — a soma de todas precisa dar 100%
+                <b className="mt-2 block text-[14px]">{option.title}</b>
+                <span className="mt-0.5 block text-[12.5px] text-[var(--ct-text-2)]">{option.text}</span>
+              </Choice>
+            ))}
+          </div>
+          {testType === 'checkout' && (
+            <Field label="Página de vendas" hint="A única página usada por todas as variantes.">
+              <input placeholder="https://" value={salesPageUrl} onChange={(e) => setSalesPageUrl(e.target.value)} className={inputClass} />
+            </Field>
+          )}
+        </Section>
+
+        <Section step={3} title="Como contar a conversão">
+          <div role="radiogroup" aria-label="Conversão" className="grid gap-3 sm:grid-cols-2">
+            {methods.map((option) => (
+              <Choice key={option.value} name="conversion_method" checked={conversionMethod === option.value} onChange={() => setConversionMethod(option.value)}>
+                <b className="block text-[14px]">{option.title}</b>
+                <span className="mt-0.5 block text-[12.5px] text-[var(--ct-text-2)]">{option.text}</span>
+              </Choice>
+            ))}
+          </div>
+        </Section>
+
+        <Section step={4} title="Variantes">
+          <div>
+            <div className="flex h-2.5 overflow-hidden rounded-full bg-[var(--ct-surface-3)]" aria-hidden>
+              {variants.map((variant, index) => (
+                <div key={index} style={{ width: `${Math.max(0, Number(variant.weight_pct) || 0)}%`, background: VARIANT_COLORS[index % VARIANT_COLORS.length] }} />
+              ))}
+            </div>
+            <p className={`mt-1.5 text-[12px] ${weightsValid ? 'text-[var(--ct-text-3)]' : 'text-[var(--ct-warn)]'}`}>
+              {variants.map((variant) => `${variant.name} ${variant.weight_pct || 0}%`).join(' · ')}
+              {weightsValid ? '' : ' — os pesos precisam somar 100%'}
             </p>
-            <input
-              placeholder={testType === 'checkout' ? 'Link do checkout (https://pay.hub.la/...)' : 'URL de destino'}
-              value={variant.destination_url}
-              onChange={(e) => updateVariant(index, 'destination_url', e.target.value)}
-              className={inputClass}
-            />
-            <p className="-mt-1 text-xs text-[var(--ct-text-2)]">
-              {testType === 'checkout'
-                ? 'Link de pagamento da Hubla pra essa variante'
-                : 'Página de vendas dessa variante'}
-            </p>
-            {conversionMethod === 'thank_you_page' && (
-              <>
-                <input
-                  placeholder="URL de thank-you"
-                  value={variant.thank_you_url}
-                  onChange={(e) => updateVariant(index, 'thank_you_url', e.target.value)}
-                  className={inputClass}
-                />
-                <p className="-mt-1 text-xs text-[var(--ct-text-2)]">
-                  Página que o cliente vê depois de comprar — cole o snippet do pixel nela
-                </p>
-              </>
-            )}
-          </fieldset>
-        ))}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {variants.map((variant, index) => (
+              <div key={index} className="flex flex-col gap-3 rounded-[12px] border border-[var(--ct-line)] bg-[var(--ct-surface-2)] p-4">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-semibold text-[var(--ct-on-accent)]"
+                    style={{ background: VARIANT_COLORS[index % VARIANT_COLORS.length] }}
+                  >
+                    {variant.name}
+                  </span>
+                  <b className="text-[14px]">Variante {variant.name}</b>
+                  {index === 0 && (
+                    <span className="rounded-full bg-[var(--ct-accent)]/15 px-2 py-0.5 text-[10.5px] font-medium text-[var(--ct-accent)]">controle</span>
+                  )}
+                  {variants.length > 2 && (
+                    <button type="button" onClick={() => removeVariant(index)} className="ml-auto text-xs font-medium text-[var(--ct-crit)] hover:underline">
+                      Remover
+                    </button>
+                  )}
+                </div>
+                <Field label="Tráfego">
+                  <div className="flex items-stretch overflow-hidden rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface)] focus-within:border-[var(--ct-accent)]">
+                    <input
+                      inputMode="numeric"
+                      aria-label={`Peso da variante ${variant.name}`}
+                      value={variant.weight_pct}
+                      onChange={(e) => updateVariant(index, 'weight_pct', e.target.value)}
+                      className="w-full bg-transparent px-3 py-2 text-sm text-[var(--ct-text)] outline-none"
+                    />
+                    <span className="flex items-center px-3 text-[12.5px] text-[var(--ct-text-3)]">%</span>
+                  </div>
+                </Field>
+                <Field label={testType === 'checkout' ? 'Link do checkout' : 'Página de vendas'}>
+                  <input
+                    placeholder={testType === 'checkout' ? 'https://pay.hub.la/...' : 'https://'}
+                    value={variant.destination_url}
+                    onChange={(e) => updateVariant(index, 'destination_url', e.target.value)}
+                    className={inputClass}
+                  />
+                </Field>
+                {conversionMethod === 'thank_you_page' && (
+                  <Field label="Página de obrigado" hint="Cole nela o snippet do pixel.">
+                    <input placeholder="https://" value={variant.thank_you_url} onChange={(e) => updateVariant(index, 'thank_you_url', e.target.value)} className={inputClass} />
+                  </Field>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                setVariants((prev) => [...prev, { name: String.fromCharCode(65 + prev.length), weight_pct: '0', destination_url: '', thank_you_url: '' }])
+              }
+              className="flex min-h-[120px] items-center justify-center rounded-[12px] border border-dashed border-[var(--ct-line-2)] text-sm font-medium text-[var(--ct-accent)] hover:bg-[var(--ct-surface-2)]"
+            >
+              + Adicionar variante
+            </button>
+          </div>
+        </Section>
 
-        <button
-          type="button"
-          onClick={() =>
-            setVariants((prev) => [...prev, { name: String.fromCharCode(65 + prev.length), weight_pct: '0', destination_url: '', thank_you_url: '' }])
-          }
-          className="text-sm font-medium text-[var(--ct-accent)] hover:text-[var(--ct-accent)]"
-        >
-          + Adicionar variante
-        </button>
+        <details className="rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-5 py-4">
+          <summary className="cursor-pointer text-[13px] font-medium text-[var(--ct-text-2)]">Avançado</summary>
+          <div className="mt-3">
+            <Field label="Página se o teste for pausado" hint="Opcional. Sem ela, o link pausado manda para o controle.">
+              <input placeholder="https://" value={fallbackUrl} onChange={(e) => setFallbackUrl(e.target.value)} className={inputClass} />
+            </Field>
+          </div>
+        </details>
 
-        {!weightsValid && <p className="text-sm text-[var(--ct-warn)]">Os pesos devem somar 100%.</p>}
-        {clientLoading && <p className="text-sm text-[var(--ct-text-2)]">Carregando...</p>}
-        {error && <p className="text-sm text-[var(--ct-crit)]">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={!clientId}
-          className="rounded-[10px] bg-[var(--ct-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--ct-on-accent)] disabled:opacity-50"
-        >
-          Criar teste
-        </button>
+        <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t border-[var(--ct-line)] bg-[var(--ct-bg)]/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-[14px] sm:border">
+          {clientLoading && <p className="text-sm text-[var(--ct-text-2)]">Carregando...</p>}
+          {error && <p role="alert" className="text-sm text-[var(--ct-crit)]">{error}</p>}
+          <button
+            type="submit"
+            disabled={!clientId}
+            className="ml-auto rounded-full bg-[var(--ct-accent)] px-5 py-2.5 text-sm font-semibold text-[var(--ct-on-accent)] hover:brightness-110 disabled:opacity-50"
+          >
+            Criar teste
+          </button>
+        </div>
       </form>
     </div>
+  )
+}
+
+const VARIANT_COLORS = ['var(--ct-accent)', 'var(--ct-an)', 'var(--ct-ok)', 'var(--ct-warn)', 'var(--ct-crit)']
+
+function Section({ step, title, children }: { step: number; title: string; children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col gap-4 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-5 py-5">
+      <h2 className="flex items-center gap-2.5 text-[15px] font-semibold">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--ct-surface-3)] font-[family-name:var(--font-geist-mono)] text-[12px] text-[var(--ct-text-2)]">
+          {step}
+        </span>
+        {title}
+      </h2>
+      {children}
+    </section>
+  )
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[12.5px] font-medium text-[var(--ct-text-2)]">{label}</span>
+      {children}
+      {hint && <span className="text-[12px] text-[var(--ct-text-3)]">{hint}</span>}
+    </label>
+  )
+}
+
+function Choice({ name, checked, onChange, children }: { name: string; checked: boolean; onChange: () => void; children: React.ReactNode }) {
+  return (
+    <label
+      className={`cursor-pointer rounded-[12px] border p-4 transition-colors ${
+        checked ? 'border-[var(--ct-accent)] bg-[var(--ct-accent)]/10' : 'border-[var(--ct-line)] bg-[var(--ct-surface-2)] hover:border-[var(--ct-line-2)]'
+      }`}
+    >
+      <input type="radio" name={name} checked={checked} onChange={onChange} className="sr-only" />
+      {children}
+    </label>
   )
 }

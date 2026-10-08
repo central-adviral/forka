@@ -11,7 +11,7 @@ import {
   type ClassifiedCampaign,
 } from '@/lib/domain/campaign-rules'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { addRule, createFront, deleteFront, pinCampaign, removeRule, unpinCampaign } from './actions'
+import { addRule, createFront, deleteFront, pinCampaign, removeRule, unpinCampaign, updateFront } from './actions'
 import { canActAs } from '@/lib/view-as'
 import { PageHeader } from '@/components/page-header'
 
@@ -251,7 +251,7 @@ export default async function CampaignRulesPage({
           const includes = front.naming_rules.filter((rule) => rule.kind === 'include')
           const sourceName = front.source_sales_funnel_id ? funnelNameById.get(front.source_sales_funnel_id) ?? 'outro projeto' : null
           return (
-            <div key={front.id} className="flex flex-col gap-3 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-6 py-5">
+            <div key={front.id} className="relative flex flex-col gap-3 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-6 py-5">
               <div className="flex flex-wrap items-center gap-3">
                 <b className="text-[15px] font-semibold">{front.name}</b>
                 <span className={`${mono} rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[11px] text-[var(--ct-text-2)]`}>{front.code}</span>
@@ -259,6 +259,27 @@ export default async function CampaignRulesPage({
                   {stats.campaigns} campanhas · {currency(stats.spend)}
                   {stats.leads > 0 ? ` · ${stats.leads.toLocaleString('pt-BR')} leads` : ''}
                 </span>
+                {canEdit && (
+                  <details className="group">
+                    <summary className="cursor-pointer list-none text-[12.5px] font-medium text-[var(--ct-accent)] hover:underline">Editar</summary>
+                    <form
+                      action={updateFront.bind(null, frontContext)}
+                      className="absolute right-6 z-10 mt-2 flex flex-wrap items-end gap-2 rounded-[12px] border border-[var(--ct-line-2)] bg-[var(--ct-surface-2)] p-4 shadow-lg"
+                    >
+                      <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
+                        Código
+                        <input name="code" required defaultValue={front.code} className={`${fieldClass} ${mono} w-32`} />
+                      </label>
+                      <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
+                        Nome
+                        <input name="name" required defaultValue={front.name} className={`${fieldClass} w-64`} />
+                      </label>
+                      <button type="submit" className="rounded-[8px] bg-[var(--ct-accent)] px-3.5 py-1.5 text-[12.5px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110">
+                        Salvar
+                      </button>
+                    </form>
+                  </details>
+                )}
                 {canEdit && (
                   <ConfirmDeleteButton action={deleteFront.bind(null, frontContext)} label="Remover" warning="Remover a frente e as regras?" />
                 )}
