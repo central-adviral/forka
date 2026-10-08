@@ -9,6 +9,8 @@ export interface AttentionItem {
   detail: string
   tool: 'painel' | 'analises' | 'ab' | 'config'
   href: string
+  /** The button's word when it is more specific than "Resolver". */
+  action?: string
 }
 
 export interface AttentionInput {
@@ -20,11 +22,13 @@ export interface AttentionInput {
   conflicts: { name: string; spend: number }[]
   unclassified: { count: number; spend: number }
   rulesHref: string | null
-  bestVariant: { testName: string; variantName: string; liftPct: number } | null
+  bestVariant: { testName: string; testSlug: string; variantName: string; liftPct: number } | null
   /** Sales of the last days no project owns (0073): a product in several projects with no ad, or in none. */
   unattributed?: { count: number; revenue: number }
   /** Open watcher alerts (0059), already worded. */
   watcherAlerts?: { severity: 'warn' | 'crit'; title: string; detail: string }[]
+  /** Running backlog cards whose rules already speak: a win, a cut or a saturated creative. */
+  testVerdicts?: { code: string; title: string; summary: string; kind: 'win' | 'cut' | 'decide'; projectSlug: string; daysRunning: number }[]
 }
 
 const STALE_AFTER_MS = 2 * 60 * 60 * 1000
@@ -109,13 +113,26 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
     })
   }
 
+  // A cut is money still going out on a variant that lost; a win or saturation waits for a decision.
+  for (const verdict of input.testVerdicts ?? []) {
+    items.push({
+      severity: verdict.kind === 'cut' ? 'crit' : 'warn',
+      title: `${verdict.code} · ${verdict.summary}`,
+      detail: `${verdict.title} · ${verdict.daysRunning} ${verdict.daysRunning === 1 ? 'dia' : 'dias'} rodando. A regra do jogo bateu: decida no card.`,
+      tool: 'ab',
+      href: `${input.base}/backlog?projeto=${verdict.projectSlug}&item=${verdict.code}`,
+      action: 'Decidir',
+    })
+  }
+
   if (input.bestVariant && input.bestVariant.liftPct > 0) {
     items.push({
       severity: 'ok',
       title: `${input.bestVariant.testName}: ${input.bestVariant.variantName} na frente`,
       detail: `Converte ${input.bestVariant.liftPct.toFixed(0)}% acima do controle.`,
       tool: 'ab',
-      href: `${input.base}/tests`,
+      href: `${input.base}/tests/${input.bestVariant.testSlug}`,
+      action: 'Ver teste',
     })
   }
 

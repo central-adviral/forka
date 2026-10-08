@@ -184,7 +184,7 @@ export default async function TodayPage({
                   <div className="mt-2.5 flex flex-wrap items-center gap-2">
                     <span className={`${mono} rounded-full px-2 py-0.5 text-[10.5px] ${TOOL_TONE[item.tool]}`}>{TOOL_LABEL[item.tool]}</span>
                     <Link href={item.href} className="rounded-md border border-[var(--ct-line-2)] px-2.5 py-0.5 text-xs font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
-                      Resolver
+                      {item.action ?? 'Resolver'}
                     </Link>
                   </div>
                 </div>

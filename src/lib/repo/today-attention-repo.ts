@@ -3,6 +3,7 @@ import { findBestVariant } from './client-hub-repo'
 import { getClientDaily, saoPauloDay, type ClientDay } from './today-repo'
 import { getAlerts, getWatchers } from './watchers-repo'
 import { getPagesWithChecks } from './pages-repo'
+import { loadRunningVerdicts } from './backlog-readout-repo'
 import { brtDayBoundaryUtc } from '@/lib/domain/report-period'
 import { buildAttention, type AttentionItem } from '@/lib/domain/attention'
 import { METRICS, formatMetric, watcherScope } from '@/lib/domain/watchers'
@@ -16,7 +17,7 @@ export interface TodayAttention {
   metaDataAt: string | null
   todayRow: ClientDay | undefined
   funnels: { slug: string; name: string; is_active: boolean; daily_sales_target: number | null; resultado: string | null }[]
-  activeTests: { id: string; name: string }[]
+  activeTests: { id: string; name: string; slug: string }[]
   conflicts: { campaign_name: string; spend: number }[]
   orphans: { campaign_name: string; spend: number }[]
   firstProject: { slug: string } | undefined
@@ -36,8 +37,8 @@ export async function loadTodayAttention(supabase: SupabaseClient, client: { id:
     getClientDaily(supabase, client.id, week.since, week.until),
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: monthSince, p_until: week.until }),
     supabase.from('sync_runs').select('finished_at, error').eq('client_id', client.id).not('finished_at', 'is', null).order('started_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('sales_funnels').select('slug, name, is_active, daily_sales_target, resultado').eq('client_id', client.id).order('name'),
-    supabase.from('tests').select('id, name').eq('client_id', client.id).eq('status', 'active'),
+    supabase.from('sales_funnels').select('id, slug, name, is_active, daily_sales_target, resultado, test_rules').eq('client_id', client.id).order('name'),
+    supabase.from('tests').select('id, name, slug').eq('client_id', client.id).eq('status', 'active'),
   ])
   // A failed read must not pass for a quiet day: no conflicts, no unclassified spend, no sync.
   const readError = campaignsResult.error ?? lastRunResult.error ?? funnelsResult.error
@@ -45,12 +46,17 @@ export async function loadTodayAttention(supabase: SupabaseClient, client: { id:
   const campaigns = campaignsResult.data
   const lastRun = lastRunResult.data
   const funnels = funnelsResult.data
-  const [bestVariant, watchers, alerts, pages, unattributedResult] = await Promise.all([
+  const [bestVariant, watchers, alerts, pages, unattributedResult, testVerdicts] = await Promise.all([
     findBestVariant(supabase, activeTests ?? [], monthSince, week.until).catch(() => null),
     getWatchers(supabase, client.id),
     getAlerts(supabase, client.id),
     getPagesWithChecks(supabase, client.id, 2),
     supabase.from('sales').select('valor_liquido').eq('client_id', client.id).is('sales_funnel_id', null).gte('data_venda', brtDayBoundaryUtc(week.since)),
+    // A failed verdict read only drops these items; the rest of the queue still stands.
+    loadRunningVerdicts(supabase, (funnels ?? []).filter((funnel) => funnel.is_active)).catch((error) => {
+      console.error('[today-test-verdicts-failed]', { clientId: client.id }, error)
+      return []
+    }),
   ])
   if (unattributedResult.error) throw unattributedResult.error
   const unattributedSales = (unattributedResult.data ?? []) as { valor_liquido: number | null }[]
@@ -94,6 +100,7 @@ export async function loadTodayAttention(supabase: SupabaseClient, client: { id:
     bestVariant,
     unattributed: { count: unattributedSales.length, revenue: unattributedSales.reduce((sum, sale) => sum + Number(sale.valor_liquido ?? 0), 0) },
     watcherAlerts: [...watcherAlerts, ...pageAlerts],
+    testVerdicts,
   })
 
   return { attention, today, week, weekDays, metaDataAt, todayRow, funnels: funnels ?? [], activeTests: activeTests ?? [], conflicts, orphans, firstProject }

@@ -7,7 +7,8 @@ import { getBacklog, type BacklogItem } from '@/lib/repo/backlog-repo'
 import { COLUMNS, METHODS, STAGES, nextCode, readRules, withPlanTeto, type Method } from '@/lib/domain/backlog'
 import { NewHypothesisWizard } from './new-hypothesis-wizard'
 import { daysRunningSince } from '@/lib/domain/report-period'
-import { readLinkTest, readMetaTest, readoutSummary, type CreativeRow, type LinkRow, type Verdict } from '@/lib/domain/backlog-readout'
+import { type Verdict } from '@/lib/domain/backlog-readout'
+import { loadReadouts, readoutKind, type Readout, type VerdictKind } from '@/lib/repo/backlog-readout-repo'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { createItem, decideItem, deleteItem, linkAbTest, moveItem, saveRules, toggleGate, togglePublished } from './actions'
 import { PageHeader } from '@/components/page-header'
@@ -37,69 +38,13 @@ const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency'
 
 // The card pill takes the verdict's color: green for a win, red for a cut, amber when the days
 // ran out without one (only then is there a summary without a win or a cut).
-const PILL = {
+const PILL: Record<VerdictKind, string> = {
   win: 'bg-[var(--ct-ok-soft)] text-[var(--ct-ok)]',
   cut: 'bg-[var(--ct-crit-soft)] text-[var(--ct-crit)]',
   decide: 'bg-[var(--ct-warn-soft)] text-[var(--ct-warn)]',
 }
 
-function pillTone(readout: Readout): string {
-  const verdicts = [...(readout.meta ?? []), ...(readout.link ?? [])].map((v) => v.verdict)
-  return verdicts.includes('win') ? PILL.win : verdicts.includes('cut') ? PILL.cut : PILL.decide
-}
-
-interface Readout {
-  summary: string | null
-  meta?: ReturnType<typeof readMetaTest>
-  link?: ReturnType<typeof readLinkTest>
-}
-
-// Meta tests read every tagged ad of the project's creative report since the earliest running
-// start; tags are unique per project, so an older window cannot leak another test's ads. A linked
-// A/B test is read from the card's own start, not the test's whole life.
-async function loadReadouts(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
-  clientId: string,
-  salesFunnelId: string,
-  items: BacklogItem[],
-  rules: ReturnType<typeof readRules>,
-  resultado: string
-): Promise<Map<string, Readout>> {
-  const running = items.filter((item) => item.status === 'running')
-  const meta = running.filter((item) => item.method === 'meta')
-  const link = running.filter((item) => item.method === 'link' && item.abTestId)
-  const since = meta
-    .map((item) => (item.startedAt ? new Date(item.startedAt).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) : null))
-    .filter((day): day is string => Boolean(day))
-    .sort()[0] ?? null
-  const [creativeResult, linkReports, { data: controls }] = await Promise.all([
-    meta.length > 0
-      ? supabase.rpc('get_funnel_report_by_creative', { p_sales_funnel_id: salesFunnelId, p_since: since, p_until: null })
-      : Promise.resolve({ data: [], error: null }),
-    Promise.all(link.map((item) => supabase.rpc('get_test_report', { p_test_id: item.abTestId, p_since: item.startedAt, p_until: null }))),
-    link.length > 0
-      ? supabase.from('variants').select('id, test_id').eq('is_control', true).in('test_id', link.map((item) => item.abTestId!))
-      : Promise.resolve({ data: [] }),
-  ])
-  if (creativeResult.error) console.error('[backlog-creative-readout-failed]', { salesFunnelId }, creativeResult.error)
-  // A lead project (0071) measures its creatives by paid leads: they take the purchases' place.
-  const creatives = ((creativeResult.data ?? []) as (CreativeRow & { leads: number })[]).map((row) =>
-    resultado === 'lead' ? { ...row, sales_count: Number(row.leads ?? 0) } : row
-  )
-  const readouts = new Map<string, Readout>()
-  for (const item of meta) {
-    const read = readMetaTest(item.code, item.variants.map((variant) => variant.key), creatives, rules)
-    const days = item.startedAt ? daysRunningSince(item.startedAt) : 1
-    readouts.set(item.id, { meta: read, summary: readoutSummary(read.map((v) => ({ label: v.key, verdict: v.verdict })), days, rules, 'meta') })
-  }
-  link.forEach((item, index) => {
-    const controlId = (controls ?? []).find((row) => row.test_id === item.abTestId)?.id
-    const read = readLinkTest((linkReports[index].data ?? []) as LinkRow[], controlId, rules)
-    const days = item.startedAt ? daysRunningSince(item.startedAt) : 1
-    readouts.set(item.id, { link: read, summary: readoutSummary(read.map((v) => ({ label: v.name, verdict: v.verdict })), days, rules, 'link') })
-  })
-  return readouts
-}
+const pillTone = (readout: Readout) => PILL[readoutKind(readout)]
 
 function cardStatus(item: BacklogItem): { text: string; tone: string } {
   const open = item.gates.filter((gate) => !gate.doneAt).length
@@ -148,7 +93,7 @@ export default async function BacklogPage({
   const rules = withPlanTeto(readRules(funnel.test_rules), costTarget, funnel.resultado)
   const tetoFromPlan = rules.teto === costTarget && funnel.resultado === 'compra'
   const [readouts, { data: abTests }] = await Promise.all([
-    loadReadouts(supabase, client.id, funnel.id, items, rules, funnel.resultado),
+    loadReadouts(supabase, funnel.id, items, rules, funnel.resultado),
     supabase.from('tests').select('id, name').eq('client_id', client.id).order('name'),
   ])
   const tab = aba === 'regras' && canEdit ? 'regras' : 'backlog'
@@ -194,6 +139,7 @@ export default async function BacklogPage({
               nextCode={nextCode(items.map((item) => item.code))}
               stages={Object.entries(STAGES).map(([value, label]) => ({ value, label }))}
               methods={Object.entries(METHODS).map(([value, label]) => ({ value, label }))}
+              serverError={erro}
             />
           )}
 
