@@ -13,7 +13,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // The sidebar's badges are read per open client by /api/nav, not here for every client.
   const [{ data: clients }, { data: funnelRows }, { data: membershipRows }, { data: staffRow }] = await Promise.all([
     supabase.from('clients').select('id, name, slug').order('name'),
-    supabase.from('sales_funnels').select('client_id, name, slug, is_active').is('archived_at', null).order('name'),
+    supabase.from('sales_funnels').select('client_id, name, slug, is_active, status').is('archived_at', null).order('name'),
     supabase.from('memberships').select('client_id, role').eq('user_id', user?.id ?? ''),
     supabase.from('staff').select('role').eq('user_id', user?.id ?? '').maybeSingle(),
   ])
@@ -21,7 +21,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   for (const row of funnelRows ?? []) {
     projectsByClient.set(row.client_id, [
       ...(projectsByClient.get(row.client_id) ?? []),
-      { name: row.name, slug: row.slug, isActive: row.is_active },
+      { name: row.name, slug: row.slug, isActive: row.is_active, status: row.status },
     ])
   }
   const roleByClient = new Map<string, ClientRole>((membershipRows ?? []).map((row) => [row.client_id, row.role]))

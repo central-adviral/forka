@@ -96,25 +96,35 @@ export async function setSalesFunnelArchived(salesFunnelId: string, archived: bo
   revalidatePath('/dashboard', 'layout')
 }
 
-const toggleSalesFunnelStatusSchema = z.object({
+const projectStatusSchema = z.object({
   sales_funnel_id: z.string().uuid(),
-  is_active: z.boolean(),
-  client_slug: z.string(),
+  status: z.enum(['rascunho', 'rodando', 'encerrado']),
 })
 
-export async function toggleSalesFunnelStatus(input: z.infer<typeof toggleSalesFunnelStatusSchema>) {
-  const parsed = toggleSalesFunnelStatusSchema.parse(input)
+// Ligar, Encerrar, Reabrir (0102). Rodando syncs, watches and alerts; encerrado stops the sync and
+// the watchers, so its numbers stay as they were. is_active follows in the database.
+export async function setProjectStatus(input: z.infer<typeof projectStatusSchema>) {
+  const parsed = projectStatusSchema.parse(input)
   const supabase = await createServerSupabaseClient()
-
+  if (parsed.status === 'rodando') {
+    const { count, error: frontsError } = await supabase
+      .from('project_fronts')
+      .select('id', { count: 'exact', head: true })
+      .eq('sales_funnel_id', parsed.sales_funnel_id)
+      .is('archived_at', null)
+    if (frontsError) throw frontsError
+    if (!count) throw new Error('Projeto sem frente: não há de onde vir o gasto. Crie uma frente antes de ligar.')
+  }
   const { data, error } = await supabase
     .from('sales_funnels')
-    .update({ is_active: parsed.is_active })
+    .update({ status: parsed.status, updated_at: new Date().toISOString() })
     .eq('id', parsed.sales_funnel_id)
+    .is('archived_at', null)
     .select('id')
   if (error) throw error
-  if (!data || data.length === 0) throw new Error('Projeto não encontrado ou você não tem permissão para alterá-lo.')
-
-  revalidatePath(`/dashboard/clients/${parsed.client_slug}/funis-venda`)
+  if (!data || data.length === 0) throw new Error('Só gestor ou owner pode mudar o estado do projeto.')
+  // The sidebar, the lists and the project page all show the state.
+  revalidatePath('/dashboard', 'layout')
 }
 
 const editSalesFunnelSchema = z.object({
@@ -173,13 +183,15 @@ export async function syncFunnelNow(context: { sales_funnel_id: string; client_s
   const supabase = await createServerSupabaseClient()
   const { data: funnel, error } = await supabase
     .from('sales_funnels')
-    .select('id, client_id, archived_at, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url)')
+    .select('id, client_id, archived_at, status, launchops_operacao_ids, launchops_produto_nomes, clients(funnel_source_url)')
     .eq('id', context.sales_funnel_id)
     .single()
   // This select runs on the user's session, so RLS proves they can see the funnel; seeing is not
   // enough to write a sync with the service role, which bypasses RLS, so the role is checked too.
   if (error || !funnel) throw new Error('Funil não encontrado')
   if (funnel.archived_at) throw new Error('Projeto arquivado: restaure para atualizar.')
+  if (funnel.status === 'rascunho') throw new Error('Projeto em rascunho: ligue o projeto para sincronizar.')
+  if (funnel.status === 'encerrado') throw new Error('Projeto encerrado: os números estão congelados. Reabra para atualizar.')
   await assertClientRole(supabase, funnel.client_id, 'gestor')
 
   const sourceUrl = (funnel.clients as unknown as { funnel_source_url: string | null } | null)?.funnel_source_url

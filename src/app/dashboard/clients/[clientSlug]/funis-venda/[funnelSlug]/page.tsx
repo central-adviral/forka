@@ -23,6 +23,7 @@ import { cpaSources, qualitySeals, type ProjectQualityRow } from '@/lib/domain/p
 import { PROJECT_RESULTS, readResult, resultUsesSales } from '@/lib/domain/project-plan'
 import { setSalesFunnelArchived } from '../actions'
 import { canActAs } from '@/lib/view-as'
+import { ProjectStatusActions } from '../project-status'
 
 export default async function SalesFunnelPage({
   params,
@@ -46,12 +47,13 @@ export default async function SalesFunnelPage({
 
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, resultado, archived_at')
+    .select('id, name, slug, resultado, archived_at, status, metrica_secundaria')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
   if (!funnel) notFound()
-  const canRestore = funnel.archived_at ? await canActAs(supabase, client.id, 'gestor') : false
+  const canEdit = await canActAs(supabase, client.id, 'gestor')
+  const canRestore = Boolean(funnel.archived_at) && canEdit
 
   const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
   const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }, { data: frontRows }, { data: frontDays }, { data: qualityRows }, { data: frontSalesRows }, { data: crossRows }] = await Promise.all([
@@ -205,7 +207,8 @@ export default async function SalesFunnelPage({
             ) : (
               <>
                 <SyncStatus lastRunAt={lastSyncAt} hasError={hasSyncError} />
-                <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
+                {funnel.status === 'rodando' && <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />}
+                <ProjectStatusActions salesFunnelId={funnel.id} status={funnel.status} canEdit={canEdit} />
                 <a
                   href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/plano`}
                   className="rounded-full border border-[var(--ct-accent)] bg-[var(--ct-accent-soft)] px-4 py-2 text-[13px] font-medium text-[var(--ct-accent)]"

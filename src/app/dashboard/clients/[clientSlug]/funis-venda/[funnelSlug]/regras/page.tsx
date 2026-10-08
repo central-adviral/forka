@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/page-header'
 import { saoPauloDay } from '@/lib/repo/today-repo'
 import { ApplySincePanel } from '../apply-since-panel'
 import { applySince, previewApplySince } from '../apply-since-actions'
+import { PROJECT_RESULTS, type ProjectResult } from '@/lib/domain/project-plan'
 
 interface FrontRow {
   id: string
@@ -26,6 +27,10 @@ interface FrontRow {
   position: number
   sales_funnel_id: string
   source_sales_funnel_id: string | null
+  metrica_principal: ProjectResult | null
+  alvo_principal: number | null
+  metrica_secundaria: ProjectResult | null
+  alvo_secundaria: number | null
   archived_at: string | null
   sales_funnels: { name: string; archived_at: string | null } | null
   naming_rules: { id: string; kind: 'include' | 'exclude'; value: string }[]
@@ -78,7 +83,7 @@ export default async function CampaignRulesPage({
     canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
     supabase
       .from('project_fronts')
-      .select('id, code, name, position, sales_funnel_id, source_sales_funnel_id, archived_at, sales_funnels!project_fronts_sales_funnel_id_fkey!inner(name, client_id, archived_at), naming_rules(id, kind, value)')
+      .select('id, code, name, position, sales_funnel_id, source_sales_funnel_id, metrica_principal, alvo_principal, metrica_secundaria, alvo_secundaria, archived_at, sales_funnels!project_fronts_sales_funnel_id_fkey!inner(name, client_id, archived_at), naming_rules(id, kind, value)')
       .eq('sales_funnels.client_id', client.id)
       .order('position'),
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: since, p_until: until }),
@@ -294,6 +299,26 @@ export default async function CampaignRulesPage({
                         Nome
                         <input name="name" required defaultValue={front.name} className={`${fieldClass} w-64`} />
                       </label>
+                      {(['principal', 'secundaria'] as const).map((role) => (
+                        <div key={role} className="flex basis-full flex-wrap items-end gap-2">
+                          <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
+                            Métrica {role === 'principal' ? 'principal' : 'secundária'} da frente
+                            <select name={`metrica_${role}`} defaultValue={front[`metrica_${role}`] ?? ''} className={`${fieldClass} w-48`}>
+                              <option value="">segue o projeto</option>
+                              {(Object.keys(PROJECT_RESULTS) as ProjectResult[]).map((metric) => (
+                                <option key={metric} value={metric}>
+                                  {PROJECT_RESULTS[metric].cost}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
+                            Alvo
+                            <input name={`alvo_${role}`} inputMode="decimal" defaultValue={front[`alvo_${role}`] !== null ? String(front[`alvo_${role}`]).replace('.', ',') : ''} className={`${fieldClass} ${mono} w-28`} />
+                          </label>
+                        </div>
+                      ))}
+                      <p className="basis-full text-[11.5px] text-[var(--ct-text-3)]">Com métrica e alvo, a frente ganha um vigia próprio. Vazio: segue o projeto, sem alerta próprio.</p>
                       <button type="submit" className="rounded-[8px] bg-[var(--ct-accent)] px-3.5 py-1.5 text-[12.5px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110">
                         Salvar
                       </button>
@@ -308,6 +333,17 @@ export default async function CampaignRulesPage({
                   />
                 )}
               </div>
+              <p className="text-[12.5px] text-[var(--ct-text-2)]">
+                {front.metrica_principal
+                  ? `Métricas próprias: ${[
+                      [front.metrica_principal, front.alvo_principal],
+                      [front.metrica_secundaria, front.alvo_secundaria],
+                    ]
+                      .filter((pair): pair is [ProjectResult, number | null] => pair[0] !== null)
+                      .map(([metric, target]) => `${PROJECT_RESULTS[metric].cost}${target !== null ? ` alvo ${Number(target).toLocaleString('pt-BR')}` : ''}`)
+                      .join(' · ')}`
+                  : 'Segue as métricas do projeto, sem alerta próprio.'}
+              </p>
               {sourceName && (
                 <p className="text-[12.5px] text-[var(--ct-text-2)]">
                   Lê as campanhas do projeto <b>{sourceName}</b>, só nos dias dentro da janela deste projeto. Não tem
