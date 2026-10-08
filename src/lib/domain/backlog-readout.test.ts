@@ -92,5 +92,13 @@ describe('backlog readout', () => {
     expect(clear[2].verdict).toBe('win')
     expect(clear[1].verdict).toBe('measuring')
   })
+
+  it('cuts a creative that sold, but at a CPA past the cut limit (one sale at R$ 300 against R$ 55)', () => {
+    const read = readMetaTest('T4', ['A', 'B'], [
+      { ad_name: 'Bônus [T4-A]', spend: 300, sales_count: 1 },
+      { ad_name: 'UGC [T4-B]', spend: 300, sales_count: 6 },
+    ], DEFAULT_RULES)
+    expect(read.map((variant) => variant.verdict)).toEqual(['cut', 'measuring'])
+  })
 })
 

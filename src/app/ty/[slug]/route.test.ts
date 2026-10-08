@@ -16,7 +16,7 @@ describe('GET /ty/[slug]', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('records a conversion when tid matches a click event for this test', async () => {
-    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'oferta-x', clientId: 'client-1' })
+    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'oferta-x', clientId: 'client-1', isBot: false })
     const request = new NextRequest('https://ir.example.com/ty/oferta-x?tid=trk_1')
     const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     expect(response.headers.get('content-type')).toBe('image/gif')
@@ -26,8 +26,16 @@ describe('GET /ty/[slug]', () => {
     )
   })
 
+  it('does not record a lead for a bot click: it would inflate the variant the bot was sent to', async () => {
+    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'oferta-x', clientId: 'client-1', isBot: true })
+    const request = new NextRequest('https://ir.example.com/ty/oferta-x?tid=trk_1')
+    const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
+    expect(response.headers.get('content-type')).toBe('image/gif')
+    expect(insertConversionIfNew).not.toHaveBeenCalled()
+  })
+
   it('does not record a conversion when tid belongs to a different test', async () => {
-    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'outro-teste', clientId: 'client-1' })
+    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'outro-teste', clientId: 'client-1', isBot: false })
     const request = new NextRequest('https://ir.example.com/ty/oferta-x?tid=trk_1')
     const response = await GET(request, { params: Promise.resolve({ slug: 'oferta-x' }) })
     expect(response.status).toBe(200)

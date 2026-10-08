@@ -132,7 +132,7 @@ describe('POST /api/webhooks/hubla/[clientSlug]', () => {
   it('does not attribute a click event belonging to a different client', async () => {
     vi.mocked(verifyHublaToken).mockReturnValue(true)
     vi.mocked(parseHublaPaymentSucceeded).mockReturnValue({ trackingId: 'trk_1', externalEventId: 'inv_1', valueCents: 1000 })
-    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'oferta-x', clientId: 'other-client' })
+    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'oferta-x', clientId: 'other-client', isBot: false })
 
     const response = await POST(makeRequest({}), { params: Promise.resolve({ clientSlug: 'gustavo-voe' }) })
     const json = await response.json()
@@ -143,7 +143,7 @@ describe('POST /api/webhooks/hubla/[clientSlug]', () => {
   it('records a conversion when the click event belongs to this client', async () => {
     vi.mocked(verifyHublaToken).mockReturnValue(true)
     vi.mocked(parseHublaPaymentSucceeded).mockReturnValue({ trackingId: 'trk_1', externalEventId: 'inv_1', valueCents: 1000 })
-    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'oferta-x', clientId: 'client-1' })
+    vi.mocked(getClickEventByTrackingId).mockResolvedValue({ id: 'click_1', testSlug: 'oferta-x', clientId: 'client-1', isBot: false })
     vi.mocked(insertConversionIfNew).mockResolvedValue('inserted')
 
     const response = await POST(makeRequest({}), { params: Promise.resolve({ clientSlug: 'gustavo-voe' }) })

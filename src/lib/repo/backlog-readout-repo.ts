@@ -10,9 +10,9 @@ export interface Readout {
   link?: ReturnType<typeof readLinkTest>
 }
 
-// Meta tests read every tagged ad of the project's creative report since the earliest running
-// start; tags are unique per project, so an older window cannot leak another test's ads. A linked
-// A/B test is read from the card's own start, not the test's whole life.
+// Each Meta test reads the project's creative report from its own start (one read per start day),
+// so an older card's window never adds spend from before a newer card began. A linked A/B test is
+// read from the card's own start too, not the test's whole life.
 export async function loadReadouts(
   supabase: SupabaseClient,
   salesFunnelId: string,
@@ -23,27 +23,27 @@ export async function loadReadouts(
   const running = items.filter((item) => item.status === 'running')
   const meta = running.filter((item) => item.method === 'meta')
   const link = running.filter((item) => item.method === 'link' && item.abTestId)
-  const since = meta
-    .map((item) => (item.startedAt ? new Date(item.startedAt).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) : null))
-    .filter((day): day is string => Boolean(day))
-    .sort()[0] ?? null
-  const [creativeResult, linkReports, { data: controls }] = await Promise.all([
-    meta.length > 0
-      ? supabase.rpc('get_funnel_report_by_creative', { p_sales_funnel_id: salesFunnelId, p_since: since, p_until: null })
-      : Promise.resolve({ data: [], error: null }),
+  const startDay = (item: BacklogItem) => (item.startedAt ? new Date(item.startedAt).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) : null)
+  const days = [...new Set(meta.map(startDay))]
+  const [creativeReads, linkReports, { data: controls }] = await Promise.all([
+    Promise.all(days.map((day) => supabase.rpc('get_funnel_report_by_creative', { p_sales_funnel_id: salesFunnelId, p_since: day, p_until: null }))),
     Promise.all(link.map((item) => supabase.rpc('get_test_report', { p_test_id: item.abTestId, p_since: item.startedAt, p_until: null }))),
     link.length > 0
       ? supabase.from('variants').select('id, test_id').eq('is_control', true).in('test_id', link.map((item) => item.abTestId!))
       : Promise.resolve({ data: [] }),
   ])
-  if (creativeResult.error) console.error('[backlog-creative-readout-failed]', { salesFunnelId }, creativeResult.error)
   // A lead project (0071) measures its creatives by paid leads: they take the purchases' place.
-  const creatives = ((creativeResult.data ?? []) as (CreativeRow & { leads: number })[]).map((row) =>
-    resultado === 'lead' ? { ...row, sales_count: Number(row.leads ?? 0) } : row
+  const creativesByDay = new Map(
+    days.map((day, index) => {
+      const result = creativeReads[index]
+      if (result.error) console.error('[backlog-creative-readout-failed]', { salesFunnelId, day }, result.error)
+      const rows = ((result.data ?? []) as (CreativeRow & { leads: number })[]).map((row) => (resultado === 'lead' ? { ...row, sales_count: Number(row.leads ?? 0) } : row))
+      return [day, rows] as const
+    })
   )
   const readouts = new Map<string, Readout>()
   for (const item of meta) {
-    const read = readMetaTest(item.code, item.variants.map((variant) => variant.key), creatives, rules)
+    const read = readMetaTest(item.code, item.variants.map((variant) => variant.key), creativesByDay.get(startDay(item)) ?? [], rules)
     const days = item.startedAt ? daysRunningSince(item.startedAt) : 1
     readouts.set(item.id, { meta: read, summary: readoutSummary(read.map((v) => ({ label: v.key, verdict: v.verdict })), days, rules, 'meta') })
   }

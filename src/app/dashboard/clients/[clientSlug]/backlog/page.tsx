@@ -23,7 +23,7 @@ const field =
 const METHOD_DOT: Record<Method, string> = { meta: 'var(--ct-painel)', link: 'var(--ct-ab)', antes: 'var(--ct-an)' }
 const RULE_FIELDS = [
   { key: 'teto', label: 'CPA teto (R$)', hint: 'Corte e vitória são medidos contra ele.', step: '0.01' },
-  { key: 'mult', label: 'Corte: gasto sem venda (× teto)', hint: 'A variante que gastar isso sem nenhuma venda é marcada para pausar.', step: '0.1' },
+  { key: 'mult', label: 'Corte: gasto sem venda (× teto)', hint: 'A variante que gastar isso sem venda, ou com CPA acima disso, é marcada para pausar.', step: '0.1' },
   { key: 'min', label: 'Vitória: mínimo de compras', hint: 'CPA no teto ou abaixo e pelo menos esse número de compras de anúncio.', step: '1' },
   { key: 'conf', label: 'A/B de link: chance mínima de vencer (%)', hint: 'Calculada por pessoa, pelo motor do Teste A/B.', step: '1' },
   { key: 'minVisits', label: 'A/B de link: mínimo de visitantes por variante', hint: 'Sem esse piso, uma chance alta com pouca gente não vale como vitória.', step: '50' },
@@ -235,7 +235,7 @@ export default async function BacklogPage({
           <div className="card-shadow flex flex-col gap-3 rounded-[18px] border border-[var(--ct-line)] px-6 py-6 text-[13px]">
             <b className="text-[15px]">Como as regras leem um teste</b>
             {[
-              ['Corte', `variante com R$ ${(rules.teto * rules.mult).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} gastos e nenhuma venda`],
+              ['Corte', `variante com R$ ${(rules.teto * rules.mult).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} gastos sem venda ou com CPA acima disso`],
               ['Vitória de criativo', `CPA de até R$ ${rules.teto.toLocaleString('pt-BR')} com ${rules.min}+ compras`],
               ['Vitória de A/B de link', `chance de ${rules.conf}%+, ${rules.min}+ conversões e a amostra para ver ${rules.mde}% de melhora (mín. ${rules.minVisits.toLocaleString('pt-BR')} pessoas)`],
               ['Saturação', `criativo rodando há mais de ${rules.sat} dias pede decisão`],
