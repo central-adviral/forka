@@ -8,8 +8,10 @@ export interface DailyFunnelRow {
   data: string
   /** Entry sales of any origin: the CPA base of the project overview. */
   vendas: number
-  /** Entry sales the UTM ties to an ad: the CPA base of creatives, campaigns and tests. */
+  /** Entry sales whose campaign is identified (0103): the CPA base of the ad CPA and the fronts. */
   vendasAnuncio: number
+  /** Entry sales that look like an ad but name no known campaign: out of the ad CPA, shown apart. */
+  vendasAnuncioSemId: number
   vendasUpsell: number
   receitaBruta: number
   receitaLiquida: number
@@ -70,6 +72,7 @@ export async function getDailyFunnel(
     receita_ascensao_liquida: number
     reembolsos: number
     receita_reembolsada_liquida: number
+    vendas_anuncio_sem_id: number
   }[]).map((row) => {
     const vendas = Number(row.vendas)
     const spendComImposto = Number(row.spend_com_imposto)
@@ -79,6 +82,7 @@ export async function getDailyFunnel(
       data: row.data,
       vendas,
       vendasAnuncio: Number(row.vendas_anuncio),
+      vendasAnuncioSemId: Number(row.vendas_anuncio_sem_id ?? 0),
       vendasUpsell: Number(row.vendas_upsell),
       receitaBruta,
       receitaLiquida,

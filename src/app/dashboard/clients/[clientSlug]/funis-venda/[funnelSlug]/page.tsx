@@ -134,6 +134,7 @@ export default async function SalesFunnelPage({
       receitaLiquida: acc.receitaLiquida + row.receitaLiquida,
       vendas: acc.vendas + row.vendas,
       vendasAnuncio: acc.vendasAnuncio + row.vendasAnuncio,
+      vendasAnuncioSemId: acc.vendasAnuncioSemId + row.vendasAnuncioSemId,
       vendasUpsell: acc.vendasUpsell + row.vendasUpsell,
       receitaAscensao: acc.receitaAscensao + row.receitaAscensaoLiquida,
       impressions: acc.impressions + row.impressions,
@@ -148,6 +149,7 @@ export default async function SalesFunnelPage({
       receitaLiquida: 0,
       vendas: 0,
       vendasAnuncio: 0,
+      vendasAnuncioSemId: 0,
       vendasUpsell: 0,
       receitaAscensao: 0,
       impressions: 0,
@@ -164,9 +166,10 @@ export default async function SalesFunnelPage({
     vendas: totals.vendas,
     vendasUpsell: totals.vendasUpsell,
     // Project overview: spend over EVERY entry sale, whatever brought the buyer in. The ad CPA
-    // beside it, and every creative row below, count only the sale the UTM ties to an ad.
+    // beside it counts only the sale whose campaign is identified (0103).
     cpa: totals.vendas > 0 ? totals.investimento / totals.vendas : null,
     cpaAnuncio: totals.vendasAnuncio > 0 ? totals.investimento / totals.vendasAnuncio : null,
+    vendasAnuncioSemId: totals.vendasAnuncioSemId,
     resultado: totals.receitaLiquida - totals.investimento,
     roas: totals.investimento > 0 ? totals.receitaLiquida / totals.investimento : null,
     roasComAscensao:
@@ -437,8 +440,9 @@ export default async function SalesFunnelPage({
             ))}
           </dl>
           <p className="mt-3 text-[12px] text-[var(--ct-text-3)]">
-            CPA geral = investimento com imposto ÷ vendas de entrada do projeto. O CPA de anúncio divide pelas vendas que a UTM diz que vieram de anúncio; por frente
-            só conta a venda cuja UTM traz o id da campanha (ou de um anúncio dela), porque é ele que liga a venda à frente.
+            CPA geral = investimento com imposto ÷ vendas de entrada do projeto. O CPA de anúncio, no projeto e por frente, divide pelas vendas cuja
+            UTM traz o id de uma campanha conhecida (ou de um anúncio dela), seja qual for a frente dona da campanha. A UTM antiga sem id fica em
+            &quot;anúncio sem identificação&quot;.
           </p>
         </details>
       )}
@@ -734,7 +738,14 @@ export default async function SalesFunnelPage({
                 </td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(row.spendComImposto)}</td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.vendas}</td>
-                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.vendasAnuncio}</td>
+                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">
+                  {row.vendasAnuncio}
+                  {row.vendasAnuncioSemId > 0 && (
+                    <span className="ml-1.5 text-[11px] text-[var(--ct-text-3)]" title="anúncio sem identificação (fora do CPA de anúncio)">
+                      +{row.vendasAnuncioSemId} sem id
+                    </span>
+                  )}
+                </td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.vendasUpsell}</td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(row.receitaLiquida)}</td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">

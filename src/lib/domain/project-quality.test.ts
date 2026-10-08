@@ -3,8 +3,8 @@ import { cpaSources, qualitySeals, type ProjectQualityRow } from './project-qual
 
 const clean: ProjectQualityRow = {
   vendas_entrada: 100,
-  vendas_anuncio: 80,
-  vendas_com_id_anuncio: 70,
+  vendas_anuncio: 70,
+  vendas_anuncio_sem_id: 10,
   vendas_sem_utm: 12,
   vendas_bio: 5,
   vendas_outra_origem: 3,
@@ -36,9 +36,8 @@ describe('cpaSources', () => {
   it('spells out what the CPA counts and what it leaves out', () => {
     expect(cpaSources({ ...clean, cliente_vendas_sem_projeto: 4 })).toEqual([
       { label: 'Vendas de entrada (CPA geral)', value: '100' },
-      { label: 'de anúncio pela UTM (CPA de anúncio)', value: '80' },
-      { label: 'com id de campanha ou anúncio na UTM (CPA por frente)', value: '70' },
-      { label: 'fora do CPA de anúncio', value: '12 sem UTM · 5 da bio · 3 de outra origem' },
+      { label: 'de anúncio, com a campanha identificada (CPA de anúncio e por frente)', value: '70' },
+      { label: 'fora do CPA de anúncio', value: '10 anúncio sem identificação · 12 sem UTM · 5 da bio · 3 de outra origem' },
       { label: 'do cliente, sem projeto (fora deste CPA)', value: '4' },
     ])
   })

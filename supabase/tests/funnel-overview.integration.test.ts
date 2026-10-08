@@ -7,6 +7,7 @@ interface DayRow {
   data: string
   vendas: number
   vendas_anuncio: number
+  vendas_anuncio_sem_id: number
   vendas_upsell: number
   receita_bruta: number
   spend: number
@@ -31,6 +32,8 @@ describe('project overview: entry vs upsell, sale origin and Meta tax (0055)', (
     await admin.from('naming_rules').insert({ front_id: front!.id, kind: 'include', value: '[1K-POR-DIA]' })
     await admin.from('campaign_daily').insert({ client_id: client!.id, data: day, campaign_id: 'c1', campaign_name: '[1K-POR-DIA] venda', spend: 1000 })
     await admin.from('client_tax_rates').insert({ client_id: client!.id, valid_from: '2026-09-01', factor: 1.138 })
+    // The ad names its campaign, so the sale is an ad sale (0103).
+    await admin.from('ad_creative_spend_daily').insert({ sales_funnel_id: funnelId, data: day, ad_id: '120239900000000123', campaign_id: 'c1' })
     const sale = (externalId: string, extra: Record<string, unknown>) => ({
       sales_funnel_id: funnelId,
       external_id: externalId,
@@ -46,11 +49,11 @@ describe('project overview: entry vs upsell, sale origin and Meta tax (0055)', (
       ...extra,
     })
     await admin.from('sales').insert([
-      sale('ad-1', { utm_source: 'facebookads', utm_content: '120231234567890123' }),
+      sale('ad-1', { utm_source: 'facebookads', utm_content: '120239900000000123' }),
       sale('ad-2', { utm_source: 'facebookads', utm_content: 'Conjunto Antigo' }),
       sale('bio-1', { utm_source: 'ig', utm_medium: 'social', utm_content: 'link_in_bio' }),
       sale('none-1', {}),
-      sale('up-1', { is_upsell: true, valor_bruto: 50, valor_liquido: 45, utm_content: '120231234567890123' }),
+      sale('up-1', { is_upsell: true, valor_bruto: 50, valor_liquido: 45, utm_content: '120239900000000123' }),
     ])
   })
 
@@ -59,7 +62,8 @@ describe('project overview: entry vs upsell, sale origin and Meta tax (0055)', (
     expect(error).toBeNull()
     const row = (data as DayRow[])[0]
     expect(Number(row.vendas)).toBe(4)
-    expect(Number(row.vendas_anuncio)).toBe(2)
+    expect(Number(row.vendas_anuncio)).toBe(1)
+    expect(Number(row.vendas_anuncio_sem_id)).toBe(1)
     expect(Number(row.vendas_upsell)).toBe(1)
     expect(Number(row.receita_bruta)).toBe(90)
     expect(Number(row.spend)).toBe(1000)

@@ -7,6 +7,8 @@ interface KpiTotals {
   vendasUpsell: number
   cpa: number | null
   cpaAnuncio: number | null
+  /** Ad-looking entry sales with no identified campaign (0103): outside the ad CPA. */
+  vendasAnuncioSemId: number
   resultado: number
   roas: number | null
   /** Front revenue plus the ascension product, over the same spend (0061). */
@@ -84,7 +86,14 @@ export function FunnelKpiCards({
       hint: totals.vendasUpsell > 0 ? `+ ${totals.vendasUpsell.toLocaleString('pt-BR')} upsell` : undefined,
     },
     { label: 'CPA geral', value: totals.cpa !== null ? currency(totals.cpa) : '—', hint: 'todas as vendas de entrada' },
-    { label: 'CPA de anúncio', value: totals.cpaAnuncio !== null ? currency(totals.cpaAnuncio) : '—', hint: 'só vendas que a UTM liga ao anúncio' },
+    {
+      label: 'CPA de anúncio',
+      value: totals.cpaAnuncio !== null ? currency(totals.cpaAnuncio) : '—',
+      hint:
+        totals.vendasAnuncioSemId > 0
+          ? `${totals.vendasAnuncioSemId.toLocaleString('pt-BR')} anúncio sem identificação (fora do CPA de anúncio)`
+          : 'só vendas com a campanha identificada',
+    },
     { label: 'Resultado', value: currency(totals.resultado), color: totals.resultado >= 0 ? 'var(--ct-ok)' : 'var(--ct-crit)' },
     {
       label: 'ROAS front',

@@ -24,8 +24,9 @@ describe('0092: de onde vem o número, e a prévia da regra', () => {
     ])
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
     const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+    const gerId = `9${Date.now()}`
     await admin.from('campaign_daily').insert([
-      { client_id: clientId, data: yesterday, campaign_id: `ger-${unique()}`, campaign_name: '[GER] Captação', spend: 100 },
+      { client_id: clientId, data: yesterday, campaign_id: gerId, campaign_name: '[GER] Captação', spend: 100 },
       { client_id: clientId, data: yesterday, campaign_id: `both-${unique()}`, campaign_name: '[GER][PAG] Mista', spend: 40 },
       { client_id: clientId, data: yesterday, campaign_id: `none-${unique()}`, campaign_name: 'Institucional', spend: 30 },
     ])
@@ -34,7 +35,7 @@ describe('0092: de onde vem o número, e a prévia da regra', () => {
       sales_funnel_id: funnel!.id, external_id: `${id}-${unique()}`, data_venda: `${yesterday}T15:00:00Z`, status: 'aprovada', produto: 'Curso', ...utm,
     })
     const { error } = await admin.from('sales').insert([
-      sale('ad', { utm_source: 'facebookads', utm_campaign: 'X 123456789' }),
+      sale('ad', { utm_source: 'facebookads', utm_campaign: `X ${gerId}` }),
       sale('legacy', { utm_source: 'facebookads' }),
       sale('none', {}),
     ])
@@ -44,8 +45,8 @@ describe('0092: de onde vem o número, e a prévia da regra', () => {
     expect(qualityError).toBeNull()
     expect(data[0]).toMatchObject({
       vendas_entrada: 3,
-      vendas_anuncio: 2,
-      vendas_com_id_anuncio: 1,
+      vendas_anuncio: 1,
+      vendas_anuncio_sem_id: 1,
       vendas_sem_utm: 1,
       cliente_campanhas_sem_frente: 2,
       cliente_campanhas_em_disputa: 1,

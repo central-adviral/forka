@@ -96,6 +96,7 @@ export default async function TodayPage({
   const vendasSemProjeto = sum(periodDays, 'vendasSemProjeto')
   const vendas = sum(periodDays, 'vendas')
   const vendasAnuncio = sum(periodDays, 'vendasAnuncio')
+  const vendasAnuncioSemId = sum(periodDays, 'vendasAnuncioSemId')
   const leads = sum(periodDays, 'leads')
 
   // The day's target is the sum of the active projects' targets; the projection uses the sales up
@@ -133,7 +134,13 @@ export default async function TodayPage({
       label: 'CPA geral',
       tag: partial ? 'parcial' : 'todas',
       value: vendas > 0 ? currency2(cpaBase / vendas) : '—',
-      foot: [vendasAnuncio > 0 ? `de anúncio ${currency2(cpaBase / vendasAnuncio)}` : 'sem venda de anúncio', vendasSemProjeto > 0 ? `${vendasSemProjeto} sem projeto` : null].filter(Boolean).join(' · '),
+      foot: [
+        vendasAnuncio > 0 ? `de anúncio ${currency2(cpaBase / vendasAnuncio)}` : 'sem venda de anúncio',
+        vendasAnuncioSemId > 0 ? `${vendasAnuncioSemId} anúncio sem identificação (fora do CPA de anúncio)` : null,
+        vendasSemProjeto > 0 ? `${vendasSemProjeto} sem projeto` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
       spark: [],
       color: '',
     },
