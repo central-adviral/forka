@@ -21,6 +21,7 @@ const RULE_FIELDS = [
   { key: 'min', label: 'Vitória: mínimo de compras', hint: 'CPA no teto ou abaixo e pelo menos esse número de compras de anúncio.', step: '1' },
   { key: 'conf', label: 'A/B de link: chance mínima de vencer (%)', hint: 'Calculada por pessoa, pelo motor do Teste A/B.', step: '1' },
   { key: 'minVisits', label: 'A/B de link: mínimo de visitantes por variante', hint: 'Sem esse piso, uma chance alta com pouca gente não vale como vitória.', step: '50' },
+  { key: 'mde', label: 'A/B de link: menor melhora que importa (%)', hint: 'Define quantas pessoas cada lado precisa antes do veredito. Quanto menor, mais gente.', step: '1' },
   { key: 'sat', label: 'Janela de saturação de criativo (dias)', hint: 'Criativo rodando há mais tempo que isso pede decisão.', step: '1' },
 ] as const
 
@@ -281,7 +282,7 @@ export default async function BacklogPage({
             {[
               ['Corte', `variante com R$ ${(rules.teto * rules.mult).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} gastos e nenhuma venda`],
               ['Vitória de criativo', `CPA de até R$ ${rules.teto.toLocaleString('pt-BR')} com ${rules.min}+ compras`],
-              ['Vitória de A/B de link', `chance de ${rules.conf}%+ com ${rules.minVisits.toLocaleString('pt-BR')}+ pessoas por variante`],
+              ['Vitória de A/B de link', `chance de ${rules.conf}%+, ${rules.min}+ conversões e a amostra para ver ${rules.mde}% de melhora (mín. ${rules.minVisits.toLocaleString('pt-BR')} pessoas)`],
               ['Saturação', `criativo rodando há mais de ${rules.sat} dias pede decisão`],
             ].map(([label, text]) => (
               <div key={label} className="flex justify-between gap-4 border-b border-[var(--ct-line)] pb-3 last:border-b-0 last:pb-0">
@@ -389,9 +390,16 @@ export default async function BacklogPage({
                       ))}
                     </div>
                   )}
+                  {selectedReadout?.link && (
+                    <p className="text-[12px] text-[var(--ct-text-2)]">
+                      {selectedReadout.link[0]?.needed == null
+                        ? 'Amostra: aparece quando o controle tiver a primeira conversão.'
+                        : `Amostra: ${Math.min(...selectedReadout.link.map((variant) => variant.visits)).toLocaleString('pt-BR')} de ${selectedReadout.link[0].needed.toLocaleString('pt-BR')} pessoas no lado com menos gente. Antes disso a chance oscila e não vale como veredito.`}
+                    </p>
+                  )}
                   <p className="text-[11.5px] text-[var(--ct-text-3)]">
                     {selected.status === 'running'
-                      ? `Vence com ${rules.conf}%+ de chance e ${rules.minVisits.toLocaleString('pt-BR')}+ pessoas em cada lado. É sugestão: a decisão é sua.`
+                      ? `Vence com ${rules.conf}%+ de chance, ${rules.min}+ conversões e a amostra completa nos dois lados. É sugestão: a decisão é sua.`
                       : 'A medição começa quando o card for para Rodando.'}
                   </p>
                 </div>

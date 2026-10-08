@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_RULES } from './backlog'
-import { readLinkTest, readMetaTest, readoutSummary, tagKey } from './backlog-readout'
+import { readLinkTest, readMetaTest, readoutSummary, requiredVisitsPerArm, tagKey } from './backlog-readout'
 
 function seeded(seed = 7): () => number {
   let state = seed
@@ -32,13 +32,32 @@ describe('backlog readout', () => {
     expect(read[0].cpa).toBeCloseTo(44)
   })
 
-  it('only calls a link test past the visitor floor on both sides', () => {
+  it('waits for the sample the control rate calls for before calling a link test', () => {
+    // 5% control rate, 30% minimum lift, 95% confidence: about 3 thousand people each side.
+    const needed = requiredVisitsPerArm(0.05, 95, 30)!
+    expect(needed).toBeGreaterThan(2800)
+    expect(needed).toBeLessThan(3200)
     const control = { variant_id: 'a', variant_name: 'Atual', visits: 600, conversions: 30 }
     const better = { variant_id: 'b', variant_name: 'Nova', visits: 600, conversions: 70 }
-    expect(readLinkTest([control, better], 'a', DEFAULT_RULES, seeded()).map((v) => v.verdict)).toEqual(['measuring', 'win'])
-    expect(readLinkTest([control, { ...better, visits: 100, conversions: 20 }], 'a', DEFAULT_RULES, seeded())[1].verdict).toBe('measuring')
-    const worse = { variant_id: 'c', variant_name: 'Pior', visits: 600, conversions: 5 }
-    expect(readLinkTest([control, worse], 'a', DEFAULT_RULES, seeded())[1].verdict).toBe('cut')
+    // A big lift on 600 people is still "measuring": stopping here is how false winners happen.
+    const early = readLinkTest([control, better], 'a', DEFAULT_RULES, seeded())
+    expect(early.map((v) => v.verdict)).toEqual(['measuring', 'measuring'])
+    expect(early[1].needed).toBe(Math.max(DEFAULT_RULES.minVisits, requiredVisitsPerArm(30 / 600, 95, 30)!))
+
+    const bigControl = { ...control, visits: 3200, conversions: 160 }
+    expect(readLinkTest([bigControl, { ...better, visits: 3200, conversions: 230 }], 'a', DEFAULT_RULES, seeded())[1].verdict).toBe('win')
+    expect(readLinkTest([bigControl, { ...better, visits: 3200, conversions: 100 }], 'a', DEFAULT_RULES, seeded())[1].verdict).toBe('cut')
+  })
+
+  it('has no sample size while the control has no conversion, and needs the minimum conversions to win', () => {
+    expect(requiredVisitsPerArm(0, 95, 30)).toBeNull()
+    const read = readLinkTest([{ variant_id: 'a', variant_name: 'Atual', visits: 900, conversions: 0 }, { variant_id: 'b', variant_name: 'Nova', visits: 900, conversions: 9 }], 'a', DEFAULT_RULES, seeded())
+    expect(read[1]).toMatchObject({ needed: null, verdict: 'measuring' })
+    // High rates make the sample small; the minimum conversions still guard the win.
+    const strict = { ...DEFAULT_RULES, min: 50 }
+    const small = readLinkTest([{ variant_id: 'a', variant_name: 'Atual', visits: 700, conversions: 140 }, { variant_id: 'b', variant_name: 'Nova', visits: 700, conversions: 235 }], 'a', strict, seeded())
+    expect(small[1].verdict).toBe('win')
+    expect(readLinkTest([{ variant_id: 'a', variant_name: 'Atual', visits: 700, conversions: 140 }, { variant_id: 'b', variant_name: 'Nova', visits: 700, conversions: 235 }], 'a', { ...strict, min: 300 }, seeded())[1].verdict).toBe('measuring')
   })
 
   it('says win first, then cut, then saturation of a creative test', () => {
