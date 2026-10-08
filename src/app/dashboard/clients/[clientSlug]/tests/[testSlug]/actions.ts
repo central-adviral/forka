@@ -2,6 +2,7 @@
 
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { httpUrl } from '@/lib/domain/http-url-schema'
 import { layerConflict } from '@/lib/domain/test-layers'
@@ -203,3 +204,49 @@ export async function updateTest(input: z.infer<typeof updateTestSchema>) {
 
   revalidatePath(`/dashboard/clients/${parsed.client_slug}/tests/${parsed.test_slug}`)
 }
+
+// Routing rules (0084): a variant sends each person to a page by ad name, source or device, after
+// the draw. Written on the user's session: the 0084 policy lets only gestor or owner change them.
+const routeSchema = z.object({
+  match_field: z.enum(['ad_name', 'utm_source', 'device']),
+  match_value: z.string().trim().min(1, 'informe o valor da regra').max(120),
+  destination_url: httpUrl,
+})
+
+function editPath(clientSlug: string, testSlug: string, message?: string): string {
+  return `/dashboard/clients/${clientSlug}/tests/${testSlug}/edit${message ? `?erro=${encodeURIComponent(message)}` : ''}#rotas`
+}
+
+export async function addRoute(target: { client_slug: string; test_slug: string; test_id: string; variant_id: string }, formData: FormData) {
+  const parsed = routeSchema.safeParse({
+    match_field: formData.get('match_field'),
+    match_value: formData.get('match_value'),
+    destination_url: formData.get('destination_url'),
+  })
+  if (!parsed.success) redirect(editPath(target.client_slug, target.test_slug, parsed.error.issues.map((issue) => issue.message).join('; ')))
+  if (parsed.data.match_field === 'device' && !['celular', 'computador'].includes(parsed.data.match_value)) {
+    redirect(editPath(target.client_slug, target.test_slug, 'Dispositivo deve ser "celular" ou "computador".'))
+  }
+  const supabase = await createServerSupabaseClient()
+  const { count } = await supabase.from('variant_routes').select('id', { count: 'exact', head: true }).eq('variant_id', target.variant_id)
+  const { error } = await supabase.from('variant_routes').insert({
+    test_id: target.test_id,
+    variant_id: target.variant_id,
+    position: count ?? 0,
+    match_field: parsed.data.match_field,
+    match_value: parsed.data.match_value,
+    destination_url: parsed.data.destination_url,
+  })
+  if (error) redirect(editPath(target.client_slug, target.test_slug, 'A regra não foi salva. Só gestor ou owner pode mudar o teste.'))
+  revalidatePath(`/dashboard/clients/${target.client_slug}/tests/${target.test_slug}`)
+  redirect(editPath(target.client_slug, target.test_slug))
+}
+
+export async function deleteRoute(target: { client_slug: string; test_slug: string; route_id: string }) {
+  const supabase = await createServerSupabaseClient()
+  const { data, error } = await supabase.from('variant_routes').delete().eq('id', target.route_id).select('id')
+  if (error || !data?.length) redirect(editPath(target.client_slug, target.test_slug, 'A regra não foi removida. Só gestor ou owner pode mudar o teste.'))
+  revalidatePath(`/dashboard/clients/${target.client_slug}/tests/${target.test_slug}`)
+  redirect(editPath(target.client_slug, target.test_slug))
+}
+

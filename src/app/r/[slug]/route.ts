@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
-import { countRecentClickEventsByIp, getOrAssignVariant, getTestBySlug, insertClickEvent } from '@/lib/repo/redirect-repo'
+import { countRecentClickEventsByIp, getOrAssignVariant, getTestBySlug, insertClickEvent, type VariantRow } from '@/lib/repo/redirect-repo'
+import { matchRoute } from '@/lib/domain/routing'
 import { pickVariant } from '@/lib/domain/pick-variant'
 import { isKnownBot } from '@/lib/domain/bot-filter'
 import {
@@ -41,11 +42,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   // Bots and paused tests both land on the real control, never on whichever variant sorts first by
   // name: Meta's reviewer must see the page people see, and a paused test's ads still pay for clicks.
   const control = test.variants.find((v) => v.is_control) ?? test.variants[0]
-  const controlDestination = resolveEntryDestination({
-    testType: test.test_type,
-    salesPageUrl: test.sales_page_url,
-    variantDestinationUrl: control.destination_url,
-  })
+  // Routing rules (0084) pick the page after the draw: by the ad's name, the source or the device.
+  // A checkout test sends everyone to the same sales page, so its rules do not apply here.
+  const click = {
+    adName: request.nextUrl.searchParams.get('utm_term') ?? '',
+    utmSource: request.nextUrl.searchParams.get('utm_source') ?? '',
+    userAgent: request.headers.get('user-agent'),
+  }
+  const pageFor = (v: VariantRow) => {
+    const route = test.test_type === 'page' ? matchRoute(v.variant_routes ?? [], click) : null
+    return {
+      routeId: route?.id ?? null,
+      url: resolveEntryDestination({ testType: test.test_type, salesPageUrl: test.sales_page_url, variantDestinationUrl: route?.destination_url ?? v.destination_url }),
+    }
+  }
+  const controlDestination = pageFor(control).url
 
   if (test.status !== 'active') {
     return NextResponse.redirect(withUtms(test.fallback_url ?? controlDestination, captureTrackedParams(request.nextUrl.searchParams)), 302)
@@ -88,6 +99,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 
   const trackingId = crypto.randomUUID()
+  const routed = pageFor(variant)
 
   const sourceUtms = captureTrackedParams(request.nextUrl.searchParams)
 
@@ -107,6 +119,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         sourceUtms,
         ip,
         rateLimited,
+        routeId: routed.routeId,
       })
     } catch (err) {
       console.error('[click-insert-failed]', { testId: test.id, slug, isBot: false }, err)
@@ -114,14 +127,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   })
 
   const destination = withTrackingId(
-    withUtms(
-      resolveEntryDestination({
-        testType: test.test_type,
-        salesPageUrl: test.sales_page_url,
-        variantDestinationUrl: variant.destination_url,
-      }),
-      sourceUtms
-    ),
+    withUtms(routed.url, sourceUtms),
     trackingId
   )
 
