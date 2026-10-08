@@ -626,6 +626,7 @@ export default async function SalesFunnelPage({
               <th className="p-3">De anúncio</th>
               <th className="p-3">Upsell</th>
               <th className="p-3">Receita líquida</th>
+              <th className="p-3">Reembolsos</th>
               <th className="p-3">CPA geral</th>
               <th className="p-3">CPA de anúncio</th>
               <th className="p-3">ROAS</th>
@@ -647,6 +648,9 @@ export default async function SalesFunnelPage({
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.vendasAnuncio}</td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.vendasUpsell}</td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{currency(row.receitaLiquida)}</td>
+                <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">
+                  {row.reembolsos > 0 ? `${row.reembolsos} · −${currency(row.receitaReembolsadaLiquida)}` : '—'}
+                </td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">{row.cac !== null ? currency(row.cac) : '—'}</td>
                 <td className="p-3 font-[family-name:var(--font-geist-mono)] tabular-nums">
                   {row.vendasAnuncio > 0 ? currency(row.spendComImposto / row.vendasAnuncio) : '—'}

@@ -50,7 +50,7 @@ export default async function ProjectProductsPage({
     supabase.from('project_products').select('produto_nome, papel').eq('sales_funnel_id', funnel.id).order('produto_nome'),
     // Sales of the client no project owns (0073): a product listed in several projects with no ad
     // on the sale, or a product no project lists any more.
-    supabase.from('sales').select('produto, valor_liquido').eq('client_id', client.id).is('sales_funnel_id', null).gte('data_venda', since),
+    supabase.from('sales').select('produto, valor_liquido').eq('client_id', client.id).is('sales_funnel_id', null).is('reembolsado_em', null).gte('data_venda', since),
   ])
   if (productsError) throw productsError
   if (unattributedError) throw unattributedError

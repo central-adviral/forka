@@ -107,6 +107,7 @@ export default async function TodayPage({
     dailyTarget > 0 && period !== '7d'
       ? `meta ${dailyTarget.toLocaleString('pt-BR')}${projected !== null ? ` · projeção ${projected.toLocaleString('pt-BR')}` : ''}`
       : `${vendasAnuncio.toLocaleString('pt-BR')} de anúncio`
+  const reembolsos = sum(periodDays, 'reembolsos')
   const salesTag = dailyTarget > 0 && projected !== null ? (projected >= dailyTarget ? 'no ritmo' : 'abaixo do ritmo') : 'todas'
 
   const weekdayLabel = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: '2-digit' })
@@ -120,7 +121,14 @@ export default async function TodayPage({
       spark: sparkOf('spendComImposto'),
       color: 'var(--ct-an)',
     },
-    { label: 'Vendas de entrada', tag: salesTag, value: vendas.toLocaleString('pt-BR'), foot: salesFoot, spark: sparkOf('vendas'), color: 'var(--ct-ok)' },
+    {
+      label: 'Vendas de entrada',
+      tag: salesTag,
+      value: vendas.toLocaleString('pt-BR'),
+      foot: reembolsos > 0 ? `${salesFoot} · ${reembolsos} ${reembolsos === 1 ? 'reembolso' : 'reembolsos'}` : salesFoot,
+      spark: sparkOf('vendas'),
+      color: 'var(--ct-ok)',
+    },
     {
       label: 'CPA geral',
       tag: partial ? 'parcial' : 'todas',

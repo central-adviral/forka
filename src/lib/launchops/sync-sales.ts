@@ -26,7 +26,7 @@ export interface LaunchOpsSaleRow {
 // every read starts this far behind it.
 export const CURSOR_OVERLAP_MS = 60 * 60 * 1000
 
-/** Only approved sales count. A row that left that status (refund, chargeback) leaves the Central. */
+/** Only approved sales enter the Central. A row that leaves that status (refund, chargeback) stays, dated by reembolsado_em. */
 export const APPROVED_STATUS = 'aprovada'
 
 export async function fetchLaunchOpsSalesRows(
@@ -133,36 +133,37 @@ export async function syncSalesForFunnel(
   appDb: SupabaseClient,
   salesFunnelId: string,
   rows: LaunchOpsSaleRow[]
-): Promise<{ synced: number; removed: number; latestUpdatedAt: string | null }> {
-  if (rows.length === 0) return { synced: 0, removed: 0, latestUpdatedAt: null }
+): Promise<{ synced: number; refunded: number; latestUpdatedAt: string | null }> {
+  if (rows.length === 0) return { synced: 0, refunded: 0, latestUpdatedAt: null }
   const latestUpdatedAt = rows.reduce((latest, row) => (row.updated_at > latest ? row.updated_at : latest), rows[0].updated_at)
   const approved = rows.filter((row) => row.status === APPROVED_STATUS)
-  const removedIds = rows.filter((row) => row.status !== APPROVED_STATUS).map((row) => row.id)
+  const notApproved = rows.filter((row) => row.status !== APPROVED_STATUS)
 
   // A sale is stored once per client (0073) and may sit in another project or in none, so a refund
-  // removes it by client, wherever the attribution put it.
+  // is found by client, wherever the attribution put it.
   let clientId: string | null = null
-  if (removedIds.length > 0) {
+  if (notApproved.length > 0) {
     const { data: funnel, error: funnelError } = await appDb.from('sales_funnels').select('client_id').eq('id', salesFunnelId).single()
     if (funnelError) throw funnelError
     clientId = funnel.client_id as string
   }
   // A sale that left 'aprovada' (refund, chargeback) leaves the A/B test too, even when the Hubla
   // refund webhook never came (0083 does the move; it does nothing when no conversion holds it).
-  const refundedInvoices = rows.filter((row) => row.status !== APPROVED_STATUS && row.transaction_id_plataforma).map((row) => row.transaction_id_plataforma as string)
+  const refundedInvoices = notApproved.filter((row) => row.transaction_id_plataforma).map((row) => row.transaction_id_plataforma as string)
   for (const invoice of refundedInvoices) {
     await refundHublaConversion(appDb, { clientId: clientId!, externalEventId: invoice, refundedAt: new Date().toISOString() })
   }
-  for (let i = 0; i < removedIds.length; i += LOOKUP_CHUNK_SIZE) {
-    const { error } = await appDb
-      .from('sales')
-      .delete()
-      .eq('client_id', clientId)
-      .eq('source', 'launchops_sync')
-      .in('external_id', removedIds.slice(i, i + LOOKUP_CHUNK_SIZE))
+  // The row stays on its sale day; reembolsado_em dates the refund (0099), the first one kept.
+  let refunded = 0
+  for (let i = 0; i < notApproved.length; i += UPSERT_BATCH_SIZE) {
+    const { data, error } = await appDb.rpc('mark_sales_refunded', {
+      p_client_id: clientId,
+      p_rows: notApproved.slice(i, i + UPSERT_BATCH_SIZE).map((row) => ({ external_id: row.id, status: row.status, updated_at: row.updated_at })),
+    })
     if (error) throw error
+    refunded += Number(data ?? 0)
   }
-  if (approved.length === 0) return { synced: 0, removed: removedIds.length, latestUpdatedAt }
+  if (approved.length === 0) return { synced: 0, refunded, latestUpdatedAt }
 
   // Best-effort reconciliation: transaction_id_plataforma (LaunchOps) and conversions.external_event_id
   // (ab-test-tool) both hold the Hubla invoice id. Most sales won't have a match — that's expected,
@@ -193,6 +194,8 @@ export async function syncSalesForFunnel(
     utm_term: row.utm_term ?? null,
     utm_content: row.utm_content ?? null,
     is_upsell: row.is_upsell ?? false,
+    // Back to approved: the refund is undone.
+    reembolsado_em: null,
   }))
 
   // A single upsert covering thousands of rows (e.g. a first full-history sync) risks
@@ -203,5 +206,5 @@ export async function syncSalesForFunnel(
     if (error) throw error
   }
 
-  return { synced: approved.length, removed: removedIds.length, latestUpdatedAt }
+  return { synced: approved.length, refunded, latestUpdatedAt }
 }

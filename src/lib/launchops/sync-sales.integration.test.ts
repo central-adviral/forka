@@ -92,13 +92,13 @@ describe('syncSalesForFunnel (integration)', () => {
     expect(data!.valor_bruto).toBe(12)
   })
 
-  it('removes a sale from the Central when LaunchOps marks it refunded (0055)', async () => {
+  it('keeps a sale LaunchOps marks refunded, dated by reembolsado_em (0099)', async () => {
     const saleRow = row()
     await syncSalesForFunnel(db, salesFunnelId, [saleRow])
     const result = await syncSalesForFunnel(db, salesFunnelId, [{ ...saleRow, status: 'reembolsada', updated_at: '2026-09-03T12:00:00Z' }])
-    expect(result).toEqual({ synced: 0, removed: 1, latestUpdatedAt: '2026-09-03T12:00:00Z' })
-    const { data } = await db.from('sales').select('id').eq('sales_funnel_id', salesFunnelId).eq('external_id', saleRow.id)
-    expect(data).toEqual([])
+    expect(result).toEqual({ synced: 0, refunded: 1, latestUpdatedAt: '2026-09-03T12:00:00Z' })
+    const { data } = await db.from('sales').select('status, reembolsado_em').eq('sales_funnel_id', salesFunnelId).eq('external_id', saleRow.id)
+    expect(data).toEqual([{ status: 'reembolsada', reembolsado_em: '2026-09-03T12:00:00+00:00' }])
   })
 
   it('keeps the upsell flag and reads the origin from the UTM (0055)', async () => {
