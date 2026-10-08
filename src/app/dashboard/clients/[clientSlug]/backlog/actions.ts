@@ -98,9 +98,12 @@ export async function createItem(context: BacklogContext, formData: FormData) {
   let linkNote = ''
   if (link && !('error' in link)) {
     const created = await createExperimentTest(supabase, context, { itemId: item.id, code, title: result.data.title, names, ...link })
-    linkNote = created.ok
-      ? ' O teste A/B e o link /r foram criados: ele fica pausado (manda todos ao controle) até o card ir para Rodando.'
-      : ` O link não foi criado: ${created.error} Crie em Testes A/B e vincule no card.`
+    // "Criar e gerar o link" ends where the next step is: the link to paste in the ads.
+    if (created.ok) {
+      revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
+      redirect(`/dashboard/clients/${context.client_slug}/tests/${created.slug}/link`)
+    }
+    linkNote = ` O link não foi criado: ${created.error} Crie em Testes A/B e vincule no card.`
   }
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
   back(context, 'ok', `${code} entrou na fila.${linkNote}`, `&item=${code}`)
@@ -134,10 +137,11 @@ async function createExperimentTest(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   context: BacklogContext,
   input: LinkFields & { itemId: string; code: string; title: string; names: string[] }
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; slug: string } | { ok: false; error: string }> {
   const weights = equalWeights(input.names.length)
   const base = experimentSlug(input.code, input.title)
   let testId: string | null = null
+  let testSlug = base
   for (const slug of [base, `${base}-${Math.random().toString(36).slice(2, 6)}`]) {
     const { data, error } = await supabase.rpc('create_test_with_variants', {
       p_client_id: context.client_id,
@@ -156,6 +160,7 @@ async function createExperimentTest(
     })
     if (!error) {
       testId = data as string
+      testSlug = slug
       break
     }
     // Only a taken slug is worth a second try with a suffix; anything else is the answer.
@@ -168,7 +173,7 @@ async function createExperimentTest(
   const { error: linkError } = await supabase.from('backlog_items').update({ ab_test_id: testId }).eq('id', input.itemId)
   if (linkError) return { ok: false, error: 'o teste foi criado, mas não ficou vinculado ao card.' }
   await supabase.from('backlog_gates').update({ done_at: new Date().toISOString() }).eq('item_id', input.itemId).eq('label', AUTO_LINK_GATE)
-  return { ok: true }
+  return { ok: true, slug: testSlug }
 }
 
 export async function moveItem(context: BacklogContext & { item_id: string; code: string }, formData: FormData) {
