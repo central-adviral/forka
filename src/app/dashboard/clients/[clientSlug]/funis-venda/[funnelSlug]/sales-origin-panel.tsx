@@ -3,7 +3,7 @@ import type { SalesByOrigin } from '@/lib/repo/funnel-repo'
 // The same order everywhere: what the ads brought first, then what came in on its own.
 const ORIGINS: { key: string; label: string; rule: string; fromAd: boolean }[] = [
   { key: 'anuncio', label: 'Anúncio Meta', rule: 'ad_id do Meta na utm_content', fromAd: true },
-  { key: 'anuncio_legado', label: 'Anúncio · UTM antiga', rule: 'utm_source=facebookads, sem ad_id', fromAd: true },
+  { key: 'anuncio_legado', label: 'Anúncio sem identificação', rule: 'utm_source=facebookads, sem id de campanha ou anúncio', fromAd: false },
   { key: 'organico_bio', label: 'Bio do Instagram', rule: 'ig/instagram com "bio" na UTM', fromAd: false },
   { key: 'sem_utm', label: 'Sem UTM', rule: 'nenhuma UTM na venda', fromAd: false },
   { key: 'outro', label: 'Outros', rule: 'qualquer outra UTM', fromAd: false },
@@ -24,8 +24,8 @@ export function SalesOriginPanel({ origins, currency }: { origins: SalesByOrigin
         </span>
       </div>
       <p className="mb-4 text-[12px] text-[var(--ct-text-2)]">
-        O CPA geral divide o investimento por todas estas vendas. O CPA de anúncio, os criativos e os testes contam só as
-        linhas marcadas como anúncio.
+        O CPA geral divide o investimento por todas estas vendas. O CPA de anúncio conta só as vendas cuja campanha foi
+        identificada; o anúncio sem identificação fica fora dele.
       </p>
       <div className="flex h-2.5 overflow-hidden rounded-full bg-[var(--ct-surface-2)]" role="img" aria-label="Fatia de cada origem nas vendas de entrada">
         {ORIGINS.map((origin) => {

@@ -7,6 +7,8 @@ export interface ClientDay {
   leads: number
   vendas: number
   vendasAnuncio: number
+  /** Entry sales that look like an ad but name no known campaign (0103): out of the ad CPA. */
+  vendasAnuncioSemId: number
   receitaLiquida: number
   /** Today only: the last Meta pull; today's sales are cut there (0058). */
   dadosAte: string | null
@@ -38,6 +40,7 @@ export async function getClientDaily(db: SupabaseClient, clientId: string, since
     spend_sem_frente_com_imposto: number
     vendas_sem_projeto: number
     reembolsos: number
+    vendas_anuncio_sem_id: number
   }[]).map((row) => ({
     data: row.data,
     spend: Number(row.spend),
@@ -45,6 +48,7 @@ export async function getClientDaily(db: SupabaseClient, clientId: string, since
     leads: Number(row.leads),
     vendas: Number(row.vendas),
     vendasAnuncio: Number(row.vendas_anuncio),
+    vendasAnuncioSemId: Number(row.vendas_anuncio_sem_id ?? 0),
     receitaLiquida: Number(row.receita_liquida),
     dadosAte: row.dados_ate,
     vendasAposDados: Number(row.vendas_apos_dados),

@@ -4,7 +4,7 @@
 export interface ProjectQualityRow {
   vendas_entrada: number
   vendas_anuncio: number
-  vendas_com_id_anuncio: number
+  vendas_anuncio_sem_id: number
   vendas_sem_utm: number
   vendas_bio: number
   vendas_outra_origem: number
@@ -79,10 +79,10 @@ export function cpaSources(row: ProjectQualityRow, cross?: { geradas_para_outro:
   const fromAds = Number(row.vendas_anuncio)
   const lines: SourceLine[] = [
     { label: 'Vendas de entrada (CPA geral)', value: n(entries) },
-    { label: 'de anúncio pela UTM (CPA de anúncio)', value: n(fromAds) },
-    { label: 'com id de campanha ou anúncio na UTM (CPA por frente)', value: n(row.vendas_com_id_anuncio) },
+    { label: 'de anúncio, com a campanha identificada (CPA de anúncio e por frente)', value: n(fromAds) },
   ]
   const outside = [
+    Number(row.vendas_anuncio_sem_id) > 0 ? `${n(row.vendas_anuncio_sem_id)} anúncio sem identificação` : null,
     Number(row.vendas_sem_utm) > 0 ? `${n(row.vendas_sem_utm)} sem UTM` : null,
     Number(row.vendas_bio) > 0 ? `${n(row.vendas_bio)} da bio` : null,
     Number(row.vendas_outra_origem) > 0 ? `${n(row.vendas_outra_origem)} de outra origem` : null,
