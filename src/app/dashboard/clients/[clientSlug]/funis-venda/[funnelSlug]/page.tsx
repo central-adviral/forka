@@ -51,7 +51,7 @@ export default async function SalesFunnelPage({
   if (!funnel) notFound()
 
   const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
-  const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }, { data: frontRows }, { data: frontDays }, { data: qualityRows }] = await Promise.all([
+  const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }, { data: frontRows }, { data: frontDays }, { data: qualityRows }, { data: frontSalesRows }, { data: crossRows }] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
     getFunnelSyncHealth(supabase, funnel.id),
     getPaymentMethodBreakdown(supabase, funnel.id, since, until),
@@ -71,6 +71,10 @@ export default async function SalesFunnelPage({
       .order('position'),
     supabase.rpc('get_project_front_daily', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
     supabase.rpc('get_project_data_quality', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
+    tab === 'frentes' && resultUsesSales(funnel.resultado)
+      ? supabase.rpc('get_project_front_sales', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until })
+      : Promise.resolve({ data: null }),
+    supabase.rpc('get_project_cross_sales', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
   ])
   const fronts: FrontInfo[] = ((frontRows ?? []) as unknown as { id: string; code: string; name: string; source: { name: string } | null }[]).map(
     (front) => ({ id: front.id, code: front.code, name: front.name, sourceName: front.source?.name ?? null })
@@ -336,7 +340,7 @@ export default async function SalesFunnelPage({
         <details className="-mt-3 mb-6 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-5 py-3">
           <summary className="cursor-pointer text-[13px] font-medium text-[var(--ct-text-2)]">De onde vem o CPA</summary>
           <dl className="mt-3 grid gap-x-6 gap-y-1.5 text-[13px] sm:grid-cols-[minmax(0,1fr)_auto]">
-            {cpaSources(quality).map((line) => (
+            {cpaSources(quality, ((crossRows ?? []) as { geradas_para_outro: number; vindas_de_outro: number }[])[0]).map((line) => (
               <div key={line.label} className="contents">
                 <dt className="text-[var(--ct-text-2)]">{line.label}</dt>
                 <dd className="font-[family-name:var(--font-geist-mono)] tabular-nums sm:text-right">{line.value}</dd>
@@ -358,6 +362,11 @@ export default async function SalesFunnelPage({
           taxFactor={totals.investimento > 0 && rows.reduce((t, row) => t + row.spend, 0) > 0 ? totals.investimento / rows.reduce((t, row) => t + row.spend, 0) : 1}
           rulesHref={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`}
           currency={currency}
+          sales={
+            frontSalesRows
+              ? new Map((frontSalesRows as { front_id: string; vendas: number; receita_liquida: number }[]).map((row) => [row.front_id, { vendas: Number(row.vendas), receita: Number(row.receita_liquida) }]))
+              : null
+          }
         />
       )}
 
