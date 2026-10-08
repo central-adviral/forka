@@ -199,7 +199,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 <th scope="col" className="px-5 py-3.5 text-right font-medium">Investido 7d</th>
                 <th scope="col" className="px-5 py-3.5 text-right font-medium">Vendas 7d</th>
                 <th scope="col" className="px-5 py-3.5 text-right font-medium">Receita líq. 7d</th>
-                <th scope="col" className="px-5 py-3.5 text-right font-medium">Projetos · testes</th>
+                <th scope="col" className="px-5 py-3.5 text-right font-medium">Funis · testes</th>
                 <th scope="col" className="px-5 py-3.5 text-right font-medium">Última sync</th>
               </tr>
             </thead>

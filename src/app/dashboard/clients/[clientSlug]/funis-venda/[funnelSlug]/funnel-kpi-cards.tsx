@@ -64,7 +64,7 @@ export function FunnelKpiCards({
   const leadCards: { label: string; value: string; color?: string; hint?: string; spark?: { values: number[]; color: string } }[] = lead
     ? [
         { label: totals.comImposto ? 'Investimento c/ imposto' : 'Investimento (sem imposto)', value: currency(totals.investimento) },
-        { label: 'Leads pagos', value: lead.leads.toLocaleString('pt-BR'), hint: 'das campanhas do projeto, sem duplicata' },
+        { label: 'Leads pagos', value: lead.leads.toLocaleString('pt-BR'), hint: 'das campanhas do funil, sem duplicata' },
         { label: 'CPL', value: lead.leads > 0 ? currency(totals.investimento / lead.leads) : '—', hint: 'investimento ÷ leads pagos' },
         { label: 'Cliques no link', value: lead.linkClicks.toLocaleString('pt-BR') },
         { label: 'Custo por clique', value: lead.linkClicks > 0 ? currency(totals.investimento / lead.linkClicks) : '—' },

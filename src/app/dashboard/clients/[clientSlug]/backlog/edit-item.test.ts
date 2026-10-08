@@ -74,6 +74,6 @@ describe('editItem', () => {
 
   it('reports a write the policies refused', async () => {
     db.refused = true
-    await expect(editItem(context, form({ title: 'T' }))).rejects.toThrow(/erro=Só gestor ou owner pode editar hipóteses/)
+    await expect(editItem(context, form({ title: 'T' }))).rejects.toThrow(/erro=Só gestor ou owner pode editar testes/)
   })
 })

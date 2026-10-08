@@ -131,7 +131,7 @@ export default async function PaginasPage({
       })
     return {
       id,
-      name: funnel?.name ?? 'Projeto',
+      name: funnel?.name ?? 'Funil',
       slug: funnel?.slug ?? '',
       spendToday: days.find((day) => day.data === today)?.spendComImposto ?? 0,
       spendRecent: days.filter((day) => day.data >= lastThreeDays).reduce((total, day) => total + day.spendComImposto, 0),
@@ -202,7 +202,7 @@ export default async function PaginasPage({
   return (
     <div className="flex max-w-[1240px] flex-col gap-8 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
-        title="Saúde das páginas"
+        title="Páginas"
         note="A sonda abre cada página como um visitante: confere se abre, para onde redireciona, o certificado, o pixel, o botão de compra e o texto que você pedir."
         actions={
           canEdit && (
@@ -242,7 +242,7 @@ export default async function PaginasPage({
         <Card label="Última checagem" foot="a cada hora · a cada 5 min se alguma cair">
           <b className={`${mono} text-2xl font-medium`}>{lastCheckAt ? when(lastCheckAt) : 'nunca'}</b>
         </Card>
-        <Card label="Gasto indo para páginas com problema" foot="hoje, com imposto, dos projetos ligados">
+        <Card label="Gasto indo para páginas com problema" foot="hoje, com imposto, dos funis ligados">
           <b className={`${mono} text-2xl font-medium ${spendAtRisk > 0 ? 'text-[var(--ct-crit)]' : ''}`}>{currency(spendAtRisk)}</b>
         </Card>
       </div>
@@ -308,7 +308,7 @@ export default async function PaginasPage({
                       {project.name}
                     </Link>
                   ) : (
-                    'Sem projeto'
+                    'Sem funil'
                   )}
                 </h2>
                 {project && (
@@ -370,7 +370,7 @@ export default async function PaginasPage({
       <footer className="rounded-[14px] border border-[var(--ct-line)] px-5 py-4 text-[12px] leading-relaxed text-[var(--ct-text-3)]">
         <b className="font-semibold text-[var(--ct-text-2)]">Como a sonda decide.</b> Fora do ar: não abriu em 2 checagens seguidas, ou a cadeia de redirecionamentos termina
         em erro. Atenção: servidor acima de {PAGE_SLOW_MS / 1000}s, certificado vencendo em menos de {CERT_WARN_DAYS} dias, ou pixel, botão de compra ou texto vigiado
-        ausentes. Sem tráfego: a frente da página (ou o projeto, se ela não tem frente) não gastou nos últimos {NO_TRAFFIC_DAYS} dias. Quem clica chega: dia com visualizações por clique {LPV_DROP * 100}% abaixo da
+        ausentes. Sem tráfego: a frente da página (ou o funil, se ela não tem frente) não gastou nos últimos {NO_TRAFFIC_DAYS} dias. Quem clica chega: dia com visualizações por clique {LPV_DROP * 100}% abaixo da
         média de 7 dias fica marcado. Frente sem página vigiada: gastou nos últimos {NO_TRAFFIC_DAYS} dias e nenhuma página ativa dela está na sonda. Página silenciada continua sendo checada, mas não avisa.
       </footer>
     </div>

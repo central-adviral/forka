@@ -98,7 +98,7 @@ export async function loadTodayAttention(supabase: SupabaseClient, client: { id:
     return [{
       severity: alert.severity,
       title: `${scope} · ${METRICS[watcher.metric].label} ${alert.severity === 'crit' ? 'crítico' : 'em atenção'}`,
-      detail: `${formatMetric(watcher.metric, alert.value)} contra alvo de ${formatMetric(watcher.metric, watcher.target)} no último dia fechado.`,
+      detail: `${formatMetric(watcher.metric, alert.value)} contra meta de ${formatMetric(watcher.metric, watcher.target)} no último dia fechado.`,
     }]
   })
 

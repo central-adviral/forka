@@ -25,7 +25,7 @@ async function assertNoDuplicateLaunchOpsMapping(
     const overlap = (funnel.launchops_operacao_ids ?? []).filter((id: string) => operacaoIds.includes(id))
     if (overlap.length > 0) {
       throw new Error(
-        `Operação(ões) já mapeada(s) no projeto "${funnel.name}" — cada operação do LaunchOps só pode pertencer a um projeto por cliente, senão o gasto é somado em dobro`
+        `Operação(ões) já mapeada(s) no funil "${funnel.name}" — cada operação do LaunchOps só pode pertencer a um funil por cliente, senão o gasto é somado em dobro`
       )
     }
   }
@@ -35,7 +35,7 @@ async function assertNoDuplicateLaunchOpsMapping(
 export async function setSalesFunnelArchived(salesFunnelId: string, archived: boolean) {
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.rpc('set_project_archived', { p_sales_funnel_id: salesFunnelId, p_archived: archived })
-  if (error) throw new Error(error.message.includes('access denied') ? 'Só gestor ou owner pode arquivar projetos.' : error.message)
+  if (error) throw new Error(error.message.includes('access denied') ? 'Só gestor ou owner pode arquivar funis.' : error.message)
   // The sidebar, the lists and the project page all show the archive state.
   revalidatePath('/dashboard', 'layout')
 }
@@ -57,7 +57,7 @@ export async function setProjectStatus(input: z.infer<typeof projectStatusSchema
       .eq('sales_funnel_id', parsed.sales_funnel_id)
       .is('archived_at', null)
     if (frontsError) throw frontsError
-    if (!count) throw new Error('Projeto sem frente: não há de onde vir o gasto. Crie uma frente antes de ligar.')
+    if (!count) throw new Error('Funil sem frente: não há de onde vir o gasto. Crie uma frente antes de ligar.')
   }
   const { data, error } = await supabase
     .from('sales_funnels')
@@ -66,7 +66,7 @@ export async function setProjectStatus(input: z.infer<typeof projectStatusSchema
     .is('archived_at', null)
     .select('id')
   if (error) throw error
-  if (!data || data.length === 0) throw new Error('Só gestor ou owner pode mudar o estado do projeto.')
+  if (!data || data.length === 0) throw new Error('Só gestor ou owner pode mudar o estado do funil.')
   // The sidebar, the lists and the project page all show the state.
   revalidatePath('/dashboard', 'layout')
 }
@@ -135,9 +135,9 @@ export async function syncFunnelNow(context: { sales_funnel_id: string; client_s
   // This select runs on the user's session, so RLS proves they can see the funnel; seeing is not
   // enough to write a sync with the service role, which bypasses RLS, so the role is checked too.
   if (error || !funnel) throw new Error('Funil não encontrado')
-  if (funnel.archived_at) throw new Error('Projeto arquivado: restaure para atualizar.')
-  if (funnel.status === 'rascunho') throw new Error('Projeto em rascunho: ligue o projeto para sincronizar.')
-  if (funnel.status === 'encerrado') throw new Error('Projeto encerrado: os números estão congelados. Reabra para atualizar.')
+  if (funnel.archived_at) throw new Error('Funil arquivado: restaure para atualizar.')
+  if (funnel.status === 'rascunho') throw new Error('Funil em rascunho: ligue o funil para sincronizar.')
+  if (funnel.status === 'encerrado') throw new Error('Funil encerrado: os números estão congelados. Reabra para atualizar.')
   await assertClientRole(supabase, funnel.client_id, 'gestor')
 
   const sourceUrl = (funnel.clients as unknown as { funnel_source_url: string | null } | null)?.funnel_source_url

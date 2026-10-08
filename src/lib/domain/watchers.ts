@@ -78,9 +78,9 @@ export function alertActions(
   const project = `${clientBase}/funis-venda/${watcher.projectSlug}`
   const actions: AlertAction[] = [
     { label: watcher.frontId ? 'Ver a frente' : costMetric ? 'Ver criativos' : 'Ver tráfego', href: `${project}?${query.toString()}` },
-    { label: 'Abrir projeto', href: `${project}?periodo=7d` },
+    { label: 'Abrir funil', href: `${project}?periodo=7d` },
   ]
-  if (canEdit) actions.push({ label: 'Ajustar alvo', href: `${clientBase}/metas` })
+  if (canEdit) actions.push({ label: 'Ajustar meta', href: `${clientBase}/metas` })
   return actions
 }
 

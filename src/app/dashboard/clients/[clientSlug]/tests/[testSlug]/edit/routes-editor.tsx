@@ -24,9 +24,9 @@ export function RoutesEditor({
   return (
     <section id="rotas" className="mx-auto mt-10 flex max-w-[720px] flex-col gap-4 px-4 pb-24">
       <div>
-        <h2 className="text-[18px] font-semibold">Regras de destino</h2>
+        <h2 className="text-[18px] font-semibold">Destinos</h2>
         <p className="mt-1 text-[13px] text-[var(--ct-text-2)]">
-          O link continua sorteando a variante pelo peso. Depois do sorteio, a primeira regra da variante que bater com o clique escolhe a página. Sem regra
+          O link continua sorteando a variante pelo peso. Depois do sorteio, o primeiro destino da variante que bater com o clique escolhe a página. Sem destino
           que bata, vale a página da variante. Use para &quot;página casada × genérica&quot;: o controle fica com a página genérica e a variante casada manda
           cada criativo para a sua página.
         </p>
@@ -37,7 +37,7 @@ export function RoutesEditor({
         <div key={variant.id} className="flex flex-col gap-3 rounded-2xl border border-[var(--ct-line)] bg-[var(--ct-surface)] px-5 py-4">
           <div>
             <b className="text-[14px]">{variant.name}</b>
-            <p className="truncate text-[12px] text-[var(--ct-text-3)]">Sem regra que bata: {variant.destination_url}</p>
+            <p className="truncate text-[12px] text-[var(--ct-text-3)]">Sem destino que bata: {variant.destination_url}</p>
           </div>
           {variant.variant_routes.length > 0 && (
             <ol className="flex flex-col gap-1.5">
@@ -68,7 +68,7 @@ export function RoutesEditor({
             </select>
             <input name="match_value" required placeholder="[dor], instagram, celular" className={field} aria-label="Valor" />
             <input name="destination_url" required placeholder="https:// página para onde vai" className={field} aria-label="Página de destino" />
-            <button type="submit" className="rounded-full border border-[var(--ct-line-2)] px-3 py-2 text-[12.5px]">Adicionar regra</button>
+            <button type="submit" className="rounded-full border border-[var(--ct-line-2)] px-3 py-2 text-[12.5px]">Adicionar destino</button>
           </form>
         </div>
       ))}

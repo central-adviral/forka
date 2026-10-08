@@ -23,7 +23,7 @@ function NumberFields({ watcher, focus = false }: { watcher?: Watcher; focus?: b
   return (
     <>
       <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-        Alvo
+        Meta
         <input name="target" required inputMode="decimal" placeholder="55,00 ou 75" autoFocus={focus} defaultValue={watcher && decimalInput(watcher.target)} className={`${field} ${mono}`} />
       </label>
       <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
@@ -88,15 +88,15 @@ export default async function MetasPage({
   const sourceLink = (watcher: Watcher) => {
     const project = `/dashboard/clients/${client.slug}/funis-venda/${watcher.projectSlug}`
     return watcherSource(watcher) === 'plano'
-      ? { href: `${project}/plano`, label: 'métrica do Plano', edit: 'mudar no Plano' }
+      ? { href: `${project}/plano`, label: 'métrica de Resultado e meta', edit: 'mudar em Resultado e meta' }
       : { href: `${project}/regras`, label: 'métrica da frente', edit: 'mudar na frente' }
   }
 
   return (
     <div className="flex max-w-[1240px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
-        title="Metas e alvos"
-        note="Cada vigia é uma métrica de um projeto, com o alvo que você aceita. As campanhas são as das Regras de campanha, as mesmas das Análises; a frente é um recorte opcional. A cada sincronização ele olha o último dia fechado e abre um alerta no Painel quando sai da faixa; o alerta fecha sozinho quando o número volta."
+        title="Metas e vigias"
+        note="Cada vigia é uma métrica de um funil, com a meta que você aceita. As campanhas são as das Frentes e etiquetas, as mesmas das Análises; a frente é um recorte opcional. A cada sincronização ele olha o último dia fechado e abre um alerta em Alertas quando sai da faixa; o alerta fecha sozinho quando o número volta."
         actions={
           canEdit && (
             <form action={evaluateNow.bind(null, context)}>
@@ -115,7 +115,7 @@ export default async function MetasPage({
         <table className="w-full text-[13px]">
           <thead>
             <tr className={`${mono} text-left text-[10.5px] uppercase tracking-[0.06em] text-[var(--ct-text-3)]`}>
-              {['Métrica', 'Aplica em', 'Ruim quando', 'Alvo', 'Atenção a partir de', 'Crítico a partir de', 'Gasto mínimo', 'Último dia fechado', ''].map((head, i) => (
+              {['Métrica', 'Aplica em', 'Ruim quando', 'Meta', 'Atenção a partir de', 'Crítico a partir de', 'Gasto mínimo', 'Último dia fechado', ''].map((head, i) => (
                 <th key={head + i} className={`px-5 py-3 font-medium ${i >= 3 && i <= 7 ? 'text-right' : ''}`}>{head}</th>
               ))}
             </tr>
@@ -143,7 +143,7 @@ export default async function MetasPage({
                               {watcher.frontName ? ` · frente ${watcher.frontName}` : ''}
                             </span>
                             <span className="text-[11px]">
-                              É a {link.label}: o alvo salvo aqui vale lá também. Para trocar a métrica,{' '}
+                              É a {link.label}: a meta salva aqui vale lá também. Para trocar a métrica,{' '}
                               <Link href={link.href} className="text-[var(--ct-accent)] hover:underline">
                                 {link.edit}
                               </Link>
@@ -160,7 +160,7 @@ export default async function MetasPage({
                         )}
                         <NumberFields watcher={watcher} focus />
                         <div className="flex items-center justify-end gap-4 md:col-span-3 xl:col-span-7">
-                          <p className="mr-auto max-w-[70ch] text-xs text-[var(--ct-text-3)]">Ao salvar, o vigia é julgado de novo no último dia fechado com o alvo novo; um alerta que deixou de valer fecha.</p>
+                          <p className="mr-auto max-w-[70ch] text-xs text-[var(--ct-text-3)]">Ao salvar, o vigia é julgado de novo no último dia fechado com o meta nova; um alerta que deixou de valer fecha.</p>
                           <Link href={metasHref} className="text-xs text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
                             cancelar
                           </Link>
@@ -226,9 +226,9 @@ export default async function MetasPage({
       {archivedWatchers.length > 0 && (
         <details className="-mt-5">
           <summary className="cursor-pointer text-[12.5px] font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
-            Vigias de projetos/frentes arquivados ({archivedWatchers.length})
+            Vigias de funis/frentes arquivados ({archivedWatchers.length})
           </summary>
-          <p className="mt-2 text-[12px] text-[var(--ct-text-3)]">Não são avaliados enquanto o projeto ou a frente estiver arquivado. Restaure para voltar a mexer neles.</p>
+          <p className="mt-2 text-[12px] text-[var(--ct-text-3)]">Não são avaliados enquanto o funil ou a frente estiver arquivado. Restaure para voltar a mexer neles.</p>
           <ul className="mt-2 flex flex-col gap-1.5">
             {archivedWatchers.map((watcher) => (
               <li key={watcher.id} className="flex flex-wrap items-baseline gap-x-3 text-[12.5px] text-[var(--ct-text-2)]">
@@ -237,7 +237,7 @@ export default async function MetasPage({
                   {watcher.projectName}
                   {watcher.frontName ? ` · frente ${watcher.frontName}` : ''}
                 </span>
-                <span className={mono}>alvo {formatMetric(watcher.metric, watcher.target)}</span>
+                <span className={mono}>meta {formatMetric(watcher.metric, watcher.target)}</span>
               </li>
             ))}
           </ul>

@@ -38,7 +38,7 @@ describe('buildAttention', () => {
 
   it('flags Meta data older than two hours during business hours', () => {
     const items = buildAttention(input({ metaDataAt: '2026-10-06T14:00:00Z' }))
-    expect(items.map((item) => item.title)).toEqual(['Dados do Meta parados'])
+    expect(items.map((item) => item.title)).toEqual(['Dados do Meta Ads parados'])
   })
 
   it('does not flag stale Meta data at night', () => {
@@ -51,7 +51,7 @@ describe('buildAttention', () => {
 })
 
 describe('buildAttention with watcher alerts', () => {
-  it('lists an open alert as a Painel de Controle item, critical ones first', () => {
+  it('lists an open alert as an Alertas item, critical ones first', () => {
     const items = buildAttention({
       base: '/dashboard/clients/voe',
       now,
@@ -61,7 +61,7 @@ describe('buildAttention with watcher alerts', () => {
       unclassified: { count: 1, spend: 80 },
       rulesHref: null,
       bestVariant: null,
-      watcherAlerts: [{ severity: 'crit', title: '1K · CPA geral crítico', detail: 'R$ 84,10 contra alvo de R$ 55,00' }],
+      watcherAlerts: [{ severity: 'crit', title: '1K · CPA geral crítico', detail: 'R$ 84,10 contra meta de R$ 55,00' }],
     })
     expect(items[0]).toMatchObject({ severity: 'crit', tool: 'painel', href: '/dashboard/clients/voe/painel' })
     expect(items[1].tool).toBe('config')
@@ -70,7 +70,7 @@ describe('buildAttention with watcher alerts', () => {
   it('warns about sales no project owns, and stays quiet when there are none', () => {
     const items = buildAttention(input({ unattributed: { count: 3, revenue: 591 } }))
     expect(items).toHaveLength(1)
-    expect(items[0]).toMatchObject({ severity: 'warn', title: 'Vendas sem projeto', tool: 'config' })
+    expect(items[0]).toMatchObject({ severity: 'warn', title: 'Vendas sem funil', tool: 'config' })
     expect(items[0].detail).toMatch(/^3 vendas \(R\$\s?591\)/)
     expect(buildAttention(input({ unattributed: { count: 0, revenue: 0 } }))).toEqual([])
   })
@@ -106,7 +106,7 @@ describe('buildAttention with watcher alerts', () => {
     expect(items[0].detail).toContain('B recebeu 58% das pessoas contra 50% previsto')
     expect(items.slice(1).map((item) => [item.severity, item.title, item.action])).toEqual([
       ['ok', 'T8 · pronto pra subir', 'Pegar link'],
-      ['ok', 'T9 · pronto pra subir', 'Abrir card'],
+      ['ok', 'T9 · pronto pra subir', 'Abrir teste'],
     ])
   })
 })

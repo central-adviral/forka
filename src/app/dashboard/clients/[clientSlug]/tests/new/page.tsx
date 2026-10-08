@@ -167,11 +167,11 @@ export default function NewTestPage() {
             </div>
           </Field>
           <Field
-            label="Projeto"
-            hint="Com projeto, a venda só conta para os testes dele, e testes de página e de checkout rodam juntos."
+            label="Funil"
+            hint="Com funil, a venda só conta para os testes dele, e testes de página e de checkout rodam juntos."
           >
             <select value={salesFunnelId} onChange={(e) => setSalesFunnelId(e.target.value)} className={inputClass}>
-              <option value="">Sem projeto</option>
+              <option value="">Sem funil</option>
               {funnels.map((funnel) => (
                 <option key={funnel.id} value={funnel.id}>
                   {funnel.name}
@@ -181,7 +181,7 @@ export default function NewTestPage() {
           </Field>
           {layerTakenBy && (
             <p className="rounded-[10px] bg-[var(--ct-an-soft)] px-3 py-2 text-xs text-[var(--ct-an)]">
-              Este projeto já roda o teste de {testType === 'checkout' ? 'checkout' : 'página'} <b>{layerTakenBy}</b>. Os dois podem rodar juntos: use anúncios
+              Este funil já roda o teste de {testType === 'checkout' ? 'checkout' : 'página'} <b>{layerTakenBy}</b>. Os dois podem rodar juntos: use anúncios
               diferentes em cada link. Quem passar pelos dois links conta nos dois testes.
             </p>
           )}

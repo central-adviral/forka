@@ -94,7 +94,7 @@ export function PageLinkSelect({
           </option>
         )}
         <Groups groups={groups} />
-        <option value="|">Sem projeto</option>
+        <option value="|">Sem funil</option>
       </select>
       <Status id={`${id}-status`} pending={pending} error={error} />
     </div>

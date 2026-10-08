@@ -40,8 +40,8 @@ export function buildInsightPrompt(variants: InsightVariantStat[], quality?: Ins
           `Qualidade da leitura: ${quality.trustworthy ? 'confiável' : 'ainda não confiável'}. ${quality.trust}`,
           `Dias rodando: ${quality.daysRunning}. Amostra mínima por variante: ${quality.neededPerArm !== null ? quality.neededPerArm : 'ainda sem cálculo (o controle não converteu)'}.`,
           quality.ownLayer
-            ? 'O teste está num projeto: só as vendas desse projeto contam para ele.'
-            : 'O teste não está num projeto: a mesma venda pode ter contado em outro teste do cliente.',
+            ? 'O teste está num funil: só as vendas desse funil contam para ele.'
+            : 'O teste não está num funil: a mesma venda pode ter contado em outro teste do cliente.',
           'Se a leitura não for confiável, diga o que falta e recomende continuar rodando, nunca declarar vencedora.',
         ]
       : []),

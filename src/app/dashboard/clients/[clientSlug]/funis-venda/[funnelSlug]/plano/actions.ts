@@ -30,13 +30,13 @@ const optionalNumber = z
 const planSchema = z
   .object({
     resultado: z.enum(['compra', 'lead', 'roas', 'checkout', 'visita', 'alcance']),
-    cost_target: optionalNumber.refine((value) => value === null || value > 0, 'o custo-alvo precisa ser maior que zero'),
+    cost_target: optionalNumber.refine((value) => value === null || value > 0, 'a meta de custo precisa ser maior que zero'),
     warn_pct: optionalNumber,
     crit_pct: optionalNumber,
     min_spend: optionalNumber,
     daily_target: optionalNumber.refine((value) => value === null || (Number.isInteger(value) && value > 0), 'o volume por dia é um número inteiro maior que zero'),
     metrica_secundaria: z.union([z.literal(''), z.enum(['compra', 'lead', 'roas', 'checkout', 'visita', 'alcance'])]).transform((value) => value || null),
-    secondary_target: optionalNumber.refine((value) => value === null || value > 0, 'o alvo da secundária precisa ser maior que zero'),
+    secondary_target: optionalNumber.refine((value) => value === null || value > 0, 'a meta da secundária precisa ser maior que zero'),
   })
   .refine((value) => (value.crit_pct ?? 40) >= (value.warn_pct ?? 20), 'o crítico precisa ser maior ou igual à atenção')
   .refine((value) => value.metrica_secundaria !== value.resultado, 'a métrica secundária precisa ser diferente da principal')
@@ -69,7 +69,7 @@ export async function savePlan(context: PlanContext, formData: FormData) {
     })
     .eq('id', context.sales_funnel_id)
     .select('id')
-  if (error || !saved?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode mudar o plano do projeto.')
+  if (error || !saved?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode mudar o resultado e a meta do funil.')
 
   // One project-wide cost watcher: the plan's cost target is that watcher, so the Painel and the
   // Hoje queue judge the same number the plan shows.
@@ -127,5 +127,5 @@ export async function savePlan(context: PlanContext, formData: FormData) {
   }
 
   revalidatePath(`/dashboard/clients/${context.client_slug}`, 'layout')
-  back(context, 'ok', 'Plano salvo.')
+  back(context, 'ok', 'Resultado e meta salvos.')
 }

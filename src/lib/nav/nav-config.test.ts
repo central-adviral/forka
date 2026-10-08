@@ -46,7 +46,7 @@ describe('resolveActive: the active section and subsection come from the URL onl
     const sections = groups.flatMap((group) => group.sections)
     expect(sections.filter((section) => section.active).map((section) => section.id)).toEqual(['alertas'])
     expect(sections.flatMap((section) => section.subs).filter((sub) => sub.active).map((sub) => sub.id)).toEqual(['vigias'])
-    expect(navHeading(resolveActive(`${base}/painel`, '', '#vigias', slug))).toMatchObject({ group: 'Operar', section: 'Alertas e páginas', sub: 'Vigias' })
+    expect(navHeading(resolveActive(`${base}/painel`, '', '#vigias', slug))).toMatchObject({ group: 'Operar', section: 'Alertas', sub: 'Vigias' })
   })
 })
 
@@ -109,7 +109,7 @@ describe('buildNav: links, badges and setup dots', () => {
         queue: { count: 3, crit: 1, warn: 2 },
         openAlerts: { count: 2, crit: 0 },
         testsRunning: 4,
-        setup: { done: 4, total: 5, nextLabel: 'Metas', stepDone: { integracoes: true, produtos: true, regras: true, plano: true, metas: false } },
+        setup: { done: 4, total: 5, nextLabel: 'Metas e vigias', stepDone: { integracoes: true, produtos: true, regras: true, plano: true, metas: false } },
       },
     })
     const badge = (id: string) => groups.flatMap((g) => g.sections).find((s) => s.id === id)!.badge

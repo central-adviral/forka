@@ -182,7 +182,7 @@ export function ReportCanvas({
                   )}
                 </div>
                 <span className="rounded-full bg-[var(--ct-surface-2)] px-2.5 py-0.5 font-[family-name:var(--font-geist-mono)] text-[11.5px] text-[var(--ct-text-2)]">
-                  alvo {variant.weightPct}%
+                  peso {variant.weightPct}%
                 </span>
               </div>
               <div className="mb-3.5 grid grid-cols-2 gap-x-7 gap-y-2.5">

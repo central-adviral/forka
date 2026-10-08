@@ -136,7 +136,7 @@ export function DashboardShell({
   const commandItems: CommandItem[] = [
     ...clients.map((client) => ({ label: client.name, group: 'cliente', href: `/dashboard/clients/${client.slug}` })),
     ...(activeClient
-      ? activeClient.projects.map((item) => ({ label: item.name, group: 'projeto', href: `${base}/funis-venda/${item.slug}` }))
+      ? activeClient.projects.map((item) => ({ label: item.name, group: 'funil', href: `${base}/funis-venda/${item.slug}` }))
       : []),
     ...groups.flatMap((group) =>
       group.sections.flatMap((section) => section.subs.map((sub) => ({ label: `${section.label} › ${sub.label}`, group: group.label.toLowerCase(), href: sub.href })))

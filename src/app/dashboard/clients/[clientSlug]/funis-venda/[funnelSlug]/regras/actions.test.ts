@@ -55,13 +55,13 @@ describe('updateRule', () => {
   })
 
   it('adds the new rule before removing the old one, and offers Aplicar desde', async () => {
-    await expect(updateRule(context, form('include', '[GER2]'))).rejects.toThrow(/ok=Regra alterada.*&mudou=1/)
+    await expect(updateRule(context, form('include', '[GER2]'))).rejects.toThrow(/ok=Etiqueta alterada.*&mudou=1/)
     expect(db.ops).toEqual(['insert include [GER2]', 'delete'])
   })
 
   it('keeps the old rule when the new one is refused', async () => {
     db.insertError = { code: '23505', message: 'duplicate' }
-    await expect(updateRule(context, form('exclude', '[GER]'))).rejects.toThrow(/erro=Essa regra já existe nesta frente/)
+    await expect(updateRule(context, form('exclude', '[GER]'))).rejects.toThrow(/erro=Essa etiqueta já existe nesta frente/)
     expect(db.ops).toEqual(['insert exclude [GER]'])
   })
 

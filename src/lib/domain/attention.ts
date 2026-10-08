@@ -59,7 +59,7 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
     items.push({
       severity: 'warn',
       title: 'As campanhas deste cliente ainda não foram lidas',
-      detail: 'Use “Atualizar agora” num projeto para fazer a primeira leitura, que traz os últimos 60 dias.',
+      detail: 'Use “Atualizar agora” num funil para fazer a primeira leitura, que traz os últimos 60 dias.',
       tool: 'analises',
       href: `${input.base}/funis-venda`,
     })
@@ -72,7 +72,7 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
     if (age > STALE_AFTER_MS) {
       items.push({
         severity: 'warn',
-        title: 'Dados do Meta parados',
+        title: 'Dados do Meta Ads parados',
         detail: input.metaDataAt
           ? `O último gasto chegou às ${new Date(input.metaDataAt).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}, há mais de 2 horas. Os números de hoje podem estar atrasados.`
           : 'Nenhum gasto de hoje chegou ainda. Os números de hoje podem estar atrasados.',
@@ -110,8 +110,8 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
   if (input.unattributed && input.unattributed.count > 0) {
     items.push({
       severity: 'warn',
-      title: 'Vendas sem projeto',
-      detail: `${input.unattributed.count} ${input.unattributed.count === 1 ? 'venda' : 'vendas'} (${currency(input.unattributed.revenue)}) nos últimos 7 dias não entraram em nenhum projeto: o produto está em mais de um projeto e a venda não traz o anúncio, ou nenhum projeto lista o produto.`,
+      title: 'Vendas sem funil',
+      detail: `${input.unattributed.count} ${input.unattributed.count === 1 ? 'venda' : 'vendas'} (${currency(input.unattributed.revenue)}) nos últimos 7 dias não entraram em nenhum funil: o produto está em mais de um funil e a venda não traz o anúncio, ou nenhum funil lista o produto.`,
       tool: 'config',
       href: `${input.base}/funis-venda`,
     })
@@ -122,7 +122,7 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
     items.push({
       severity: verdict.kind === 'cut' ? 'crit' : 'warn',
       title: `${verdict.code} · ${verdict.summary}`,
-      detail: `${verdict.title} · ${verdict.daysRunning} ${verdict.daysRunning === 1 ? 'dia' : 'dias'} rodando. A regra do jogo bateu: decida no card.`,
+      detail: `${verdict.title} · ${verdict.daysRunning} ${verdict.daysRunning === 1 ? 'dia' : 'dias'} rodando. Os critérios de decisão bateram: decida no teste.`,
       tool: 'ab',
       href: `${input.base}/backlog?projeto=${verdict.projectSlug}&item=${verdict.code}`,
       action: 'Decidir',
@@ -145,10 +145,10 @@ export function buildAttention(input: AttentionInput): AttentionItem[] {
     items.push({
       severity: 'ok',
       title: `${card.code} · pronto pra subir`,
-      detail: `${card.title}. Checklist completo${card.hasLink ? ': falta colar o link nos anúncios e levar o card para Rodando.' : '.'}`,
+      detail: `${card.title}. Checklist completo${card.hasLink ? ': falta colar o link nos anúncios e levar o teste para Rodando.' : '.'}`,
       tool: 'ab',
       href: card.href,
-      action: card.hasLink ? 'Pegar link' : 'Abrir card',
+      action: card.hasLink ? 'Pegar link' : 'Abrir teste',
     })
   }
 

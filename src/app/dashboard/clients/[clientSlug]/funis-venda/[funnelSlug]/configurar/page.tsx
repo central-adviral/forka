@@ -77,7 +77,7 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
         note={
           missing === 0
             ? `${funnel.name} está pronto: todos os passos estão configurados.`
-            : `${funnel.name}: ${status.done} de ${status.steps.length} passos prontos. ${missing === 1 ? 'Falta 1 passo' : `Faltam ${missing} passos`} para os números do projeto ficarem confiáveis.`
+            : `${funnel.name}: ${status.done} de ${status.steps.length} passos prontos. ${missing === 1 ? 'Falta 1 passo' : `Faltam ${missing} passos`} para os números do funil ficarem confiáveis.`
         }
         actions={
           !funnel.archived_at && next && stepHref[next.id] ? (

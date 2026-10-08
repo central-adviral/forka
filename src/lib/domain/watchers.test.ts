@@ -40,8 +40,8 @@ describe('alertActions', () => {
   it('sends a cost alert to the creatives tab of the last 7 days, and the editor to the target', () => {
     expect(alertActions({ metric: 'cpa_anuncio', projectSlug: '1k', frontId: null }, base, true)).toEqual([
       { label: 'Ver criativos', href: '/dashboard/clients/voe/funis-venda/1k?periodo=7d&aba=criativos' },
-      { label: 'Abrir projeto', href: '/dashboard/clients/voe/funis-venda/1k?periodo=7d' },
-      { label: 'Ajustar alvo', href: '/dashboard/clients/voe/metas' },
+      { label: 'Abrir funil', href: '/dashboard/clients/voe/funis-venda/1k?periodo=7d' },
+      { label: 'Ajustar meta', href: '/dashboard/clients/voe/metas' },
     ])
   })
 
@@ -52,7 +52,7 @@ describe('alertActions', () => {
     })
     const scoped = alertActions({ metric: 'frequencia', projectSlug: '1k', frontId: 'f-1' }, base, false)
     expect(scoped[0]).toEqual({ label: 'Ver a frente', href: '/dashboard/clients/voe/funis-venda/1k?periodo=7d&aba=frentes&frente=f-1' })
-    expect(scoped.map((action) => action.label)).not.toContain('Ajustar alvo')
+    expect(scoped.map((action) => action.label)).not.toContain('Ajustar meta')
   })
 })
 

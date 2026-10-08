@@ -61,7 +61,7 @@ describe('backlog readout', () => {
   })
 
   it('says win first, then cut, then saturation of a creative test', () => {
-    expect(readoutSummary([{ label: 'B', verdict: 'win' }, { label: 'C', verdict: 'cut' }], 3, DEFAULT_RULES, 'meta')).toBe('vencedora pelas regras: B')
+    expect(readoutSummary([{ label: 'B', verdict: 'win' }, { label: 'C', verdict: 'cut' }], 3, DEFAULT_RULES, 'meta')).toBe('vencedora pelos critérios: B')
     expect(readoutSummary([{ label: 'C', verdict: 'cut' }], 3, DEFAULT_RULES, 'meta')).toBe('cortar: C')
     expect(readoutSummary([{ label: 'A', verdict: 'measuring' }], 12, DEFAULT_RULES, 'meta')).toBe('12 dias rodando, pede decisão')
     expect(readoutSummary([{ label: 'A', verdict: 'measuring' }], 12, DEFAULT_RULES, 'link')).toBeNull()

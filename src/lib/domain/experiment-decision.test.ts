@@ -33,13 +33,13 @@ describe('linkVerdict', () => {
     expect(verdict.winnerName).toBe('B · ancorado')
     expect(verdict.chancePct).toBe(96)
     expect(verdict.liftPct).toBe(21)
-    expect(verdict.checks.filter((check) => check.ok).map((check) => check.label)).toEqual(['Amostra', 'Sorteio no peso', 'Ciclo de 7+ dias', 'Venda do próprio projeto', 'Reembolsos'])
+    expect(verdict.checks.filter((check) => check.ok).map((check) => check.label)).toEqual(['Amostra', 'Sorteio no peso', 'Ciclo de 7+ dias', 'Venda do próprio funil', 'Reembolsos'])
   })
 
   it('flags a short cycle and a test outside a project', () => {
     const verdict = linkVerdict(read(), 5, false)!
     expect(verdict.checks.find((check) => check.label.startsWith('Ciclo'))!.ok).toBe(false)
-    expect(verdict.checks.find((check) => check.label.startsWith('Venda do próprio'))!.value).toContain('sem projeto')
+    expect(verdict.checks.find((check) => check.label.startsWith('Venda do próprio'))!.value).toContain('sem funil')
   })
 
   it('has no verdict while nobody wins', () => {

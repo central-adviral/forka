@@ -37,7 +37,7 @@ import {
 import { CopyButton } from '@/components/copy-button'
 import { createProject } from './actions'
 
-const STEPS = ['Projeto', 'Frentes', 'Produtos', 'Conferir']
+const STEPS = ['Funil', 'Frentes', 'Produtos', 'Conferir']
 const mono = 'font-[family-name:var(--font-geist-mono)]'
 const field =
   'min-h-[42px] rounded-[10px] border border-[var(--ct-line-2)] bg-[var(--ct-surface-2)] px-3 text-[13.5px] text-[var(--ct-text)] outline-none focus:border-[var(--ct-accent)]'
@@ -105,11 +105,11 @@ export function ProjectWizard(props: Props) {
   const stepProjeto = (
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 className="text-[17px] font-semibold">1. Projeto</h2>
+        <h2 className="text-[17px] font-semibold">1. Funil</h2>
         {props.sources.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <select aria-label="Projeto para duplicar" value={duplicateId} onChange={(event) => setDuplicateId(event.target.value)} className={field}>
-              <option value="">Duplicar de um projeto anterior…</option>
+            <select aria-label="Funil para duplicar" value={duplicateId} onChange={(event) => setDuplicateId(event.target.value)} className={field}>
+              <option value="">Duplicar de um funil anterior…</option>
               {props.sources.map((source) => (
                 <option key={source.id} value={source.id}>
                   {source.name}
@@ -129,7 +129,7 @@ export function ProjectWizard(props: Props) {
       </div>
       {project.duplicatedFrom && (
         <p className="rounded-[12px] bg-[var(--ct-ok-soft)] px-4 py-3 text-[13px] text-[var(--ct-ok)]">
-          Copiado de {project.duplicatedFrom}: frentes, métricas, produtos e páginas. As etiquetas passaram para a etiqueta do projeto novo. Revise as páginas antes de ligar.
+          Copiado de {project.duplicatedFrom}: frentes, métricas, produtos e páginas. As etiquetas passaram para a etiqueta do funil novo. Revise as páginas antes de ligar.
         </p>
       )}
       <div className={label}>
@@ -172,7 +172,7 @@ export function ProjectWizard(props: Props) {
         </label>
       </details>
       <div className={label}>
-        Métrica principal do projeto
+        Métrica principal do funil
         <MetricPicker
           value={project.primary}
           onChange={(metric) =>
@@ -184,16 +184,16 @@ export function ProjectWizard(props: Props) {
         />
       </div>
       <div className={label}>
-        Métrica secundária do projeto
+        Métrica secundária do funil
         <MetricPicker value={project.secondary} disabled={project.primary} onChange={(metric) => setProject((current) => ({ ...current, secondary: metric, secondaryTarget: DEFAULT_TARGET[metric] }))} />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className={label}>
-          Alvo principal ({metricLabel(project.primary)})
+          Meta principal ({metricLabel(project.primary)})
           <input type="number" step="0.01" min="0" value={numberValue(project.primaryTarget)} onChange={(event) => setProject((current) => ({ ...current, primaryTarget: Number(event.target.value) }))} className={`${field} ${mono}`} />
         </label>
         <label className={label}>
-          Alvo secundário ({metricLabel(project.secondary)})
+          Meta secundária ({metricLabel(project.secondary)})
           <input type="number" step="0.01" min="0" value={numberValue(project.secondaryTarget)} onChange={(event) => setProject((current) => ({ ...current, secondaryTarget: Number(event.target.value) }))} className={`${field} ${mono}`} />
         </label>
         <label className={label}>
@@ -206,7 +206,7 @@ export function ProjectWizard(props: Props) {
         </label>
       </div>
       <p className="rounded-[12px] bg-[var(--ct-accent-soft)] px-4 py-3 text-[13px] text-[var(--ct-text)]">
-        Principal e secundária são o que a Visão geral destaca e o que gera alerta do projeto. Todas as outras métricas do funil continuam nas análises. O modelo só preenche: tudo é editável.
+        Principal e secundária são o que o Resumo do funil destaca e o que gera alerta do funil. Todas as outras métricas do caminho de conversão continuam nas análises. O modelo só preenche: tudo é editável.
       </p>
     </>
   )
@@ -262,7 +262,7 @@ export function ProjectWizard(props: Props) {
                       />
                       <CopyButton text={front.tag} />
                     </div>
-                    <span className="text-[12px] text-[var(--ct-text-3)]">Use esta etiqueta no nome das campanhas no Meta. Vira a regra &quot;contém&quot; da frente.</span>
+                    <span className="text-[12px] text-[var(--ct-text-3)]">Use esta etiqueta no nome das campanhas no Meta Ads. Vira a etiqueta da frente.</span>
                     <div className="text-[12.5px]" aria-live="polite">
                       {!front.tag.trim() ? (
                         <b className="text-[var(--ct-crit)]">Sem etiqueta: a frente não pega nenhuma campanha.</b>
@@ -270,7 +270,7 @@ export function ProjectWizard(props: Props) {
                         <>
                           <b>{preview.campaigns.length}</b> campanhas · <b>{brl(preview.spend)}</b> em 30 dias
                           {preview.disputed.length > 0 && <b className="text-[var(--ct-crit)]"> · {preview.disputed.length} em disputa com outra frente</b>}
-                          {preview.foreign.length > 0 && <b className="text-[var(--ct-warn)]"> · {preview.foreign.length} de outro projeto</b>}
+                          {preview.foreign.length > 0 && <b className="text-[var(--ct-warn)]"> · {preview.foreign.length} de outro funil</b>}
                           {preview.campaigns.length ? (
                             <ul className={`${mono} mt-1 flex flex-col gap-0.5 text-[11.5px] text-[var(--ct-text-2)]`}>
                               {preview.campaigns.slice(0, 8).map((campaign) => (
@@ -290,7 +290,7 @@ export function ProjectWizard(props: Props) {
                 ) : (
                   <>
                     <label className={label}>
-                      Lê o gasto do projeto
+                      Lê o gasto do funil
                       <select value={front.sourceProjectId ?? ''} onChange={(event) => setFront(index, { sourceProjectId: event.target.value || null })} className={field}>
                         <option value="">escolha…</option>
                         {props.sources.map((source) => (
@@ -310,7 +310,7 @@ export function ProjectWizard(props: Props) {
                         <input type="date" value={front.windowEnd} onChange={(event) => setFront(index, { windowEnd: event.target.value })} className={field} />
                       </label>
                     </div>
-                    <span className="text-[12px] text-[var(--ct-text-3)]">O espelho só soma o gasto do outro projeto nos dias dentro desta janela. As vendas ficam com o projeto dono.</span>
+                    <span className="text-[12px] text-[var(--ct-text-3)]">O espelho só soma o gasto do outro funil nos dias dentro desta janela. As vendas ficam com o funil dono.</span>
                   </>
                 )}
               </div>
@@ -321,19 +321,19 @@ export function ProjectWizard(props: Props) {
                   <span>
                     <b>Usar métricas próprias nesta frente</b>
                     <br />
-                    <span className="text-[12px] text-[var(--ct-text-3)]">Desligado: a frente segue o projeto e não tem alerta próprio.</span>
+                    <span className="text-[12px] text-[var(--ct-text-3)]">Desligado: a frente segue o funil e não tem alerta próprio.</span>
                   </span>
                 </label>
                 {front.own ? (
                   <div className="grid grid-cols-2 gap-2">
                     <MetricSelect name="Métrica principal da frente" value={front.primary} onChange={(metric) => setFront(index, { primary: metric, primaryTarget: DEFAULT_TARGET[metric], ...(front.secondary === metric ? { secondary: METRIC_KEYS.find((other) => other !== metric)!, secondaryTarget: DEFAULT_TARGET[METRIC_KEYS.find((other) => other !== metric)!] } : {}) })} />
-                    <input aria-label="Alvo principal da frente" type="number" step="0.01" min="0" value={numberValue(front.primaryTarget)} onChange={(event) => setFront(index, { primaryTarget: Number(event.target.value) })} className={`${field} ${mono}`} />
+                    <input aria-label="Meta principal da frente" type="number" step="0.01" min="0" value={numberValue(front.primaryTarget)} onChange={(event) => setFront(index, { primaryTarget: Number(event.target.value) })} className={`${field} ${mono}`} />
                     <MetricSelect name="Métrica secundária da frente" value={front.secondary} disabled={front.primary} onChange={(metric) => setFront(index, { secondary: metric, secondaryTarget: DEFAULT_TARGET[metric] })} />
-                    <input aria-label="Alvo secundário da frente" type="number" step="0.01" min="0" value={numberValue(front.secondaryTarget)} onChange={(event) => setFront(index, { secondaryTarget: Number(event.target.value) })} className={`${field} ${mono}`} />
+                    <input aria-label="Meta secundária da frente" type="number" step="0.01" min="0" value={numberValue(front.secondaryTarget)} onChange={(event) => setFront(index, { secondaryTarget: Number(event.target.value) })} className={`${field} ${mono}`} />
                   </div>
                 ) : (
                   <span className="text-[13px] text-[var(--ct-text-2)]">
-                    Segue o projeto: {metricLabel(metrics.primary)} (principal) e {metricLabel(metrics.secondary)} (secundária).
+                    Segue o funil: {metricLabel(metrics.primary)} (principal) e {metricLabel(metrics.secondary)} (secundária).
                   </span>
                 )}
               </div>
@@ -361,7 +361,7 @@ export function ProjectWizard(props: Props) {
                           ×
                         </button>
                         {conflict && <span className="col-span-3 text-[12px] font-semibold text-[var(--ct-crit)]">Esta página já está em {conflict}. Cada página fica em uma frente só.</span>}
-                        {!conflict && page.review && page.url.trim() && <span className="col-span-3 text-[12px] text-[var(--ct-warn)]">Copiada do projeto anterior: confira o endereço.</span>}
+                        {!conflict && page.review && page.url.trim() && <span className="col-span-3 text-[12px] text-[var(--ct-warn)]">Copiada do funil anterior: confira o endereço.</span>}
                       </div>
                     )
                   })}
@@ -459,10 +459,10 @@ export function ProjectWizard(props: Props) {
               </span>
               <input type="range" min="0.5" max="10" step="0.1" value={conversion} onChange={(event) => setConversion(Number(event.target.value))} className="accent-[var(--ct-accent)]" />
             </label>
-            <Boxes items={[['CPL alvo', brl(fit.cpl)], ['÷ conversão', `${conversion.toLocaleString('pt-BR')}%`], ['= CPA projetado', brl(fit.projectedCpa), fit.ok], ['CPA alvo', brl(fit.cpa)]]} />
+            <Boxes items={[['Meta de CPL', brl(fit.cpl)], ['÷ conversão', `${conversion.toLocaleString('pt-BR')}%`], ['= CPA projetado', brl(fit.projectedCpa), fit.ok], ['Meta de CPA', brl(fit.cpa)]]} />
             <p className={`rounded-[12px] px-4 py-3 text-[13px] ${fit.ok ? 'bg-[var(--ct-ok-soft)] text-[var(--ct-ok)]' : 'bg-[var(--ct-crit-soft)] text-[var(--ct-crit)]'}`}>
               {fit.ok
-                ? `As metas fecham: com ${conversion.toLocaleString('pt-BR')}% de conversão, o CPL de ${brl(fit.cpl)} entrega CPA de ${brl(fit.projectedCpa)}, dentro do alvo.`
+                ? `As metas fecham: com ${conversion.toLocaleString('pt-BR')}% de conversão, o CPL de ${brl(fit.cpl)} entrega CPA de ${brl(fit.projectedCpa)}, dentro da meta.`
                 : `As metas não fecham. Para o CPA de ${brl(fit.cpa)}, você precisa de CPL até ${brl(fit.neededCpl)} ou conversão de ${fit.neededConversionPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%.`}
             </p>
           </>
@@ -473,10 +473,10 @@ export function ProjectWizard(props: Props) {
               Ticket médio de entrada (R$)
               <input type="number" min="0" step="0.01" value={ticket ?? (entryTicket ? Math.round(entryTicket * 100) / 100 : '')} onChange={(event) => setTicket(Number(event.target.value))} className={`${field} ${mono}`} />
             </label>
-            <Boxes items={[['Ticket', brl(fit.ticket)], ['÷ ROAS alvo', `${fit.roas.toLocaleString('pt-BR')}x`], ['= CPA máximo', brl(fit.maxCpa), fit.ok], ['CPA alvo', brl(fit.cpa)]]} />
+            <Boxes items={[['Ticket', brl(fit.ticket)], ['÷ meta de ROAS', `${fit.roas.toLocaleString('pt-BR')}x`], ['= CPA máximo', brl(fit.maxCpa), fit.ok], ['Meta de CPA', brl(fit.cpa)]]} />
             <p className={`rounded-[12px] px-4 py-3 text-[13px] ${fit.ok ? 'bg-[var(--ct-ok-soft)] text-[var(--ct-ok)]' : 'bg-[var(--ct-crit-soft)] text-[var(--ct-crit)]'}`}>
               {fit.ok
-                ? 'As metas fecham: o CPA alvo cabe dentro do ROAS pedido.'
+                ? 'As metas fecham: a meta de CPA cabe dentro do ROAS pedido.'
                 : `As metas não fecham: com ticket de ${brl(fit.ticket)} e ROAS ${fit.roas.toLocaleString('pt-BR')}x, o CPA precisa ficar até ${brl(fit.maxCpa)}.`}
             </p>
           </>
@@ -494,13 +494,13 @@ export function ProjectWizard(props: Props) {
       )}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className={primaryButton} disabled={blocked || isPending} onClick={() => save(true)}>
-          Ligar projeto
+          Ligar funil
         </button>
         <button type="button" className={button} disabled={blocksDraft(found) || isPending} onClick={() => save(false)}>
           Salvar como rascunho
         </button>
         <span className="text-[12.5px] text-[var(--ct-text-3)]">
-          {blocked ? 'Resolva os itens críticos para ligar. O rascunho não sincroniza nem alerta.' : 'Ligado, o projeto sincroniza, vigia e alerta.'}
+          {blocked ? 'Resolva os itens críticos para ligar. O rascunho não sincroniza nem alerta.' : 'Ligado, o funil sincroniza, vigia e alerta.'}
         </span>
       </div>
     </>
@@ -595,7 +595,7 @@ function Boxes({ items }: { items: [string, string, boolean?][] }) {
 }
 
 function SealList({ list, onGo, action }: { list: Seal[]; onGo: (step: number) => void; action: string }) {
-  if (list.length === 0) return <p className="rounded-[12px] bg-[var(--ct-ok-soft)] px-3 py-2 text-[13px] text-[var(--ct-ok)]">Nada faltando. Os números deste projeto já nascem confiáveis.</p>
+  if (list.length === 0) return <p className="rounded-[12px] bg-[var(--ct-ok-soft)] px-3 py-2 text-[13px] text-[var(--ct-ok)]">Nada faltando. Os números deste funil já nascem confiáveis.</p>
   return (
     <ul className="flex flex-col gap-1.5">
       {list.map((seal) => (
@@ -612,8 +612,8 @@ function SealList({ list, onGo, action }: { list: Seal[]; onGo: (step: number) =
 
 function LiveCard({ project, campaigns, sources, found, onGo }: { project: WizardProject; campaigns: PreviewCampaign[]; sources: SourceProject[]; found: Seal[]; onGo: (step: number) => void }) {
   return (
-    <aside aria-label="Cartão do projeto" className="flex min-w-0 flex-col gap-3 rounded-[18px] border-2 border-[var(--ct-text)] bg-[var(--ct-surface)] p-5 lg:sticky lg:top-3">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ct-text-3)]">Cartão do projeto</span>
+    <aside aria-label="Cartão do funil" className="flex min-w-0 flex-col gap-3 rounded-[18px] border-2 border-[var(--ct-text)] bg-[var(--ct-surface)] p-5 lg:sticky lg:top-3">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ct-text-3)]">Cartão do funil</span>
       <b className="text-[20px]">{project.name || 'Sem nome'}</b>
       <span className="self-start rounded-full bg-[var(--ct-warn-soft)] px-2.5 py-0.5 text-[11.5px] font-semibold text-[var(--ct-warn)]">rascunho até ligar</span>
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-[13.5px]">
@@ -644,7 +644,7 @@ function LiveCard({ project, campaigns, sources, found, onGo }: { project: Wizar
                 ? `lê ${sources.find((source) => source.id === front.sourceProjectId)?.name ?? '—'}${project.startsOn && project.endsOn ? ' na janela' : ' · sem janela'}`
                 : `${preview.campaigns.length} campanhas · ${brl(preview.spend)} em 30 dias`}
             </span>
-            <span>{metrics.own ? `${metricLabel(metrics.primary)} + ${metricLabel(metrics.secondary)} · próprias` : <span className="text-[var(--ct-text-3)]">segue o projeto</span>}</span>
+            <span>{metrics.own ? `${metricLabel(metrics.primary)} + ${metricLabel(metrics.secondary)} · próprias` : <span className="text-[var(--ct-text-3)]">segue o funil</span>}</span>
             {front.kind === 'propria' && <span className="text-[var(--ct-text-3)]">{front.pages.filter((page) => page.url.trim()).length} página(s) vigiada(s)</span>}
           </div>
         )

@@ -34,7 +34,7 @@ export interface FrontOption {
 function whereItIs(existing: ExistingPage): string {
   if (existing.frontName && existing.projectName) return `na frente ${existing.frontName} do ${existing.projectName}`
   if (existing.projectName) return `sem frente, no ${existing.projectName}`
-  return 'sem projeto'
+  return 'sem funil'
 }
 
 export function PageForm({
@@ -140,7 +140,7 @@ export function PageForm({
         </section>
 
         <section className={step} aria-labelledby="passo-nome">
-          <h2 id="passo-nome" className={stepTitle}>2. Nome, projeto e frente</h2>
+          <h2 id="passo-nome" className={stepTitle}>2. Nome, funil e frente</h2>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
             Nome
             <input name="label" required maxLength={60} value={label} onChange={(event) => setLabel(event.target.value)} placeholder="ex.: Página de vendas 1K" className={field} />
@@ -157,7 +157,7 @@ export function PageForm({
             </select>
           </label>
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-            Projeto que manda tráfego para ela
+            Funil que manda tráfego para ela
             <select
               name="sales_funnel_id"
               value={projectId}
@@ -174,7 +174,7 @@ export function PageForm({
                 </option>
               ))}
             </select>
-            <span>Com o projeto, a sonda mostra o gasto que chega à página e quanto custa uma queda.</span>
+            <span>Com o funil, a sonda mostra o gasto que chega à página e quanto custa uma queda.</span>
           </label>
           {projectId && (
             <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
@@ -190,7 +190,7 @@ export function PageForm({
               <span>
                 {projectFronts.length > 0
                   ? 'Uma frente pode ter várias páginas; cada página fica em uma frente só.'
-                  : 'Este projeto ainda não tem frentes com campanhas próprias.'}
+                  : 'Este funil ainda não tem frentes com campanhas próprias.'}
               </span>
             </label>
           )}
@@ -220,7 +220,7 @@ export function PageForm({
           <p className="text-[12px] text-[var(--ct-text-3)]">Se abre, os redirecionamentos, o tempo do servidor e o certificado são sempre conferidos.</p>
           <label className="flex min-h-11 items-center gap-3 text-[13px]">
             <input type="checkbox" name="watch_pixel" defaultChecked={initial.watchPixel} className="h-5 w-5 accent-[var(--ct-accent)]" />
-            Pixel do Meta na página
+            Pixel do Meta Ads na página
           </label>
           <label className="flex min-h-11 items-center gap-3 text-[13px]">
             <input type="checkbox" name="watch_checkout" defaultChecked={initial.watchCheckout} className="h-5 w-5 accent-[var(--ct-accent)]" />

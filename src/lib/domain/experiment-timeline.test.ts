@@ -11,8 +11,8 @@ describe('experimentTimeline', () => {
       archivedAt: null,
     })
     expect(events.map((event) => event.text)).toEqual([
-      'Teste criado para o card T5.',
-      'T5 foi para Rodando: a medição do card conta daqui.',
+      'Link A/B criado para o teste T5.',
+      'T5 foi para Rodando: a medição do teste conta daqui.',
       'Primeiro clique recebido no link.',
       'Peso de A · Controle: 70% → 50%. O sorteio é conferido a partir daqui.',
       'Decidido: venceu B.',
@@ -21,6 +21,6 @@ describe('experimentTimeline', () => {
 
   it('works for a test without a card, and marks the archive', () => {
     const events = experimentTimeline({ createdAt: '2026-09-25T12:00:00Z', firstClickAt: null, changes: [], card: null, archivedAt: '2026-10-01T00:00:00Z' })
-    expect(events.map((event) => event.text)).toEqual(['Teste criado.', 'Teste arquivado: o link manda todos para o controle.'])
+    expect(events.map((event) => event.text)).toEqual(['Link A/B criado.', 'Link A/B arquivado: o link manda todos para o controle.'])
   })
 })

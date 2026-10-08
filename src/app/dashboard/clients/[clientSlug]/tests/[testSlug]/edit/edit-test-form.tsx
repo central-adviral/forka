@@ -124,18 +124,18 @@ export function EditTestForm({
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[13px] font-medium text-[var(--ct-text-2)]">Projeto</label>
+          <label className="mb-1.5 block text-[13px] font-medium text-[var(--ct-text-2)]">Funil</label>
           <select value={salesFunnelId} onChange={(e) => setSalesFunnelId(e.target.value)} className={inputClass}>
-            <option value="">Sem projeto</option>
+            <option value="">Sem funil</option>
             {funnels.map((funnel) => (
               <option key={funnel.id} value={funnel.id}>
-                Projeto {funnel.name}
+                Funil {funnel.name}
               </option>
             ))}
           </select>
           <p className="mt-1 text-xs text-[var(--ct-text-2)]">
-            Com projeto, a venda só conta para os testes dele, e um teste de página e um de checkout rodam juntos. Um teste
-            ativo de cada tipo por projeto.
+            Com funil, a venda só conta para os testes dele, e um teste de página e um de checkout rodam juntos. Um teste
+            ativo de cada tipo por funil.
           </p>
         </div>
 

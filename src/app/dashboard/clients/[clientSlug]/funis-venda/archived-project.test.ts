@@ -66,24 +66,24 @@ describe('writes to an archived project', () => {
   })
 
   it('refuses the plan', async () => {
-    await expect(savePlan(context, form({ resultado: 'compra' }))).rejects.toThrow(/erro=Projeto arquivado: restaure para editar/)
+    await expect(savePlan(context, form({ resultado: 'compra' }))).rejects.toThrow(/erro=Funil arquivado: restaure para editar/)
     expect(db.writes).toEqual([])
   })
 
   it('refuses adding, changing and removing products', async () => {
-    await expect(setProductRole(context, form({ produto_nome: 'Curso', papel: 'entrada' }))).rejects.toThrow(/erro=Projeto arquivado/)
-    await expect(removeProduct({ ...context, produto_nome: 'Curso' })).rejects.toThrow(/erro=Projeto arquivado/)
+    await expect(setProductRole(context, form({ produto_nome: 'Curso', papel: 'entrada' }))).rejects.toThrow(/erro=Funil arquivado/)
+    await expect(removeProduct({ ...context, produto_nome: 'Curso' })).rejects.toThrow(/erro=Funil arquivado/)
     expect(db.writes).toEqual([])
   })
 
   it('refuses Aplicar desde', async () => {
-    await expect(applySince({ sales_funnel_id: funnelId, path: '/p' }, form({ since: '2026-09-01' }))).rejects.toThrow(/erro=Projeto arquivado/)
+    await expect(applySince({ sales_funnel_id: funnelId, path: '/p' }, form({ since: '2026-09-01' }))).rejects.toThrow(/erro=Funil arquivado/)
     expect(db.writes).toEqual([])
   })
 
   it('refuses the project edit', async () => {
     const edit = form({ name: 'T15', launchops_operacao_ids: '', starts_on: '', ends_on: '' })
-    await expect(editSalesFunnel(context, edit)).rejects.toThrow('Projeto arquivado: restaure para editar.')
+    await expect(editSalesFunnel(context, edit)).rejects.toThrow('Funil arquivado: restaure para editar.')
     expect(db.writes).toEqual([])
   })
 

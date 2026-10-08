@@ -72,7 +72,7 @@ export function readDataHealth(row: DataHealthRow): HealthItem[] {
     {
       label: 'Compradores em outro teste',
       value: `${pct(row.buyers_in_other_tests, row.buyers)}%`,
-      detail: 'Passaram também por outro link do projeto: a venda conta nos dois testes.',
+      detail: 'Passaram também por outro link do funil: a venda conta nos dois testes.',
       tone: pct(row.buyers_in_other_tests, row.buyers) > 20 ? 'warn' : 'ok',
     },
     {

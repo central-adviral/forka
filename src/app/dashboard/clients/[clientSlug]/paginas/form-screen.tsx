@@ -101,14 +101,14 @@ export async function PageFormScreen({
         note={page ? 'Mude o que a sonda confere nesta página.' : 'Teste o endereço antes de salvar: a sonda abre a página uma vez e mostra o que encontrou.'}
         actions={
           <Link href={`${base}/paginas`} className="text-[13px] text-[var(--ct-accent)]">
-            ← Saúde das páginas
+            ← Páginas
           </Link>
         }
       />
       {erro && <p role="alert" className="rounded-[10px] bg-[var(--ct-crit-soft)] px-4 py-3 text-[13px] text-[var(--ct-crit)]">{erro}</p>}
       {!page && !existing && active >= MAX_PAGES_PER_CLIENT ? (
         <p className="rounded-[14px] border border-dashed border-[var(--ct-line-2)] p-6 text-sm text-[var(--ct-text-2)]">
-          As {MAX_PAGES_PER_CLIENT} vagas da sonda estão em uso. Pause ou tire uma página em <Link href={`${base}/paginas`} className="text-[var(--ct-accent)]">Saúde das páginas</Link> para
+          As {MAX_PAGES_PER_CLIENT} vagas da sonda estão em uso. Pause ou tire uma página em <Link href={`${base}/paginas`} className="text-[var(--ct-accent)]">Páginas</Link> para
           adicionar outra.
         </p>
       ) : (

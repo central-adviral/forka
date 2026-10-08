@@ -82,7 +82,7 @@ describe('seals', () => {
   it('blocks a project with no name, no front or no entry product when a metric needs sales', () => {
     const project = { ...emptyProject(), fronts: [] }
     const texts = seals(project, context).filter((seal) => seal.tone === 'crit').map((seal) => seal.text)
-    expect(texts).toEqual(expect.arrayContaining(['Projeto sem nome.', 'Projeto sem frente: não há de onde vir o gasto.', 'Uma métrica escolhida depende de venda (CPA ou ROAS) e não há produto de entrada.']))
+    expect(texts).toEqual(expect.arrayContaining(['Funil sem nome.', 'Funil sem frente: não há de onde vir o gasto.', 'Uma métrica escolhida depende de venda (CPA ou ROAS) e não há produto de entrada.']))
     // A draft can wait for fronts and products; a project without a name cannot be saved at all.
     expect(blocksDraft(seals({ ...named('1K LATAM'), fronts: [] }, context))).toBe(false)
     expect(blocksDraft(seals(project, context))).toBe(true)
@@ -102,7 +102,7 @@ describe('seals', () => {
     expect(list.map((seal) => [seal.tone, seal.text])).toEqual(
       expect.arrayContaining([
         ['crit', 'Frente Captação: 1 campanha(s) em duas frentes.'],
-        ['crit', 'Já existe um projeto com o endereço /1k-latam.'],
+        ['crit', 'Já existe um funil com o endereço /1k-latam.'],
         ['warn', 'Frente Captação recebe anúncio e não tem página vigiada.'],
       ])
     )
@@ -112,7 +112,7 @@ describe('seals', () => {
     const base = { ...named('1K LATAM'), products: { P: 'entrada' as const }, startsOn: '2026-10-01', endsOn: '2026-10-31' }
     const mirror = { ...base.fronts[0], kind: 'espelho' as const }
     const texts = (front: typeof mirror) => seals({ ...base, fronts: [front] }, context).map((seal) => seal.text)
-    expect(texts(mirror)).toContain('Frente espelho Captação sem projeto de origem.')
+    expect(texts(mirror)).toContain('Frente espelho Captação sem funil de origem.')
     expect(texts(mirror)).toContain('Frente espelho Captação sem janela de datas.')
     expect(texts({ ...mirror, windowStart: '2026-10-10', windowEnd: '2026-10-05' })).toContain('Frente espelho Captação: o fim da janela vem antes do início.')
     const ok = texts({ ...mirror, sourceProjectId: 'p1', windowStart: '2026-10-05', windowEnd: '2026-10-10' })

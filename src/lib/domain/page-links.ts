@@ -30,7 +30,7 @@ export function parseLinkValue(value: string): PageLink {
 /** "Projeto X › Frente Y", "Projeto X (sem frente)" or "Sem projeto". */
 export function linkLabel(projects: LinkProject[], link: PageLink): string {
   const project = projects.find((item) => item.id === link.salesFunnelId)
-  if (!project) return 'Sem projeto'
+  if (!project) return 'Sem funil'
   const front = project.fronts.find((item) => item.id === link.frontId)
   return front ? `${project.name} › ${front.name}` : `${project.name} (sem frente)`
 }

@@ -28,13 +28,13 @@ function back(context: MetasContext, param: 'ok' | 'erro', message: string): nev
 const decimal = z.string().trim().transform((value) => Number(value.replace(/\./g, '').replace(',', '.'))).pipe(z.number().finite())
 
 const numbersShape = {
-  target: decimal.pipe(z.number().positive('o alvo precisa ser maior que zero')),
+  target: decimal.pipe(z.number().positive('a meta precisa ser maior que zero')),
   warn_pct: decimal.pipe(z.number().min(0)),
   crit_pct: decimal.pipe(z.number().min(0)),
   min_spend: decimal.pipe(z.number().min(0)),
 }
 const scopeShape = {
-  scope: z.string().regex(/^[0-9a-f-]{36}\|([0-9a-f-]{36})?$/, 'escolha o projeto ou a frente'),
+  scope: z.string().regex(/^[0-9a-f-]{36}\|([0-9a-f-]{36})?$/, 'escolha o funil ou a frente'),
   metric: z.enum(Object.keys(METRICS) as [WatcherMetric, ...WatcherMetric[]]),
 }
 const critAboveWarn = (value: { warn_pct: number; crit_pct: number }) => value.crit_pct >= value.warn_pct
@@ -59,7 +59,7 @@ function issues(error: z.ZodError): string {
 // A watcher of an archived project or front is not evaluated (0100), so it is read-only.
 async function archivedScopeError(supabase: SupabaseClient, funnelId: string, frontId: string | null): Promise<string | null> {
   const { data: funnel } = await supabase.from('sales_funnels').select('archived_at').eq('id', funnelId).maybeSingle()
-  if (funnel?.archived_at) return 'Projeto arquivado: restaure o projeto para mexer nos vigias dele.'
+  if (funnel?.archived_at) return 'Funil arquivado: restaure o funil para mexer nos vigias dele.'
   if (!frontId) return null
   const { data: front } = await supabase.from('project_fronts').select('archived_at').eq('id', frontId).maybeSingle()
   return front?.archived_at ? 'Frente arquivada: restaure a frente para mexer nos vigias dela.' : null
@@ -68,12 +68,12 @@ async function archivedScopeError(supabase: SupabaseClient, funnelId: string, fr
 // The rules of 0086 and 0071, checked before the database refuses with a less useful message.
 async function scopeError(supabase: SupabaseClient, scope: string, metric: WatcherMetric): Promise<string | null> {
   const [funnelId, frontId] = scope.split('|')
-  if (frontId && METRICS[metric].projectOnly) return `${METRICS[metric].label} vale para todas as frentes do projeto: as vendas não são de uma frente.`
+  if (frontId && METRICS[metric].projectOnly) return `${METRICS[metric].label} vale para todas as frentes do funil: as vendas não são de uma frente.`
   const archived = await archivedScopeError(supabase, funnelId, frontId || null)
   if (archived) return archived
   if (METRICS[metric].salesOnly) {
     const { data: funnel } = await supabase.from('sales_funnels').select('resultado').eq('id', funnelId).maybeSingle()
-    if (!resultUsesSales(funnel?.resultado)) return `${METRICS[metric].label} precisa de vendas, e o objetivo deste projeto não conta vendas.`
+    if (!resultUsesSales(funnel?.resultado)) return `${METRICS[metric].label} precisa de vendas, e o objetivo deste funil não conta vendas.`
   }
   return null
 }

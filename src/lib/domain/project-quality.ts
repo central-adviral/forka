@@ -38,28 +38,28 @@ export function qualitySeals(row: ProjectQualityRow, links: { regras: string; pr
   if (Number(row.cliente_campanhas_em_disputa) > 0)
     seals.push({
       label: plural(row.cliente_campanhas_em_disputa, 'campanha em disputa', 'campanhas em disputa'),
-      detail: 'O nome bate com mais de uma frente: o gasto não conta em nenhum projeto até alguém escolher.',
+      detail: 'O nome bate com mais de uma frente: o gasto não conta em nenhum funil até alguém escolher.',
       tone: 'crit',
       href: links.regras,
     })
   if (Number(row.cliente_gasto_sem_frente) > 0)
     seals.push({
       label: `${brl(row.cliente_gasto_sem_frente)} sem frente`,
-      detail: `${plural(row.cliente_campanhas_sem_frente, 'campanha do cliente gasta', 'campanhas do cliente gastam')} sem frente: fora do CPA de todo projeto.`,
+      detail: `${plural(row.cliente_campanhas_sem_frente, 'campanha do cliente gasta', 'campanhas do cliente gastam')} sem frente: fora do CPA de todo funil.`,
       tone: 'warn',
       href: links.regras,
     })
   if (Number(row.cliente_vendas_sem_projeto) > 0)
     seals.push({
-      label: plural(row.cliente_vendas_sem_projeto, 'venda sem projeto', 'vendas sem projeto'),
-      detail: 'Vendas do cliente que nenhum projeto pegou: o produto está em mais de um projeto e a UTM não diz o anúncio.',
+      label: plural(row.cliente_vendas_sem_projeto, 'venda sem funil', 'vendas sem funil'),
+      detail: 'Vendas do cliente que nenhum funil pegou: o produto está em mais de um funil e a UTM não diz o anúncio.',
       tone: 'warn',
       href: links.produtos,
     })
   if (Number(row.espelhos_sem_janela) > 0)
     seals.push({
       label: plural(row.espelhos_sem_janela, 'frente espelho sem janela', 'frentes espelho sem janela'),
-      detail: 'Sem janela própria nem início e fim do projeto, o espelho soma todos os dias do outro projeto.',
+      detail: 'Sem janela própria nem início e fim do funil, o espelho soma todos os dias do outro funil.',
       tone: 'warn',
       href: links.regras,
     })
@@ -88,9 +88,9 @@ export function cpaSources(row: ProjectQualityRow, cross?: { geradas_para_outro:
     Number(row.vendas_outra_origem) > 0 ? `${n(row.vendas_outra_origem)} de outra origem` : null,
   ].filter(Boolean)
   if (entries > fromAds && outside.length > 0) lines.push({ label: 'fora do CPA de anúncio', value: outside.join(' · ') })
-  if (Number(row.cliente_vendas_sem_projeto) > 0) lines.push({ label: 'do cliente, sem projeto (fora deste CPA)', value: n(row.cliente_vendas_sem_projeto) })
+  if (Number(row.cliente_vendas_sem_projeto) > 0) lines.push({ label: 'do cliente, sem funil (fora deste CPA)', value: n(row.cliente_vendas_sem_projeto) })
   // A product only another project sells stays there; the ad that brought the buyer is still shown (0095).
-  if (cross && Number(cross.vindas_de_outro) > 0) lines.push({ label: 'vieram de anúncio de outro projeto (contam aqui)', value: n(cross.vindas_de_outro) })
-  if (cross && Number(cross.geradas_para_outro) > 0) lines.push({ label: 'geradas para outro projeto (contam lá)', value: n(cross.geradas_para_outro) })
+  if (cross && Number(cross.vindas_de_outro) > 0) lines.push({ label: 'vieram de anúncio de outro funil (contam aqui)', value: n(cross.vindas_de_outro) })
+  if (cross && Number(cross.geradas_para_outro) > 0) lines.push({ label: 'geradas para outro funil (contam lá)', value: n(cross.geradas_para_outro) })
   return lines
 }

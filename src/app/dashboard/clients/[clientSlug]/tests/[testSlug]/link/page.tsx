@@ -105,7 +105,7 @@ export default async function TestLinkPage({
       <div className="mx-6 mb-6 mt-6">
         <h2 className="mb-1 font-[family-name:var(--font-sora)] text-lg font-semibold">Link da campanha</h2>
         <p className="mb-3 text-xs text-[var(--ct-text-2)]">
-          Cole este endereço no campo <em>Site</em> do anúncio. As chaves duplas o Meta preenche no clique.
+          Cole este endereço no campo <em>Site</em> do anúncio. As chaves duplas o Meta Ads preenche no clique.
         </p>
         <div className="rounded-[10px] border border-[var(--ct-line)] p-3">
           <div className="mb-3 flex items-start gap-1.5">

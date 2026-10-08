@@ -42,7 +42,7 @@ export function ExperimentBand({
         }`}
       >
         <span className={`${mono} text-[10.5px] uppercase tracking-[0.08em] text-[var(--ct-text-3)]`}>
-          {card ? `${card.code} · ${card.title}` : 'Teste sem card no Quadro'}
+          {card ? `${card.code} · ${card.title}` : 'Link A/B sem teste no Quadro'}
         </span>
         {card?.status === 'decided' ? (
           <>
@@ -55,7 +55,7 @@ export function ExperimentBand({
               {verdict.winnerName} vence: {verdict.liftPct >= 0 ? '+' : ''}
               {verdict.liftPct}% de conversão
             </b>
-            <span className="text-[12.5px] text-[var(--ct-text-2)]">{verdict.chancePct}% de chance de bater o controle, pela regra do jogo do projeto.</span>
+            <span className="text-[12.5px] text-[var(--ct-text-2)]">{verdict.chancePct}% de chance de bater o controle, pelos critérios de decisão do funil.</span>
             <ul className="grid gap-1 text-[12.5px] sm:grid-cols-2">
               {verdict.checks.map((check) => (
                 <li key={check.label} className="flex items-baseline gap-2">
@@ -70,7 +70,7 @@ export function ExperimentBand({
           <>
             <b className="text-[17px]">{card ? 'Ainda medindo' : 'Sem decisão por aqui'}</b>
             <span className="text-[12.5px] text-[var(--ct-text-2)]">
-              {card ? measuring : 'A decisão (vencedora, aprendizado e tráfego) acontece num card do Quadro. Crie uma hipótese de A/B de link e vincule este teste a ela.'}
+              {card ? measuring : 'A decisão (vencedora, aprendizado e tráfego) acontece num teste do Quadro. Crie um teste de link A/B e vincule este link a ele.'}
             </span>
           </>
         )}
@@ -81,7 +81,7 @@ export function ExperimentBand({
             </Link>
           )}
           <Link href={card?.href ?? boardHref} className="rounded-full border border-[var(--ct-line-2)] px-3.5 py-1.5 text-[12.5px] text-[var(--ct-text-2)]">
-            {card ? 'Abrir o card' : 'Ir para o Quadro'}
+            {card ? 'Abrir o teste' : 'Ir para o Quadro'}
           </Link>
         </div>
       </div>
