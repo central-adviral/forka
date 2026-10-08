@@ -15,9 +15,10 @@ import { SyncFunnelButton } from './sync-funnel-button'
 import { SyncStatus } from '@/components/sync-status'
 import { MiniBarChart } from '@/components/mini-bar-chart'
 import { SalesOriginPanel } from './sales-origin-panel'
-import { PageHeader, headerAction } from '@/components/page-header'
+import { PageHeader } from '@/components/page-header'
+import { headerAction } from '@/components/header-actions'
 import { FrontsPanel, type FrontDayRow, type FrontInfo } from './fronts-panel'
-import { ANALYSIS_TABS, readAnalysisTab } from '@/lib/domain/analysis-tabs'
+import { readAnalysisTab } from '@/lib/domain/analysis-tabs'
 
 export default async function SalesFunnelPage({
   params,
@@ -170,8 +171,7 @@ export default async function SalesFunnelPage({
     <div className="flex max-w-[1440px] flex-col px-4 md:px-14 pb-24 pt-12">
       <div className="mb-9">
         <PageHeader
-          tool="an"
-          eyebrow={
+          note={
             <>
               {funnel.resultado === 'lead' ? 'projeto de lead' : 'projeto de compra'}
               {rows.length > 0 ? ` · investimento das ${rows[0].spendSource === 'frentes' ? 'regras de campanha' : 'operações do LaunchOps'}` : ''}
@@ -207,14 +207,14 @@ export default async function SalesFunnelPage({
         />
       </div>
 
-      <div className="mb-6 flex gap-1.5">
+      <div className="mb-6 flex flex-wrap gap-1.5">
         {REPORT_PERIODS.map((option) => {
           const isActive = (periodo ?? 'all') === option.value
           return (
             <a
               key={option.value}
               href={withParams({ periodo: option.value === 'all' ? undefined : option.value, desde: undefined, ate: undefined })}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+              className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium ${
                 isActive
                   ? 'border-[var(--ct-accent)] bg-[var(--ct-accent)]/15 text-[var(--ct-accent)]'
                   : 'border-[var(--ct-line)] text-[var(--ct-text-2)] hover:text-[var(--ct-text)]'
@@ -306,20 +306,6 @@ export default async function SalesFunnelPage({
         }
       />
 
-      <nav className="mb-6 inline-flex max-w-full gap-0.5 overflow-x-auto rounded-full border border-[var(--ct-line)] bg-[var(--ct-surface-2)] p-1" aria-label="Abas da análise">
-        {ANALYSIS_TABS.map((option) => (
-          <a
-            key={option.value}
-            href={withParams({ aba: option.value === 'visao' ? undefined : option.value })}
-            aria-current={tab === option.value ? 'page' : undefined}
-            className={`whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-medium ${
-              tab === option.value ? 'bg-[var(--ct-surface)] text-[var(--ct-text)] shadow-[0_0_0_1px_var(--ct-line-2)]' : 'text-[var(--ct-text-2)] hover:text-[var(--ct-text)]'
-            }`}
-          >
-            {option.label}
-          </a>
-        ))}
-      </nav>
 
       {tab === 'frentes' && (
         <FrontsPanel
