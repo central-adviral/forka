@@ -101,17 +101,17 @@ export interface SalesByOrigin {
   origem: string
   vendas: number
   vendasUpsell: number
-  receitaBruta: number
+  receitaLiquida: number
 }
 
 export async function getSalesByOrigin(db: SupabaseClient, salesFunnelId: string, since: string, until: string): Promise<SalesByOrigin[]> {
   const { data, error } = await db.rpc('get_funnel_sales_by_origin', { p_sales_funnel_id: salesFunnelId, p_since: since, p_until: until })
   if (error) throw error
-  return ((data ?? []) as { origem: string; vendas: number; vendas_upsell: number; receita_bruta: number }[]).map((row) => ({
+  return ((data ?? []) as { origem: string; vendas: number; vendas_upsell: number; receita_liquida: number }[]).map((row) => ({
     origem: row.origem,
     vendas: Number(row.vendas),
     vendasUpsell: Number(row.vendas_upsell),
-    receitaBruta: Number(row.receita_bruta),
+    receitaLiquida: Number(row.receita_liquida),
   }))
 }
 

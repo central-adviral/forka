@@ -11,6 +11,7 @@ interface Fixture {
   entryProducts: number
   namingRules: number
   watchers: { metric: string; front_id: string | null; target: number }[]
+  fronts: { source_sales_funnel_id: string | null; naming_rules: { kind: string }[] }[]
 }
 
 function fakeDb(fixture: Fixture): SupabaseClient {
@@ -21,6 +22,7 @@ function fakeDb(fixture: Fixture): SupabaseClient {
     project_products: () => ({ count: fixture.entryProducts }),
     naming_rules: () => ({ count: fixture.namingRules }),
     watchers: () => ({ data: fixture.watchers }),
+    project_fronts: () => ({ data: fixture.fronts }),
   }
   return {
     from(table: string) {
@@ -44,6 +46,7 @@ const READY: Fixture = {
     { metric: 'cpa_geral', front_id: null, target: 60 },
     { metric: 'ctr', front_id: 'f1', target: 1.2 },
   ],
+  fronts: [{ source_sales_funnel_id: null, naming_rules: [{ kind: 'include' }, { kind: 'exclude' }] }],
 }
 
 async function status(overrides: Partial<Fixture>) {
@@ -72,8 +75,20 @@ describe('getProjectSetupStatus', () => {
     expect(result!.done).toBe(4)
   })
 
-  it('3. Regras de campanha: needs at least one naming rule', async () => {
-    expect(pending(await status({ namingRules: 0 }))).toEqual(['regras'])
+  it('2. Produtos: a lead project counts leads, so it needs no entry product', async () => {
+    const result = await status({ project: { resultado: 'lead' }, entryProducts: 0, watchers: [{ metric: 'cpl', front_id: null, target: 5 }, { metric: 'ctr', front_id: 'f1', target: 1 }] })
+    expect(pending(result)).toEqual([])
+    expect(result!.steps.find((step) => step.id === 'produtos')!.text).toContain('CPL')
+  })
+
+  it('3. Regras de campanha: every own front needs a "contém" rule; a mirror front needs none', async () => {
+    expect(pending(await status({ fronts: [] }))).toEqual(['regras'])
+    const excludeOnly = await status({ fronts: [{ source_sales_funnel_id: null, naming_rules: [{ kind: 'exclude' }] }] })
+    expect(pending(excludeOnly)).toEqual(['regras'])
+    expect(excludeOnly!.steps.find((step) => step.id === 'regras')!.text).toContain('não pega nenhuma campanha')
+    const mirror = await status({ namingRules: 0, fronts: [{ source_sales_funnel_id: 'other', naming_rules: [] }] })
+    expect(pending(mirror)).toEqual([])
+    expect(mirror!.steps.find((step) => step.id === 'regras')!.text).toBe('1 frente lê outro projeto.')
   })
 
   it('4. Plano: needs the result and the cost target (the project-wide cost watcher)', async () => {

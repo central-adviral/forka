@@ -12,6 +12,11 @@ export interface SetupFacts {
   entryProducts: number
   /** Naming rules across the project's fronts. */
   namingRules: number
+  /** Own fronts (not mirrors), and how many of them have at least one "contém" rule. */
+  ownFronts: number
+  ownFrontsWithInclude: number
+  /** Fronts that read another project (they need no rules of their own). */
+  mirrorFronts: number
   /** The project's result (compra or lead) and its cost target (the project-wide cost watcher). */
   resultado: string | null
   costTarget: number | null
@@ -38,6 +43,20 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
   const integrations = facts.launchopsConnected && facts.hublaConnected
   const missingSources = [!facts.launchopsConnected && 'LaunchOps', !facts.hublaConnected && 'Hubla'].filter(Boolean).join(' e ')
   const plan = facts.resultado !== null && facts.costTarget !== null && facts.costTarget > 0
+  // A front with only "não contém" takes no campaign; a mirror front reads another project instead.
+  const frontsWithoutInclude = facts.ownFronts - facts.ownFrontsWithInclude
+  const rulesDone = facts.ownFronts + facts.mirrorFronts > 0 && frontsWithoutInclude === 0
+  const rulesText =
+    facts.ownFronts + facts.mirrorFronts === 0
+      ? 'Nenhuma frente: o projeto ainda não sabe quais campanhas são dele.'
+      : frontsWithoutInclude > 0
+        ? `${plural(frontsWithoutInclude, 'frente sem', 'frentes sem')} regra de "contém": não pega nenhuma campanha.`
+        : [
+            facts.ownFronts > 0 ? `${plural(facts.namingRules, 'regra', 'regras')} de nome definindo as campanhas do projeto` : null,
+            facts.mirrorFronts > 0 ? `${plural(facts.mirrorFronts, 'frente lê', 'frentes leem')} outro projeto` : null,
+          ]
+            .filter(Boolean)
+            .join('; ') + '.'
   const steps: SetupStep[] = [
     {
       id: 'integracoes',
@@ -48,14 +67,20 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
     {
       id: 'produtos',
       label: 'Produtos',
-      done: facts.entryProducts > 0,
-      text: facts.entryProducts > 0 ? `${plural(facts.entryProducts, 'produto', 'produtos')} de entrada.` : 'Nenhum produto com papel de entrada: o CPA não tem venda para contar.',
+      // A lead project's cost is the CPL: it counts leads, not sales, so it needs no entry product.
+      done: facts.resultado === 'lead' || facts.entryProducts > 0,
+      text:
+        facts.resultado === 'lead'
+          ? 'Projeto de leads: o custo é o CPL, sem produto de entrada.'
+          : facts.entryProducts > 0
+            ? `${plural(facts.entryProducts, 'produto', 'produtos')} de entrada.`
+            : 'Nenhum produto com papel de entrada: o CPA não tem venda para contar.',
     },
     {
       id: 'regras',
       label: 'Regras de campanha',
-      done: facts.namingRules > 0,
-      text: facts.namingRules > 0 ? `${plural(facts.namingRules, 'regra', 'regras')} de nome definindo as campanhas do projeto.` : 'Nenhuma regra: o projeto ainda não sabe quais campanhas são dele.',
+      done: rulesDone,
+      text: rulesText,
     },
     {
       id: 'plano',
