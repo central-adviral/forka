@@ -21,6 +21,8 @@ import { FrontsPanel, type FrontDayRow, type FrontInfo } from './fronts-panel'
 import { readAnalysisTab } from '@/lib/domain/analysis-tabs'
 import { cpaSources, qualitySeals, type ProjectQualityRow } from '@/lib/domain/project-quality'
 import { PROJECT_RESULTS, readResult, resultUsesSales } from '@/lib/domain/project-plan'
+import { setSalesFunnelArchived } from '../actions'
+import { canActAs } from '@/lib/view-as'
 
 export default async function SalesFunnelPage({
   params,
@@ -44,11 +46,12 @@ export default async function SalesFunnelPage({
 
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, resultado')
+    .select('id, name, slug, resultado, archived_at')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
   if (!funnel) notFound()
+  const canRestore = funnel.archived_at ? await canActAs(supabase, client.id, 'gestor') : false
 
   const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
   const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }, { data: frontRows }, { data: frontDays }, { data: qualityRows }, { data: frontSalesRows }, { data: crossRows }] = await Promise.all([
@@ -68,6 +71,7 @@ export default async function SalesFunnelPage({
       .from('project_fronts')
       .select('id, code, name, source:sales_funnels!project_fronts_source_sales_funnel_id_fkey(name)')
       .eq('sales_funnel_id', funnel.id)
+      .is('archived_at', null)
       .order('position'),
     supabase.rpc('get_project_front_daily', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
     supabase.rpc('get_project_data_quality', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
@@ -196,28 +200,50 @@ export default async function SalesFunnelPage({
               : 'Gasto, vendas, receita e criativos do projeto, lidos das regras de campanha e dos produtos.'
           }
           actions={
-            <>
+            funnel.archived_at ? (
               <SyncStatus lastRunAt={lastSyncAt} hasError={hasSyncError} />
-              <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
-              <a
-                href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/plano`}
-                className="rounded-full border border-[var(--ct-accent)] bg-[var(--ct-accent-soft)] px-4 py-2 text-[13px] font-medium text-[var(--ct-accent)]"
-              >
-                Plano
-              </a>
-              <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/produtos`} className={headerAction}>
-                Produtos
-              </a>
-              <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`} className={headerAction}>
-                Regras de campanha
-              </a>
-              <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`} className={headerAction}>
-                Editar
-              </a>
-            </>
+            ) : (
+              <>
+                <SyncStatus lastRunAt={lastSyncAt} hasError={hasSyncError} />
+                <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />
+                <a
+                  href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/plano`}
+                  className="rounded-full border border-[var(--ct-accent)] bg-[var(--ct-accent-soft)] px-4 py-2 text-[13px] font-medium text-[var(--ct-accent)]"
+                >
+                  Plano
+                </a>
+                <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/produtos`} className={headerAction}>
+                  Produtos
+                </a>
+                <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`} className={headerAction}>
+                  Regras de campanha
+                </a>
+                <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`} className={headerAction}>
+                  Editar
+                </a>
+              </>
+            )
           }
         />
       </div>
+
+      {funnel.archived_at && (
+        <div role="status" className="-mt-5 mb-7 flex flex-wrap items-center gap-3 rounded-[12px] bg-[var(--ct-surface-2)] px-5 py-3 text-[13px] text-[var(--ct-text-2)]">
+          <span>
+            <b className="text-[var(--ct-text)]">
+              Projeto arquivado em {new Date(funnel.archived_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' })}.
+            </b>{' '}
+            Os números ficam como estavam; vendas novas, sync e vigias não entram mais.
+          </span>
+          {canRestore && (
+            <form action={setSalesFunnelArchived.bind(null, funnel.id, false)} className="ml-auto">
+              <button type="submit" className="text-[13px] font-semibold text-[var(--ct-accent)] hover:underline">
+                Restaurar
+              </button>
+            </form>
+          )}
+        </div>
+      )}
 
       {seals.length > 0 && (
         <ul aria-label="Qualidade dos dados" className="-mt-5 mb-7 flex flex-wrap gap-2">

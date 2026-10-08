@@ -11,7 +11,7 @@ import {
   type ClassifiedCampaign,
 } from '@/lib/domain/campaign-rules'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { addRule, createFront, deleteFront, pinCampaign, previewRule, removeRule, unpinCampaign, updateFront } from './actions'
+import { addRule, createFront, setFrontArchived, pinCampaign, previewRule, removeRule, unpinCampaign, updateFront } from './actions'
 import { RuleForm } from './rule-form'
 import { canActAs } from '@/lib/view-as'
 import { PageHeader } from '@/components/page-header'
@@ -23,7 +23,8 @@ interface FrontRow {
   position: number
   sales_funnel_id: string
   source_sales_funnel_id: string | null
-  sales_funnels: { name: string } | null
+  archived_at: string | null
+  sales_funnels: { name: string; archived_at: string | null } | null
   naming_rules: { id: string; kind: 'include' | 'exclude'; value: string }[]
 }
 
@@ -63,35 +64,39 @@ export default async function CampaignRulesPage({
   if (!(await canActAs(supabase, client.id, 'analista'))) notFound()
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug')
+    .select('id, name, slug, archived_at')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
   if (!funnel) notFound()
 
   const { since, until } = resolvePeriodDateRange(periodo, undefined, undefined)
-  const [{ data: canEdit }, { data: frontRows, error: frontsError }, { data: campaignRows }, { data: lastSync }, { data: otherFunnels }] = await Promise.all([
+  const [{ data: canEditClient }, { data: frontRows, error: frontsError }, { data: campaignRows }, { data: lastSync }, { data: otherFunnels }] = await Promise.all([
     canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
     supabase
       .from('project_fronts')
-      .select('id, code, name, position, sales_funnel_id, source_sales_funnel_id, sales_funnels!project_fronts_sales_funnel_id_fkey!inner(name, client_id), naming_rules(id, kind, value)')
+      .select('id, code, name, position, sales_funnel_id, source_sales_funnel_id, archived_at, sales_funnels!project_fronts_sales_funnel_id_fkey!inner(name, client_id, archived_at), naming_rules(id, kind, value)')
       .eq('sales_funnels.client_id', client.id)
       .order('position'),
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: since, p_until: until }),
     supabase.from('campaign_daily').select('synced_at').eq('client_id', client.id).order('synced_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('sales_funnels').select('id, name').eq('client_id', client.id).neq('id', funnel.id).order('name'),
+    supabase.from('sales_funnels').select('id, name, archived_at').eq('client_id', client.id).neq('id', funnel.id).order('name'),
   ])
 
   if (frontsError) throw frontsError
   const allFronts = (frontRows ?? []) as unknown as FrontRow[]
-  const fronts = allFronts.filter((front) => front.sales_funnel_id === funnel.id)
+  // An archived project opens read-only; its archived fronts are listed apart, to restore.
+  const canEdit = canEditClient && !funnel.archived_at
+  const fronts = allFronts.filter((front) => front.sales_funnel_id === funnel.id && !front.archived_at)
+  const archivedFronts = allFronts.filter((front) => front.sales_funnel_id === funnel.id && front.archived_at)
   const frontById = new Map(allFronts.map((front) => [front.id, front]))
   const funnelNameById = new Map((otherFunnels ?? []).map((other) => [other.id as string, other.name as string]))
   // Only fronts with campaigns of their own can own one; a front that reads another project cannot.
-  const ownerFronts = allFronts.filter((front) => !front.source_sales_funnel_id)
+  const ownerFronts = allFronts.filter((front) => !front.source_sales_funnel_id && !front.archived_at && !front.sales_funnels?.archived_at)
   const campaigns = (campaignRows ?? []) as ClassifiedCampaign[]
   const summary = summarizeFronts(campaigns, fronts.map((front) => front.id))
-  const projectFrontIds = new Set(fronts.map((front) => front.id))
+  // Archived fronts still own their campaigns: the project's spend keeps them.
+  const projectFrontIds = new Set([...fronts, ...archivedFronts].map((front) => front.id))
   const conflicts = conflictingCampaigns(campaigns, projectFrontIds)
   const orphans = orphanCampaigns(campaigns)
   const unclassifiedSpend = campaigns
@@ -111,7 +116,8 @@ export default async function CampaignRulesPage({
     const front = frontById.get(frontId)
     if (!front) return { text: '?', own: false }
     const own = front.sales_funnel_id === funnel!.id
-    return { text: own ? front.code : `${front.sales_funnels?.name ?? 'outro projeto'} · ${front.code}`, own }
+    const text = own ? front.code : `${front.sales_funnels?.name ?? 'outro projeto'} · ${front.code}`
+    return { text: front.archived_at ? `${text} (arquivada)` : text, own }
   }
 
   return (
@@ -282,7 +288,11 @@ export default async function CampaignRulesPage({
                   </details>
                 )}
                 {canEdit && (
-                  <ConfirmDeleteButton action={deleteFront.bind(null, frontContext)} label="Remover" warning="Remover a frente e as regras?" />
+                  <ConfirmDeleteButton
+                    action={setFrontArchived.bind(null, { ...frontContext, code: front.code }, true)}
+                    label="Arquivar"
+                    warning="Arquivar? As campanhas dela ficam no histórico, novas não entram."
+                  />
                 )}
               </div>
               {sourceName && (
@@ -338,7 +348,7 @@ export default async function CampaignRulesPage({
               Campanhas
               <select name="source_sales_funnel_id" defaultValue="" className={fieldClass}>
                 <option value="">próprias, pelas regras de nome</option>
-                {(otherFunnels ?? []).map((other) => (
+                {(otherFunnels ?? []).filter((other) => !other.archived_at).map((other) => (
                   <option key={other.id} value={other.id}>
                     lê o projeto {other.name}
                   </option>
@@ -349,6 +359,28 @@ export default async function CampaignRulesPage({
               + Nova frente
             </button>
           </form>
+        )}
+        {archivedFronts.length > 0 && (
+          <details>
+            <summary className="cursor-pointer text-[12.5px] font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
+              Frentes arquivadas ({archivedFronts.length})
+            </summary>
+            <ul className="mt-2 flex flex-col gap-1.5">
+              {archivedFronts.map((front) => (
+                <li key={front.id} className="flex items-center gap-3 text-[12.5px] text-[var(--ct-text-2)]">
+                  <span className={`${mono} rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[11px]`}>{front.code}</span>
+                  {front.name}
+                  {canEdit && (
+                    <form action={setFrontArchived.bind(null, { ...context, front_id: front.id, code: front.code }, false)}>
+                      <button type="submit" className="text-xs font-semibold text-[var(--ct-accent)] hover:underline">
+                        Restaurar
+                      </button>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
       </section>
 

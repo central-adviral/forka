@@ -75,10 +75,10 @@ export default async function BacklogPage({
   if (!client) notFound()
   const { data: funnels } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, is_active, test_rules, resultado')
+    .select('id, name, slug, is_active, archived_at, test_rules, resultado')
     .eq('client_id', client.id)
     .order('name')
-  const funnel = (funnels ?? []).find((row) => row.slug === projeto) ?? (funnels ?? []).find((row) => row.is_active) ?? (funnels ?? [])[0]
+  const funnel = (funnels ?? []).find((row) => row.slug === projeto) ?? (funnels ?? []).find((row) => row.is_active && !row.archived_at) ?? (funnels ?? [])[0]
   const base = `/dashboard/clients/${client.slug}/backlog`
   if (!funnel) {
     return (

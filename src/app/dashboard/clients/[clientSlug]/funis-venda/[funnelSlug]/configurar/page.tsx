@@ -9,6 +9,7 @@ import type { SetupStepId } from '@/lib/domain/project-setup'
 import type { ProjectQualityRow } from '@/lib/domain/project-quality'
 import { saoPauloDay } from '@/lib/repo/today-repo'
 import { ProjectMap, type MapFront } from './project-map'
+import { setFrontArchived } from '../regras/actions'
 
 // Projeto › Visão geral: the setup steps as cards, in order. Read-only; each card links to the
 // screen that already edits that step.
@@ -22,14 +23,15 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
   if (!client) notFound()
   // Configuration is internal to the agency, like the screens these cards lead to.
   if (!(await canActAs(supabase, client.id, 'analista'))) notFound()
-  const { data: funnel } = await supabase.from('sales_funnels').select('id, name, slug, resultado').eq('client_id', client.id).eq('slug', funnelSlug).maybeSingle()
+  const { data: funnel } = await supabase.from('sales_funnels').select('id, name, slug, resultado, archived_at').eq('client_id', client.id).eq('slug', funnelSlug).maybeSingle()
   if (!funnel) notFound()
 
   const window = { p_sales_funnel_id: funnel.id, p_since: saoPauloDay(-30), p_until: saoPauloDay(1) }
-  const [status, isOwner, { data: fronts }, { data: frontDays }, { data: products }, { data: productSales }, { data: qualityRows }] = await Promise.all([
+  const [status, isOwner, canEdit, { data: fronts }, { data: frontDays }, { data: products }, { data: productSales }, { data: qualityRows }] = await Promise.all([
     getProjectSetupStatus(supabase, createServiceRoleClient(), client.id, funnel.id),
     canActAs(supabase, client.id, 'owner'),
-    supabase.from('project_fronts').select('id, code, name, source:sales_funnels!project_fronts_source_sales_funnel_id_fkey(name)').eq('sales_funnel_id', funnel.id).order('position'),
+    canActAs(supabase, client.id, 'gestor'),
+    supabase.from('project_fronts').select('id, code, name, archived_at, source:sales_funnels!project_fronts_source_sales_funnel_id_fkey(name)').eq('sales_funnel_id', funnel.id).order('position'),
     supabase.rpc('get_project_front_daily', window),
     supabase.from('project_products').select('produto_nome, papel').eq('sales_funnel_id', funnel.id),
     supabase.rpc('get_funnel_sales_by_product', window),
@@ -51,7 +53,9 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
   }
   const spendByFront = new Map<string, number>()
   for (const day of (frontDays ?? []) as { front_id: string; spend: number }[]) spendByFront.set(day.front_id, (spendByFront.get(day.front_id) ?? 0) + Number(day.spend))
-  const mapFronts: MapFront[] = ((fronts ?? []) as unknown as { id: string; code: string; name: string; source: { name: string } | null }[]).map((front) => ({
+  const frontRows = (fronts ?? []) as unknown as { id: string; code: string; name: string; archived_at: string | null; source: { name: string } | null }[]
+  const archivedFronts = frontRows.filter((front) => front.archived_at)
+  const mapFronts: MapFront[] = frontRows.filter((front) => !front.archived_at).map((front) => ({
     name: front.name,
     code: front.code,
     mirrorOf: front.source?.name ?? null,
@@ -126,6 +130,28 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
 
       <div id="mapa" className="scroll-mt-24" />
       <ProjectMap fronts={mapFronts} products={mapProducts} quality={((qualityRows ?? []) as ProjectQualityRow[])[0] ?? null} resultado={funnel.resultado ?? 'compra'} />
+      {archivedFronts.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-[12.5px] font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
+            Frentes arquivadas ({archivedFronts.length})
+          </summary>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {archivedFronts.map((front) => (
+              <li key={front.id} className="flex items-center gap-3 text-[12.5px] text-[var(--ct-text-2)]">
+                <span className={`${mono} rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[11px]`}>{front.code}</span>
+                {front.name}
+                {canEdit && !funnel.archived_at && (
+                  <form action={setFrontArchived.bind(null, { client_slug: client.slug, funnel_slug: funnel.slug, sales_funnel_id: funnel.id, front_id: front.id, code: front.code }, false)}>
+                    <button type="submit" className="text-xs font-semibold text-[var(--ct-accent)] hover:underline">
+                      Restaurar
+                    </button>
+                  </form>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   )
 }

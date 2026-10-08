@@ -29,7 +29,13 @@ export default async function EditTestPage({
 
   const [{ data: variants }, { data: funnels }] = await Promise.all([
     supabase.from('variants').select('id, name, weight_pct, destination_url, thank_you_url, variant_routes(id, match_field, match_value, destination_url, position)').eq('test_id', test.id).order('name'),
-    supabase.from('sales_funnels').select('id, name').eq('client_id', test.client_id).order('name'),
+    // An archived project is no choice, unless the test already points at it.
+    supabase
+      .from('sales_funnels')
+      .select('id, name')
+      .eq('client_id', test.client_id)
+      .or(test.sales_funnel_id ? `archived_at.is.null,id.eq.${test.sales_funnel_id}` : 'archived_at.is.null')
+      .order('name'),
   ])
 
   const rows = (variants ?? []) as unknown as (VariantFormRow & { variant_routes: (VariantRoute & { position: number })[] })[]

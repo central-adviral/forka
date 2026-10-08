@@ -6,7 +6,7 @@ vi.mock('@/lib/launchops/client', () => ({ createLaunchOpsClient: vi.fn(() => ({
 const listMock = vi.fn()
 vi.mock('@/lib/supabase/service-role', () => ({
   createServiceRoleClient: vi.fn(() => ({
-    from: () => ({ select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: listMock(), error: null }) }) }) }),
+    from: () => ({ select: () => ({ eq: () => ({ is: () => ({ order: () => Promise.resolve({ data: listMock(), error: null }) }) }) }) }),
   })),
 }))
 // Secrets live in client_secrets, reachable only by the service role, and are looked up per
