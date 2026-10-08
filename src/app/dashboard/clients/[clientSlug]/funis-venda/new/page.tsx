@@ -17,7 +17,7 @@ export default async function NewSalesFunnelPage({ params }: { params: Promise<{
         action={createSalesFunnel.bind(null, { client_id: client.id, client_slug: client.slug })}
         className="max-w-xl space-y-4"
       >
-        <h1 className="font-[family-name:var(--font-sora)] text-lg font-semibold">Novo funil de venda</h1>
+        <h1 className="font-[family-name:var(--font-sora)] text-lg font-semibold">Novo projeto</h1>
         <input required name="name" placeholder="Nome (ex: 1K LATAM)" className={inputClass} />
         <input required name="slug" placeholder="Slug (ex: 1k-latam)" className={inputClass} />
         <p className="-mt-2 text-xs text-[var(--ct-text-2)]">

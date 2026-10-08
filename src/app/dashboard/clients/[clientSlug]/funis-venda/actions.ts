@@ -24,7 +24,7 @@ async function assertNoDuplicateLaunchOpsMapping(
     const overlap = (funnel.launchops_operacao_ids ?? []).filter((id: string) => operacaoIds.includes(id))
     if (overlap.length > 0) {
       throw new Error(
-        `Operação(ões) já mapeada(s) no funil "${funnel.name}" — cada operação do LaunchOps só pode pertencer a um funil de venda por cliente, senão o gasto é somado em dobro`
+        `Operação(ões) já mapeada(s) no projeto "${funnel.name}" — cada operação do LaunchOps só pode pertencer a um projeto por cliente, senão o gasto é somado em dobro`
       )
     }
   }

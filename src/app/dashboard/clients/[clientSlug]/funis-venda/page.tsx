@@ -74,7 +74,7 @@ export default async function SalesFunnelsListPage({
             <ConfirmDeleteButton action={deleteSalesFunnel.bind(null, funnel.id, client.slug)} />
           </div>
         ))}
-        {summaries.length === 0 && <div className="px-6 py-8 text-sm text-[var(--ct-text-2)]">Nenhum funil de venda ainda.</div>}
+        {summaries.length === 0 && <div className="px-6 py-8 text-sm text-[var(--ct-text-2)]">Nenhum projeto ainda.</div>}
       </div>
     </div>
   )

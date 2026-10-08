@@ -91,7 +91,7 @@ export const NAV_SECTIONS: SectionDef[] = [
     subs: [
       { id: 'abertos', label: 'Abertos', desc: 'Fora da faixa agora', exists: true, href: (c) => `${c.base}/painel#atencao` },
       { id: 'vigias', label: 'Vigias', desc: 'Métricas observadas', exists: true, href: (c) => `${c.base}/painel#vigias` },
-      { id: 'paginas', label: 'Páginas', desc: 'No ar, rápidas e vendendo', exists: true, href: (c) => `${c.base}/paginas` },
+      { id: 'paginas', label: 'Páginas', desc: 'No ar, rápidas e vendendo', exists: true, step: 'paginas', href: (c) => `${c.base}/paginas` },
     ],
   },
   {
