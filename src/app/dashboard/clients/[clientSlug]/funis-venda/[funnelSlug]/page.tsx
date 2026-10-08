@@ -348,8 +348,8 @@ export default async function SalesFunnelPage({
             ))}
           </dl>
           <p className="mt-3 text-[12px] text-[var(--ct-text-3)]">
-            CPA geral = investimento com imposto ÷ vendas de entrada do projeto. O CPA de anúncio divide pelas vendas que a UTM diz que vieram de anúncio; por frente e
-            nos Criativos só conta a venda que traz o id do anúncio, porque é ele que liga a venda à campanha.
+            CPA geral = investimento com imposto ÷ vendas de entrada do projeto. O CPA de anúncio divide pelas vendas que a UTM diz que vieram de anúncio; por frente
+            só conta a venda cuja UTM traz o id da campanha (ou de um anúncio dela), porque é ele que liga a venda à frente.
           </p>
         </details>
       )}

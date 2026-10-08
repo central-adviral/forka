@@ -37,7 +37,7 @@ describe('cpaSources', () => {
     expect(cpaSources({ ...clean, cliente_vendas_sem_projeto: 4 })).toEqual([
       { label: 'Vendas de entrada (CPA geral)', value: '100' },
       { label: 'de anúncio pela UTM (CPA de anúncio)', value: '80' },
-      { label: 'com o id do anúncio (CPA por frente e Criativos)', value: '70' },
+      { label: 'com id de campanha ou anúncio na UTM (CPA por frente)', value: '70' },
       { label: 'fora do CPA de anúncio', value: '12 sem UTM · 5 da bio · 3 de outra origem' },
       { label: 'do cliente, sem projeto (fora deste CPA)', value: '4' },
     ])

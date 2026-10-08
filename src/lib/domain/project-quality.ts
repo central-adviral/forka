@@ -80,7 +80,7 @@ export function cpaSources(row: ProjectQualityRow, cross?: { geradas_para_outro:
   const lines: SourceLine[] = [
     { label: 'Vendas de entrada (CPA geral)', value: n(entries) },
     { label: 'de anúncio pela UTM (CPA de anúncio)', value: n(fromAds) },
-    { label: 'com o id do anúncio (CPA por frente e Criativos)', value: n(row.vendas_com_id_anuncio) },
+    { label: 'com id de campanha ou anúncio na UTM (CPA por frente)', value: n(row.vendas_com_id_anuncio) },
   ]
   const outside = [
     Number(row.vendas_sem_utm) > 0 ? `${n(row.vendas_sem_utm)} sem UTM` : null,
