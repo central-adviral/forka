@@ -30,63 +30,6 @@ async function assertNoDuplicateLaunchOpsMapping(
   }
 }
 
-const createSalesFunnelSchema = z.object({
-  client_id: z.string().uuid(),
-  client_slug: z.string(),
-  name: z.string().min(1),
-  slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
-  launchops_operacao_ids: z
-    .string()
-    .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean))
-    .pipe(z.array(z.string().uuid('IDs de operação devem ser UUIDs válidos'))),
-  launchops_produto_nomes: z.string(),
-})
-
-export async function createSalesFunnel(context: { client_id: string; client_slug: string }, formData: FormData) {
-  const result = createSalesFunnelSchema.safeParse({
-    client_id: context.client_id,
-    client_slug: context.client_slug,
-    name: formData.get('name'),
-    slug: formData.get('slug'),
-    launchops_operacao_ids: formData.get('launchops_operacao_ids'),
-    launchops_produto_nomes: formData.get('launchops_produto_nomes'),
-  })
-  if (!result.success) {
-    throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
-  }
-  const parsed = result.data
-  const produtoNomes = parsed.launchops_produto_nomes.split(',').map((s) => s.trim()).filter(Boolean)
-
-  const supabase = await createServerSupabaseClient()
-  await assertNoDuplicateLaunchOpsMapping(supabase, parsed.client_id, parsed.launchops_operacao_ids)
-  const { data: funnel, error } = await supabase
-    .from('sales_funnels')
-    .insert({
-      client_id: parsed.client_id,
-      name: parsed.name,
-      slug: parsed.slug,
-      launchops_operacao_ids: parsed.launchops_operacao_ids,
-    })
-    .select('id')
-    .single()
-  if (error) {
-    if (error.code === '23505') {
-      throw new Error('Já existe um funil com esse slug neste cliente')
-    }
-    throw error
-  }
-  // The names typed here start as entry products; the Produtos screen classifies them (0061).
-  if (produtoNomes.length > 0) {
-    const { error: productsError } = await supabase
-      .from('project_products')
-      .insert(produtoNomes.map((produto_nome) => ({ sales_funnel_id: funnel.id, produto_nome, papel: 'entrada' })))
-    if (productsError) throw productsError
-  }
-  revalidatePath(`/dashboard/clients/${parsed.client_slug}/funis-venda`)
-  // A new project has no numbers yet: it opens on what is left to configure.
-  redirect(`/dashboard/clients/${parsed.client_slug}/funis-venda/${parsed.slug}/configurar`)
-}
-
 // Archive, never delete: deleting cascaded the project's fronts and watchers and left its sales without a project (0100).
 export async function setSalesFunnelArchived(salesFunnelId: string, archived: boolean) {
   const supabase = await createServerSupabaseClient()

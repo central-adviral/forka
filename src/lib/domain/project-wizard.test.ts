@@ -5,6 +5,7 @@ import {
   coherence,
   duplicateProject,
   emptyProject,
+  blocksDraft,
   isBlocked,
   needsProducts,
   pageConflict,
@@ -82,6 +83,9 @@ describe('seals', () => {
     const project = { ...emptyProject(), fronts: [] }
     const texts = seals(project, context).filter((seal) => seal.tone === 'crit').map((seal) => seal.text)
     expect(texts).toEqual(expect.arrayContaining(['Projeto sem nome.', 'Projeto sem frente: não há de onde vir o gasto.', 'Uma métrica escolhida depende de venda (CPA ou ROAS) e não há produto de entrada.']))
+    // A draft can wait for fronts and products; a project without a name cannot be saved at all.
+    expect(blocksDraft(seals({ ...named('1K LATAM'), fronts: [] }, context))).toBe(false)
+    expect(blocksDraft(seals(project, context))).toBe(true)
     const ready = { ...named('1K LATAM'), products: { '1K Por Dia': 'entrada' as const } }
     expect(isBlocked(seals(ready, context))).toBe(false)
   })

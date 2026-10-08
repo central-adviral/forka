@@ -283,6 +283,8 @@ export interface Seal {
   text: string
   /** The step that fixes it: 0 Projeto, 1 Frentes, 2 Produtos. */
   step: number
+  /** A draft can be saved with it; only "Ligar" waits for it. */
+  draftOk?: true
 }
 
 export interface SealContext {
@@ -300,26 +302,26 @@ export function seals(project: WizardProject, context: SealContext): Seal[] {
   if (!project.slug) out.push({ tone: 'crit', text: 'Projeto sem endereço interno.', step: 0 })
   else if (context.takenSlugs.includes(project.slug)) out.push({ tone: 'crit', text: `Já existe um projeto com o endereço /${project.slug}.`, step: 0 })
   if (project.primary === project.secondary) out.push({ tone: 'crit', text: 'A métrica secundária precisa ser diferente da principal.', step: 0 })
-  if (!(project.primaryTarget > 0) || !(project.secondaryTarget > 0)) out.push({ tone: 'crit', text: 'Preencha os alvos da métrica principal e da secundária.', step: 0 })
+  if (!(project.primaryTarget > 0) || !(project.secondaryTarget > 0)) out.push({ tone: 'crit', text: 'Preencha os alvos da métrica principal e da secundária.', step: 0, draftOk: true })
   if (project.startsOn && project.endsOn && project.endsOn < project.startsOn) out.push({ tone: 'crit', text: 'O fim do projeto vem antes do início.', step: 0 })
-  if (project.fronts.length === 0) out.push({ tone: 'crit', text: 'Projeto sem frente: não há de onde vir o gasto.', step: 1 })
+  if (project.fronts.length === 0) out.push({ tone: 'crit', text: 'Projeto sem frente: não há de onde vir o gasto.', step: 1, draftOk: true })
   const codes = project.fronts.map((front) => front.code.trim().toUpperCase())
   project.fronts.forEach((front, index) => {
     if (!front.code.trim() || !front.name.trim()) out.push({ tone: 'crit', text: `Frente ${index + 1} sem nome ou código.`, step: 1 })
     else if (codes.indexOf(codes[index]) !== index) out.push({ tone: 'crit', text: `Duas frentes com o código ${codes[index]}.`, step: 1 })
     const preview = previewFront(project, front, context.campaigns)
     if (front.kind === 'propria') {
-      if (!front.tag.trim()) out.push({ tone: 'crit', text: `Frente ${front.name} sem etiqueta.`, step: 1 })
-      else if (preview.disputed.length) out.push({ tone: 'crit', text: `Frente ${front.name}: ${preview.disputed.length} campanha(s) em duas frentes.`, step: 1 })
+      if (!front.tag.trim()) out.push({ tone: 'crit', text: `Frente ${front.name} sem etiqueta.`, step: 1, draftOk: true })
+      else if (preview.disputed.length) out.push({ tone: 'crit', text: `Frente ${front.name}: ${preview.disputed.length} campanha(s) em duas frentes.`, step: 1, draftOk: true })
       else if (preview.foreign.length) out.push({ tone: 'warn', text: `Frente ${front.name} pega campanha de ${preview.foreign[0].owner_project}.`, step: 1 })
       else if (!preview.campaigns.length) out.push({ tone: 'info', text: `Frente ${front.name} aguardando campanhas com ${front.tag.trim()}.`, step: 1 })
       if (preview.campaigns.length && !front.pages.some((page) => page.url.trim())) out.push({ tone: 'warn', text: `Frente ${front.name} recebe anúncio e não tem página vigiada.`, step: 1 })
     } else {
       if (!front.sourceProjectId) out.push({ tone: 'crit', text: `Frente espelho ${front.name} sem projeto de origem.`, step: 1 })
-      if (!project.startsOn || !project.endsOn) out.push({ tone: 'crit', text: `Frente espelho ${front.name} sem janela: preencha início e fim do projeto.`, step: 0 })
+      if (!project.startsOn || !project.endsOn) out.push({ tone: 'crit', text: `Frente espelho ${front.name} sem janela: preencha início e fim do projeto.`, step: 0, draftOk: true })
     }
     if (front.own && front.primary === front.secondary) out.push({ tone: 'crit', text: `Frente ${front.name}: a métrica secundária precisa ser diferente da principal.`, step: 1 })
-    if (front.own && (!(front.primaryTarget > 0) || !(front.secondaryTarget > 0))) out.push({ tone: 'crit', text: `Frente ${front.name}: preencha os alvos das métricas próprias.`, step: 1 })
+    if (front.own && (!(front.primaryTarget > 0) || !(front.secondaryTarget > 0))) out.push({ tone: 'crit', text: `Frente ${front.name}: preencha os alvos das métricas próprias.`, step: 1, draftOk: true })
     if (front.pages.some((_, pageIndex) => pageConflict(project, index, pageIndex, context.existingPages))) {
       out.push({ tone: 'crit', text: `Frente ${front.name} tem página que já está em outra frente.`, step: 1 })
     }
@@ -330,12 +332,13 @@ export function seals(project: WizardProject, context: SealContext): Seal[] {
     out.push({ tone: 'crit', text: `A sonda acompanha até ${MAX_PAGES_PER_CLIENT} páginas por cliente; este projeto passaria de ${context.activePages + newPages}.`, step: 1 })
   }
   if (needsProducts(project) && !Object.values(project.products).includes('entrada')) {
-    out.push({ tone: 'crit', text: 'Uma métrica escolhida depende de venda (CPA ou ROAS) e não há produto de entrada.', step: 2 })
+    out.push({ tone: 'crit', text: 'Uma métrica escolhida depende de venda (CPA ou ROAS) e não há produto de entrada.', step: 2, draftOk: true })
   }
   return out
 }
 
 export const isBlocked = (list: Seal[]) => list.some((seal) => seal.tone === 'crit')
+export const blocksDraft = (list: Seal[]) => list.some((seal) => seal.tone === 'crit' && !seal.draftOk)
 
 export interface SourceProject {
   id: string
