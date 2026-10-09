@@ -28,7 +28,8 @@ describe('resolveActive: the active section and subsection come from the URL onl
     expect(resolveActive(`${base}/funis-venda/1k/configurar`, '', '', slug)).toEqual({ section: 'projeto', sub: 'visao-projeto' })
     expect(resolveActive(`${base}/funis-venda/1k/produtos`, '', '', slug)).toEqual({ section: 'projeto', sub: 'produtos' })
     expect(resolveActive(`${base}/funis-venda/1k/regras`, '', '', slug)).toEqual({ section: 'projeto', sub: 'regras-campanha' })
-    expect(resolveActive(`${base}/funis-venda/1k/plano`, '', '', slug)).toEqual({ section: 'projeto', sub: 'plano' })
+    expect(resolveActive(`${base}/funis-venda/1k/metas`, '', '', slug)).toEqual({ section: 'projeto', sub: 'metas' })
+    expect(resolveActive(`${base}/funis-venda/1k/plano`, '', '', slug)).toEqual({ section: 'projeto', sub: 'metas' })
     expect(resolveActive(`${base}/metas`, '', '', slug)).toEqual({ section: 'projeto', sub: 'metas' })
     expect(resolveActive(`${base}/integrations`, '', '', slug)).toEqual({ section: 'cliente', sub: 'integracoes' })
     expect(resolveActive(`${base}/membros`, '', '', slug)).toEqual({ section: 'cliente', sub: 'membros' })
@@ -86,7 +87,7 @@ describe('buildNav: what each role sees', () => {
     const groups = nav({ project: null })
     expect(sectionIds(groups)).not.toContain('desempenho')
     expect(subIds(groups, 'testes')).toEqual(['ab', 'aprendizados'])
-    expect(subIds(groups, 'projeto')).toEqual(['metas'])
+    expect(subIds(groups, 'projeto')).toEqual([])
   })
 })
 
@@ -101,6 +102,7 @@ describe('buildNav: links, badges and setup dots', () => {
     expect(href('testes', 'quadro')).toBe(`${base}/backlog?projeto=1k`)
     expect(href('testes', 'regras-jogo')).toBe(`${base}/backlog?projeto=1k&aba=regras`)
     expect(href('projeto', 'visao-projeto')).toBe(`${base}/funis-venda/1k/configurar`)
+    expect(href('projeto', 'metas')).toBe(`${base}/funis-venda/1k/metas`)
     expect(href('cliente', 'integracoes')).toBe(`${base}/integrations`)
   })
 
@@ -130,8 +132,7 @@ describe('buildNav: links, badges and setup dots', () => {
       ['visao-projeto', 'warn'],
       ['produtos', 'ok'],
       ['regras-campanha', 'ok'],
-      ['plano', 'ok'],
-      ['metas', 'warn'],
+      ['metas', 'ok'],
     ])
   })
 

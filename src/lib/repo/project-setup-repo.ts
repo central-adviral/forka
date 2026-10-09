@@ -29,7 +29,7 @@ export async function getProjectSetupStatus(
     getConfiguredSecrets(serviceDb, clientId),
     db.from('project_products').select('produto_nome', { count: 'exact', head: true }).eq('sales_funnel_id', projectId).eq('papel', 'entrada'),
     db.from('naming_rules').select('id, project_fronts!inner(sales_funnel_id)', { count: 'exact', head: true }).eq('project_fronts.sales_funnel_id', projectId).is('project_fronts.archived_at', null),
-    db.from('watchers').select('metric, front_id, target').eq('sales_funnel_id', projectId),
+    db.from('watchers').select('metric, front_id, target:effective_target').eq('sales_funnel_id', projectId),
     // An archived front is out of the setup: it claims nothing, so it needs no rule or page.
     db.from('project_fronts').select('id, name, source_sales_funnel_id, naming_rules(kind)').eq('sales_funnel_id', projectId).is('archived_at', null),
     db.from('pages').select('front_id').eq('sales_funnel_id', projectId).eq('is_active', true),

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { BacklogStatus, Method, Stage } from '@/lib/domain/backlog'
+import type { TestTeto, TetoMedida, TetoSource } from '@/lib/domain/targets'
 
 export interface BacklogVariant {
   id: string
@@ -37,6 +38,13 @@ export interface BacklogItem {
   learning: string | null
   published: boolean
   abTestId: string | null
+  /** The test's own teto (0106); null follows the Critérios override or its stage meta. */
+  teto: number | null
+  /** The teto it started with and judges with while it runs, and its cost. */
+  tetoInicial: number | null
+  tetoMedida: TetoMedida | null
+  /** The teto it would get now (effective_teto): differs from the start after a meta change. */
+  tetoNow: TestTeto
   variants: BacklogVariant[]
   gates: BacklogGate[]
 }
@@ -46,7 +54,7 @@ export async function getBacklog(db: SupabaseClient, salesFunnelId: string): Pro
   const { data, error } = await db
     .from('backlog_items')
     .select(
-      'id, code, title, hypothesis, stage, funnel_stage_id, method, status, impact, confidence, ease, ice, metric, owner, started_at, decided_at, result, winner_key, learning, published, ab_test_id, backlog_variants(id, key, name, status, position), backlog_gates(id, label, done_at, position)'
+      'id, code, title, hypothesis, stage, funnel_stage_id, method, status, impact, confidence, ease, ice, metric, owner, started_at, decided_at, result, winner_key, learning, published, ab_test_id, teto, teto_inicial, teto_medida, effective_teto, effective_teto_source, effective_teto_medida, backlog_variants(id, key, name, status, position), backlog_gates(id, label, done_at, position)'
     )
     .eq('sales_funnel_id', salesFunnelId)
     .order('ice', { ascending: false })
@@ -73,6 +81,12 @@ export async function getBacklog(db: SupabaseClient, salesFunnelId: string): Pro
     learning: string | null
     published: boolean
     ab_test_id: string | null
+    teto: number | null
+    teto_inicial: number | null
+    teto_medida: TetoMedida | null
+    effective_teto: number | null
+    effective_teto_source: TetoSource | null
+    effective_teto_medida: TetoMedida | null
     backlog_variants: { id: string; key: string; name: string; status: BacklogVariant['status']; position: number }[]
     backlog_gates: { id: string; label: string; done_at: string | null; position: number }[]
   }[]).map((row) => ({
@@ -97,6 +111,14 @@ export async function getBacklog(db: SupabaseClient, salesFunnelId: string): Pro
     learning: row.learning,
     published: row.published,
     abTestId: row.ab_test_id,
+    teto: row.teto === null ? null : Number(row.teto),
+    tetoInicial: row.teto_inicial === null ? null : Number(row.teto_inicial),
+    tetoMedida: row.teto_medida,
+    tetoNow: {
+      value: row.effective_teto === null ? null : Number(row.effective_teto),
+      source: row.effective_teto_source,
+      medida: row.effective_teto_medida,
+    },
     variants: [...(row.backlog_variants ?? [])].sort((a, b) => a.position - b.position).map(({ id, key, name, status }) => ({ id, key, name, status })),
     gates: [...(row.backlog_gates ?? [])].sort((a, b) => a.position - b.position).map((gate) => ({ id: gate.id, label: gate.label, doneAt: gate.done_at })),
   }))

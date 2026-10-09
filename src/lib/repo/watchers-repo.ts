@@ -1,18 +1,30 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { WatcherMetric, WatcherStatus } from '@/lib/domain/watchers'
+import type { TargetSource } from '@/lib/domain/targets'
 
 export interface Watcher {
   id: string
   metric: WatcherMetric
-  target: number
+  /** The target it judges against (0106): its own, or the one it follows; null when nothing gives one. */
+  target: number | null
+  /** Its own target; null follows the front, the stage or the funnel result's stage. */
+  ownTarget: number | null
+  targetSource: TargetSource | null
+  /** The stage whose meta a following watcher uses. */
+  targetStageId: string | null
+  /** The band it judges with: its own, or the funnel's faixa padrão. */
   warnPct: number
   critPct: number
+  ownBand: boolean
   minSpend: number
   isActive: boolean
   projectName: string
   projectSlug: string
   frontId: string | null
   frontName: string | null
+  /** A watcher of one stage reads only that stage's campaigns and sales. */
+  stageId: string | null
+  stageName: string | null
   funnelId: string
   /** Set when the Plano (project) or the front's metrics own the metric and target (0094, 0102). */
   planRole: 'principal' | 'secundaria' | null
@@ -34,45 +46,60 @@ export interface Alert {
   closedAt: string | null
 }
 
-export async function getWatchers(db: SupabaseClient, clientId: string): Promise<Watcher[]> {
-  const { data, error } = await db
+/** The client's watchers, or one funnel's. */
+export async function getWatchers(db: SupabaseClient, clientId: string, salesFunnelId?: string): Promise<Watcher[]> {
+  let query = db
     .from('watchers')
     .select(
-      'id, metric, target, warn_pct, crit_pct, min_spend, is_active, last_day, last_value, last_status, sales_funnel_id, plan_role, project:sales_funnels!inner(name, slug, archived_at), front:project_fronts(id, name, archived_at)'
+      'id, metric, target, effective_target, target_source, target_stage_id, warn_pct, crit_pct, effective_warn_pct, effective_crit_pct, min_spend, is_active, last_day, last_value, last_status, sales_funnel_id, stage_id, plan_role, project:sales_funnels!inner(name, slug, archived_at), front:project_fronts(id, name, archived_at), stage:funnel_stages!watchers_stage_fkey(name, archived_at)'
     )
     .eq('client_id', clientId)
-    .order('created_at')
+  if (salesFunnelId) query = query.eq('sales_funnel_id', salesFunnelId)
+  const { data, error } = await query.order('created_at')
   if (error) throw error
   return ((data ?? []) as unknown as {
     id: string
     metric: WatcherMetric
-    target: number
-    warn_pct: number
-    crit_pct: number
+    target: number | null
+    effective_target: number | null
+    target_source: TargetSource | null
+    target_stage_id: string | null
+    warn_pct: number | null
+    crit_pct: number | null
+    effective_warn_pct: number
+    effective_crit_pct: number
     min_spend: number
     is_active: boolean
     last_day: string | null
     last_value: number | null
     last_status: WatcherStatus | null
     sales_funnel_id: string
+    stage_id: string | null
     plan_role: 'principal' | 'secundaria' | null
     project: { name: string; slug: string; archived_at: string | null }
     front: { id: string; name: string; archived_at: string | null } | null
+    stage: { name: string; archived_at: string | null } | null
   }[]).map((row) => ({
     id: row.id,
     metric: row.metric,
-    target: Number(row.target),
-    warnPct: Number(row.warn_pct),
-    critPct: Number(row.crit_pct),
+    target: row.effective_target === null ? null : Number(row.effective_target),
+    ownTarget: row.target === null ? null : Number(row.target),
+    targetSource: row.target_source,
+    targetStageId: row.target_stage_id,
+    warnPct: Number(row.effective_warn_pct),
+    critPct: Number(row.effective_crit_pct),
+    ownBand: row.warn_pct !== null,
     minSpend: Number(row.min_spend),
     isActive: row.is_active,
     projectName: row.project.name,
     projectSlug: row.project.slug,
     frontId: row.front?.id ?? null,
     frontName: row.front?.name ?? null,
+    stageId: row.stage_id,
+    stageName: row.stage?.name ?? null,
     funnelId: row.sales_funnel_id,
     planRole: row.plan_role,
-    archived: Boolean(row.project.archived_at || row.front?.archived_at),
+    archived: Boolean(row.project.archived_at || row.front?.archived_at || row.stage?.archived_at),
     lastDay: row.last_day,
     lastValue: row.last_value === null ? null : Number(row.last_value),
     lastStatus: row.last_status,

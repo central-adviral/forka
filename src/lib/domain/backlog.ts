@@ -60,11 +60,14 @@ export function blockedMove(to: BacklogStatus, check: MoveCheck): string | null 
 }
 
 export interface TestRules {
-  /** CPA ceiling the cut and the win are measured against. */
-  teto: number
-  /** A variant that spends mult × teto with no sale gets marked for pausing. */
+  /**
+   * The funnel's override of the tests' teto (0106), in the cost of each test's stage; null follows
+   * the meta of the test's stage. A test judges with its own teto snapshot, not with this.
+   */
+  teto: number | null
+  /** A variant that spends mult × teto with no result gets marked for pausing. */
   mult: number
-  /** A creative wins with CPA ≤ teto and at least this many ad purchases. */
+  /** A creative wins within the teto with at least this many results (purchases, or leads for a CPL). */
   min: number
   /** Link A/B: minimum chance to beat the control, in %. */
   conf: number
@@ -76,7 +79,7 @@ export interface TestRules {
   sat: number
 }
 
-export const DEFAULT_RULES: TestRules = { teto: 55, mult: 1.5, min: 10, conf: 95, minVisits: 500, mde: 30, sat: 10 }
+export const DEFAULT_RULES: TestRules = { teto: null, mult: 1.5, min: 10, conf: 95, minVisits: 500, mde: 30, sat: 10 }
 
 export const RULE_LIMITS: Record<keyof TestRules, [number, number, boolean]> = {
   teto: [1, 100000, false],
@@ -88,20 +91,12 @@ export const RULE_LIMITS: Record<keyof TestRules, [number, number, boolean]> = {
   sat: [1, 90, true],
 }
 
-/**
- * The test ceiling of a purchase project is its CPA target, read live from the project's cost
- * watcher (the one the Plano and Metas edit), so a target changed in one place is the ceiling
- * everywhere. Only a lead project, or one without a target, keeps the ceiling stored in its rules.
- */
-export function withPlanTeto(rules: TestRules, costTarget: number | null, resultado: string): TestRules {
-  return resultado === 'compra' && costTarget !== null && costTarget > 0 ? { ...rules, teto: costTarget } : rules
-}
-
 /** Reads the project's rules, falling back to the default for any missing or out-of-range number. */
 export function readRules(raw: unknown): TestRules {
   const source = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const rules = { ...DEFAULT_RULES }
   for (const key of Object.keys(RULE_LIMITS) as (keyof TestRules)[]) {
+    if (source[key] === null || source[key] === undefined || source[key] === '') continue
     const value = Number(source[key])
     const [min, max, integer] = RULE_LIMITS[key]
     if (Number.isFinite(value) && value >= min && value <= max && (!integer || Number.isInteger(value))) rules[key] = value

@@ -51,6 +51,8 @@ describe('test backlog (0068)', () => {
     expect(noLearning).not.toBeNull()
 
     const { data: defaults } = await admin.from('sales_funnels').select('test_rules').eq('id', funnel!.id).single()
-    expect(defaults!.test_rules).toMatchObject({ teto: 55, min: 10, conf: 95 })
+    // A new funnel has no teto override: its tests follow the meta of their stage (0106).
+    expect(defaults!.test_rules).toMatchObject({ min: 10, conf: 95 })
+    expect(defaults!.test_rules).not.toHaveProperty('teto')
   })
 })

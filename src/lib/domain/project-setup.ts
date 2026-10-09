@@ -115,15 +115,15 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
     },
     {
       id: 'plano',
-      label: 'Resultado e meta',
+      label: 'Meta do resultado',
       done: plan,
-      text: plan ? `Resultado ${facts.resultado} com meta definida.` : 'Falta o resultado do funil e a meta de custo.',
+      text: plan ? `Resultado ${facts.resultado} com meta definida.` : 'Falta a meta do resultado do funil (a meta da etapa que o mede).',
     },
     {
       id: 'metas',
       label: 'Metas e vigias',
       done: facts.extraWatchers > 0,
-      text: facts.extraWatchers > 0 ? `${plural(facts.extraWatchers, 'vigia', 'vigias')} além do de custo.` : 'Só o vigia de custo: nada avisa quando CTR, CPM ou frequência saem da faixa.',
+      text: facts.extraWatchers > 0 ? `${plural(facts.extraWatchers, 'vigia', 'vigias')} além do resultado.` : 'Só o vigia do resultado: nada avisa quando CTR, CPM ou frequência saem da faixa.',
     },
   ]
   const pendingBefore = steps.filter((step) => !step.done).length

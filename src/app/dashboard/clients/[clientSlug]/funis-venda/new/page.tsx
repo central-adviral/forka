@@ -45,7 +45,7 @@ export default async function NewProjectPage({ params }: { params: Promise<{ cli
       .select('id, sales_funnel_id, code, name, source_sales_funnel_id, metrica_principal, alvo_principal, metrica_secundaria, alvo_secundaria, archived_at, sales_funnels!project_fronts_sales_funnel_id_fkey!inner(client_id), naming_rules(kind, value)')
       .eq('sales_funnels.client_id', client.id)
       .order('position'),
-    supabase.from('watchers').select('sales_funnel_id, target, plan_role').eq('client_id', client.id).is('front_id', null).not('plan_role', 'is', null),
+    supabase.from('watchers').select('sales_funnel_id, target:effective_target, plan_role').eq('client_id', client.id).is('front_id', null).not('plan_role', 'is', null),
     supabase.from('project_products').select('sales_funnel_id, produto_nome, papel, sales_funnels!inner(client_id)').eq('sales_funnels.client_id', client.id),
     supabase.from('pages').select('url, tipo, is_active, front_id, sales_funnel_id').eq('client_id', client.id),
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: saoPauloDay(-LOOKBACK_DAYS), p_until: saoPauloDay(1) }),
@@ -67,7 +67,7 @@ export default async function NewProjectPage({ params }: { params: Promise<{ cli
     const project = page.sales_funnel_id ? projectName.get(page.sales_funnel_id) : undefined
     return { url: page.url, where: [project ?? 'sem funil', front?.name].filter(Boolean).join(' · ') }
   })
-  const targets = (watchers.data ?? []) as { sales_funnel_id: string; target: number; plan_role: 'principal' | 'secundaria' }[]
+  const targets = (watchers.data ?? []) as { sales_funnel_id: string; target: number | null; plan_role: 'principal' | 'secundaria' }[]
   const productRows = (products.data ?? []) as unknown as { sales_funnel_id: string; produto_nome: string; papel: ProductRole }[]
   const sources: SourceProject[] = projectRows
     .filter((project) => !project.archived_at)

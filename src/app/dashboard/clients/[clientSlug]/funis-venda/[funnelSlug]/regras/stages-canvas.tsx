@@ -14,9 +14,9 @@ import {
   placeStage,
   sequenceEdges,
 } from '@/lib/domain/stage-canvas'
-import { addStage, archiveStage, moveFront, placeStageAction, removeCombo, removePreset, saveCombo, saveStage, savePreset, type StageActionResult } from './stage-actions'
+import { addStage, applyNewTeto, archiveStage, moveFront, placeStageAction, removeCombo, removePreset, saveCombo, saveStage, savePreset, saveTestTeto, saveWatcherTargets, type StageActionResult } from './stage-actions'
 import { ComboDrawer } from './combo-drawer'
-import { StageDrawer, frontTargetText, mono } from './stage-drawer'
+import { StageDrawer, frontMetaText, mono } from './stage-drawer'
 import type { CanvasContext, CanvasPreset, CanvasStage } from './canvas-types'
 
 type Selection = { kind: 'stage'; id: string } | { kind: 'combo'; id: string | null } | null
@@ -122,6 +122,7 @@ export function StagesCanvas({
       fronts: [],
       watchers: [],
       tests: [],
+      followers: { following: 0, specific: 0 },
     }
     const next = placeStage(shown, draft, toParallel, index)
     run(
@@ -233,7 +234,7 @@ export function StagesCanvas({
                   {front.name} <em className={`${mono} not-italic text-[11.5px] text-[var(--ct-text-3)]`}>{front.rules.find((rule) => rule.kind === 'include')?.value ?? front.code}</em>
                 </span>
                 <em className={`${mono} flex-none not-italic text-[11.5px] text-[var(--ct-text-3)]`}>
-                  {front.metricaPrincipal ? frontTargetText(front.metricaPrincipal, front.alvoPrincipal) : 'segue'}
+                  {frontMetaText(front, stage)}
                 </em>
               </div>
             ))}
@@ -498,6 +499,9 @@ export function StagesCanvas({
           pending={pending}
           onClose={() => setSelection(null)}
           onSave={(fields) => run(null, () => saveStage(context, selectedStage.id, fields), () => setToast('Etapa salva.'))}
+          onSaveWatcher={(watcherId, input) => run(null, () => saveWatcherTargets(context, watcherId, input), () => setToast('Vigia salvo e reavaliado.'))}
+          onSaveTestTeto={(itemId, teto) => run(null, () => saveTestTeto(context, itemId, teto), () => setToast(teto === null ? 'O teste segue o teto do funil.' : 'O teste tem teto próprio.'))}
+          onApplyNewTeto={(itemId) => run(null, () => applyNewTeto(context, itemId), () => setToast('O teste agora é julgado com a meta nova.'))}
           onPlace={(toParallel, index) => place(selectedStage, toParallel, index)}
           onArchive={() =>
             run(null, () => archiveStage(context, selectedStage.id, true), () => {

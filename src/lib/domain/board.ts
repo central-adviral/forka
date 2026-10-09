@@ -36,9 +36,12 @@ const fmt = (n: number) => n.toLocaleString('pt-BR')
 
 /**
  * How far a running card is from a verdict, without opening it: people on the thinnest side of a
- * link test against the sample it needs, or purchases of the best creative against the rules' minimum.
+ * link test against the sample it needs, or results of the best creative against the rules' minimum.
  */
-export function cardProgress(read: { link?: LinkVariantRead[]; meta?: MetaVariantRead[] } | undefined, rules: TestRules): CardProgress | null {
+export function cardProgress(
+  read: { link?: LinkVariantRead[]; meta?: MetaVariantRead[]; resultsLabel?: string } | undefined,
+  rules: TestRules
+): CardProgress | null {
   if (read?.link?.length) {
     const needed = read.link[0].needed
     if (!needed) return null
@@ -46,8 +49,8 @@ export function cardProgress(read: { link?: LinkVariantRead[]; meta?: MetaVarian
     return { done: thinnest, target: needed, label: `${fmt(thinnest)} / ${fmt(needed)} pessoas` }
   }
   if (read?.meta?.length) {
-    const best = Math.max(...read.meta.map((variant) => variant.sales))
-    return { done: best, target: rules.min, label: `${fmt(best)} / ${fmt(rules.min)} compras` }
+    const best = Math.max(...read.meta.map((variant) => variant.results))
+    return { done: best, target: rules.min, label: `${fmt(Math.floor(best))} / ${fmt(rules.min)} ${read.resultsLabel ?? 'compras'}` }
   }
   return null
 }

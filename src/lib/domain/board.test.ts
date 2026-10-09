@@ -34,8 +34,9 @@ describe('cardProgress', () => {
   })
 
   it('shows the best creative purchases against the minimum of a Meta test', () => {
-    const meta = [{ sales: 4 }, { sales: 2 }] as MetaVariantRead[]
+    const meta = [{ results: 4 }, { results: 2 }] as MetaVariantRead[]
     expect(cardProgress({ meta }, DEFAULT_RULES)).toEqual({ done: 4, target: 10, label: '4 / 10 compras' })
+    expect(cardProgress({ meta, resultsLabel: 'leads' }, DEFAULT_RULES)?.label).toBe('4 / 10 leads')
   })
 
   it('has no progress while the sample cannot be sized', () => {
