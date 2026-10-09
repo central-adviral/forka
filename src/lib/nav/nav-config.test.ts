@@ -72,9 +72,13 @@ describe('buildNav: what each role sees', () => {
 
   it('names the stage screens the same in Configurar, Desempenho and the analysis tabs', () => {
     const subs = nav().flatMap((group) => group.sections).flatMap((section) => section.subs)
-    expect(subs.find((sub) => sub.id === 'regras-campanha')).toMatchObject({ label: 'Etapas e frentes', desc: 'Monte a jornada, as etiquetas e as metas' })
+    expect(subs.find((sub) => sub.id === 'regras-campanha')).toMatchObject({ label: 'Etapas e frentes', desc: 'Jornada, etiquetas, metas e páginas' })
     expect(subs.find((sub) => sub.id === 'frentes')?.label).toBe('Etapas e frentes')
     expect(ANALYSIS_TABS.find((tab) => tab.value === 'frentes')?.label).toBe('Etapas e frentes')
+  })
+
+  it('lists the funnel setup in the checklist order', () => {
+    expect(subIds(nav(), 'projeto')).toEqual(['visao-projeto', 'regras-campanha', 'produtos', 'metas'])
   })
 
   it('never shows the subsections that do not exist yet', () => {
@@ -119,7 +123,7 @@ describe('buildNav: links, badges and setup dots', () => {
         queue: { count: 3, crit: 1, warn: 2 },
         openAlerts: { count: 2, crit: 0 },
         testsRunning: 4,
-        setup: { done: 4, total: 5, nextLabel: 'Metas e vigias', stepDone: { integracoes: true, produtos: true, regras: true, plano: true, metas: false } },
+        setup: { done: 4, total: 5, nextLabel: 'Produtos', stepDone: { integracoes: true, etapas: true, produtos: false, metas: true, conferir: false } },
       },
     })
     const badge = (id: string) => groups.flatMap((g) => g.sections).find((s) => s.id === id)!.badge
@@ -130,8 +134,8 @@ describe('buildNav: links, badges and setup dots', () => {
     const projectSubs = groups.flatMap((g) => g.sections).find((s) => s.id === 'projeto')!.subs
     expect(projectSubs.map((sub) => [sub.id, sub.status])).toEqual([
       ['visao-projeto', 'warn'],
-      ['produtos', 'ok'],
       ['regras-campanha', 'ok'],
+      ['produtos', 'warn'],
       ['metas', 'ok'],
     ])
   })

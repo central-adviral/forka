@@ -7,8 +7,8 @@ import { canActAs } from '@/lib/view-as'
 import { getCostCombos, getFunnelStages } from '@/lib/repo/funnel-stages-repo'
 import { getWatchers, type Watcher } from '@/lib/repo/watchers-repo'
 import { PROJECT_RESULTS, readResult, resultUsesSales, suggestedCost, suggestedVolume, type ProjectResult } from '@/lib/domain/project-plan'
-import { MEASURES, measureOfMetric, type StageMeasure } from '@/lib/domain/funnel-stages'
-import { metaToInput } from '@/lib/domain/stage-canvas'
+import { MEASURES, funnelResultStage, measureOfMetric, type StageMeasure } from '@/lib/domain/funnel-stages'
+import { funnelResultLine, metaToInput } from '@/lib/domain/stage-canvas'
 import { METRICS, decimalInput, formatMetric, thresholds, watcherScope, watcherSource, type WatcherMetric } from '@/lib/domain/watchers'
 import {
   followersLine,
@@ -27,7 +27,8 @@ import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { PageHeader } from '@/components/page-header'
 import { headerAction } from '@/components/header-actions'
 import { ArchivedProjectBanner } from '../../archived-project-banner'
-import { saveBand, saveComboMeta, saveFrontMeta, saveResult, saveStageMeta } from './actions'
+import { saveBand, saveComboMeta, saveResult } from './actions'
+import { FunnelHeader } from '../funnel-header'
 import { createWatcher, deleteWatcher, evaluateNow, toggleWatcher, updateWatcher } from './watcher-actions'
 import { ScopeMetricFields } from './scope-metric-fields'
 
@@ -145,7 +146,7 @@ export default async function FunnelMetasPage({
   const resultado = readResult(funnel.resultado)
   const band = { warnPct: Number(funnel.warn_pct), critPct: Number(funnel.crit_pct) }
 
-  // 1. Resultado: what each result looked like in the last closed days, for the choice and the suggestion.
+  // 1. Resultado: what the result looked like in the last closed days, for the suggestions.
   const leadsByDay = new Map<string, number>()
   for (const row of (frontDaily.data ?? []) as { data: string; leads: number }[]) leadsByDay.set(row.data, (leadsByDay.get(row.data) ?? 0) + Number(row.leads ?? 0))
   const series: Record<ProjectResult, { spend: number; results: number }[]> = {
@@ -156,19 +157,15 @@ export default async function FunnelMetasPage({
     visita: days.map((day) => ({ spend: day.spendComImposto, results: day.landingPageViews })),
     alcance: days.map((day) => ({ spend: day.spendComImposto, results: day.impressions / 1000 })),
   }
-  const volumeSeries = (result: ProjectResult) => (result === 'roas' ? series.compra : series[result])
-  const found = (Object.keys(PROJECT_RESULTS) as ProjectResult[]).map((result) => {
-    const info = PROJECT_RESULTS[result]
-    const total = series[result].reduce((sum, day) => sum + day.results, 0)
-    const spend = series[result].reduce((sum, day) => sum + day.spend, 0)
-    const cost = total > 0 && spend > 0 ? (info.higherIsBetter ? total / spend : spend / total) : null
-    return { result, total, cost, suggestedCost: suggestedCost(series[result], info.higherIsBetter), suggestedVolume: suggestedVolume(volumeSeries(result)) }
-  })
-  const metricText = (result: ProjectResult, value: number) =>
-    PROJECT_RESULTS[result].higherIsBetter ? `${value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}x` : currency(value)
-  const current = found.find((option) => option.result === resultado)!
+  // The suggestions under the result's inputs, from the last closed days.
+  const current = {
+    suggestedCost: suggestedCost(series[resultado], PROJECT_RESULTS[resultado].higherIsBetter),
+    suggestedVolume: suggestedVolume(resultado === 'roas' ? series.compra : series[resultado]),
+  }
 
   const stages = stageRows.filter((stage) => !stage.archivedAt)
+  const resultStageRow = funnelResultStage(stages)
+  const resultLine = funnelResultLine(stages, resultado)
   const stageName = new Map(stageRows.map((stage) => [stage.id, stage.name]))
   const fronts = ((frontRows ?? []) as { id: string; code: string; name: string; stage_id: string; metrica_principal: ProjectResult | null; alvo_principal: number | null; metrica_secundaria: ProjectResult | null; alvo_secundaria: number | null; archived_at: string | null }[]).map((row) => ({
     id: row.id,
@@ -230,9 +227,8 @@ export default async function FunnelMetasPage({
         title="Metas e vigias"
         note={
           <>
-            As metas de {funnel.name} valem de cima para baixo: o funil, cada etapa, cada frente, os vigias e os testes. Cada lugar segue o de cima,
-            a não ser que tenha uma meta específica. As campanhas vêm das{' '}
-            <Link href={`${base}/regras`} className="text-[var(--ct-accent)]">Etapas e frentes</Link>.
+            As metas de {funnel.name} valem de cima para baixo: o funil, cada etapa, cada frente, os vigias e os testes. A meta de cada etapa fica no{' '}
+            <Link href={`${base}/regras`} className="text-[var(--ct-accent)]">canvas de Etapas e frentes</Link>; aqui ficam a faixa, os vigias extras e os custos combinados.
           </>
         }
         actions={
@@ -247,6 +243,7 @@ export default async function FunnelMetasPage({
       />
 
       {funnel.archived_at && <ArchivedProjectBanner salesFunnelId={funnel.id} archivedAt={funnel.archived_at} canRestore={canEditClient} note="As metas ficam só para leitura." />}
+      <FunnelHeader client={client} salesFunnelId={funnel.id} canEdit={canEdit} regrasHref={`${base}/regras`} />
       {ok && <p role="status" className="rounded-[10px] bg-[var(--ct-ok-soft)] px-4 py-3 text-[13px] text-[var(--ct-ok)]">{ok}</p>}
       {erro && <p role="alert" className="rounded-[10px] bg-[var(--ct-crit-soft)] px-4 py-3 text-[13px] text-[var(--ct-crit)]">{erro}</p>}
       {!canEditClient && <p className="text-[12.5px] text-[var(--ct-text-3)]">Só gestor ou owner muda as metas; aqui você vê o que vale.</p>}
@@ -256,51 +253,56 @@ export default async function FunnelMetasPage({
           <legend className="sr-only">Resultado do funil</legend>
           <div className="flex flex-wrap items-baseline gap-3">
             <h2 className="text-[16px] font-semibold">1 · Resultado do funil</h2>
-            <span className={`${mono} text-[11.5px] text-[var(--ct-text-3)]`}>encontrado nos últimos {LOOKBACK_DAYS} dias fechados</span>
+            <span className="text-[12px] text-[var(--ct-text-3)]">Automático: a última etapa da sequência, fora a ascensão.</span>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {found.map((option) => (
-              <label
-                key={option.result}
-                className="flex cursor-pointer flex-col gap-1 rounded-[14px] border border-[var(--ct-line)] px-4 py-3 has-[:checked]:border-[var(--ct-accent)] has-[:checked]:bg-[var(--ct-accent-soft)]"
-              >
-                <span className="flex items-center gap-2">
-                  <input type="radio" name="resultado" value={option.result} defaultChecked={option.result === resultado} />
-                  <b className="text-[14px]">{PROJECT_RESULTS[option.result].label}</b>
-                  <span className="text-[12px] text-[var(--ct-text-3)]">mede {PROJECT_RESULTS[option.result].cost}</span>
-                </span>
-                <span className={`${mono} text-[12.5px] text-[var(--ct-text-2)]`}>
-                  {option.result === 'roas' ? currency(option.total) : Math.round(option.total).toLocaleString('pt-BR')} {PROJECT_RESULTS[option.result].unit}
-                  {option.cost !== null ? ` · ${PROJECT_RESULTS[option.result].cost} ${metricText(option.result, option.cost)}` : ''}
-                </span>
-              </label>
-            ))}
-          </div>
+          {resultLine && resultStageRow ? (
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px]">
+              <b className="font-semibold">{resultLine.cost}</b>
+              {resultLine.meta ? <span className={mono}>{resultLine.meta}</span> : <span className="text-[var(--ct-warn)]">sem meta</span>}
+              <span className="text-[var(--ct-text-3)]">· etapa {resultLine.stageName}</span>
+              <Link href={`${base}/regras?etapa=${resultStageRow.id}`} className="text-[13px] font-medium text-[var(--ct-accent)] hover:underline">
+                Editar no canvas
+              </Link>
+            </p>
+          ) : (
+            <p className="text-[13px] text-[var(--ct-warn)]">
+              Nenhuma etapa na sequência ainda. Monte a jornada em <Link href={`${base}/regras`} className="text-[var(--ct-accent)]">Etapas e frentes</Link>.
+            </p>
+          )}
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-              {PROJECT_RESULTS[resultado].higherIsBetter ? `Meta do resultado · ${PROJECT_RESULTS[resultado].cost} mínimo (x)` : `Meta do resultado · ${PROJECT_RESULTS[resultado].cost}`}
-              <input
-                name="cost_target"
-                inputMode="decimal"
-                defaultValue={principal.value !== null ? decimalInput(principal.value) : ''}
-                placeholder={current.suggestedCost !== null ? `sugestão ${current.suggestedCost.toFixed(2).replace('.', ',')}` : 'você define'}
-                className={`${field} ${mono}`}
-              />
-              <span className="text-[11px]">
-                {principal.stage
-                  ? `É a meta da etapa ${principal.stage.name}: muda aqui, muda lá, e em tudo que segue a etapa. Em branco, sem vigia do resultado.`
-                  : 'Nenhuma etapa mede este resultado: a meta fica no vigia do resultado (específica).'}
-              </span>
-              {principal.specificDiffers && (
-                <span className="text-[11px] text-[var(--ct-warn)]">
-                  O vigia do resultado julga hoje com uma meta específica ({formatMetric(principal.metric, principal.watcher!.ownTarget)}). Ao salvar, ele passa a seguir a etapa.
-                </span>
-              )}
-            </label>
+            {resultStageRow?.measure === 'compra' && (
+              <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                Na etapa de compra, julgar por
+                <select name="julgar" defaultValue={resultado} className={field}>
+                  {(['compra', 'roas', 'checkout'] as const).map((option) => (
+                    <option key={option} value={option}>
+                      {PROJECT_RESULTS[option].cost}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[11px]">CPA e ROAS usam a meta da etapa. Custo por checkout tem meta própria, no vigia do resultado.</span>
+              </label>
+            )}
+            {resultado === 'checkout' && (
+              <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                Meta do resultado · custo por checkout
+                <input
+                  name="cost_target"
+                  inputMode="decimal"
+                  defaultValue={principal.value !== null ? decimalInput(principal.value) : ''}
+                  placeholder={current.suggestedCost !== null ? `sugestão ${current.suggestedCost.toFixed(2).replace('.', ',')}` : 'você define'}
+                  className={`${field} ${mono}`}
+                />
+              </label>
+            )}
             <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
               Volume por dia ({PROJECT_RESULTS[resultado].perDay})
               <input name="daily_target" inputMode="numeric" defaultValue={funnel.daily_sales_target ?? ''} placeholder={current.suggestedVolume !== null ? `sugestão ${current.suggestedVolume}` : 'ex.: 80'} className={`${field} ${mono}`} />
               <span className="text-[11px]">A aba Hoje projeta o dia contra este número.</span>
+            </label>
+            <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+              Gasto mínimo no dia para julgar o resultado
+              <input name="min_spend" inputMode="decimal" defaultValue={principal.watcher ? decimalInput(principal.watcher.minSpend) : ''} placeholder="300" className={`${field} ${mono}`} />
             </label>
             <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
               Métrica secundária
@@ -318,14 +320,10 @@ export default async function FunnelMetasPage({
               <input name="secondary_target" inputMode="decimal" defaultValue={secondary?.value != null ? decimalInput(secondary.value) : ''} placeholder="ex.: 4,00" className={`${field} ${mono}`} />
               <span className="text-[11px]">{secondary?.stage ? `É a meta da etapa ${secondary.stage.name} nesse custo.` : 'Vira um segundo vigia do funil. Em branco, sem vigia.'}</span>
             </label>
-            <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-              Gasto mínimo no dia para julgar o resultado
-              <input name="min_spend" inputMode="decimal" defaultValue={principal.watcher ? decimalInput(principal.watcher.minSpend) : ''} placeholder="300" className={`${field} ${mono}`} />
-            </label>
           </div>
           {canEdit && (
             <button type="submit" className={primary}>
-              Salvar resultado e meta
+              Salvar resultado
             </button>
           )}
         </fieldset>
@@ -333,80 +331,52 @@ export default async function FunnelMetasPage({
 
       <section className={card} aria-labelledby="metas-etapas">
         <div className="flex flex-wrap items-baseline gap-3">
-          <h2 id="metas-etapas" className="text-[16px] font-semibold">2 · Metas por etapa e frente</h2>
-          <span className="text-[12px] text-[var(--ct-text-3)]">Cada etapa mede o custo só das campanhas dela. Frentes, vigias e testes seguem a etapa, a não ser que tenham meta específica.</span>
+          <h2 id="metas-etapas" className="text-[16px] font-semibold">2 · Metas por etapa</h2>
+          <span className="text-[12px] text-[var(--ct-text-3)]">Editadas no canvas. Frentes, vigias e testes seguem a etapa, a não ser que tenham meta específica.</span>
         </div>
         {stages.length === 0 && <p className="text-[13px] text-[var(--ct-text-2)]">Nenhuma etapa ainda. Monte a jornada em <Link href={`${base}/regras`} className="text-[var(--ct-accent)]">Etapas e frentes</Link>.</p>}
-        {stages.map((stage) => {
-          const info = MEASURES[stage.measure]
-          const impact = stageFollowers(stage.id, readers)
-          const stageFronts = fronts.filter((front) => front.stageId === stage.id && !front.archived)
-          return (
-            <div key={stage.id} className="flex flex-col gap-3 rounded-[14px] border border-[var(--ct-line)] px-4 py-3.5">
-              <form action={saveStageMeta.bind(null, { ...context, stage_id: stage.id, measure: stage.measure })} className="flex flex-wrap items-end gap-3">
-                <div className="mr-auto min-w-[160px]">
+        <ul className="flex flex-col gap-2.5">
+          {stages.map((stage) => {
+            const info = MEASURES[stage.measure]
+            const stageFronts = fronts.filter((front) => front.stageId === stage.id && !front.archived)
+            const hasMeta = stage.meta !== null || (stage.measure === 'compra' && stage.metaRoas !== null)
+            return (
+              <li key={stage.id} className="flex flex-col gap-2 rounded-[14px] border border-[var(--ct-line)] px-4 py-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <b className="text-[14px]">{stage.name}</b>
-                  <span className="block text-[12px] text-[var(--ct-text-3)]">
-                    {info.label} · mede {info.cost}
+                  <span className={`${mono} text-[13px] ${hasMeta ? '' : 'text-[var(--ct-warn)]'}`}>
+                    {info.cost} {stage.meta === null ? (stage.measure === 'compra' && stage.metaRoas !== null ? '' : 'sem meta') : `${info.direction === 'max' ? '≤' : '≥'} ${stageMetaText(stage.measure, stage.meta)}`}
+                    {stage.measure === 'compra' && stage.metaRoas !== null ? ` · ROAS ≥ ${decimalInput(stage.metaRoas)}x` : ''}
                   </span>
+                  {resultStageRow?.id === stage.id && <Pill source="segue" text="resultado do funil" />}
+                  {stage.parallel && <Pill source="sem" text="paralela" />}
+                  <Link href={`${base}/regras?etapa=${stage.id}`} className={`ml-auto ${small}`}>
+                    Editar no canvas
+                  </Link>
                 </div>
-                <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-                  Meta · {info.cost} {info.direction === 'max' ? '≤' : '≥'}
-                  <input name="meta" inputMode="decimal" disabled={!canEdit} defaultValue={metaToInput(stage.measure, stage.meta)} placeholder={info.format === 'pct' ? 'em %' : 'você define'} className={`${field} ${mono} w-32`} />
-                </label>
-                {stage.measure === 'compra' && (
-                  <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-                    ROAS ≥
-                    <input name="meta_roas" inputMode="decimal" disabled={!canEdit} defaultValue={metaToInput('compra', stage.metaRoas)} className={`${field} ${mono} w-24`} />
-                  </label>
+                <p className="text-[12px] text-[var(--ct-text-3)]">{followersLine(stageFollowers(stage.id, readers))}</p>
+                {stageFronts.length > 0 && (
+                  <ul className="flex flex-col gap-1 border-t border-[var(--ct-line)] pt-2">
+                    {stageFronts.map((front) => {
+                      const meta = frontPrincipalMeta(front, stage)
+                      return (
+                        <li key={front.id} className="flex flex-wrap items-center gap-2 text-[12.5px]">
+                          <span className={`${mono} rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[11px]`}>{front.code}</span>
+                          <span className="min-w-[120px]">{front.name}</span>
+                          <Pill source={meta.source === 'especifica' ? 'especifica' : 'segue'} text={meta.source === 'especifica' ? 'específica' : 'segue a etapa'} />
+                          <span className={mono}>
+                            {meta.source === 'especifica' && front.metricaPrincipal && front.metricaPrincipal !== stage.measure ? `${PROJECT_RESULTS[front.metricaPrincipal].cost} ` : ''}
+                            {meta.source === 'especifica' && front.metricaPrincipal === 'roas' && meta.value !== null ? `${decimalInput(meta.value)}x` : stageMetaText(stage.measure, meta.value)}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
                 )}
-                {canEdit && (
-                  <button type="submit" className={small}>
-                    Salvar meta
-                  </button>
-                )}
-                <p className="w-full text-[12px] text-[var(--ct-text-3)]">
-                  {followersLine(impact)} {principal.stage?.id === stage.id ? 'É também a meta do resultado do funil.' : ''}
-                </p>
-              </form>
-              {stageFronts.length > 0 && (
-                <ul className="flex flex-col gap-1.5 border-t border-[var(--ct-line)] pt-3">
-                  {stageFronts.map((front) => {
-                    const meta = frontPrincipalMeta(front, stage)
-                    const metric: ProjectResult = front.metricaPrincipal ?? (stage.measure === 'ascensao' ? 'compra' : stage.measure)
-                    return (
-                      <li key={front.id} className="flex flex-wrap items-center gap-2 text-[12.5px]">
-                        <span className={`${mono} rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[11px]`}>{front.code}</span>
-                        <span className="min-w-[120px]">{front.name}</span>
-                        <Pill source={meta.source === 'especifica' ? 'especifica' : 'segue'} text={meta.source === 'especifica' ? 'específica' : 'segue a etapa'} />
-                        <span className={mono}>
-                          {meta.source === 'especifica' && front.metricaPrincipal && front.metricaPrincipal !== stage.measure ? `${PROJECT_RESULTS[front.metricaPrincipal].cost} ` : ''}
-                          {meta.source === 'especifica' && front.metricaPrincipal === 'roas' && meta.value !== null ? `${decimalInput(meta.value)}x` : stageMetaText(stage.measure, meta.value)}
-                        </span>
-                        {canEdit && stage.measure !== 'ascensao' && (
-                          <form action={saveFrontMeta.bind(null, { ...context, front_id: front.id, metric })} className="ml-auto flex flex-wrap items-center gap-2 text-[12px] text-[var(--ct-text-2)]">
-                            <label className="flex items-center gap-1">
-                              <input type="radio" name="mode" value="segue" defaultChecked={meta.source !== 'especifica'} />
-                              segue
-                            </label>
-                            <label className="flex items-center gap-1">
-                              <input type="radio" name="mode" value="especifica" defaultChecked={meta.source === 'especifica'} />
-                              específica
-                            </label>
-                            <input name="alvo" inputMode="decimal" defaultValue={meta.source === 'especifica' && meta.value !== null ? decimalInput(meta.value) : ''} aria-label={`Meta específica da frente ${front.name}`} className={`${field} ${mono} w-24 py-1`} />
-                            <button type="submit" className={small}>
-                              Salvar
-                            </button>
-                          </form>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
-          )
-        })}
+              </li>
+            )
+          })}
+        </ul>
       </section>
 
       <form action={saveBand.bind(null, context)}>
@@ -472,7 +442,7 @@ export default async function FunnelMetasPage({
           <p className="mt-1 text-[12.5px] text-[var(--ct-text-3)]">
             Cada vigia olha uma métrica no funil, numa etapa ou numa frente, todo último dia fechado, e abre um alerta em{' '}
             <Link href={`/dashboard/clients/${client.slug}/painel#vigias`} className="text-[var(--ct-accent)]">Alertas</Link> quando sai da faixa. O do resultado e os das
-            frentes têm a meta nas seções acima.
+            frentes têm a meta no canvas.
           </p>
         </div>
         <div className="card-shadow overflow-x-auto rounded-[18px] border border-[var(--ct-line)]">
@@ -505,7 +475,7 @@ export default async function FunnelMetasPage({
                               <span className="text-[13px] text-[var(--ct-text)]">
                                 {METRICS[watcher.metric].label} · {watcherScope(watcher)}
                               </span>
-                              <span className="text-[11px]">{source === 'plano' ? 'A meta é a do resultado do funil (seção 1).' : 'A meta é a da frente (seção 2).'}</span>
+                              <span className="text-[11px]">{source === 'plano' ? 'A meta é a da etapa do resultado, no canvas.' : 'A meta é a da frente, no canvas.'}</span>
                             </p>
                           ) : (
                             <ScopeMetricFields fieldClass={field} scopes={scopes} metrics={metricOptions} sales={resultUsesSales(funnel.resultado)} initial={{ scope: scopeOf(watcher), metric: watcher.metric }} />

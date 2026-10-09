@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { EMPTY_TOTALS } from './funnel-stages'
+import { EMPTY_TOTALS, type StageMeasure } from './funnel-stages'
 import {
   NODE_WIDTH,
   SEQUENCE_GAP,
@@ -8,6 +8,7 @@ import {
   comboFormula,
   dropIndex,
   edgeLabel,
+  funnelResultLine,
   measureOfWatcherMetric,
   metaFromInput,
   metaText,
@@ -80,8 +81,9 @@ describe('names', () => {
   it('cleans tags and suggests campaign names', () => {
     expect(cleanTag(' cap 2 ')).toBe('CAP2')
     expect(cleanTag('  ')).toBeNull()
-    expect(campaignNameSuggestion('CAP', '[FRIO]')).toBe('CAP | [FRIO] | nome do criativo')
-    expect(campaignNameSuggestion(null, 'FRIO')).toBe('FRIO | nome do criativo')
+    expect(campaignNameSuggestion(null, 'CAP', '[FRIO]')).toBe('CAP | [FRIO] | nome do criativo')
+    expect(campaignNameSuggestion(null, null, 'FRIO')).toBe('FRIO | nome do criativo')
+    expect(campaignNameSuggestion('MENT26', 'CAP', 'FRIO')).toBe('MENT26 | CAP | FRIO | nome do criativo')
   })
 
   it('writes the combo formula', () => {
@@ -134,5 +136,25 @@ describe('watchers, tones and passage', () => {
     expect(passageRate({ measure: 'lead', totals: { ...EMPTY_TOTALS, leads: 200 } }, { measure: 'compra', totals: { ...EMPTY_TOTALS, vendas: 10 } })).toBe(0.05)
     expect(passageRate({ measure: 'alcance', totals: { ...EMPTY_TOTALS, impressions: 10_000 } }, { measure: 'lead', totals: { ...EMPTY_TOTALS, leads: 50 } })).toBe(0.005)
     expect(passageRate({ measure: 'lead', totals: EMPTY_TOTALS }, { measure: 'compra', totals: EMPTY_TOTALS })).toBeNull()
+  })
+})
+
+describe('funnelResultLine', () => {
+  const stage = (name: string, measure: StageMeasure, meta: number | null, extra: Partial<{ parallel: boolean; metaRoas: number | null }> = {}) => ({ name, measure, meta, metaRoas: null, parallel: false, archivedAt: null, ...extra })
+
+  it('names the result stage, its cost and meta', () => {
+    expect(funnelResultLine([stage('Captação', 'lead', 6), stage('Vendas', 'compra', 300), stage('Ascensão', 'ascensao', 0.1)], 'compra')).toEqual({
+      stageName: 'Vendas',
+      measure: 'compra',
+      cost: 'CPA',
+      meta: `≤ ${metaText('compra', 300)}`,
+    })
+    expect(funnelResultLine([stage('Captação', 'lead', null)], 'lead')).toMatchObject({ cost: 'CPL', meta: null })
+  })
+
+  it('reads ROAS and checkout from the compra stage, and is null without a result stage', () => {
+    expect(funnelResultLine([stage('Vendas', 'compra', null, { metaRoas: 2.5 })], 'roas')).toMatchObject({ cost: 'ROAS', meta: '≥ 2,5x' })
+    expect(funnelResultLine([stage('Vendas', 'compra', 300)], 'checkout')).toMatchObject({ cost: 'custo por checkout', meta: null })
+    expect(funnelResultLine([stage('Reconhecimento', 'alcance', 12, { parallel: true })], 'compra')).toBeNull()
   })
 })

@@ -33,7 +33,7 @@ const brl = (value: number) => Number(value).toLocaleString('pt-BR', { style: 'c
 const plural = (count: number, one: string, many: string) => `${n(count)} ${Number(count) === 1 ? one : many}`
 
 /** Seals only for what is wrong; each one links to the screen that fixes it. */
-export function qualitySeals(row: ProjectQualityRow, links: { regras: string; produtos: string; edit: string; metas: string }): QualitySeal[] {
+export function qualitySeals(row: ProjectQualityRow, links: { regras: string; produtos: string; metas: string }): QualitySeal[] {
   const seals: QualitySeal[] = []
   if (Number(row.cliente_campanhas_em_disputa) > 0)
     seals.push({

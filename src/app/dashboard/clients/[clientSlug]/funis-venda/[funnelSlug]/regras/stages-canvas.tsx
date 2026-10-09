@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useOptimistic, useRef, useState, useTransition, type DragEvent, type ReactNode } from 'react'
-import { MEASURES, type CostCombo } from '@/lib/domain/funnel-stages'
+import { MEASURES, funnelResultStage, type CostCombo } from '@/lib/domain/funnel-stages'
 import { clampZoom } from '@/lib/domain/canvas-zoom'
 import {
   MEASURE_COLOR,
@@ -88,6 +88,7 @@ export function StagesCanvas({
   const sequence = shown.filter((stage) => !stage.parallel)
   const selectedStage = selection?.kind === 'stage' ? shown.find((stage) => stage.id === selection.id) : undefined
   const selectedCombo = selection?.kind === 'combo' ? (combos.find((combo) => combo.id === selection.id) ?? null) : undefined
+  const resultId = funnelResultStage(shown)?.id
 
   /** Runs a write with the canvas already showing its result; a refusal reverts it and says why. */
   function run(optimistic: CanvasStage[] | null, write: () => Promise<StageActionResult & { id?: string }>, done?: (result: StageActionResult & { id?: string }) => void) {
@@ -182,7 +183,7 @@ export function StagesCanvas({
         role="button"
         tabIndex={0}
         draggable={canEdit && stage.id !== 'new'}
-        aria-label={`Etapa ${stage.name}${ordinal ? `, ${ordinal} na sequência` : ', paralela'}. Abrir para editar`}
+        aria-label={`Etapa ${stage.name}${ordinal ? `, ${ordinal} na sequência` : ', paralela'}${stage.id === resultId ? ', resultado do funil' : ''}. Abrir para editar`}
         aria-pressed={selected}
         onClick={() => stage.id !== 'new' && setSelection({ kind: 'stage', id: stage.id })}
         onKeyDown={(event) => {
@@ -212,7 +213,11 @@ export function StagesCanvas({
             <span className="h-2.5 w-2.5 flex-none rounded-[3px]" style={{ background: MEASURE_COLOR[stage.measure] }} />
             <b className="truncate font-[family-name:var(--font-sora)] text-[15px] font-semibold tracking-[-0.02em]">{stage.name}</b>
           </span>
-          {ordinal ? (
+          {stage.id === resultId ? (
+            <span title="A última etapa da sequência, fora a ascensão, é o resultado do funil." className="rounded-full bg-[var(--ct-ok-soft)] px-2 py-0.5 text-[10.5px] text-[var(--ct-ok)]">
+              {ordinal} · resultado
+            </span>
+          ) : ordinal ? (
             <span className={`${mono} rounded-full bg-[var(--ct-surface-2)] px-2 py-0.5 text-[10.5px] text-[var(--ct-text-2)]`}>{ordinal}</span>
           ) : (
             <span className="rounded-full bg-[color-mix(in_srgb,var(--ct-ab)_15%,transparent)] px-2 py-0.5 text-[10.5px] text-[var(--ct-ab)]">paralela</span>
@@ -373,7 +378,7 @@ export function StagesCanvas({
             </div>
           </div>
           <p className={laneLabel}>
-            Sequência <em className="font-[family-name:var(--font-body)] text-[12px] normal-case not-italic tracking-normal">a ordem da jornada{canEdit ? ' · arraste para reordenar' : ''}</em>
+            Sequência <em className="font-[family-name:var(--font-body)] text-[12px] normal-case not-italic tracking-normal">a ordem da jornada · a última etapa (fora ascensão) é o resultado do funil{canEdit ? ' · arraste para reordenar' : ''}</em>
           </p>
           <div
             className={laneClass('seq')}

@@ -11,7 +11,8 @@ const db = vi.hoisted(() => ({
   calls: [] as Call[],
   stageUpdates: [] as [string, Record<string, unknown>][],
   plan: { principal: { id: 'w-p' } as { id: string } | null, secundaria: null as { id: string } | null },
-  stages: [] as { id: string; measure: string; position: number; archivedAt: string | null; meta: number | null; metaRoas: number | null }[],
+  stages: [] as { id: string; measure: string; position: number; parallel: boolean; archivedAt: string | null; meta: number | null; metaRoas: number | null }[],
+  resultado: 'compra',
 }))
 
 function from(table: string) {
@@ -28,7 +29,7 @@ function from(table: string) {
       return builder
     },
     maybeSingle: async () => {
-      if (table === 'sales_funnels') return { data: { archived_at: null }, error: null }
+      if (table === 'sales_funnels') return { data: { archived_at: null, resultado: db.resultado }, error: null }
       const role = call.filters.find(([column]) => column === 'plan_role')?.[1] as 'principal' | 'secundaria'
       return { data: db.plan[role], error: null }
     },
@@ -45,7 +46,6 @@ vi.mock('@/lib/repo/funnel-stages-repo', () => ({
   },
   updateCostCombo: async () => undefined,
 }))
-vi.mock('@/lib/repo/result-meta-repo', () => ({ ensureResultWatchers: async () => undefined }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/navigation', () => ({
   redirect: (to: string) => {
@@ -63,37 +63,44 @@ function form(fields: Record<string, string>): FormData {
 }
 const watcherWrites = () => db.calls.filter((call) => call.table === 'watchers' && call.op !== 'select')
 
-describe('Resultado do funil: its meta is the meta of the stage that measures it', () => {
+describe('Resultado do funil: the result is the last sequence stage and its meta is the stage meta', () => {
   beforeEach(() => {
     db.calls = []
     db.stageUpdates = []
     db.plan = { principal: { id: 'w-p' }, secundaria: null }
+    db.resultado = 'compra'
     db.stages = [
-      { id: 'cap', measure: 'lead', position: 0, archivedAt: null, meta: 6, metaRoas: null },
-      { id: 'vnd', measure: 'compra', position: 1, archivedAt: null, meta: 55, metaRoas: null },
+      { id: 'cap', measure: 'lead', position: 0, parallel: false, archivedAt: null, meta: 6, metaRoas: null },
+      { id: 'vnd', measure: 'compra', position: 1, parallel: false, archivedAt: null, meta: 55, metaRoas: null },
     ]
   })
 
-  it('writes the CPA meta on the compra stage and makes the result watcher follow it', async () => {
-    await expect(saveResult(context, form({ resultado: 'compra', cost_target: '48,50', metrica_secundaria: 'roas', secondary_target: '2,5' }))).rejects.toThrow(/ok=Resultado e meta salvos/)
-    expect(db.stageUpdates).toEqual([
-      ['vnd', { meta: 48.5 }],
-      ['vnd', { metaRoas: 2.5 }],
-    ])
+  it('keeps the result watcher following the stage, and writes the secondary ROAS on the compra stage', async () => {
+    await expect(saveResult(context, form({ julgar: 'compra', min_spend: '300', metrica_secundaria: 'roas', secondary_target: '2,5' }))).rejects.toThrow(/ok=Resultado salvo/)
+    expect(db.stageUpdates).toEqual([['vnd', { metaRoas: 2.5 }]])
+    expect(db.calls.find((call) => call.table === 'sales_funnels' && call.op === 'update')?.values).toMatchObject({ resultado: 'compra', metrica_secundaria: 'roas' })
     const [principal, secondary] = watcherWrites()
-    expect(principal).toMatchObject({ op: 'update', values: { metric: 'cpa_geral', target: null, min_spend: 0 }, filters: [['id', 'w-p']] })
+    expect(principal).toMatchObject({ op: 'update', values: { metric: 'cpa_geral', target: null, min_spend: 300 }, filters: [['id', 'w-p']] })
     expect(secondary).toMatchObject({ op: 'insert', values: { metric: 'roas', target: null, plan_role: 'secundaria', is_plan: false } })
   })
 
-  it('keeps a result no stage measures as a specific meta on its watcher', async () => {
-    await expect(saveResult(context, form({ resultado: 'checkout', cost_target: '12' }))).rejects.toThrow(/ok=/)
+  it('judges a compra result stage by ROAS or checkout; checkout keeps its meta on the watcher', async () => {
+    await expect(saveResult(context, form({ julgar: 'checkout', cost_target: '12' }))).rejects.toThrow(/ok=/)
     expect(db.stageUpdates).toEqual([])
     expect(watcherWrites()[0]).toMatchObject({ op: 'update', values: { metric: 'custo_checkout', target: 12 } })
   })
 
-  it('blank meta: no stage meta and no result watcher, as before', async () => {
-    await expect(saveResult(context, form({ resultado: 'lead', cost_target: '' }))).rejects.toThrow(/ok=/)
-    expect(db.stageUpdates).toEqual([['cap', { meta: null }]])
+  it('never moves the result off the stages: with a lead result stage the choice is ignored', async () => {
+    db.resultado = 'lead'
+    db.stages = [db.stages[0]]
+    await expect(saveResult(context, form({ julgar: 'roas' }))).rejects.toThrow(/ok=/)
+    expect(db.calls.find((call) => call.table === 'sales_funnels' && call.op === 'update')?.values).toMatchObject({ resultado: 'lead' })
+    expect(watcherWrites()[0]).toMatchObject({ op: 'update', values: { metric: 'cpl', target: null } })
+  })
+
+  it('a result stage without meta: no result watcher, as before', async () => {
+    db.stages = [db.stages[0], { ...db.stages[1], meta: null }]
+    await expect(saveResult(context, form({ julgar: 'compra' }))).rejects.toThrow(/ok=/)
     expect(watcherWrites()).toMatchObject([{ op: 'delete', filters: [['id', 'w-p']] }])
   })
 

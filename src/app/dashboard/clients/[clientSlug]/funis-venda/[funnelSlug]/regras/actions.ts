@@ -5,6 +5,10 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { stageWriteError } from '@/lib/repo/funnel-stages-repo'
+import { archivedProjectError } from '@/lib/repo/project-archive-repo'
+import { findPageByUrl, hasProbeSlot, pageWriteError } from '@/lib/repo/pages-repo'
+import { MAX_PAGES_PER_CLIENT, isSafeProbeUrl, normalizePageUrl } from '@/lib/domain/page-probe'
+import { PAGE_KINDS, PAGE_KIND_LABEL } from '@/lib/domain/new-funnel'
 
 // Writes go through the user's session: the 0053 policies only let a gestor or owner of the
 // project's client create fronts and rules, so no extra role check is needed here.
@@ -245,4 +249,58 @@ export async function removeRule(context: RulesContext & { rule_id: string }) {
   if (!data || data.length === 0) back(context, 'erro', 'Só gestor ou owner pode remover etiquetas.')
   revalidatePath(rulesPath(context))
   back(context, 'ok', 'Etiqueta removida. Campanhas que já gastaram ficam com o dono que têm; a mudança decide as novas.', true)
+}
+
+const frontPageSchema = z.object({
+  tipo: z.enum(PAGE_KINDS, 'escolha o tipo da página'),
+  url: z
+    .string()
+    .trim()
+    .min(1, 'informe o endereço da página')
+    .transform(normalizePageUrl)
+    .refine(isSafeProbeUrl, 'use o endereço https público da página (sem IP nem endereço interno)'),
+})
+
+/**
+ * "+ Página" in the front's drawer (0107): the page enters the probe linked to this funnel and front,
+ * with the checks the Páginas form starts with. Alertas › Páginas keeps watching it.
+ */
+export async function addFrontPage(context: RulesContext & { client_id: string; front_id: string; front_name: string }, formData: FormData) {
+  const result = frontPageSchema.safeParse({ tipo: formData.get('tipo'), url: String(formData.get('url') ?? '') })
+  if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '))
+  const supabase = await createServerSupabaseClient()
+  const archived = await archivedProjectError(supabase, context.sales_funnel_id)
+  if (archived) back(context, 'erro', archived)
+  const existing = await findPageByUrl(supabase, context.client_id, result.data.url)
+  if (existing) {
+    back(context, 'erro', `Essa página já está na sonda${existing.frontName ? `, na frente ${existing.frontName}` : ''}${existing.projectName ? ` do ${existing.projectName}` : ''}. Mude a frente dela em Alertas › Páginas, em "Ligar a".`)
+  }
+  if (!(await hasProbeSlot(supabase, context.client_id))) back(context, 'erro', `A sonda acompanha até ${MAX_PAGES_PER_CLIENT} páginas por cliente. Tire uma para cadastrar outra.`)
+  const { error } = await supabase.from('pages').insert({
+    client_id: context.client_id,
+    sales_funnel_id: context.sales_funnel_id,
+    front_id: context.front_id,
+    url: result.data.url,
+    tipo: result.data.tipo,
+    label: `${PAGE_KIND_LABEL[result.data.tipo]} · ${context.front_name}`.slice(0, 60),
+    watch_pixel: true,
+    watch_checkout: true,
+  })
+  if (error) back(context, 'erro', pageWriteError(error))
+  revalidatePath(rulesPath(context))
+  revalidatePath(`/dashboard/clients/${context.client_slug}/paginas`)
+  back(context, 'ok', 'Página ligada à frente. A sonda checa a cada hora, em Alertas › Páginas.')
+}
+
+/** Desligar: the page leaves the front and stays in the probe, in the funnel, with its history. */
+export async function unlinkFrontPage(context: RulesContext & { page_id: string }) {
+  const supabase = await createServerSupabaseClient()
+  const archived = await archivedProjectError(supabase, context.sales_funnel_id)
+  if (archived) back(context, 'erro', archived)
+  const { data, error } = await supabase.from('pages').update({ front_id: null }).eq('id', context.page_id).eq('sales_funnel_id', context.sales_funnel_id).select('id')
+  if (error) back(context, 'erro', pageWriteError(error))
+  if (!data?.length) back(context, 'erro', 'Só gestor ou owner pode desligar a página.')
+  revalidatePath(rulesPath(context))
+  revalidatePath(`/dashboard/clients/${context.client_slug}/paginas`)
+  back(context, 'ok', 'Página desligada da frente. Ela continua na sonda, em Alertas › Páginas.')
 }

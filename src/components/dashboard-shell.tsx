@@ -158,6 +158,7 @@ export function DashboardShell({
     setup: counts.setup,
     setupHref,
     canPreview,
+    canCreateFunnel: role === 'owner' || role === 'gestor',
     previewing,
     onTogglePreview: () => setPreview(!previewing),
     pathname,

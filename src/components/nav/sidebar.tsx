@@ -25,6 +25,8 @@ interface Props {
   collapsed: boolean
   onToggleCollapse?: () => void
   canPreview: boolean
+  /** Gestor or owner, not previewing as the client: the picker offers "Novo funil". */
+  canCreateFunnel: boolean
   previewing: boolean
   onTogglePreview: () => void
   /** Closes the mobile drawer after a link is followed. */
@@ -126,6 +128,11 @@ export function Sidebar(props: Props) {
                 <PickerItem href={`/dashboard/clients/${activeClient.slug}/funis-venda`} active={false} onNavigate={props.onNavigate}>
                   <span className="text-[var(--ct-text-3)]">Todos os funis</span>
                 </PickerItem>
+                {props.canCreateFunnel && (
+                  <PickerItem href={`/dashboard/clients/${activeClient.slug}/funis-venda/new`} active={props.pathname === `/dashboard/clients/${activeClient.slug}/funis-venda/new`} onNavigate={props.onNavigate}>
+                    <span className="font-semibold text-[var(--ct-accent)]">+ Novo funil</span>
+                  </PickerItem>
+                )}
               </Picker>
             ) : (
               <span />

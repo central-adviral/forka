@@ -1,4 +1,5 @@
-import { MEASURES, meetsMeta, stageResult, type CostCombo, type StageMeasure, type StageTotals } from './funnel-stages'
+import { MEASURES, funnelResultStage, meetsMeta, stageResult, type CostCombo, type Stage, type StageMeasure, type StageTotals } from './funnel-stages'
+import { PROJECT_RESULTS, type ProjectResult } from './project-plan'
 
 // "Etapas e frentes": the canvas geometry, the words it prints and the checks of its setup strip.
 
@@ -105,9 +106,9 @@ export function cleanTag(raw: string): string | null {
   return raw.toUpperCase().replace(/\s+/g, '') || null
 }
 
-/** "CAP | FRIO | nome do criativo": the stage tag (when it has one), the front's tag, the creative. */
-export function campaignNameSuggestion(stageTag: string | null, frontTag: string): string {
-  return [stageTag, frontTag, 'nome do criativo'].filter(Boolean).join(' | ')
+/** "MENT26 | CAP | FRIO | nome do criativo": the funnel and stage tags (each when set), the front's tag, the creative. */
+export function campaignNameSuggestion(funnelTag: string | null, stageTag: string | null, frontTag: string): string {
+  return [funnelTag, stageTag, frontTag, 'nome do criativo'].filter(Boolean).join(' | ')
 }
 
 export function comboFormula(combo: Pick<CostCombo, 'stageIds' | 'over' | 'overStageId'>, stages: { id: string; name: string; measure: StageMeasure }[]): string {
@@ -176,4 +177,25 @@ export function stageCount(measure: StageMeasure, totals: StageTotals): number {
 export function passageRate(from: { measure: StageMeasure; totals: StageTotals }, to: { measure: StageMeasure; totals: StageTotals }): number | null {
   const base = stageCount(from.measure, from.totals)
   return base > 0 ? stageCount(to.measure, to.totals) / base : null
+}
+
+export interface FunnelResultLine {
+  stageName: string
+  measure: StageMeasure
+  /** CPA, ROAS, CPL...: ROAS and checkout when the funnel judges its compra stage by them. */
+  cost: string
+  /** "≤ R$ 300,00", "≥ 2,5x"; null when the stage has no meta in that cost. */
+  meta: string | null
+}
+
+/** "Resultado do funil" in the header: the result stage (0107), its cost and meta. Null with no stage that can be it. */
+export function funnelResultLine(stages: Pick<Stage, 'name' | 'measure' | 'parallel' | 'archivedAt' | 'meta' | 'metaRoas'>[], resultado: ProjectResult): FunnelResultLine | null {
+  const stage = funnelResultStage(stages)
+  if (!stage) return null
+  const info = MEASURES[stage.measure]
+  if (stage.measure === 'compra' && resultado === 'roas') {
+    return { stageName: stage.name, measure: stage.measure, cost: 'ROAS', meta: stage.metaRoas === null ? null : `≥ ${stage.metaRoas.toLocaleString('pt-BR')}x` }
+  }
+  if (stage.measure === 'compra' && resultado === 'checkout') return { stageName: stage.name, measure: stage.measure, cost: PROJECT_RESULTS.checkout.cost, meta: null }
+  return { stageName: stage.name, measure: stage.measure, cost: info.cost, meta: stage.meta === null ? null : `${info.direction === 'max' ? '≤' : '≥'} ${metaText(stage.measure, stage.meta)}` }
 }

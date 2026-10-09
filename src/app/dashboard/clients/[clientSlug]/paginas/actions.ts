@@ -7,8 +7,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { assertClientRole } from '@/lib/repo/client-access-repo'
 import { MAX_PAGES_PER_CLIENT, isSafeProbeUrl } from '@/lib/domain/page-probe'
-import { PAGE_KINDS } from '@/lib/domain/project-wizard'
-import { findPageByUrl, type ExistingPage } from '@/lib/repo/pages-repo'
+import { PAGE_KINDS } from '@/lib/domain/new-funnel'
+import { findPageByUrl, hasProbeSlot, pageWriteError, type ExistingPage } from '@/lib/repo/pages-repo'
 import { PAGE_TO_PROBE_COLUMNS, probeClientPages, probePage, probePages, type PageToProbe, type ProbeResult } from '@/lib/pages/probe'
 
 interface PagesContext {
@@ -70,21 +70,12 @@ export async function savePage(context: PagesContext & { page_id?: string }, for
       const keep = new URLSearchParams({ url: result.data.url, projeto: result.data.sales_funnel_id ?? '', frente: result.data.front_id ?? '' })
       redirect(`${formUrl}?${keep}`)
     }
-    const { count } = await supabase.from('pages').select('id', { count: 'exact', head: true }).eq('client_id', context.client_id).eq('is_active', true)
-    if ((count ?? 0) >= MAX_PAGES_PER_CLIENT) back(context, 'erro', `A sonda acompanha até ${MAX_PAGES_PER_CLIENT} páginas por cliente. Tire uma para cadastrar outra.`)
+    if (!(await hasProbeSlot(supabase, context.client_id))) back(context, 'erro', `A sonda acompanha até ${MAX_PAGES_PER_CLIENT} páginas por cliente. Tire uma para cadastrar outra.`)
   }
   const { error } = context.page_id
     ? await supabase.from('pages').update(result.data).eq('id', context.page_id).eq('client_id', context.client_id)
     : await supabase.from('pages').insert({ client_id: context.client_id, ...result.data })
-  if (error) {
-    const message =
-      error.code === '23505' ? 'Essa página já está na sonda.'
-      : error.code === '42501' ? 'Só gestor ou owner pode cadastrar páginas.'
-      : error.code === '23503' ? 'Esse funil não é deste cliente.'
-      : error.code === '23514' ? 'Escolha uma frente do próprio funil que tenha campanhas.'
-      : error.message
-    redirect(`${formUrl}?erro=${encodeURIComponent(message)}`)
-  }
+  if (error) redirect(`${formUrl}?erro=${encodeURIComponent(pageWriteError(error))}`)
   refresh(context)
   back(context, 'ok', context.page_id ? `${result.data.label} salva.` : `${result.data.label} entrou na sonda. Ela é checada a cada hora.`)
 }

@@ -225,6 +225,17 @@ export async function createStage(db: SupabaseClient, salesFunnelId: string, inp
   return toStage(data as StageRow)
 }
 
+/**
+ * Several stages in one insert, returned in the order given. One statement, so the funnel's resultado
+ * (0107) is derived once, from all of them, instead of passing through each half-built journey.
+ */
+export async function createStages(db: SupabaseClient, salesFunnelId: string, inputs: StageInput[]): Promise<Stage[]> {
+  if (inputs.length === 0) return []
+  const { data, error } = await db.from('funnel_stages').insert(inputs.map((input) => ({ sales_funnel_id: salesFunnelId, ...stageColumns(input) }))).select(STAGE_COLUMNS)
+  if (error) throw new Error(stageWriteError(error))
+  return (data as StageRow[]).map(toStage)
+}
+
 /** A tag change freezes the campaigns the names give today first (0105), like a rule change. */
 export async function updateStage(db: SupabaseClient, stageId: string, input: Partial<StageInput>): Promise<void> {
   const { data, error } = await db.from('funnel_stages').update(stageColumns(input)).eq('id', stageId).select('id')
@@ -328,11 +339,11 @@ export async function copyStages(db: SupabaseClient, fromFunnelId: string, toFun
   const stages = (await getFunnelStages(db, fromFunnelId)).filter((stage) => !stage.archivedAt)
   const newIds = new Map<string, string>()
   const byCode = new Map<string, string>()
-  for (const stage of stages) {
-    const created = await createStage(db, toFunnelId, { ...stage, janelaInicio: null, janelaFim: null })
-    newIds.set(stage.id, created.id)
-    for (const front of stage.fronts) byCode.set(front.code.toUpperCase(), created.id)
-  }
+  const created = await createStages(db, toFunnelId, stages.map((stage) => ({ ...stage, janelaInicio: null, janelaFim: null })))
+  stages.forEach((stage, index) => {
+    newIds.set(stage.id, created[index].id)
+    for (const front of stage.fronts) byCode.set(front.code.toUpperCase(), created[index].id)
+  })
   for (const combo of await getCostCombos(db, fromFunnelId)) {
     const stageIds = combo.stageIds.flatMap((id) => newIds.get(id) ?? [])
     const overStageId = combo.overStageId ? newIds.get(combo.overStageId) : null

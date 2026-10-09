@@ -56,6 +56,12 @@ export function isSafeProbeUrl(raw: string): boolean {
   return true
 }
 
+/** "exemplo.com/aula " -> "https://exemplo.com/aula": a typed address without a scheme is https. */
+export function normalizePageUrl(raw: string): string {
+  const text = raw.trim()
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`
+}
+
 function ipv4Parts(ip: string): number[] | null {
   const parts = ip.split('.').map(Number)
   return parts.length === 4 && parts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255) ? parts : null

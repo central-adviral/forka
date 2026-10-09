@@ -91,7 +91,7 @@ export const NAV_SECTIONS: SectionDef[] = [
     subs: [
       { id: 'abertos', label: 'Alertas abertos', desc: 'Fora da faixa agora', exists: true, href: (c) => `${c.base}/painel#atencao` },
       { id: 'vigias', label: 'Vigias', desc: 'Métricas observadas', exists: true, href: (c) => `${c.base}/painel#vigias` },
-      { id: 'paginas', label: 'Páginas', desc: 'No ar, rápidas e vendendo', exists: true, step: 'paginas', href: (c) => `${c.base}/paginas` },
+      { id: 'paginas', label: 'Páginas', desc: 'No ar, rápidas e vendendo', exists: true, href: (c) => `${c.base}/paginas` },
     ],
   },
   {
@@ -134,9 +134,9 @@ export const NAV_SECTIONS: SectionDef[] = [
     minRole: 'analista',
     subs: [
       { id: 'visao-projeto', label: 'Checklist', desc: 'O que falta configurar', exists: true, needsProject: true, href: (c) => `${c.base}/funis-venda/${c.project}/configurar` },
+      { id: 'regras-campanha', label: 'Etapas e frentes', desc: 'Jornada, etiquetas, metas e páginas', exists: true, needsProject: true, step: 'etapas', href: (c) => `${c.base}/funis-venda/${c.project}/regras` },
       { id: 'produtos', label: 'Produtos', desc: 'Quais vendas contam', exists: true, needsProject: true, step: 'produtos', href: (c) => `${c.base}/funis-venda/${c.project}/produtos` },
-      { id: 'regras-campanha', label: 'Etapas e frentes', desc: 'Monte a jornada, as etiquetas e as metas', exists: true, needsProject: true, step: 'regras', href: (c) => `${c.base}/funis-venda/${c.project}/regras` },
-      { id: 'metas', label: 'Metas e vigias', desc: 'O resultado, a meta de cada etapa e os vigias', exists: true, needsProject: true, step: 'plano', href: (c) => `${c.base}/funis-venda/${c.project}/metas` },
+      { id: 'metas', label: 'Metas e vigias', desc: 'Faixa, vigias extras e custos combinados', exists: true, needsProject: true, step: 'metas', href: (c) => `${c.base}/funis-venda/${c.project}/metas` },
     ],
   },
   {

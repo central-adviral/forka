@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { setProjectStatus } from './actions'
-import type { ProjectStatus } from '@/lib/domain/project-wizard'
+import type { ProjectStatus } from '@/lib/domain/new-funnel'
 
 // The project's lifecycle (0102): rascunho -> rodando -> encerrado, and Reabrir back to rodando.
 

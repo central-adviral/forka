@@ -7,7 +7,7 @@ const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321'
 const admin = createClient(URL, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 describe('getProjectSetupStatus against the database', () => {
-  it('reads the five facts on the owner session and counts rules through the project fronts only', async () => {
+  it('reads the setup facts on the owner session and counts rules through the funnel fronts only', async () => {
     const email = `setup-${Date.now()}@example.com`
     const { data: user } = await admin.auth.admin.createUser({ email, password: 'password123', email_confirm: true })
     const owner = createClient(URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
@@ -27,9 +27,9 @@ describe('getProjectSetupStatus against the database', () => {
     const project = projects!.find((row) => row.slug === 'perpetuo')!
     const other = projects!.find((row) => row.slug === 'outro')!
 
-    // Nothing set yet: only Projeto (it exists, with the default objective).
+    // Nothing set yet: no stage, no front, no product.
     const empty = await getProjectSetupStatus(owner, admin, client!.id, project.id)
-    expect(empty!.done).toBe(1)
+    expect(empty!.done).toBe(0)
 
     await saveClientSecrets(admin, client!.id, { funnelSourceServiceRoleKey: 'k', hublaWebhookToken: 't' })
     await admin.from('project_products').insert({ sales_funnel_id: project.id, produto_nome: 'Curso', papel: 'entrada' })
@@ -43,27 +43,23 @@ describe('getProjectSetupStatus against the database', () => {
     // A rule on the other project's front must not count for this one.
     await admin.from('naming_rules').insert({ front_id: fronts!.find((row) => row.sales_funnel_id === other.id)!.id, kind: 'include', value: 'OUTRO' })
     const withoutOwnRule = await getProjectSetupStatus(owner, admin, client!.id, project.id)
-    expect(withoutOwnRule!.steps.find((step) => step.id === 'regras')!.done).toBe(false)
+    expect(withoutOwnRule!.steps.find((step) => step.id === 'etapas')!.done).toBe(false)
 
     await admin.from('naming_rules').insert({ front_id: fronts!.find((row) => row.sales_funnel_id === project.id)!.id, kind: 'include', value: 'PERP' })
-    await admin.from('watchers').insert([
-      { client_id: client!.id, sales_funnel_id: project.id, metric: 'cpa_geral', target: 60 },
-      { client_id: client!.id, sales_funnel_id: project.id, metric: 'ctr', target: 1.2 },
-    ])
+    // The front landed in the funnel's Vendas stage (0105); its meta is the last step.
+    expect(withoutOwnRule!.steps.find((step) => step.id === 'metas')!.text).toBe('Falta a meta de: Vendas (edite no canvas).')
+    await admin.from('funnel_stages').update({ meta: 60 }).eq('sales_funnel_id', project.id)
     await admin.from('pages').insert({
       client_id: client!.id, label: 'Vendas', url: `https://example.com/setup-${Date.now()}`, sales_funnel_id: project.id, front_id: fronts!.find((row) => row.sales_funnel_id === project.id)!.id,
     })
     const ready = await getProjectSetupStatus(owner, admin, client!.id, project.id)
     expect(ready!.steps.map((step) => [step.id, step.done])).toEqual([
       ['integracoes', true],
-      ['projeto', true],
+      ['etapas', true],
       ['produtos', true],
-      ['regras', true],
-      ['paginas', true],
-      ['plano', true],
       ['metas', true],
       ['conferir', true],
     ])
-    expect(ready!.done).toBe(8)
+    expect(ready!.done).toBe(5)
   })
 })

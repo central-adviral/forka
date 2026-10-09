@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { pageKey, type AbDestination, type PageCheck, type PageWatch } from '@/lib/domain/page-probe'
+import { MAX_PAGES_PER_CLIENT, pageKey, type AbDestination, type PageCheck, type PageWatch } from '@/lib/domain/page-probe'
 
 export interface ProbedPage {
   id: string
@@ -112,4 +112,20 @@ export async function findPageByUrl(db: SupabaseClient, clientId: string, url: s
     (page) => page.id !== exceptId && pageKey(page.url) === key
   )
   return found ? { id: found.id, label: found.label, projectName: found.project?.name ?? null, frontName: found.front?.name ?? null } : null
+}
+
+/** Whether the probe has room for one more active page of the client (MAX_PAGES_PER_CLIENT). */
+export async function hasProbeSlot(db: SupabaseClient, clientId: string): Promise<boolean> {
+  const { count, error } = await db.from('pages').select('id', { count: 'exact', head: true }).eq('client_id', clientId).eq('is_active', true)
+  if (error) throw error
+  return (count ?? 0) < MAX_PAGES_PER_CLIENT
+}
+
+/** A refused page write in the screen's words. */
+export function pageWriteError(error: { code?: string; message: string }): string {
+  if (error.code === '23505') return 'Essa página já está na sonda.'
+  if (error.code === '42501') return 'Só gestor ou owner pode cadastrar páginas.'
+  if (error.code === '23503') return 'Esse funil não é deste cliente.'
+  if (error.code === '23514') return 'Escolha uma frente do próprio funil que tenha campanhas.'
+  return error.message
 }
