@@ -9,12 +9,16 @@ import { ensureResultWatchers } from '@/lib/repo/result-meta-repo'
 import { archivedProjectError } from '@/lib/repo/project-archive-repo'
 import { DEFAULT_STAGE_PRESETS, STAGE_MEASURES, type StageMeasure } from '@/lib/domain/funnel-stages'
 import { metaFromInput } from '@/lib/domain/stage-canvas'
+import { frontInUse, isLastOpenStage, stageInUse } from '@/lib/domain/stage-removal'
 import {
   createCostCombo,
   createStage,
   createStagePreset,
   deleteCostCombo,
+  deleteFront,
+  deleteStage,
   deleteStagePreset,
+  getRemovalFacts,
   moveFrontToStage,
   reorderStages,
   setStageArchived,
@@ -206,6 +210,8 @@ export async function placeStageAction(context: StageContext, stageId: string, p
   return { error: null }
 }
 
+const LAST_STAGE = 'É a última etapa aberta do funil: ele precisa de ao menos uma.'
+
 /** The database refuses a stage that still has active fronts; the message says what to do. */
 export async function archiveStage(context: StageContext, stageId: string, archived: boolean): Promise<StageActionResult> {
   const id = z.uuid().safeParse(stageId)
@@ -213,7 +219,48 @@ export async function archiveStage(context: StageContext, stageId: string, archi
   const access = await writer(context)
   if ('error' in access) return { error: access.error! }
   try {
+    if (archived && isLastOpenStage(id.data, await getRemovalFacts(access.supabase, context.sales_funnel_id))) return { error: LAST_STAGE }
     await setStageArchived(access.supabase, id.data, archived)
+  } catch (err) {
+    return { error: message(err) }
+  }
+  refresh(context)
+  return { error: null }
+}
+
+/**
+ * Removes for good a stage that never took data, with its fronts. The canvas only offers it then;
+ * it is asked again here, right before deleting, in case a campaign or a page arrived meanwhile.
+ */
+export async function removeStage(context: StageContext, stageId: string): Promise<StageActionResult> {
+  const id = z.uuid().safeParse(stageId)
+  if (!id.success) return { error: 'Etapa inválida.' }
+  const access = await writer(context)
+  if ('error' in access) return { error: access.error! }
+  try {
+    const facts = await getRemovalFacts(access.supabase, context.sales_funnel_id)
+    if (!facts.stages.some((stage) => stage.id === id.data)) return { error: 'Etapa não encontrada neste funil.' }
+    if (isLastOpenStage(id.data, facts)) return { error: LAST_STAGE }
+    if (stageInUse(id.data, facts)) return { error: 'Esta etapa já tem dados; use Arquivar.' }
+    await deleteStage(access.supabase, context.sales_funnel_id, id.data)
+  } catch (err) {
+    return { error: message(err) }
+  }
+  refresh(context)
+  return { error: null }
+}
+
+/** Removes for good a front that never took data (no etiquetas, campanhas, páginas or vigias). */
+export async function removeFront(context: StageContext, frontId: string): Promise<StageActionResult> {
+  const id = z.uuid().safeParse(frontId)
+  if (!id.success) return { error: 'Frente inválida.' }
+  const access = await writer(context)
+  if ('error' in access) return { error: access.error! }
+  try {
+    const facts = await getRemovalFacts(access.supabase, context.sales_funnel_id)
+    if (!facts.stages.some((stage) => stage.fronts.some((front) => front.id === id.data))) return { error: 'Frente não encontrada neste funil.' }
+    if (frontInUse(id.data, facts)) return { error: 'Esta frente já tem dados; use Arquivar.' }
+    await deleteFront(access.supabase, context.sales_funnel_id, id.data)
   } catch (err) {
     return { error: message(err) }
   }

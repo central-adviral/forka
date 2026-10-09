@@ -23,11 +23,12 @@ export default async function NewFunnelPage({ params }: { params: Promise<{ clie
 
   return (
     <div className="flex max-w-[1180px] flex-col gap-6 px-4 pb-24 pt-12 md:px-14">
-      <PageHeader title="Novo funil" note="Uma tela só: o nome, a etiqueta e o modelo. O funil abre direto no canvas, com as etapas montadas; produtos e metas vêm logo depois, no checklist." />
+      <PageHeader title="Novo funil" description="Uma tela só: o nome, a etiqueta e o modelo. O funil abre direto no canvas, com as etapas montadas; produtos e metas vêm logo depois, no checklist." />
       <NewFunnelForm
         context={{ client_id: client.id, client_slug: client.slug }}
         models={FUNNEL_MODELS.map((model) => ({ key: model.key, name: model.name, text: model.text, stages: modelStages(model.key, presets) }))}
         funnels={(funnels ?? []).map((funnel) => ({ id: funnel.id as string, name: funnel.name as string }))}
+        presets={presets.map((preset) => ({ name: preset.name, tag: preset.tag, measure: preset.measure, parallel: preset.parallel }))}
       />
     </div>
   )

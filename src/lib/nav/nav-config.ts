@@ -190,7 +190,8 @@ export function resolveActive(pathname: string, search: string, hash: string, cl
     case 'membros':
       return { section: 'cliente', sub: 'membros' }
     case 'funis-venda': {
-      if (rest.length === 1 || rest[1] === 'new') return { section: 'desempenho', sub: null }
+      if (rest.length === 1) return { section: 'desempenho', sub: null }
+      if (rest[1] === 'new') return { section: 'projeto', sub: null }
       const page = rest[2]
       if (!page) return { section: 'desempenho', sub: readAnalysisTab(aba) }
       if (page === 'configurar') return { section: 'projeto', sub: 'visao-projeto' }

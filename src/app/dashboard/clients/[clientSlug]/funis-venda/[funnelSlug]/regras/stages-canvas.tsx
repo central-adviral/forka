@@ -14,7 +14,7 @@ import {
   placeStage,
   sequenceEdges,
 } from '@/lib/domain/stage-canvas'
-import { addStage, applyNewTeto, archiveStage, moveFront, placeStageAction, removeCombo, removePreset, saveCombo, saveStage, savePreset, saveTestTeto, saveWatcherTargets, type StageActionResult } from './stage-actions'
+import { addStage, applyNewTeto, archiveStage, moveFront, placeStageAction, removeCombo, removeFront, removePreset, removeStage, saveCombo, saveStage, savePreset, saveTestTeto, saveWatcherTargets, type StageActionResult } from './stage-actions'
 import { ComboDrawer } from './combo-drawer'
 import { StageDrawer, frontMetaText, mono } from './stage-drawer'
 import type { CanvasContext, CanvasPreset, CanvasStage } from './canvas-types'
@@ -23,6 +23,8 @@ type Selection = { kind: 'stage'; id: string } | { kind: 'combo'; id: string | n
 type Lane = 'par' | 'seq'
 
 const ZOOM_STEP = 0.1
+// More fronts than this make the node taller than the canvas; the drawer lists them all.
+const VISIBLE_FRONTS = 5
 // The sequence track's top sits this far below the bottom of the parallel nodes: lane padding,
 // the "Sequência" label and the parallel lane's bottom margin (see the classes below).
 const RAIL_RISE = 80
@@ -124,6 +126,8 @@ export function StagesCanvas({
       watchers: [],
       tests: [],
       followers: { following: 0, specific: 0 },
+      inUse: null,
+      lastOpen: false,
     }
     const next = placeStage(shown, draft, toParallel, index)
     run(
@@ -202,7 +206,7 @@ export function StagesCanvas({
           setDrop(null)
         }}
         style={{ width: NODE_WIDTH }}
-        className={`card-shadow grid flex-none gap-3 rounded-xl border bg-[var(--ct-surface-3)] px-[18px] py-4 text-left transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 ${
+        className={`card-shadow grid flex-none grid-cols-[minmax(0,1fr)] gap-3 rounded-xl border bg-[var(--ct-surface-3)] px-[18px] py-4 text-left transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 ${
           canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
         } ${stage.parallel ? 'border-dashed border-[color-mix(in_srgb,var(--ct-ab)_50%,transparent)]' : 'border-[var(--ct-line)] hover:border-[var(--ct-line-2)]'} ${
           selected ? '!border-[var(--ct-accent)] shadow-[0_0_0_3px_var(--ct-accent-soft)]' : ''
@@ -214,13 +218,13 @@ export function StagesCanvas({
             <b className="truncate font-[family-name:var(--font-sora)] text-[15px] font-semibold tracking-[-0.02em]">{stage.name}</b>
           </span>
           {stage.id === resultId ? (
-            <span title="A última etapa da sequência, fora a ascensão, é o resultado do funil." className="rounded-full bg-[var(--ct-ok-soft)] px-2 py-0.5 text-[10.5px] text-[var(--ct-ok)]">
+            <span title="A última etapa da sequência, fora a ascensão, é o resultado do funil." className="flex-none whitespace-nowrap rounded-full bg-[var(--ct-ok-soft)] px-2 py-0.5 text-[10.5px] text-[var(--ct-ok)]">
               {ordinal} · resultado
             </span>
           ) : ordinal ? (
-            <span className={`${mono} rounded-full bg-[var(--ct-surface-2)] px-2 py-0.5 text-[10.5px] text-[var(--ct-text-2)]`}>{ordinal}</span>
+            <span className={`${mono} flex-none rounded-full bg-[var(--ct-surface-2)] px-2 py-0.5 text-[10.5px] text-[var(--ct-text-2)]`}>{ordinal}</span>
           ) : (
-            <span className="rounded-full bg-[color-mix(in_srgb,var(--ct-ab)_15%,transparent)] px-2 py-0.5 text-[10.5px] text-[var(--ct-ab)]">paralela</span>
+            <span className="flex-none rounded-full bg-[color-mix(in_srgb,var(--ct-ab)_15%,transparent)] px-2 py-0.5 text-[10.5px] text-[var(--ct-ab)]">paralela</span>
           )}
         </div>
         <div className="grid grid-cols-2 gap-x-5 gap-y-2.5">
@@ -232,17 +236,23 @@ export function StagesCanvas({
           ))}
         </div>
         {stage.fronts.length > 0 && (
-          <div className="grid gap-1 border-t border-[var(--ct-line)] pt-2.5">
-            {stage.fronts.map((front) => (
-              <div key={front.id} className="flex justify-between gap-2 text-[12.5px] text-[var(--ct-text-2)]">
-                <span className="min-w-0 truncate">
-                  {front.name} <em className={`${mono} not-italic text-[11.5px] text-[var(--ct-text-3)]`}>{front.rules.find((rule) => rule.kind === 'include')?.value ?? front.code}</em>
-                </span>
-                <em className={`${mono} flex-none not-italic text-[11.5px] text-[var(--ct-text-3)]`}>
-                  {frontMetaText(front, stage)}
-                </em>
-              </div>
-            ))}
+          <div className="grid min-w-0 gap-1 border-t border-[var(--ct-line)] pt-2.5">
+            {stage.fronts.slice(0, VISIBLE_FRONTS).map((front) => {
+              const meta = frontMetaText(front, stage)
+              return (
+                <div key={front.id} className="flex min-w-0 items-baseline gap-2 text-[12.5px] text-[var(--ct-text-2)]">
+                  <span className="min-w-0 flex-1 truncate" title={front.name}>
+                    {front.name} <em className={`${mono} not-italic text-[11.5px] text-[var(--ct-text-3)]`}>{front.rules.find((rule) => rule.kind === 'include')?.value ?? front.code}</em>
+                  </span>
+                  <em title={meta} className={`${mono} min-w-0 max-w-[55%] truncate not-italic text-[11.5px] text-[var(--ct-text-3)]`}>
+                    {meta}
+                  </em>
+                </div>
+              )
+            })}
+            {stage.fronts.length > VISIBLE_FRONTS && (
+              <span className="text-[12px] text-[var(--ct-text-3)]">+{stage.fronts.length - VISIBLE_FRONTS} frentes</span>
+            )}
           </div>
         )}
         <div className="flex flex-wrap gap-1.5">
@@ -514,6 +524,21 @@ export function StagesCanvas({
               setToast(`Etapa ${selectedStage.name} arquivada.`)
             })
           }
+          onRemove={() =>
+            run(
+              shown.filter((stage) => stage.id !== selectedStage.id),
+              () => removeStage(context, selectedStage.id),
+              () => {
+                setSelection(null)
+                setToast(`Etapa ${selectedStage.name} removida.`)
+              }
+            )
+          }
+          onRemoveFront={(frontId) => {
+            const front = selectedStage.fronts.find((item) => item.id === frontId)
+            const next = shown.map((stage) => ({ ...stage, fronts: stage.fronts.filter((item) => item.id !== frontId) }))
+            run(next, () => removeFront(context, frontId), () => setToast(`Frente ${front?.name ?? ''} removida.`))
+          }}
           onSavePreset={() =>
             run(
               null,

@@ -23,7 +23,8 @@ import { METRICS, watcherSource, type WatcherMetric } from '@/lib/domain/watcher
 import { resultStage, stageFollowers, watcherReader, type FrontMetas, type MetaReader, type TargetSource, type TetoMedida, type TetoSource } from '@/lib/domain/targets'
 import { measureOfMetric } from '@/lib/domain/funnel-stages'
 import { campaignNameSuggestion, stageSetupItems } from '@/lib/domain/stage-canvas'
-import { getCostCombos, getFunnelStages, getStagePresets } from '@/lib/repo/funnel-stages-repo'
+import { getCostCombos, getFunnelStages, getRemovalFacts, getStagePresets } from '@/lib/repo/funnel-stages-repo'
+import { frontInUse, isLastOpenStage, stageInUse } from '@/lib/domain/stage-removal'
 import type { PageKind } from '@/lib/domain/new-funnel'
 import { StagesCanvas } from './stages-canvas'
 import type { CanvasStage } from './canvas-types'
@@ -102,6 +103,7 @@ export default async function StagesAndFrontsPage({
     { data: watcherRows, error: watchersError },
     { data: testRows, error: testsError },
     { data: pageRows, error: pagesError },
+    removalFacts,
   ] = await Promise.all([
     canActAs(supabase, client.id, 'gestor'),
     supabase
@@ -126,6 +128,7 @@ export default async function StagesAndFrontsPage({
       .eq('sales_funnel_id', funnel.id)
       .order('code'),
     supabase.from('pages').select('id, url, tipo, front_id, is_active').eq('sales_funnel_id', funnel.id).not('front_id', 'is', null).order('created_at'),
+    getRemovalFacts(supabase, funnel.id),
   ])
 
   if (frontsError) throw frontsError
@@ -227,6 +230,8 @@ export default async function StagesAndFrontsPage({
       return {
         ...stage,
         followers: stageFollowers(stage.id, readers),
+        inUse: stageInUse(stage.id, removalFacts),
+        lastOpen: isLastOpenStage(stage.id, removalFacts),
         fronts: open.map((front) => {
           const row = frontById.get(front.id)
           const stats = summary.get(front.id)
@@ -245,6 +250,7 @@ export default async function StagesAndFrontsPage({
             campaigns: stats?.campaigns ?? 0,
             spend: stats?.spend ?? 0,
             pages: pagesOfFront(front.id),
+            inUse: frontInUse(front.id, removalFacts),
           }
         }),
         watchers: watchers
