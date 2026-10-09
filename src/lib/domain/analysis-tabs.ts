@@ -1,7 +1,7 @@
 export const ANALYSIS_TABS = [
   { value: 'visao', label: 'Resumo do funil' },
   { value: 'trafego', label: 'Tráfego' },
-  { value: 'frentes', label: 'Frentes' },
+  { value: 'frentes', label: 'Etapas e frentes' },
   { value: 'criativos', label: 'Por criativo' },
   { value: 'origem', label: 'Origem das vendas' },
   { value: 'dias', label: 'Dia a dia' },

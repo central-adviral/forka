@@ -10,15 +10,20 @@ import {
   summarizeFronts,
   type ClassifiedCampaign,
 } from '@/lib/domain/campaign-rules'
-import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { addRule, createFront, setFrontArchived, pinCampaign, previewRule, removeRule, unpinCampaign, updateFront, updateRule } from './actions'
-import { RuleForm } from './rule-form'
+import { pinCampaign, setFrontArchived, unpinCampaign } from './actions'
 import { canActAs } from '@/lib/view-as'
 import { PageHeader } from '@/components/page-header'
 import { saoPauloDay } from '@/lib/repo/today-repo'
 import { ApplySincePanel } from '../apply-since-panel'
 import { applySince, previewApplySince } from '../apply-since-actions'
-import { PROJECT_RESULTS, type ProjectResult } from '@/lib/domain/project-plan'
+import { ArchivedProjectBanner } from '../../archived-project-banner'
+import type { ProjectResult } from '@/lib/domain/project-plan'
+import { COLUMNS } from '@/lib/domain/backlog'
+import { METRICS, formatMetric, type WatcherMetric } from '@/lib/domain/watchers'
+import { campaignNameSuggestion, measureOfWatcherMetric, stageSetupItems } from '@/lib/domain/stage-canvas'
+import { getCostCombos, getFunnelStages, getStagePresets } from '@/lib/repo/funnel-stages-repo'
+import { StagesCanvas } from './stages-canvas'
+import type { CanvasStage } from './canvas-types'
 
 interface FrontRow {
   id: string
@@ -43,9 +48,6 @@ const PERIODS = [
   { value: '30d', label: '30 dias' },
 ] as const
 
-const day = (value: string) => value.split('-').reverse().join('/')
-const windowText = (start: string | null, end: string | null) => (start || end ? `${start ? day(start) : '…'} a ${end ? day(end) : '…'}` : 'sem datas: todos os dias')
-
 const currency = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
@@ -59,15 +61,15 @@ const mono = 'font-[family-name:var(--font-geist-mono)]'
 const fieldClass =
   'rounded-[8px] border border-[var(--ct-line-2)] bg-[var(--ct-surface-2)] px-2.5 py-1.5 text-[12.5px] text-[var(--ct-text)] outline-none focus:border-[var(--ct-accent)]'
 
-export default async function CampaignRulesPage({
+export default async function StagesAndFrontsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ clientSlug: string; funnelSlug: string }>
-  searchParams: Promise<{ periodo?: string; ok?: string; erro?: string; mudou?: string; regra?: string }>
+  searchParams: Promise<{ periodo?: string; ok?: string; erro?: string; mudou?: string; etapa?: string }>
 }) {
   const { clientSlug, funnelSlug } = await params
-  const { periodo: periodParam, ok, erro, mudou, regra } = await searchParams
+  const { periodo: periodParam, ok, erro, mudou, etapa } = await searchParams
   const periodo = periodParam === '30d' ? '30d' : '7d'
   const supabase = await createServerSupabaseClient()
 
@@ -84,8 +86,19 @@ export default async function CampaignRulesPage({
   if (!funnel) notFound()
 
   const { since, until } = resolvePeriodDateRange(periodo, undefined, undefined)
-  const [{ data: canEditClient }, { data: frontRows, error: frontsError }, { data: campaignRows }, { data: lastSync }, { data: otherFunnels }] = await Promise.all([
-    canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
+  const [
+    canEditClient,
+    { data: frontRows, error: frontsError },
+    { data: campaignRows },
+    { data: lastSync },
+    { data: otherFunnels },
+    stageRows,
+    combos,
+    presets,
+    { data: watcherRows, error: watchersError },
+    { data: testRows, error: testsError },
+  ] = await Promise.all([
+    canActAs(supabase, client.id, 'gestor'),
     supabase
       .from('project_fronts')
       .select('id, code, name, position, sales_funnel_id, source_sales_funnel_id, janela_inicio, janela_fim, metrica_principal, alvo_principal, metrica_secundaria, alvo_secundaria, archived_at, sales_funnels!project_fronts_sales_funnel_id_fkey!inner(name, client_id, archived_at), naming_rules(id, kind, value)')
@@ -94,9 +107,16 @@ export default async function CampaignRulesPage({
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: since, p_until: until }),
     supabase.from('campaign_daily').select('synced_at').eq('client_id', client.id).order('synced_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('sales_funnels').select('id, name, archived_at').eq('client_id', client.id).neq('id', funnel.id).order('name'),
+    getFunnelStages(supabase, funnel.id),
+    getCostCombos(supabase, funnel.id),
+    getStagePresets(supabase, client.id),
+    supabase.from('watchers').select('id, metric, target, front_id, plan_role').eq('sales_funnel_id', funnel.id).eq('is_active', true),
+    supabase.from('backlog_items').select('code, title, status, funnel_stage_id').eq('sales_funnel_id', funnel.id).not('funnel_stage_id', 'is', null).order('code'),
   ])
 
   if (frontsError) throw frontsError
+  if (watchersError) throw watchersError
+  if (testsError) throw testsError
   const allFronts = (frontRows ?? []) as unknown as FrontRow[]
   // An archived project opens read-only; its archived fronts are listed apart, to restore.
   const canEdit = canEditClient && !funnel.archived_at
@@ -121,6 +141,55 @@ export default async function CampaignRulesPage({
     .reduce((sum, campaign) => sum + Number(campaign.spend), 0)
   const tags = bracketTags(campaigns)
 
+  // The stages with their open fronts, the watchers that read them and the tests the Quadro put in them.
+  const watchers = (watcherRows ?? []) as { id: string; metric: WatcherMetric; target: number; front_id: string | null; plan_role: string | null }[]
+  const stageOfFront = new Map(stageRows.flatMap((stage) => stage.fronts.map((front) => [front.id, stage] as const)))
+  const stages: CanvasStage[] = stageRows
+    .filter((stage) => !stage.archivedAt)
+    .map((stage) => {
+      const open = stage.fronts.filter((front) => !front.archivedAt)
+      const openIds = new Set(open.map((front) => front.id))
+      return {
+        ...stage,
+        fronts: open.map((front) => {
+          const row = frontById.get(front.id)
+          const stats = summary.get(front.id)
+          return {
+            id: front.id,
+            code: front.code,
+            name: front.name,
+            sourceName: front.sourceSalesFunnelId ? (funnelNameById.get(front.sourceSalesFunnelId) ?? 'outro funil') : null,
+            rules: front.rules,
+            metricaPrincipal: row?.metrica_principal ?? null,
+            alvoPrincipal: row?.alvo_principal === null || row?.alvo_principal === undefined ? null : Number(row.alvo_principal),
+            metricaSecundaria: row?.metrica_secundaria ?? null,
+            alvoSecundaria: row?.alvo_secundaria === null || row?.alvo_secundaria === undefined ? null : Number(row.alvo_secundaria),
+            janelaInicio: row?.janela_inicio ?? funnel.starts_on,
+            janelaFim: row?.janela_fim ?? funnel.ends_on,
+            campaigns: stats?.campaigns ?? 0,
+            spend: stats?.spend ?? 0,
+          }
+        }),
+        watchers: watchers
+          .filter((watcher) => (watcher.front_id ? openIds.has(watcher.front_id) : watcher.plan_role !== null && measureOfWatcherMetric(watcher.metric) === stage.measure))
+          .map((watcher) => ({
+            id: watcher.id,
+            label: `${METRICS[watcher.metric]?.label ?? watcher.metric} · meta ${formatMetric(watcher.metric, Number(watcher.target))}`,
+            scope: watcher.front_id ? `frente ${frontById.get(watcher.front_id)?.code ?? ''}` : 'do funil',
+          })),
+        tests: ((testRows ?? []) as { code: string; title: string; status: string; funnel_stage_id: string }[])
+          .filter((test) => test.funnel_stage_id === stage.id)
+          .map((test) => ({ code: test.code, title: test.title, status: COLUMNS.find((column) => column.status === test.status)?.label ?? test.status })),
+      }
+    })
+  const ordered = [...stages.filter((stage) => stage.parallel), ...stages.filter((stage) => !stage.parallel)]
+  const missing = stageSetupItems(
+    stages.map((stage) => ({
+      ...stage,
+      fronts: stage.fronts.map((front) => ({ name: front.name, mirror: front.sourceName !== null, includes: front.rules.filter((rule) => rule.kind === 'include').length })),
+    }))
+  )
+
   const base = `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`
   const context = { client_slug: client.slug, funnel_slug: funnel.slug, sales_funnel_id: funnel.id }
   const pinContext = { ...context, client_id: client.id as string }
@@ -130,32 +199,71 @@ export default async function CampaignRulesPage({
     const front = frontById.get(frontId)
     if (!front) return { text: '?', own: false }
     const own = front.sales_funnel_id === funnel!.id
-    const text = own ? front.code : `${front.sales_funnels?.name ?? 'outro funil'} · ${front.code}`
+    const stage = own ? stageOfFront.get(frontId) : undefined
+    const text = own ? `${stage ? `${stage.name} › ` : ''}${front.code}` : `${front.sales_funnels?.name ?? 'outro funil'} · ${front.code}`
     return { text: front.archived_at ? `${text} (arquivada)` : text, own }
   }
 
+  const naming = (
+    <section className="card-shadow grid min-w-0 gap-3.5 rounded-[22px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-6 py-[22px]">
+      <div className="flex flex-wrap items-baseline justify-between gap-2.5">
+        <h2 className="text-[17px] font-semibold">Nomenclatura das campanhas</h2>
+        <p className="text-[12.5px] text-[var(--ct-text-3)]">Como nomear no Meta Ads</p>
+      </div>
+      <p className="text-[12.5px] text-[var(--ct-text-3)]">A etiqueta da etapa e a da frente precisam estar no nome; o resto é livre.</p>
+      <div className={`${mono} grid gap-1.5 overflow-x-auto text-[12.5px]`}>
+        {ordered.flatMap((stage) => {
+          const own = stage.fronts.filter((front) => !front.sourceName)
+          if (own.length === 0) {
+            return [
+              <div key={stage.id} className="flex gap-3">
+                <span className="min-w-[160px] font-[family-name:var(--font-body)] text-[var(--ct-text-3)]">{stage.name}</span>
+                <span className="text-[var(--ct-text-3)]">crie uma frente para esta etapa</span>
+              </div>,
+            ]
+          }
+          return own.map((front) => (
+            <div key={front.id} className="flex gap-3">
+              <span className="min-w-[160px] font-[family-name:var(--font-body)] text-[var(--ct-text-3)]">
+                {stage.name} › {front.name}
+              </span>
+              <span className="whitespace-nowrap">{campaignNameSuggestion(stage.tag, front.rules.find((rule) => rule.kind === 'include')?.value ?? front.code)}</span>
+            </div>
+          ))
+        })}
+        {ordered.length === 0 && <span className="font-[family-name:var(--font-body)] text-[var(--ct-text-3)]">Sem etapas ainda.</span>}
+      </div>
+    </section>
+  )
+
   return (
-    <div className="flex max-w-[1180px] flex-col gap-8 px-4 md:px-14 pb-24 pt-12">
+    <div className="flex max-w-[1500px] flex-col gap-[22px] px-4 md:px-14 pb-24 pt-12">
       <PageHeader
-        title="Frentes e etiquetas"
-        note="Cada campanha tem um dono só: uma frente. O nome sugere o dono (contém todos os textos verdes e nenhum dos vermelhos) e o sync fixa essa escolha, então renomear a campanha no Gerenciador não muda o histórico. Mudar uma etiqueta vale daqui pra frente: campanhas que já gastaram ficam com o dono que têm. Você pode fixar o dono à mão na tabela. Uma frente também pode ler outro funil, só dentro da janela deste."
+        title="Etapas e frentes"
+        note={
+          canEdit
+            ? 'Monte a jornada arrastando etapas. Cada etapa mede o próprio custo, só com o gasto das campanhas dela; clique numa etapa para editar meta, etiqueta, frentes, vigias e testes.'
+            : 'Somente leitura: só gestor ou owner muda etapas e frentes.'
+        }
         actions={
-          <div className="flex items-center gap-1 rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface)] p-[3px]" role="group" aria-label="Período">
-              {PERIODS.map((period) => (
-                <Link
-                  key={period.value}
-                  href={`${base}/regras?periodo=${period.value}`}
-                  aria-current={periodo === period.value ? 'page' : undefined}
-                  className={`rounded-[7px] px-3 py-1 text-[12.5px] font-medium ${
-                    periodo === period.value ? 'bg-[var(--ct-surface-3)] text-[var(--ct-text)]' : 'text-[var(--ct-text-3)]'
-                  }`}
-                >
-                  {period.label}
-                </Link>
-              ))}
+          <div className="flex items-center gap-1 rounded-[10px] border border-[var(--ct-line)] bg-[var(--ct-surface)] p-[3px]" role="group" aria-label="Período das campanhas">
+            {PERIODS.map((period) => (
+              <Link
+                key={period.value}
+                href={`${base}/regras?periodo=${period.value}`}
+                aria-current={periodo === period.value ? 'page' : undefined}
+                className={`rounded-[7px] px-3 py-1 text-[12.5px] font-medium ${
+                  periodo === period.value ? 'bg-[var(--ct-surface-3)] text-[var(--ct-text)]' : 'text-[var(--ct-text-3)]'
+                }`}
+              >
+                {period.label}
+              </Link>
+            ))}
           </div>
         }
       />
+
+      {funnel.archived_at && <ArchivedProjectBanner salesFunnelId={funnel.id} archivedAt={funnel.archived_at} canRestore={canEditClient} />}
 
       {ok && (
         <p role="status" className="rounded-[10px] bg-[var(--ct-an-soft)] px-4 py-3 text-[13px] text-[var(--ct-an)]">
@@ -177,10 +285,51 @@ export default async function CampaignRulesPage({
         />
       )}
 
+      <div
+        role="status"
+        className={`flex flex-wrap items-center gap-x-3.5 gap-y-2 rounded-[14px] border px-4 py-2.5 text-[13px] ${
+          missing.length
+            ? 'border-[color-mix(in_srgb,var(--ct-warn)_30%,transparent)] bg-[color-mix(in_srgb,var(--ct-warn)_8%,transparent)]'
+            : 'border-[color-mix(in_srgb,var(--ct-ok)_30%,transparent)] bg-[color-mix(in_srgb,var(--ct-ok)_8%,transparent)]'
+        }`}
+      >
+        {missing.length ? (
+          <>
+            <b className="font-semibold">Falta {missing.length === 1 ? '1 item' : `${missing.length} itens`} para os números deste funil serem confiáveis:</b>
+            <ul className="flex flex-wrap gap-x-3.5 gap-y-1 text-[var(--ct-text-2)]">
+              {missing.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <>
+            <span className="h-[7px] w-[7px] rounded-full bg-[var(--ct-ok)]" />
+            <b className="font-semibold">Nada faltando nas etapas.</b>
+          </>
+        )}
+      </div>
+
+      <StagesCanvas
+        stages={stages}
+        archivedStages={stageRows.filter((stage) => stage.archivedAt).map((stage) => ({ id: stage.id, name: stage.name }))}
+        combos={combos}
+        presets={presets}
+        ownPresets={presets.some((preset) => preset.id !== null)}
+        canEdit={canEdit}
+        context={pinContext}
+        otherFunnels={(otherFunnels ?? []).filter((other) => !other.archived_at).map((other) => ({ id: other.id as string, name: other.name as string }))}
+        metasHref={`/dashboard/clients/${client.slug}/metas`}
+        boardHref={`/dashboard/clients/${client.slug}/backlog?projeto=${funnel.slug}`}
+        initialStageId={etapa ?? null}
+        naming={naming}
+      />
+
+      <h2 className="mt-4 text-[16px] font-semibold">Campanhas</h2>
       <div className="grid grid-cols-2 gap-[18px] lg:grid-cols-4">
         {[
           { label: 'Gasto do funil', value: currency(projectSpend), foot: `campanhas nas frentes · ${periodo === '7d' ? '7' : '30'} dias` },
-          { label: 'Frentes', value: String(fronts.length), foot: 'deste funil' },
+          { label: 'Frentes', value: String(fronts.length), foot: `em ${stages.length} ${stages.length === 1 ? 'etapa' : 'etapas'}` },
           { label: 'Não classificado', value: currency(unclassifiedSpend), foot: 'sem dono · aparece em todos os totais' },
           {
             label: 'Última leitura',
@@ -264,221 +413,29 @@ export default async function CampaignRulesPage({
         </div>
       )}
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-baseline gap-3">
-          <h2 className="text-[16px] font-semibold">Frentes</h2>
-          {!canEdit && <span className="text-xs text-[var(--ct-text-3)]">somente leitura</span>}
-        </div>
-        {fronts.length === 0 && (
-          <p className="text-sm text-[var(--ct-text-3)]">
-            Este funil ainda não tem frentes. Crie a primeira abaixo — por exemplo GRA-GER (Captação Gratuita), PAG
-            (Captação Paga) ou PRE (Pré-lançamento).
-          </p>
-        )}
-        {fronts.map((front) => {
-          const stats = summary.get(front.id) ?? { campaigns: 0, spend: 0, leads: 0 }
-          const frontContext = { ...context, front_id: front.id }
-          const includes = front.naming_rules.filter((rule) => rule.kind === 'include')
-          const sourceName = front.source_sales_funnel_id ? funnelNameById.get(front.source_sales_funnel_id) ?? 'outro funil' : null
-          return (
-            <div key={front.id} className="relative flex flex-col gap-3 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-6 py-5">
-              <div className="flex flex-wrap items-center gap-3">
-                <b className="text-[15px] font-semibold">{front.name}</b>
-                <span className={`${mono} rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[11px] text-[var(--ct-text-2)]`}>{front.code}</span>
-                <span className={`${mono} ml-auto text-[12px] text-[var(--ct-text-3)]`}>
-                  {stats.campaigns} campanhas · {currency(stats.spend)}
-                  {stats.leads > 0 ? ` · ${stats.leads.toLocaleString('pt-BR')} leads` : ''}
-                </span>
+      {archivedFronts.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-[12.5px] font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
+            Frentes arquivadas ({archivedFronts.length})
+          </summary>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {archivedFronts.map((front) => (
+              <li key={front.id} className="flex items-center gap-3 text-[12.5px] text-[var(--ct-text-2)]">
+                <span className={`${mono} rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[11px]`}>{front.code}</span>
+                {front.name}
+                {stageOfFront.get(front.id) && <span className="text-[var(--ct-text-3)]">· {stageOfFront.get(front.id)!.name}</span>}
                 {canEdit && (
-                  <details className="group">
-                    <summary className="cursor-pointer list-none text-[12.5px] font-medium text-[var(--ct-accent)] hover:underline">Editar</summary>
-                    <form
-                      action={updateFront.bind(null, frontContext)}
-                      className="absolute right-6 z-10 mt-2 flex flex-wrap items-end gap-2 rounded-[12px] border border-[var(--ct-line-2)] bg-[var(--ct-surface-2)] p-4 shadow-lg"
-                    >
-                      <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-                        Código
-                        <input name="code" required defaultValue={front.code} className={`${fieldClass} ${mono} w-32`} />
-                      </label>
-                      <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-                        Nome
-                        <input name="name" required defaultValue={front.name} className={`${fieldClass} w-64`} />
-                      </label>
-                      {sourceName && (
-                        <div className="flex basis-full flex-wrap items-end gap-2">
-                          <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-                            Janela: início
-                            <input type="date" name="janela_inicio" required defaultValue={front.janela_inicio ?? funnel.starts_on ?? ''} className={fieldClass} />
-                          </label>
-                          <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-                            Janela: fim
-                            <input type="date" name="janela_fim" required defaultValue={front.janela_fim ?? funnel.ends_on ?? ''} className={fieldClass} />
-                          </label>
-                        </div>
-                      )}
-                      {(['principal', 'secundaria'] as const).map((role) => (
-                        <div key={role} className="flex basis-full flex-wrap items-end gap-2">
-                          <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-                            Métrica {role === 'principal' ? 'principal' : 'secundária'} da frente
-                            <select name={`metrica_${role}`} defaultValue={front[`metrica_${role}`] ?? ''} className={`${fieldClass} w-48`}>
-                              <option value="">segue o funil</option>
-                              {(Object.keys(PROJECT_RESULTS) as ProjectResult[]).map((metric) => (
-                                <option key={metric} value={metric}>
-                                  {PROJECT_RESULTS[metric].cost}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-                            Meta
-                            <input name={`alvo_${role}`} inputMode="decimal" defaultValue={front[`alvo_${role}`] !== null ? String(front[`alvo_${role}`]).replace('.', ',') : ''} className={`${fieldClass} ${mono} w-28`} />
-                          </label>
-                        </div>
-                      ))}
-                      <p className="basis-full text-[11.5px] text-[var(--ct-text-3)]">Com métrica e meta, a frente ganha um vigia próprio. Vazio: segue o funil, sem alerta próprio.</p>
-                      <button type="submit" className="rounded-[8px] bg-[var(--ct-accent)] px-3.5 py-1.5 text-[12.5px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110">
-                        Salvar
-                      </button>
-                    </form>
-                  </details>
+                  <form action={setFrontArchived.bind(null, { ...context, front_id: front.id, code: front.code }, false)}>
+                    <button type="submit" className="text-xs font-semibold text-[var(--ct-accent)] hover:underline">
+                      Restaurar
+                    </button>
+                  </form>
                 )}
-                {canEdit && (
-                  <ConfirmDeleteButton
-                    action={setFrontArchived.bind(null, { ...frontContext, code: front.code }, true)}
-                    label="Arquivar"
-                    warning="Arquivar? As campanhas dela ficam no histórico, novas não entram."
-                  />
-                )}
-              </div>
-              <p className="text-[12.5px] text-[var(--ct-text-2)]">
-                {front.metrica_principal
-                  ? `Métricas próprias: ${[
-                      [front.metrica_principal, front.alvo_principal],
-                      [front.metrica_secundaria, front.alvo_secundaria],
-                    ]
-                      .filter((pair): pair is [ProjectResult, number | null] => pair[0] !== null)
-                      .map(([metric, target]) => `${PROJECT_RESULTS[metric].cost}${target !== null ? ` meta ${Number(target).toLocaleString('pt-BR')}` : ''}`)
-                      .join(' · ')}`
-                  : 'Segue as métricas do funil, sem alerta próprio.'}
-              </p>
-              {sourceName && (
-                <p className="text-[12.5px] text-[var(--ct-text-2)]">
-                  Lê as campanhas do funil <b>{sourceName}</b>, só nos dias da janela{' '}
-                  <b>{windowText(front.janela_inicio ?? funnel.starts_on, front.janela_fim ?? funnel.ends_on)}</b>. Não tem etiquetas próprias: as
-                  campanhas continuam com um dono só.
-                </p>
-              )}
-              {!sourceName && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {front.naming_rules.map((rule) =>
-                  canEdit && regra === rule.id ? (
-                    <form key={rule.id} action={updateRule.bind(null, { ...frontContext, rule_id: rule.id })} className="flex flex-wrap items-center gap-2">
-                      <select name="kind" defaultValue={rule.kind} className={fieldClass} aria-label="Tipo da etiqueta">
-                        <option value="include">contém</option>
-                        <option value="exclude">não contém</option>
-                      </select>
-                      <input name="value" required defaultValue={rule.value} autoFocus className={`${fieldClass} ${mono} min-w-[220px]`} aria-label="Texto da etiqueta" />
-                      <button type="submit" className="text-[12.5px] font-medium text-[var(--ct-accent)] hover:underline">
-                        salvar
-                      </button>
-                      <Link href={`${base}/regras`} className="text-[12.5px] text-[var(--ct-text-2)] hover:underline">
-                        cancelar
-                      </Link>
-                    </form>
-                  ) : (
-                  <span
-                    key={rule.id}
-                    className={`${mono} flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] ${
-                      rule.kind === 'include' ? 'bg-[var(--ct-an-soft)] text-[var(--ct-an)]' : 'bg-[var(--ct-crit-soft)] text-[var(--ct-crit)]'
-                    }`}
-                  >
-                    {rule.kind === 'include' ? 'contém' : 'não contém'} {rule.value}
-                    {canEdit && (
-                      <Link href={`${base}/regras?regra=${rule.id}`} aria-label={`Editar etiqueta ${rule.value}`} className="opacity-60 hover:opacity-100 hover:underline">
-                        editar
-                      </Link>
-                    )}
-                    {canEdit && (
-                      <form action={removeRule.bind(null, { ...context, rule_id: rule.id })}>
-                        <button type="submit" aria-label={`Remover etiqueta ${rule.value}`} className="opacity-60 hover:opacity-100">
-                          ×
-                        </button>
-                      </form>
-                    )}
-                  </span>
-                  )
-                )}
-                {includes.length === 0 && (
-                  <span className="text-[12px] text-[var(--ct-text-3)]">sem etiqueta, esta frente não pega nenhuma campanha</span>
-                )}
-              </div>
-              )}
-              {canEdit && !sourceName && (
-                <RuleForm addAction={addRule.bind(null, frontContext)} previewAction={previewRule.bind(null, frontContext)} fieldClass={fieldClass} mono={mono} />
-              )}
-            </div>
-          )
-        })}
-        {canEdit && (
-          <form
-            action={createFront.bind(null, context)}
-            className="flex flex-wrap items-end gap-2 rounded-[14px] border border-dashed border-[var(--ct-line-2)] px-6 py-5"
-          >
-            <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-              Código
-              <input name="code" required placeholder="GRA-GER" className={`${fieldClass} ${mono} w-32`} />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-              Nome
-              <input name="name" required placeholder="Captação Gratuita" className={`${fieldClass} w-64`} />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-              Campanhas
-              <select name="source_sales_funnel_id" defaultValue="" className={fieldClass}>
-                <option value="">próprias, pelas etiquetas</option>
-                {(otherFunnels ?? []).filter((other) => !other.archived_at).map((other) => (
-                  <option key={other.id} value={other.id}>
-                    lê o funil {other.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-              Janela do espelho: início
-              <input type="date" name="janela_inicio" defaultValue={funnel.starts_on ?? ''} className={fieldClass} />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-[var(--ct-text-3)]">
-              Janela do espelho: fim
-              <input type="date" name="janela_fim" defaultValue={funnel.ends_on ?? ''} className={fieldClass} />
-            </label>
-            <button type="submit" className="rounded-[8px] bg-[var(--ct-accent)] px-3.5 py-1.5 text-[12.5px] font-semibold text-[var(--ct-on-accent)] hover:brightness-110">
-              + Nova frente
-            </button>
-          </form>
-        )}
-        {archivedFronts.length > 0 && (
-          <details>
-            <summary className="cursor-pointer text-[12.5px] font-medium text-[var(--ct-text-2)] hover:text-[var(--ct-text)]">
-              Frentes arquivadas ({archivedFronts.length})
-            </summary>
-            <ul className="mt-2 flex flex-col gap-1.5">
-              {archivedFronts.map((front) => (
-                <li key={front.id} className="flex items-center gap-3 text-[12.5px] text-[var(--ct-text-2)]">
-                  <span className={`${mono} rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[11px]`}>{front.code}</span>
-                  {front.name}
-                  {canEdit && (
-                    <form action={setFrontArchived.bind(null, { ...context, front_id: front.id, code: front.code }, false)}>
-                      <button type="submit" className="text-xs font-semibold text-[var(--ct-accent)] hover:underline">
-                        Restaurar
-                      </button>
-                    </form>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
-      </section>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {tags.length > 0 && (
         <section className="flex flex-col gap-3">
@@ -505,7 +462,7 @@ export default async function CampaignRulesPage({
               <thead>
                 <tr className={`${mono} text-left text-[10.5px] uppercase tracking-[0.06em] text-[var(--ct-text-3)]`}>
                   <th className="px-5 py-3 font-medium">Campanha</th>
-                  <th className="px-5 py-3 font-medium">Frente</th>
+                  <th className="px-5 py-3 font-medium">Etapa e frente</th>
                   <th className="px-5 py-3 font-medium">Dono</th>
                   <th className="px-5 py-3 text-right font-medium">Gasto</th>
                   <th className="px-5 py-3 text-right font-medium">Leads</th>

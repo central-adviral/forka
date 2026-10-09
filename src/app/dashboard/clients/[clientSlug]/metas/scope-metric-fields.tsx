@@ -71,7 +71,7 @@ export function ScopeMetricFields({
           <span className="text-[11px]">
             Campanhas do funil pelas{' '}
             <a href={project.rulesHref} className="text-[var(--ct-accent)] hover:underline">
-              Frentes e etiquetas
+              Etapas e frentes
             </a>
             , as mesmas das Análises.
           </span>

@@ -104,7 +104,7 @@ export const NAV_SECTIONS: SectionDef[] = [
     subs: [
       { id: 'visao', label: 'Resumo do funil', desc: 'CPA, ROAS, receita e conversão', exists: true, needsProject: true, href: (c) => analysisHref(c, 'visao') },
       { id: 'trafego', label: 'Tráfego', desc: 'Mídia dia a dia e padrões', exists: true, needsProject: true, href: (c) => analysisHref(c, 'trafego') },
-      { id: 'frentes', label: 'Frentes', desc: 'Gasto e desempenho de cada frente', exists: true, needsProject: true, href: (c) => analysisHref(c, 'frentes') },
+      { id: 'frentes', label: 'Etapas e frentes', desc: 'Custo de cada etapa e de cada frente', exists: true, needsProject: true, href: (c) => analysisHref(c, 'frentes') },
       { id: 'criativos', label: 'Criativos', desc: 'Custo e vendas por anúncio', exists: true, needsProject: true, href: (c) => analysisHref(c, 'criativos') },
       { id: 'origem', label: 'Origem das vendas', desc: 'Anúncio, bio, sem UTM', exists: true, needsProject: true, href: (c) => analysisHref(c, 'origem') },
       { id: 'dias', label: 'Dia a dia', desc: 'A tabela completa do período', exists: true, needsProject: true, href: (c) => analysisHref(c, 'dias') },
@@ -135,7 +135,7 @@ export const NAV_SECTIONS: SectionDef[] = [
     subs: [
       { id: 'visao-projeto', label: 'Checklist', desc: 'O que falta configurar', exists: true, needsProject: true, href: (c) => `${c.base}/funis-venda/${c.project}/configurar` },
       { id: 'produtos', label: 'Produtos', desc: 'Quais vendas contam', exists: true, needsProject: true, step: 'produtos', href: (c) => `${c.base}/funis-venda/${c.project}/produtos` },
-      { id: 'regras-campanha', label: 'Frentes e etiquetas', desc: 'Quais campanhas são do funil', exists: true, needsProject: true, step: 'regras', href: (c) => `${c.base}/funis-venda/${c.project}/regras` },
+      { id: 'regras-campanha', label: 'Etapas e frentes', desc: 'Monte a jornada, as etiquetas e as metas', exists: true, needsProject: true, step: 'regras', href: (c) => `${c.base}/funis-venda/${c.project}/regras` },
       { id: 'plano', label: 'Resultado e meta', desc: 'O que o funil produz e quanto pode custar', exists: true, needsProject: true, step: 'plano', href: (c) => `${c.base}/funis-venda/${c.project}/plano` },
       { id: 'metas', label: 'Metas e vigias', desc: 'Vigias além do custo', exists: true, step: 'metas', href: (c) => `${c.base}/metas` },
     ],

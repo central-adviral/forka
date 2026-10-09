@@ -35,6 +35,7 @@ import {
   type WizardProject,
 } from '@/lib/domain/project-wizard'
 import { CopyButton } from '@/components/copy-button'
+import { STAGE_NAME, measureOfMetric } from '@/lib/domain/funnel-stages'
 import { createProject } from './actions'
 
 const STEPS = ['Funil', 'Frentes', 'Produtos', 'Conferir']
@@ -316,6 +317,9 @@ export function ProjectWizard(props: Props) {
               </div>
               <div className="flex min-w-0 flex-col gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ct-text-3)]">Métricas da frente</span>
+                <span className="text-[12.5px] text-[var(--ct-text-2)]">
+                  Entra na etapa <b>{STAGE_NAME[measureOfMetric(metrics.primary)]}</b>, pela métrica principal. Depois você ajusta em Etapas e frentes.
+                </span>
                 <label className="flex cursor-pointer items-start gap-2.5 text-[13.5px]">
                   <input type="checkbox" checked={front.own} onChange={(event) => setFront(index, { own: event.target.checked })} className="mt-0.5 h-[18px] w-[18px] accent-[var(--ct-accent)]" />
                   <span>

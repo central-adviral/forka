@@ -72,6 +72,16 @@ describe('editItem', () => {
     expect(db.writes).toEqual([])
   })
 
+  it('saves the funnel stage only when the form sends it, empty as none', async () => {
+    await expect(editItem(context, form({ title: 'T', funnel_stage_id: '11111111-1111-4111-8111-111111111111' }))).rejects.toThrow(/ok=/)
+    expect(db.writes[0].values).toMatchObject({ funnel_stage_id: '11111111-1111-4111-8111-111111111111' })
+    await expect(editItem(context, form({ title: 'T', funnel_stage_id: '' }))).rejects.toThrow(/ok=/)
+    expect(db.writes[1].values).toMatchObject({ funnel_stage_id: null })
+    await expect(editItem(context, form({ title: 'T' }))).rejects.toThrow(/ok=/)
+    expect(db.writes[2].values).not.toHaveProperty('funnel_stage_id')
+    await expect(editItem(context, form({ title: 'T', funnel_stage_id: 'x' }))).rejects.toThrow(/erro=Etapa do funil inválida/)
+  })
+
   it('reports a write the policies refused', async () => {
     db.refused = true
     await expect(editItem(context, form({ title: 'T' }))).rejects.toThrow(/erro=Só gestor ou owner pode editar testes/)

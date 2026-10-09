@@ -85,7 +85,7 @@ export default async function ProjectPlanPage({
         note={
           <>
             O que {funnel.name} produz e quanto pode custar. As campanhas vêm das{' '}
-            <Link href={`${base}/regras`} className="text-[var(--ct-accent)]">Frentes e etiquetas</Link> e as vendas dos{' '}
+            <Link href={`${base}/regras`} className="text-[var(--ct-accent)]">Etapas e frentes</Link> e as vendas dos{' '}
             <Link href={`${base}/produtos`} className="text-[var(--ct-accent)]">Produtos</Link>; o plano decide como as telas leem esses números e contra
             qual meta os alertas julgam.
           </>

@@ -25,6 +25,8 @@ import { ObjectivesPanel, type ObjectiveFront } from './objectives-panel'
 import { ArchivedProjectBanner } from '../archived-project-banner'
 import { canActAs } from '@/lib/view-as'
 import { ProjectStatusActions } from '../project-status'
+import { getCostCombos, getFunnelStages, getStageDaily, getStageOrigin } from '@/lib/repo/funnel-stages-repo'
+import { ComboCards, StagesPanel, stageTotals } from './stages-panel'
 
 export default async function SalesFunnelPage({
   params,
@@ -57,6 +59,16 @@ export default async function SalesFunnelPage({
   const canRestore = Boolean(funnel.archived_at) && canEdit
 
   const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
+  // The stage cards (Etapas e frentes) and the combo cards (Resumo) read the stages of the period.
+  const stagesData =
+    tab === 'frentes' || tab === 'visao'
+      ? Promise.all([getFunnelStages(supabase, funnel.id), getStageDaily(supabase, funnel.id, since, until), getStageOrigin(supabase, funnel.id, since, until), getCostCombos(supabase, funnel.id)]).catch(
+          (error) => {
+            console.error('[funnel-stages-report-failed]', { salesFunnelId: funnel.id }, error)
+            return null
+          }
+        )
+      : Promise.resolve(null)
   const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }, { data: frontRows }, { data: frontDays }, { data: qualityRows }, { data: frontSalesRows }, { data: crossRows }, { data: planRows }] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
     getFunnelSyncHealth(supabase, funnel.id),
@@ -95,6 +107,9 @@ export default async function SalesFunnelPage({
     alvo_secundaria: number | null
     source: { name: string } | null
   }[]
+  const stagesReport = await stagesData
+  const stageByFront = new Map((stagesReport?.[0] ?? []).flatMap((stage, order) => stage.fronts.map((front) => [front.id, { name: stage.name, order: stage.parallel ? order - 1000 : order }] as const)))
+  const totalsByStage = stageTotals(stagesReport?.[1] ?? [])
   const fronts: FrontInfo[] = frontList.map((front) => ({ id: front.id, code: front.code, name: front.name, sourceName: front.source?.name ?? null }))
   if (creativeResult.error) {
     console.error('[funnel-creative-report-failed]', { salesFunnelId: funnel.id }, creativeResult.error)
@@ -274,7 +289,7 @@ export default async function SalesFunnelPage({
                   Produtos
                 </a>
                 <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`} className={headerAction}>
-                  Frentes e etiquetas
+                  Etapas e frentes
                 </a>
                 <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`} className={headerAction}>
                   Editar
@@ -434,9 +449,24 @@ export default async function SalesFunnelPage({
       )}
 
 
+      {tab === 'visao' && stagesReport && (
+        <ComboCards combos={stagesReport[3]} stages={stagesReport[0]} totals={totalsByStage} revenue={totals.receitaLiquida} currency={currency} />
+      )}
+
+      {tab === 'frentes' && stagesReport && (
+        <StagesPanel
+          stages={stagesReport[0]}
+          totals={totalsByStage}
+          origins={stagesReport[2]}
+          rulesHref={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`}
+          currency={currency}
+        />
+      )}
+
       {tab === 'frentes' && (
         <FrontsPanel
-          fronts={fronts}
+          fronts={stagesReport ? [...fronts].sort((a, b) => (stageByFront.get(a.id)?.order ?? 1e6) - (stageByFront.get(b.id)?.order ?? 1e6)) : fronts}
+          stageOf={stagesReport ? new Map([...stageByFront].map(([id, stage]) => [id, stage.name])) : undefined}
           rows={(frontDays ?? []) as FrontDayRow[]}
           taxFactor={taxFactor}
           rulesHref={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`}

@@ -98,7 +98,7 @@ export function projectSetupStatus(facts: SetupFacts): SetupStatus {
     },
     {
       id: 'regras',
-      label: 'Frentes e etiquetas',
+      label: 'Etapas e frentes',
       done: rulesDone,
       text: rulesText,
     },

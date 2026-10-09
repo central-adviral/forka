@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { stageWriteError } from '@/lib/repo/funnel-stages-repo'
 
 // Writes go through the user's session: the 0053 policies only let a gestor or owner of the
 // project's client create fronts and rules, so no extra role check is needed here.
@@ -12,6 +13,8 @@ interface RulesContext {
   client_slug: string
   funnel_slug: string
   sales_funnel_id: string
+  /** The stage whose drawer sent the form: the page opens it again after the redirect. */
+  stage_id?: string
 }
 
 function rulesPath(context: RulesContext): string {
@@ -20,7 +23,7 @@ function rulesPath(context: RulesContext): string {
 
 // changed = a naming rule was saved, so the page offers "Aplicar desde".
 function back(context: RulesContext, param: 'ok' | 'erro', message: string, changed = false): never {
-  redirect(`${rulesPath(context)}?${param}=${encodeURIComponent(message)}${changed ? '&mudou=1' : ''}`)
+  redirect(`${rulesPath(context)}?${param}=${encodeURIComponent(message)}${changed ? '&mudou=1' : ''}${context.stage_id ? `&etapa=${context.stage_id}` : ''}`)
 }
 
 function databaseMessage(error: { code?: string; message: string }, duplicate: string): string {
@@ -42,6 +45,8 @@ const frontSchema = z.object({
   // Empty = the front owns campaigns through name rules; a project id = the front reads that project (0054).
   source_sales_funnel_id: z.union([z.literal(''), z.string().uuid()]).transform((value) => value || null),
 })
+// Empty lets the 0105 trigger pick the stage of the front's measure.
+const stageField = z.union([z.literal(''), z.uuid()]).transform((value) => value || null)
 
 function readWindow(formData: FormData) {
   return mirrorWindow.safeParse({ janela_inicio: formData.get('janela_inicio') ?? '', janela_fim: formData.get('janela_fim') ?? '' })
@@ -54,6 +59,8 @@ export async function createFront(context: RulesContext, formData: FormData) {
     source_sales_funnel_id: formData.get('source_sales_funnel_id') ?? '',
   })
   if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '))
+  const stage = stageField.safeParse(formData.get('stage_id') ?? '')
+  if (!stage.success) back(context, 'erro', 'Etapa inválida.')
   const dates = result.data.source_sales_funnel_id ? readWindow(formData) : null
   if (dates && !dates.success) back(context, 'erro', dates.error.issues.map((issue) => issue.message).join('; '))
   const supabase = await createServerSupabaseClient()
@@ -66,10 +73,11 @@ export async function createFront(context: RulesContext, formData: FormData) {
     code: result.data.code,
     name: result.data.name,
     source_sales_funnel_id: result.data.source_sales_funnel_id,
+    stage_id: stage.data,
     ...dates?.data,
     position: count ?? 0,
   })
-  if (error) back(context, 'erro', databaseMessage(error, `Já existe uma frente ${result.data.code} neste funil (veja também as arquivadas).`))
+  if (error) back(context, 'erro', error.message.includes('is archived') ? 'Etapa arquivada: restaure a etapa antes de colocar frente nela.' : databaseMessage(error, `Já existe uma frente ${result.data.code} neste funil (veja também as arquivadas).`))
   revalidatePath(rulesPath(context))
   back(
     context,
@@ -156,7 +164,7 @@ export async function unpinCampaign(context: RulesContext & { client_id: string;
 export async function setFrontArchived(context: RulesContext & { front_id: string; code: string }, archived: boolean) {
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.rpc('set_front_archived', { p_front_id: context.front_id, p_archived: archived })
-  if (error) back(context, 'erro', error.message.includes('access denied') ? 'Só gestor ou owner pode arquivar frentes.' : error.message)
+  if (error) back(context, 'erro', error.message.includes('access denied') ? 'Só gestor ou owner pode arquivar frentes.' : stageWriteError(error))
   revalidatePath(`/dashboard/clients/${context.client_slug}/funis-venda/${context.funnel_slug}`, 'layout')
   back(
     context,
