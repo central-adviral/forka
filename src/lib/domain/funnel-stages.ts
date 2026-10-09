@@ -1,4 +1,5 @@
 import type { ProjectResult } from './project-plan'
+import type { ProductRole } from './product-roles'
 
 // Etapas no funil (0105): Funil -> Etapa -> Frente. A stage's measure is fixed and says what it
 // produces and what its cost is; the stage's spend is only the spend of its fronts' campaigns.
@@ -42,7 +43,24 @@ export interface Stage {
   /** Compra only: the ROAS floor next to the CPA ceiling. */
   metaRoas: number | null
   archivedAt: string | null
+  /** The funnel whose sales the stage also shows (0108); null for a stage with only its own. */
+  mirror: StageMirror | null
 }
+
+/**
+ * "Espelhar vendas de outro funil" (0108): the stage shows the source funnel's sales of these roles
+ * (and products, when listed) inside its window, without taking them from the source.
+ */
+export interface StageMirror {
+  funnelId: string
+  funnelName: string
+  papeis: ProductRole[]
+  /** Null takes every product of the roles. */
+  products: string[] | null
+}
+
+/** The measures whose stage can mirror sales (0108): the sales are its leads, entry sales or ascensions. */
+export const MIRROR_MEASURES: StageMeasure[] = ['lead', 'compra', 'ascensao']
 
 export interface StagePreset {
   name: string
@@ -119,9 +137,11 @@ export interface StageTotals {
   vendas: number
   /** Net of the refunds of the period. */
   receitaLiquida: number
+  /** How many of the vendas are another funnel's, mirrored (0108). */
+  vendasEspelho: number
 }
 
-export const EMPTY_TOTALS: StageTotals = { spendComImposto: 0, impressions: 0, leads: 0, landingPageViews: 0, vendas: 0, receitaLiquida: 0 }
+export const EMPTY_TOTALS: StageTotals = { spendComImposto: 0, impressions: 0, leads: 0, landingPageViews: 0, vendas: 0, receitaLiquida: 0, vendasEspelho: 0 }
 
 export function sumTotals(rows: StageTotals[]): StageTotals {
   return rows.reduce(
@@ -132,9 +152,18 @@ export function sumTotals(rows: StageTotals[]): StageTotals {
       landingPageViews: sum.landingPageViews + row.landingPageViews,
       vendas: sum.vendas + row.vendas,
       receitaLiquida: sum.receitaLiquida + row.receitaLiquida,
+      vendasEspelho: sum.vendasEspelho + row.vendasEspelho,
     }),
     EMPTY_TOTALS
   )
+}
+
+/**
+ * A lead stage that mirrors sales has the mirrored buyers as its leads (0108, as watcher_day): the
+ * buyers of the source's entry product are the paid leads, so its CPL is the spend over them.
+ */
+export function withMirroredLeads(stage: Pick<Stage, 'measure' | 'mirror'>, totals: StageTotals): StageTotals {
+  return stage.measure === 'lead' && stage.mirror ? { ...totals, leads: totals.vendas } : totals
 }
 
 /** The stage's result count in its measure's unit (thousands of impressions for alcance). */

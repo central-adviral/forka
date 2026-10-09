@@ -113,7 +113,7 @@ export default async function StagesAndFrontsPage({
       .order('position'),
     supabase.rpc('get_client_campaigns', { p_client_id: client.id, p_since: since, p_until: until }),
     supabase.from('campaign_daily').select('synced_at').eq('client_id', client.id).order('synced_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('sales_funnels').select('id, name, archived_at').eq('client_id', client.id).neq('id', funnel.id).order('name'),
+    supabase.from('sales_funnels').select('id, name, archived_at, project_products(produto_nome)').eq('client_id', client.id).neq('id', funnel.id).order('name'),
     getFunnelStages(supabase, funnel.id),
     getCostCombos(supabase, funnel.id),
     getStagePresets(supabase, client.id),
@@ -423,7 +423,13 @@ export default async function StagesAndFrontsPage({
         ownPresets={presets.some((preset) => preset.id !== null)}
         canEdit={canEdit}
         context={pinContext}
-        otherFunnels={(otherFunnels ?? []).filter((other) => !other.archived_at).map((other) => ({ id: other.id as string, name: other.name as string }))}
+        otherFunnels={(otherFunnels ?? [])
+          .filter((other) => !other.archived_at)
+          .map((other) => ({
+            id: other.id as string,
+            name: other.name as string,
+            products: ((other.project_products ?? []) as { produto_nome: string }[]).map((product) => product.produto_nome),
+          }))}
         metasHref={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/metas`}
         boardHref={`/dashboard/clients/${client.slug}/backlog?projeto=${funnel.slug}`}
         initialStageId={etapa ?? null}
