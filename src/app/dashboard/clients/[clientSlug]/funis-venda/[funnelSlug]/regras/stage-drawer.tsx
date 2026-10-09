@@ -7,7 +7,8 @@ import { cleanTag, metaFromInput, metaToInput } from '@/lib/domain/stage-canvas'
 import { TETO_MEDIDA, decidesCreatives, followersLine, frontPrincipalMeta, sourceLabel, tetoChanged, type TestTeto, type TetoMedida } from '@/lib/domain/targets'
 import { decimalInput, formatMetric } from '@/lib/domain/watchers'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { addRule, createFront, previewRule, removeRule, setFrontArchived, updateFront, updateRule } from './actions'
+import { PAGE_KINDS, PAGE_KIND_LABEL } from '@/lib/domain/new-funnel'
+import { addFrontPage, addRule, createFront, previewRule, removeRule, setFrontArchived, unlinkFrontPage, updateFront, updateRule } from './actions'
 import { RuleForm } from './rule-form'
 import type { StageFields, WatcherTargetsInput } from './stage-actions'
 import type { CanvasContext, CanvasFront, CanvasStage, CanvasTest, CanvasWatcher } from './canvas-types'
@@ -621,6 +622,47 @@ function FrontItem({
       )}
       {canEdit && !front.sourceName && (
         <RuleForm addAction={addRule.bind(null, frontContext)} previewAction={previewRule.bind(null, frontContext)} fieldClass={smallField} mono={mono} />
+      )}
+      {!front.sourceName && (
+        <div className="flex flex-col gap-1.5 border-t border-[var(--ct-line)] pt-2">
+          <span className="text-[12px] font-medium text-[var(--ct-text-2)]">Páginas desta frente</span>
+          {front.pages.length === 0 && <span className="text-[12px] text-[var(--ct-text-3)]">Nenhuma (opcional): com uma página, a sonda avisa se ela cair.</span>}
+          {front.pages.length > 0 && (
+            <ul className="flex flex-col gap-1">
+              {front.pages.map((page) => (
+                <li key={page.id} className="flex min-w-0 items-center gap-2 text-[12px]">
+                  <span className="flex-none rounded-full bg-[var(--ct-surface-3)] px-2 py-0.5 text-[11px] text-[var(--ct-text-2)]">{page.tipo ? PAGE_KIND_LABEL[page.tipo] : 'página'}</span>
+                  <a href={page.url} target="_blank" rel="noreferrer" className={`${mono} min-w-0 flex-1 truncate text-[var(--ct-text)] hover:text-[var(--ct-accent)] hover:underline`}>
+                    {page.url.replace('https://', '')}
+                  </a>
+                  {!page.isActive && <span className="flex-none text-[11px] text-[var(--ct-text-3)]">pausada</span>}
+                  {canEdit && (
+                    <form action={unlinkFrontPage.bind(null, { ...context, page_id: page.id })}>
+                      <button type="submit" aria-label={`Desligar ${page.url} da frente ${front.name}`} className="flex-none text-[11.5px] text-[var(--ct-text-3)] hover:text-[var(--ct-crit)] hover:underline">
+                        desligar
+                      </button>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {canEdit && (
+            <form action={addFrontPage.bind(null, { ...frontContext, front_name: front.name })} className="grid grid-cols-[104px_minmax(0,1fr)_auto] items-center gap-1.5">
+              <select name="tipo" defaultValue={stage.measure === 'lead' ? 'captura' : 'vendas'} aria-label={`Tipo da página da frente ${front.name}`} className={smallField}>
+                {PAGE_KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {PAGE_KIND_LABEL[kind]}
+                  </option>
+                ))}
+              </select>
+              <input name="url" required inputMode="url" placeholder="exemplo.com/aula" aria-label={`Endereço da página da frente ${front.name}`} className={`${smallField} ${mono}`} />
+              <button type="submit" className={smallButton}>
+                + Página
+              </button>
+            </form>
+          )}
+        </div>
       )}
       {canEdit && (
         <div className="flex flex-wrap items-center gap-2">

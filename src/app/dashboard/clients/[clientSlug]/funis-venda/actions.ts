@@ -71,58 +71,41 @@ export async function setProjectStatus(input: z.infer<typeof projectStatusSchema
   revalidatePath('/dashboard', 'layout')
 }
 
-const editSalesFunnelSchema = z.object({
+const legacyOperationsSchema = z.object({
   sales_funnel_id: z.string().uuid(),
   client_id: z.string().uuid(),
-  client_slug: z.string(),
-  funnel_slug: z.string(),
-  name: z.string().min(1),
   launchops_operacao_ids: z
     .string()
     .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean))
     .pipe(z.array(z.string().uuid('IDs de operação devem ser UUIDs válidos'))),
-  // The project's window: a front that reads another project only counts these days (0054).
-  starts_on: z.union([z.literal(''), z.iso.date()]).transform((value) => value || null),
-  ends_on: z.union([z.literal(''), z.iso.date()]).transform((value) => value || null),
-}).refine((value) => !value.starts_on || !value.ends_on || value.ends_on >= value.starts_on, 'o fim da janela vem depois do início')
+})
 
-export async function editSalesFunnel(
+// "Histórico antigo": the LaunchOps operations of a funnel with days before its synced campaigns.
+// Name, tag, status and window are edited in the funnel header (0107).
+export async function saveLegacyOperations(
   context: { sales_funnel_id: string; client_id: string; client_slug: string; funnel_slug: string },
   formData: FormData
 ) {
-  const result = editSalesFunnelSchema.safeParse({
-    sales_funnel_id: context.sales_funnel_id,
-    client_id: context.client_id,
-    client_slug: context.client_slug,
-    funnel_slug: context.funnel_slug,
-    name: formData.get('name'),
-    launchops_operacao_ids: formData.get('launchops_operacao_ids'),
-    starts_on: formData.get('starts_on') ?? '',
-    ends_on: formData.get('ends_on') ?? '',
-  })
-  if (!result.success) {
-    throw new Error(result.error.issues.map((issue) => issue.message).join('; '))
-  }
+  const checklist = `/dashboard/clients/${context.client_slug}/funis-venda/${context.funnel_slug}/configurar`
+  const result = legacyOperationsSchema.safeParse({ ...context, launchops_operacao_ids: formData.get('launchops_operacao_ids') ?? '' })
+  if (!result.success) redirect(`${checklist}?erro=${encodeURIComponent(result.error.issues.map((issue) => issue.message).join('; '))}`)
   const parsed = result.data
-
   const supabase = await createServerSupabaseClient()
   const archived = await archivedProjectError(supabase, parsed.sales_funnel_id)
-  if (archived) throw new Error(archived)
-  await assertNoDuplicateLaunchOpsMapping(supabase, parsed.client_id, parsed.launchops_operacao_ids, parsed.sales_funnel_id)
-  const { error } = await supabase
+  if (archived) redirect(`${checklist}?erro=${encodeURIComponent(archived)}`)
+  try {
+    await assertNoDuplicateLaunchOpsMapping(supabase, parsed.client_id, parsed.launchops_operacao_ids, parsed.sales_funnel_id)
+  } catch (err) {
+    redirect(`${checklist}?erro=${encodeURIComponent(err instanceof Error ? err.message : String(err))}`)
+  }
+  const { data, error } = await supabase
     .from('sales_funnels')
-    .update({
-      name: parsed.name,
-      launchops_operacao_ids: parsed.launchops_operacao_ids,
-      starts_on: parsed.starts_on,
-      ends_on: parsed.ends_on,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ launchops_operacao_ids: parsed.launchops_operacao_ids, updated_at: new Date().toISOString() })
     .eq('id', parsed.sales_funnel_id)
-  if (error) throw error
-  revalidatePath(`/dashboard/clients/${parsed.client_slug}/funis-venda`)
-  revalidatePath(`/dashboard/clients/${parsed.client_slug}/funis-venda/${parsed.funnel_slug}`)
-  redirect(`/dashboard/clients/${parsed.client_slug}/funis-venda/${parsed.funnel_slug}`)
+    .select('id')
+  if (error || !data?.length) redirect(`${checklist}?erro=${encodeURIComponent(error?.message ?? 'Só gestor ou owner pode mudar o funil.')}`)
+  revalidatePath(`/dashboard/clients/${context.client_slug}/funis-venda`, 'layout')
+  redirect(`${checklist}?ok=${encodeURIComponent('Histórico antigo salvo.')}`)
 }
 
 export async function syncFunnelNow(context: { sales_funnel_id: string; client_slug: string; funnel_slug: string }) {

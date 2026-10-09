@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { checkFindings, type PageSuggestion } from '@/lib/domain/page-probe'
-import { PAGE_KINDS, PAGE_KIND_LABEL, type PageKind } from '@/lib/domain/project-wizard'
+import { PAGE_KINDS, PAGE_KIND_LABEL, type PageKind } from '@/lib/domain/new-funnel'
 import type { ExistingPage } from '@/lib/repo/pages-repo'
 import { movePage, type TestPageResult } from './actions'
 

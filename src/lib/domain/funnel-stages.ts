@@ -85,6 +85,30 @@ export function measureOfMetric(metric: ProjectResult): Exclude<StageMeasure, 'a
   return metric
 }
 
+/**
+ * The funnel's result stage (0107): its last open stage of the sequence, parallel stages and ascensão
+ * left out. Stages come in position order, as getFunnelStages reads them.
+ */
+export function funnelResultStage<T extends Pick<Stage, 'measure' | 'parallel' | 'archivedAt'>>(stages: T[]): T | undefined {
+  return stages.filter((stage) => !stage.parallel && !stage.archivedAt && stage.measure !== 'ascensao').at(-1)
+}
+
+/** The funnel's resultado for its result stage's measure, as private.derived_resultado: ROAS and checkout live in the compra stage. */
+export function derivedResultado(current: ProjectResult, measure: StageMeasure | null | undefined): ProjectResult {
+  if (!measure || measure === 'ascensao') return current
+  if (measure === 'compra' && (current === 'compra' || current === 'roas' || current === 'checkout')) return current
+  return measure
+}
+
+/**
+ * The stage that counts a product's sales (0105): entrada, order bump and upsell in the compra stage,
+ * ascensão in the ascensao stage; with two, the first open one by position (as the sales are placed).
+ */
+export function stageOfProductRole<T extends Pick<Stage, 'measure' | 'position' | 'archivedAt'>>(role: string, stages: T[]): T | undefined {
+  const measure: StageMeasure = role === 'ascensao' ? 'ascensao' : 'compra'
+  return stages.filter((stage) => stage.measure === measure && !stage.archivedAt).sort((a, b) => a.position - b.position)[0]
+}
+
 /** A stage's totals over a period, as get_funnel_stage_daily gives them per day. */
 export interface StageTotals {
   spendComImposto: number

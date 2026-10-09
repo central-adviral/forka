@@ -1,5 +1,6 @@
 import type { Stage, StageMeasure } from '@/lib/domain/funnel-stages'
 import type { ProjectResult } from '@/lib/domain/project-plan'
+import type { PageKind } from '@/lib/domain/new-funnel'
 import type { StageFollowers, TargetSource, TestTeto, TetoMedida } from '@/lib/domain/targets'
 import type { WatcherMetric } from '@/lib/domain/watchers'
 
@@ -25,6 +26,8 @@ export interface CanvasFront {
   janelaFim: string | null
   campaigns: number
   spend: number
+  /** The pages linked to the front (pages.front_id), watched in Alertas › Páginas. */
+  pages: { id: string; url: string; tipo: PageKind | null; isActive: boolean }[]
 }
 
 export interface CanvasWatcher {

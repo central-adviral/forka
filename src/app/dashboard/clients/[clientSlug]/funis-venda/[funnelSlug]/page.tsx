@@ -268,7 +268,7 @@ export default async function SalesFunnelPage({
   const projectBase = `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`
   const quality = ((qualityRows ?? []) as ProjectQualityRow[])[0]
   const seals = quality
-    ? qualitySeals(quality, { regras: `${projectBase}/regras`, produtos: `${projectBase}/produtos`, edit: `${projectBase}/edit`, metas: `${projectBase}/metas` })
+    ? qualitySeals(quality, { regras: `${projectBase}/regras`, produtos: `${projectBase}/produtos`, metas: `${projectBase}/metas` })
     : []
 
   return (
@@ -307,8 +307,8 @@ export default async function SalesFunnelPage({
                 <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`} className={headerAction}>
                   Etapas e frentes
                 </a>
-                <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/edit`} className={headerAction}>
-                  Editar
+                <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/configurar`} className={headerAction}>
+                  Configurar
                 </a>
               </>
             )

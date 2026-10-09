@@ -11,20 +11,29 @@ import { saoPauloDay } from '@/lib/repo/today-repo'
 import { ProjectMap, type MapFront } from './project-map'
 import { setFrontArchived } from '../regras/actions'
 import { ArchivedProjectBanner } from '../../archived-project-banner'
+import { FunnelHeader } from '../funnel-header'
+import { FunnelMoreOptions } from './funnel-more-options'
 
-// Projeto › Visão geral: the setup steps as cards, in order. Read-only; each card links to the
-// screen that already edits that step.
+// Configurar › Funil › Checklist: the funnel header and the five setup steps as cards, in the menu's
+// order. Each card links to the screen that edits that step.
 
 const mono = 'font-[family-name:var(--font-geist-mono)]'
 
-export default async function ProjectSetupPage({ params }: { params: Promise<{ clientSlug: string; funnelSlug: string }> }) {
+export default async function ProjectSetupPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ clientSlug: string; funnelSlug: string }>
+  searchParams: Promise<{ ok?: string; erro?: string }>
+}) {
   const { clientSlug, funnelSlug } = await params
+  const { ok, erro } = await searchParams
   const supabase = await createServerSupabaseClient()
   const { data: client } = await supabase.from('clients').select('id, slug').eq('slug', clientSlug).maybeSingle()
   if (!client) notFound()
   // Configuration is internal to the agency, like the screens these cards lead to.
   if (!(await canActAs(supabase, client.id, 'analista'))) notFound()
-  const { data: funnel } = await supabase.from('sales_funnels').select('id, name, slug, resultado, archived_at').eq('client_id', client.id).eq('slug', funnelSlug).maybeSingle()
+  const { data: funnel } = await supabase.from('sales_funnels').select('id, name, slug, resultado, archived_at, launchops_operacao_ids').eq('client_id', client.id).eq('slug', funnelSlug).maybeSingle()
   if (!funnel) notFound()
 
   const window = { p_sales_funnel_id: funnel.id, p_since: saoPauloDay(-30), p_until: saoPauloDay(1) }
@@ -41,15 +50,14 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
   if (!status) notFound()
 
   const base = `/dashboard/clients/${client.slug}`
+  const metasStep = status.steps.find((step) => step.id === 'metas')
   const stepHref: Record<SetupStepId, string | null> = {
     // Integrações is owner-only; other roles see the step but not a link to it.
     integracoes: isOwner ? `${base}/integrations` : null,
-    projeto: `${base}/funis-venda/${funnel.slug}/edit`,
+    etapas: `${base}/funis-venda/${funnel.slug}/regras`,
     produtos: `${base}/funis-venda/${funnel.slug}/produtos`,
-    regras: `${base}/funis-venda/${funnel.slug}/regras`,
-    paginas: `${base}/paginas`,
-    plano: `${base}/funis-venda/${funnel.slug}/metas`,
-    metas: `${base}/funis-venda/${funnel.slug}/metas`,
+    // A stage meta is edited on the canvas; with every meta set, the rest is in Metas e vigias.
+    metas: `${base}/funis-venda/${funnel.slug}/${metasStep?.done ? 'metas' : 'regras'}`,
     conferir: '#mapa',
   }
   const spendByFront = new Map<string, number>()
@@ -92,7 +100,20 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
         <ArchivedProjectBanner salesFunnelId={funnel.id} archivedAt={funnel.archived_at} canRestore={canEdit} note="A configuração fica só para leitura." />
       )}
 
-      <ol className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(230px,1fr))]">
+      {ok && (
+        <p role="status" className="rounded-[10px] bg-[var(--ct-ok-soft)] px-4 py-3 text-[13px] text-[var(--ct-ok)]">
+          {ok}
+        </p>
+      )}
+      {erro && (
+        <p role="alert" className="rounded-[10px] bg-[var(--ct-crit-soft)] px-4 py-3 text-[13px] text-[var(--ct-crit)]">
+          {erro}
+        </p>
+      )}
+
+      <FunnelHeader client={client} salesFunnelId={funnel.id} canEdit={canEdit && !funnel.archived_at} regrasHref={`${base}/funis-venda/${funnel.slug}/regras`} />
+
+      <ol className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
         {status.steps.map((step, index) => {
           const href = stepHref[step.id]
           const current = step.id === next?.id
@@ -156,6 +177,12 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
             ))}
           </ul>
         </details>
+      )}
+      {canEdit && !funnel.archived_at && (
+        <FunnelMoreOptions
+          context={{ sales_funnel_id: funnel.id, client_id: client.id, client_slug: client.slug, funnel_slug: funnel.slug }}
+          operacaoIds={(funnel.launchops_operacao_ids ?? []).join(', ')}
+        />
       )}
     </div>
   )

@@ -37,6 +37,7 @@ vi.mock('@/lib/supabase/server', () => ({
   }),
 }))
 vi.mock('@/lib/supabase/service-role', () => ({ createServiceRoleClient: () => ({}) }))
+vi.mock('@/lib/view-as', () => ({ canActAs: async () => true }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('next/navigation', () => ({
   redirect: (to: string) => {
@@ -47,7 +48,8 @@ vi.mock('next/navigation', () => ({
 import { saveBand, saveResult } from './[funnelSlug]/metas/actions'
 import { removeProduct, setProductRole } from './[funnelSlug]/produtos/actions'
 import { applySince } from './[funnelSlug]/apply-since-actions'
-import { editSalesFunnel } from './actions'
+import { saveLegacyOperations } from './actions'
+import { saveFunnelHeader } from './[funnelSlug]/funnel-header-actions'
 
 const funnelId = '11111111-1111-4111-8111-111111111111'
 const clientId = '22222222-2222-4222-8222-222222222222'
@@ -82,9 +84,16 @@ describe('writes to an archived project', () => {
     expect(db.writes).toEqual([])
   })
 
-  it('refuses the project edit', async () => {
-    const edit = form({ name: 'T15', launchops_operacao_ids: '', starts_on: '', ends_on: '' })
-    await expect(editSalesFunnel(context, edit)).rejects.toThrow('Funil arquivado: restaure para editar.')
+  it('refuses the funnel header and the old operations', async () => {
+    for (const change of [
+      { field: 'name', value: 'T15' },
+      { field: 'tag', value: 't15' },
+      { field: 'status', value: 'rodando' },
+      { field: 'window', value: { starts_on: '2026-10-01', ends_on: '' } },
+    ] as const) {
+      expect(await saveFunnelHeader(context, change)).toEqual({ error: 'Funil arquivado: restaure para editar.' })
+    }
+    await expect(saveLegacyOperations(context, form({ launchops_operacao_ids: '' }))).rejects.toThrow(/erro=Funil arquivado/)
     expect(db.writes).toEqual([])
   })
 

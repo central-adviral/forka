@@ -2,30 +2,28 @@ import { describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getProjectSetupStatus } from './project-setup-repo'
 
-// A stand-in for the Supabase client: each table answers with fixed rows or a count, whatever the
-// filters. Enough to check how the five facts turn into steps; the real queries run in integration.
+// A stand-in for the Supabase client: each table answers with fixed rows, whatever the filters.
+// Enough to check how the facts turn into the five steps; the real queries run in integration.
 interface Fixture {
   client: { funnel_source_url: string | null } | null
-  project: { resultado: string | null } | null
+  project: { warn_pct: number; crit_pct: number } | null
   secrets: { funnel_source_service_role_key: string | null; hubla_webhook_token: string | null } | null
-  entryProducts: number
-  namingRules: number
-  watchers: { metric: string; front_id: string | null; target: number }[]
-  fronts: { id?: string; name?: string; source_sales_funnel_id: string | null; naming_rules: { kind: string }[] }[]
+  products: { papel: string }[]
+  stages: { id: string; name: string; tag: string | null; measure: string; meta: number | null; meta_roas: number | null }[]
+  fronts: { id: string; name: string; stage_id: string; source_sales_funnel_id: string | null; naming_rules: { kind: string; value: string }[] }[]
   pages?: { front_id: string | null }[]
   quality?: Record<string, number> | null
 }
 
 function fakeDb(fixture: Fixture): SupabaseClient {
-  const answer: Record<string, () => { data?: unknown; count?: number }> = {
+  const answer: Record<string, () => { data?: unknown }> = {
     clients: () => ({ data: fixture.client }),
     sales_funnels: () => ({ data: fixture.project }),
     client_secrets: () => ({ data: fixture.secrets }),
-    project_products: () => ({ count: fixture.entryProducts }),
-    naming_rules: () => ({ count: fixture.namingRules }),
-    watchers: () => ({ data: fixture.watchers }),
+    project_products: () => ({ data: fixture.products }),
+    funnel_stages: () => ({ data: fixture.stages }),
     project_fronts: () => ({ data: fixture.fronts }),
-    pages: () => ({ data: fixture.pages ?? [{ front_id: 'f1' }] }),
+    pages: () => ({ data: fixture.pages ?? [{ front_id: 'f1' }, { front_id: 'f2' }] }),
   }
   return {
     rpc: async () => ({ data: fixture.quality === null ? null : [fixture.quality ?? {}], error: null }),
@@ -34,7 +32,7 @@ function fakeDb(fixture: Fixture): SupabaseClient {
       const chain: Record<string, unknown> = {
         then: (resolve: (value: unknown) => void) => resolve(result),
       }
-      for (const method of ['select', 'eq', 'is', 'in', 'maybeSingle']) chain[method] = () => chain
+      for (const method of ['select', 'eq', 'is', 'in', 'order', 'maybeSingle']) chain[method] = () => chain
       return chain
     },
   } as unknown as SupabaseClient
@@ -42,15 +40,17 @@ function fakeDb(fixture: Fixture): SupabaseClient {
 
 const READY: Fixture = {
   client: { funnel_source_url: 'https://launchops.example.com' },
-  project: { resultado: 'compra' },
+  project: { warn_pct: 20, crit_pct: 40 },
   secrets: { funnel_source_service_role_key: 'k', hubla_webhook_token: 't' },
-  entryProducts: 1,
-  namingRules: 3,
-  watchers: [
-    { metric: 'cpa_geral', front_id: null, target: 60 },
-    { metric: 'ctr', front_id: 'f1', target: 1.2 },
+  products: [{ papel: 'entrada' }, { papel: 'order_bump' }],
+  stages: [
+    { id: 's1', name: 'Captação', tag: 'CAP', measure: 'lead', meta: 6, meta_roas: null },
+    { id: 's2', name: 'Vendas', tag: 'VND', measure: 'compra', meta: null, meta_roas: 2 },
   ],
-  fronts: [{ id: 'f1', name: 'Captação', source_sales_funnel_id: null, naming_rules: [{ kind: 'include' }, { kind: 'exclude' }] }],
+  fronts: [
+    { id: 'f1', name: 'Frio', stage_id: 's1', source_sales_funnel_id: null, naming_rules: [{ kind: 'include', value: 'FRIO' }, { kind: 'exclude', value: 'X' }] },
+    { id: 'f2', name: 'Base', stage_id: 's2', source_sales_funnel_id: null, naming_rules: [{ kind: 'include', value: 'BASE' }] },
+  ],
 }
 
 async function status(overrides: Partial<Fixture>) {
@@ -59,67 +59,64 @@ async function status(overrides: Partial<Fixture>) {
 }
 // Conferir is pending whenever another step is: these cases look at the step that causes it.
 const pending = (result: Awaited<ReturnType<typeof status>>) => result!.steps.filter((step) => !step.done && step.id !== 'conferir').map((step) => step.id)
+const text = (result: Awaited<ReturnType<typeof status>>, id: string) => result!.steps.find((step) => step.id === id)!.text
 
 describe('getProjectSetupStatus', () => {
-  it('is 8/8 when every step is set', async () => {
+  it('is 5/5 when every step is set, with the menu names', async () => {
     const result = await status({})
-    expect(result!.done).toBe(8)
-    expect(pending(result)).toEqual([])
+    expect(result!.done).toBe(5)
+    expect(result!.steps.map((step) => step.label)).toEqual(['Integrações', 'Etapas e frentes', 'Produtos', 'Metas e vigias', 'Conferir'])
+    expect(text(result, 'etapas')).toBe('2 etapas, 2 frentes.')
   })
 
   it('1. Integrações: needs LaunchOps (URL and key) and the Hubla token', async () => {
     expect(pending(await status({ secrets: { funnel_source_service_role_key: 'k', hubla_webhook_token: null } }))).toEqual(['integracoes'])
     expect(pending(await status({ client: { funnel_source_url: null } }))).toEqual(['integracoes'])
-    const none = await status({ secrets: null })
-    expect(none!.steps[0].text).toBe('Falta conectar LaunchOps e Hubla.')
+    expect(text(await status({ secrets: null }), 'integracoes')).toBe('Falta conectar LaunchOps e Hubla.')
   })
 
-  it('2. Produtos: needs at least one product with the entry role', async () => {
-    const result = await status({ entryProducts: 0 })
-    expect(pending(result)).toEqual(['produtos'])
-    expect(result!.done).toBe(6)
+  it('2. Etapas e frentes: stage tags with more than one stage, no repeated tag, every own front with a "contém"', async () => {
+    const noTag = await status({ stages: [{ ...READY.stages[0], tag: null }, READY.stages[1]] })
+    expect(pending(noTag)).toEqual(['etapas'])
+    expect(text(noTag, 'etapas')).toBe('Falta: etiqueta da etapa Captação.')
+    expect(pending(await status({ stages: [{ ...READY.stages[1], tag: null }], fronts: [READY.fronts[1]] }))).toEqual([])
+    expect(text(await status({ stages: [READY.stages[0], { ...READY.stages[1], tag: 'cap' }] }), 'etapas')).toContain('etiqueta CAP repetida (Captação, Vendas)')
+    const excludeOnly = await status({ fronts: [{ ...READY.fronts[0], naming_rules: [{ kind: 'exclude', value: 'X' }] }, READY.fronts[1]] })
+    expect(text(excludeOnly, 'etapas')).toBe('Falta: etiqueta da frente Frio.')
+    const twins = await status({ fronts: [...READY.fronts, { ...READY.fronts[0], id: 'f3', name: 'Frio 2', naming_rules: [{ kind: 'include', value: 'frio' }] }] })
+    expect(text(twins, 'etapas')).toContain('frentes Frio e Frio 2 com a mesma etiqueta')
+    expect(text(await status({ fronts: [] }), 'etapas')).toBe('Falta: ao menos uma frente.')
+    expect(text(await status({ stages: [] }), 'etapas')).toBe('Falta: ao menos uma etapa.')
   })
 
-  it('2. Produtos: a lead project counts leads, so it needs no entry product', async () => {
-    const result = await status({ project: { resultado: 'lead' }, entryProducts: 0, watchers: [{ metric: 'cpl', front_id: null, target: 5 }, { metric: 'ctr', front_id: 'f1', target: 1 }] })
-    expect(pending(result)).toEqual([])
-    expect(result!.steps.find((step) => step.id === 'produtos')!.text).toContain('CPL')
+  it('2. Etapas e frentes: a mirror needs no rule; a front without page is only said', async () => {
+    const mirror = await status({ fronts: [READY.fronts[0], { ...READY.fronts[1], source_sales_funnel_id: 'other', naming_rules: [] }] })
+    expect(pending(mirror)).toEqual([])
+    const noPage = await status({ pages: [] })
+    expect(pending(noPage)).toEqual([])
+    expect(text(noPage, 'etapas')).toBe('2 etapas, 2 frentes; 2 frentes sem página (opcional).')
   })
 
-  it('3. Etapas e frentes: every own front needs a "contém" rule; a mirror front needs none', async () => {
-    // No front at all: no rules, and no front to hang a page on.
-    expect(pending(await status({ fronts: [] }))).toEqual(['regras', 'paginas'])
-    const excludeOnly = await status({ fronts: [{ id: 'f1', name: 'Captação', source_sales_funnel_id: null, naming_rules: [{ kind: 'exclude' }] }] })
-    expect(pending(excludeOnly)).toEqual(['regras'])
-    expect(excludeOnly!.steps.find((step) => step.id === 'regras')!.text).toContain('não pega nenhuma campanha')
-    const mirror = await status({ namingRules: 0, fronts: [{ source_sales_funnel_id: 'other', naming_rules: [] }] })
-    // Rules are fine; pages are not, since a mirror front owns no page.
-    expect(pending(mirror)).toEqual(['paginas'])
-    expect(mirror!.steps.find((step) => step.id === 'regras')!.text).toBe('1 frente lê outro funil.')
+  it('3. Produtos: an entry product when a stage sells, an ascension product when a stage ascends', async () => {
+    expect(text(await status({ products: [] }), 'produtos')).toBe('Nenhum produto de entrada: nenhuma venda conta ainda.')
+    const ascends = await status({ stages: [...READY.stages, { id: 's3', name: 'Ascensão', tag: 'ASC', measure: 'ascensao', meta: 0.1, meta_roas: null }] })
+    expect(pending(ascends)).toEqual(['produtos'])
+    expect(text(ascends, 'produtos')).toBe('Há etapa de ascensão sem produto de ascensão.')
+    const leadOnly = await status({ stages: [READY.stages[0]], fronts: [READY.fronts[0]], products: [] })
+    expect(pending(leadOnly)).toEqual([])
+    expect(text(leadOnly, 'produtos')).toBe('Sem etapa de compra: o funil não conta vendas.')
   })
 
-  it('4. Plano: needs the result and the cost target (the project-wide cost watcher)', async () => {
-    // Only the CTR watcher left: no cost target, and it still counts as an extra watcher.
-    expect(pending(await status({ watchers: [{ metric: 'ctr', front_id: 'f1', target: 1.2 }] }))).toEqual(['plano'])
-    // A lead project's cost watcher is the CPL one; a CPA watcher does not stand in for it.
-    expect(pending(await status({ project: { resultado: 'lead' } }))).toEqual(['plano'])
-  })
-
-  it('5. Metas: needs a watcher besides the cost one', async () => {
-    const result = await status({ watchers: [{ metric: 'cpa_geral', front_id: null, target: 60 }] })
+  it('4. Metas e vigias: every stage has a meta (a ROAS floor counts for compra)', async () => {
+    const result = await status({ stages: [{ ...READY.stages[0], meta: null }, READY.stages[1]] })
     expect(pending(result)).toEqual(['metas'])
-    expect(result!.steps.find((step) => step.id === 'metas')!.text).toContain('Só o vigia do resultado')
+    expect(text(result, 'metas')).toBe('Falta a meta de: Captação (edite no canvas).')
+    expect(text(await status({}), 'metas')).toBe('Toda etapa tem meta; faixa +20% / +40%.')
   })
 
-  it('returns null for a project the session cannot see', async () => {
+  it('returns null for a funnel the session cannot see', async () => {
     expect(await status({ project: null })).toBeNull()
     expect(await status({ client: null })).toBeNull()
-  })
-
-  it('Páginas: every own front needs an active page', async () => {
-    const result = await status({ pages: [] })
-    expect(pending(result)).toEqual(['paginas'])
-    expect(result!.steps.find((step) => step.id === 'paginas')!.text).toContain('Captação')
   })
 
   it('Conferir: done only with every step done and no quality seal open', async () => {

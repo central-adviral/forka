@@ -24,8 +24,10 @@ import { resultStage, stageFollowers, watcherReader, type FrontMetas, type MetaR
 import { measureOfMetric } from '@/lib/domain/funnel-stages'
 import { campaignNameSuggestion, stageSetupItems } from '@/lib/domain/stage-canvas'
 import { getCostCombos, getFunnelStages, getStagePresets } from '@/lib/repo/funnel-stages-repo'
+import type { PageKind } from '@/lib/domain/new-funnel'
 import { StagesCanvas } from './stages-canvas'
 import type { CanvasStage } from './canvas-types'
+import { FunnelHeader } from '../funnel-header'
 
 interface FrontRow {
   id: string
@@ -81,7 +83,7 @@ export default async function StagesAndFrontsPage({
   if (!(await canActAs(supabase, client.id, 'analista'))) notFound()
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, archived_at, starts_on, ends_on, resultado')
+    .select('id, name, slug, tag, archived_at, starts_on, ends_on, resultado')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
@@ -99,6 +101,7 @@ export default async function StagesAndFrontsPage({
     presets,
     { data: watcherRows, error: watchersError },
     { data: testRows, error: testsError },
+    { data: pageRows, error: pagesError },
   ] = await Promise.all([
     canActAs(supabase, client.id, 'gestor'),
     supabase
@@ -122,11 +125,17 @@ export default async function StagesAndFrontsPage({
       .select('id, code, title, status, method, funnel_stage_id, teto, teto_inicial, teto_medida, effective_teto, effective_teto_source, effective_teto_medida')
       .eq('sales_funnel_id', funnel.id)
       .order('code'),
+    supabase.from('pages').select('id, url, tipo, front_id, is_active').eq('sales_funnel_id', funnel.id).not('front_id', 'is', null).order('created_at'),
   ])
 
   if (frontsError) throw frontsError
   if (watchersError) throw watchersError
   if (testsError) throw testsError
+  if (pagesError) throw pagesError
+  const pagesOfFront = (frontId: string) =>
+    ((pageRows ?? []) as { id: string; url: string; tipo: PageKind | null; front_id: string; is_active: boolean }[])
+      .filter((page) => page.front_id === frontId)
+      .map((page) => ({ id: page.id, url: page.url, tipo: page.tipo, isActive: page.is_active }))
   const allFronts = (frontRows ?? []) as unknown as FrontRow[]
   // An archived project opens read-only; its archived fronts are listed apart, to restore.
   const canEdit = canEditClient && !funnel.archived_at
@@ -235,6 +244,7 @@ export default async function StagesAndFrontsPage({
             janelaFim: row?.janela_fim ?? funnel.ends_on,
             campaigns: stats?.campaigns ?? 0,
             spend: stats?.spend ?? 0,
+            pages: pagesOfFront(front.id),
           }
         }),
         watchers: watchers
@@ -295,9 +305,9 @@ export default async function StagesAndFrontsPage({
     <section className="card-shadow grid min-w-0 gap-3.5 rounded-[22px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-6 py-[22px]">
       <div className="flex flex-wrap items-baseline justify-between gap-2.5">
         <h2 className="text-[17px] font-semibold">Nomenclatura das campanhas</h2>
-        <p className="text-[12.5px] text-[var(--ct-text-3)]">Como nomear no Meta Ads</p>
+        <p className={`${mono} text-[12.5px] text-[var(--ct-text-3)]`}>{'{funil} | {etapa} | {frente} | criativo'}</p>
       </div>
-      <p className="text-[12.5px] text-[var(--ct-text-3)]">A etiqueta da etapa e a da frente precisam estar no nome; o resto é livre.</p>
+      <p className="text-[12.5px] text-[var(--ct-text-3)]">A etiqueta do funil, a da etapa e a da frente precisam estar no nome; a ordem e o resto são livres.</p>
       <div className={`${mono} grid gap-1.5 overflow-x-auto text-[12.5px]`}>
         {ordered.flatMap((stage) => {
           const own = stage.fronts.filter((front) => !front.sourceName)
@@ -314,7 +324,7 @@ export default async function StagesAndFrontsPage({
               <span className="min-w-[160px] font-[family-name:var(--font-body)] text-[var(--ct-text-3)]">
                 {stage.name} › {front.name}
               </span>
-              <span className="whitespace-nowrap">{campaignNameSuggestion(stage.tag, front.rules.find((rule) => rule.kind === 'include')?.value ?? front.code)}</span>
+              <span className="whitespace-nowrap">{campaignNameSuggestion(funnel!.tag, stage.tag, front.rules.find((rule) => rule.kind === 'include')?.value ?? front.code)}</span>
             </div>
           ))
         })}
@@ -329,7 +339,7 @@ export default async function StagesAndFrontsPage({
         title="Etapas e frentes"
         note={
           canEdit
-            ? 'Monte a jornada arrastando etapas. Cada etapa mede o próprio custo, só com o gasto das campanhas dela; clique numa etapa para editar meta, etiqueta, frentes, vigias e testes.'
+            ? 'Monte a jornada arrastando etapas. Cada etapa mede o próprio custo, só com o gasto das campanhas dela; clique numa etapa para editar meta, etiqueta, frentes, páginas, vigias e testes.'
             : 'Somente leitura: só gestor ou owner muda etapas e frentes.'
         }
         actions={
@@ -351,6 +361,8 @@ export default async function StagesAndFrontsPage({
       />
 
       {funnel.archived_at && <ArchivedProjectBanner salesFunnelId={funnel.id} archivedAt={funnel.archived_at} canRestore={canEditClient} />}
+
+      <FunnelHeader client={client} salesFunnelId={funnel.id} canEdit={canEdit} regrasHref={`${base}/regras`} />
 
       {ok && (
         <p role="status" className="rounded-[10px] bg-[var(--ct-an-soft)] px-4 py-3 text-[13px] text-[var(--ct-an)]">

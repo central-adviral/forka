@@ -14,6 +14,9 @@ import { PageHeader } from '@/components/page-header'
 import { ArchivedProjectBanner } from '../../archived-project-banner'
 import { ApplySincePanel } from '../apply-since-panel'
 import { applySince, previewApplySince } from '../apply-since-actions'
+import { FunnelHeader } from '../funnel-header'
+import { MEASURE_COLOR } from '@/lib/domain/stage-canvas'
+import { stageOfProductRole, type StageMeasure } from '@/lib/domain/funnel-stages'
 
 const LOOKBACK_DAYS = 30
 
@@ -48,20 +51,26 @@ export default async function ProjectProductsPage({
   if (!funnel) notFound()
 
   const since = brtDayBoundaryUtc(saoPauloDay(-LOOKBACK_DAYS))
-  const [{ data: canEditClient }, { data: productRows, error: productsError }, { data: unattributedRows, error: unattributedError }] = await Promise.all([
+  const [{ data: canEditClient }, { data: productRows, error: productsError }, { data: unattributedRows, error: unattributedError }, { data: stageRows, error: stagesError }] = await Promise.all([
     canActAs(supabase, client.id, 'gestor').then((data) => ({ data })),
     supabase.from('project_products').select('produto_nome, papel').eq('sales_funnel_id', funnel.id).order('produto_nome'),
     // Sales of the client no project owns (0073): a product listed in several projects with no ad
     // on the sale, or a product no project lists any more.
     supabase.from('sales').select('produto, valor_liquido').eq('client_id', client.id).is('sales_funnel_id', null).is('reembolsado_em', null).gte('data_venda', since),
+    supabase.from('funnel_stages').select('id, name, measure, position, archived_at').eq('sales_funnel_id', funnel.id),
   ])
   if (productsError) throw productsError
+  if (stagesError) throw stagesError
+  const stages = ((stageRows ?? []) as { id: string; name: string; measure: StageMeasure; position: number; archived_at: string | null }[]).map((row) => ({ ...row, archivedAt: row.archived_at }))
   const canEdit = canEditClient && !funnel.archived_at
   if (unattributedError) throw unattributedError
   const unattributed = (unattributedRows ?? []) as { produto: string | null; valor_liquido: number | null }[]
   const unattributedRevenue = unattributed.reduce((sum, row) => sum + Number(row.valor_liquido ?? 0), 0)
   const unattributedProducts = [...new Set(unattributed.map((row) => row.produto ?? '(sem produto)'))]
   const products = (productRows ?? []) as { produto_nome: string; papel: ProductRole }[]
+  const listed = new Set(products.map((product) => product.produto_nome))
+  // Products sold with no funnel, not in this one yet: one click adds them.
+  const found = unattributedProducts.filter((name) => name !== '(sem produto)' && !listed.has(name))
 
   // The LaunchOps key is read with the service role, so only a gestor gets the catalog; RLS above
   // already proved this user can see the project.
@@ -101,6 +110,18 @@ export default async function ProjectProductsPage({
     )
   }
 
+  function stageCell(role: ProductRole) {
+    const stage = stageOfProductRole(role, stages)
+    if (!stage) return <span className="text-[var(--ct-warn)]">sem etapa de {role === 'ascensao' ? 'ascensão' : 'compra'}: as vendas não contam</span>
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-[3px]" style={{ background: MEASURE_COLOR[stage.measure] }} />
+        {stage.name}
+        {(role === 'order_bump' || role === 'upsell') && <span className="text-[var(--ct-text-3)]">· soma na receita</span>}
+      </span>
+    )
+  }
+
   function salesCell(name: string) {
     const product = catalogByName.get(name)
     if (!product) return <span className="text-[var(--ct-text-3)]">sem vendas</span>
@@ -124,6 +145,8 @@ export default async function ProjectProductsPage({
       {funnel.archived_at && (
         <ArchivedProjectBanner salesFunnelId={funnel.id} archivedAt={funnel.archived_at} canRestore={canEditClient} note="Os produtos ficam só para leitura." />
       )}
+
+      <FunnelHeader client={client} salesFunnelId={funnel.id} canEdit={canEdit} regrasHref={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/regras`} />
 
       {unattributed.length > 0 && (
         <p className="rounded-[10px] bg-[var(--ct-warn-soft)] px-4 py-3 text-[13px] text-[var(--ct-warn)]">
@@ -165,6 +188,7 @@ export default async function ProjectProductsPage({
                 <th className="px-[22px] py-2.5 font-medium">Produto</th>
                 {canEdit && <th className="px-3 py-2.5 font-medium">Vendas {LOOKBACK_DAYS}d · ticket</th>}
                 <th className="px-3 py-2.5 font-medium">Papel</th>
+                <th className="px-3 py-2.5 font-medium">Conta na etapa</th>
                 <th className="px-[22px] py-2.5" />
               </tr>
             </thead>
@@ -188,6 +212,7 @@ export default async function ProjectProductsPage({
                       </span>
                     )}
                   </td>
+                  <td className="px-3 py-3 text-[12.5px]">{stageCell(product.papel)}</td>
                   <td className="px-[22px] py-3 text-right">
                     {canEdit && (
                       <ConfirmDeleteButton
@@ -203,6 +228,34 @@ export default async function ProjectProductsPage({
           </table>
         )}
       </section>
+
+      {canEdit && found.length > 0 && (
+        <section aria-labelledby="produtos-sem-funil" className="flex flex-col gap-2.5 rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)] px-[22px] py-4">
+          <h2 id="produtos-sem-funil" className="text-sm font-semibold">
+            Encontrados nas vendas e ainda sem funil
+          </h2>
+          <ul className="flex flex-wrap gap-2">
+            {found.map((name) => (
+              <li key={name}>
+                <form action={setProductRole.bind(null, context)} className="flex items-center gap-1.5 rounded-full border border-[var(--ct-line-2)] bg-[var(--ct-surface-2)] py-1 pl-3 pr-1 text-[12.5px]">
+                  <input type="hidden" name="produto_nome" value={name} />
+                  <span>{name}</span>
+                  <select name="papel" defaultValue="entrada" aria-label={`Papel de ${name}`} className="rounded-full bg-transparent px-1 text-[12px] text-[var(--ct-text-2)] outline-none focus:text-[var(--ct-text)]">
+                    {PRODUCT_ROLES.map((role) => (
+                      <option key={role} value={role}>
+                        {PRODUCT_ROLE_LABEL[role]}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="submit" aria-label={`Adicionar ${name} ao funil`} className="grid h-6 w-6 place-items-center rounded-full bg-[var(--ct-surface-3)] font-bold text-[var(--ct-text-2)] hover:text-[var(--ct-accent)]">
+                    +
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {canEdit && (
         <section className="rounded-[14px] border border-[var(--ct-line)] bg-[var(--ct-surface)]">
