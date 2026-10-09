@@ -6,6 +6,7 @@ const STATUS_TONE: Record<WatcherStatus, string> = {
   crit: 'bg-[var(--ct-crit-soft)] text-[var(--ct-crit)]',
   sem_volume: 'bg-[var(--ct-surface-3)] text-[var(--ct-text-3)]',
   sem_dado: 'bg-[var(--ct-surface-3)] text-[var(--ct-text-3)]',
+  sem_meta: 'bg-[var(--ct-surface-3)] text-[var(--ct-text-3)]',
 }
 
 export function WatcherStatusPill({ status }: { status: WatcherStatus }) {

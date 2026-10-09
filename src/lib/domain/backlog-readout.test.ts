@@ -25,11 +25,52 @@ describe('backlog readout', () => {
       { ad_name: 'Carrossel [T4-C]', spend: 20, sales_count: 0 },
       { ad_name: 'Outro teste [T5-B]', spend: 999, sales_count: 0 },
     ]
-    const read = readMetaTest('T4', ['A', 'B', 'C', 'D'], rows, DEFAULT_RULES)
+    const read = readMetaTest('T4', ['A', 'B', 'C', 'D'], rows, DEFAULT_RULES, { value: 55, medida: 'cpa' })
     expect(read.map((v) => v.verdict)).toEqual(['win', 'cut', 'measuring', 'no_data'])
-    expect(read[0]).toMatchObject({ ads: 2, sales: 10 })
+    expect(read[0]).toMatchObject({ ads: 2, results: 10 })
     expect(read[0].spend).toBeCloseTo(440)
-    expect(read[0].cpa).toBeCloseTo(44)
+    expect(read[0].cost).toBeCloseTo(44)
+  })
+
+  it('judges a lead stage by CPL, counting the paid leads of each creative', () => {
+    const rows = [
+      { ad_name: 'Isca [T2-A]', spend: 60, sales_count: 0, leads: 12 },
+      { ad_name: 'Isca [T2-B]', spend: 15, sales_count: 0, leads: 0 },
+      { ad_name: 'Isca [T2-C]', spend: 40, sales_count: 3, leads: 4 },
+    ]
+    const read = readMetaTest('T2', ['A', 'B', 'C'], rows, DEFAULT_RULES, { value: 6, medida: 'cpl' })
+    // A: CPL 5 with 12 leads wins; B: 15 spent (≥ 1.5 × 6) with no lead is cut; C: CPL 10 ≥ 9 is cut too.
+    expect(read.map((v) => v.verdict)).toEqual(['win', 'cut', 'cut'])
+    expect(read[0]).toMatchObject({ results: 12, cost: 5 })
+  })
+
+  it('judges a stage with only a ROAS meta by ROAS, with the cut mirrored from the CPA rule', () => {
+    // Ticket of the window: 1200 / 12 = 100. At ROAS 2 the CPA that hits the meta is 50; the cut needs 75 spent.
+    const rows = [
+      { ad_name: 'A [T3-A]', spend: 400, sales_count: 10, revenue: 1000 },
+      { ad_name: 'B [T3-B]', spend: 80, sales_count: 0, revenue: 0 },
+      { ad_name: 'C [T3-C]', spend: 160, sales_count: 2, revenue: 200 },
+      { ad_name: 'D [T3-D]', spend: 50, sales_count: 0, revenue: 0 },
+    ]
+    const read = readMetaTest('T3', ['A', 'B', 'C', 'D'], rows, DEFAULT_RULES, { value: 2, medida: 'roas' })
+    // A: ROAS 2.5 with 10 sales wins; B: 80 ≥ 75 with no sale; C: ROAS 1.25 ≤ 2 / 1.5; D: below 75, still measuring.
+    expect(read.map((v) => v.verdict)).toEqual(['win', 'cut', 'cut', 'measuring'])
+    expect(read[0].roas).toBeCloseTo(2.5)
+  })
+
+  it('judges reach by CPM over thousands of impressions', () => {
+    const rows = [
+      { ad_name: 'A [T6-A]', spend: 200, sales_count: 0, impressions: 20000 },
+      { ad_name: 'B [T6-B]', spend: 300, sales_count: 0, impressions: 10000 },
+    ]
+    const read = readMetaTest('T6', ['A', 'B'], rows, DEFAULT_RULES, { value: 12, medida: 'cpm' })
+    expect(read.map((v) => v.verdict)).toEqual(['win', 'cut'])
+    expect(read[0]).toMatchObject({ results: 20, cost: 10 })
+  })
+
+  it('only measures without a teto it can judge', () => {
+    const rows = [{ ad_name: 'A [T7-A]', spend: 900, sales_count: 0 }]
+    expect(readMetaTest('T7', ['A'], rows, DEFAULT_RULES, null)[0].verdict).toBe('measuring')
   })
 
   it('waits for the sample the control rate calls for before calling a link test', () => {
@@ -97,7 +138,7 @@ describe('backlog readout', () => {
     const read = readMetaTest('T4', ['A', 'B'], [
       { ad_name: 'Bônus [T4-A]', spend: 300, sales_count: 1 },
       { ad_name: 'UGC [T4-B]', spend: 300, sales_count: 6 },
-    ], DEFAULT_RULES)
+    ], DEFAULT_RULES, { value: 55, medida: 'cpa' })
     expect(read.map((variant) => variant.verdict)).toEqual(['cut', 'measuring'])
   })
 })

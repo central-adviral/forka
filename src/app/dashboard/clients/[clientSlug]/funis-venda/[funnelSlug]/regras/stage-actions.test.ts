@@ -25,6 +25,9 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/view-as', () => ({ canActAs: async () => state.gestor }))
 vi.mock('@/lib/repo/project-archive-repo', () => ({ archivedProjectError: async () => state.archived }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+const ensured = vi.hoisted(() => vi.fn(async () => undefined))
+vi.mock('@/lib/repo/result-meta-repo', () => ({ ensureResultWatchers: ensured }))
+vi.mock('@/lib/supabase/service-role', () => ({ createServiceRoleClient: () => ({ rpc: async () => ({ data: 1, error: null }) }) }))
 vi.mock('@/lib/repo/funnel-stages-repo', () => {
   const record =
     (name: string, result?: () => unknown) =>
@@ -83,6 +86,7 @@ describe('stage actions', () => {
 
   it('reads pt-BR metas, the ascension rate in % and drops ROAS off a non-sale stage', async () => {
     expect(await saveStage(context, CAP, { ...fields, metaRoas: '2' })).toEqual({ error: null })
+    expect(ensured).toHaveBeenCalledWith(expect.anything(), 'c-1', 'f-1')
     expect(state.calls[0]).toEqual(['updateStage', CAP, expect.objectContaining({ tag: 'CAP', meta: 6.5, metaRoas: null, janelaInicio: null })])
     await saveStage(context, CAP, { ...fields, measure: 'ascensao', meta: '8' })
     expect(state.calls[1]).toEqual(['updateStage', CAP, expect.objectContaining({ measure: 'ascensao', meta: 0.08 })])

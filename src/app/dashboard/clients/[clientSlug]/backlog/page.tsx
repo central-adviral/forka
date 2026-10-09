@@ -4,7 +4,9 @@ import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { canActAs } from '@/lib/view-as'
 import { getBacklog, type BacklogItem } from '@/lib/repo/backlog-repo'
-import { AUTO_LINK_GATE, COLUMNS, TAG_LOOKBACK_DAYS, isAutoTagGate, METHODS, STAGES, nextCode, readRules, withPlanTeto, type Method } from '@/lib/domain/backlog'
+import { AUTO_LINK_GATE, COLUMNS, TAG_LOOKBACK_DAYS, isAutoTagGate, METHODS, STAGES, nextCode, readRules, type Method } from '@/lib/domain/backlog'
+import { TETO_MEDIDA, decidesCreatives, effectiveTestTeto, sourceLabel, tetoChanged, type TetoMedida } from '@/lib/domain/targets'
+import { readResult } from '@/lib/domain/project-plan'
 import { NewHypothesisWizard } from './new-hypothesis-wizard'
 import { daysRunningSince } from '@/lib/domain/report-period'
 import { type Verdict } from '@/lib/domain/backlog-readout'
@@ -14,7 +16,7 @@ import { LANES, cardProgress, laneOf, recentlyDecided } from '@/lib/domain/board
 import { PLAYBOOK, PLAYBOOK_DONTS, playbookStep } from '@/lib/domain/playbook'
 import { Board, type BoardLane } from './board'
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
-import { createItem, decideItem, deleteItem, dropItem, editItem, linkAbTest, moveItem, saveRules, toggleGate, togglePublished } from './actions'
+import { createItem, decideItem, deleteItem, dropItem, editItem, linkAbTest, moveItem, saveRules, setItemTeto, toggleGate, togglePublished, applyCurrentTeto } from './actions'
 import { PageHeader } from '@/components/page-header'
 import { headerPrimaryAction } from '@/components/header-actions'
 import { getFunnelStages } from '@/lib/repo/funnel-stages-repo'
@@ -24,9 +26,8 @@ const field =
   'rounded-[10px] border border-[var(--ct-line-2)] bg-[var(--ct-surface-2)] px-3 py-2 text-[13px] text-[var(--ct-text)] outline-none focus:border-[var(--ct-accent)]'
 const METHOD_DOT: Record<Method, string> = { meta: 'var(--ct-painel)', link: 'var(--ct-ab)', antes: 'var(--ct-an)' }
 const RULE_FIELDS = [
-  { key: 'teto', label: 'CPA teto (R$)', hint: 'Corte e vitória são medidos contra ele.', step: '0.01' },
-  { key: 'mult', label: 'Corte: gasto sem venda (× teto)', hint: 'A variante que gastar isso sem venda, ou com CPA acima disso, é marcada para pausar.', step: '0.1' },
-  { key: 'min', label: 'Vitória: mínimo de compras', hint: 'CPA no teto ou abaixo e pelo menos esse número de compras de anúncio.', step: '1' },
+  { key: 'mult', label: 'Corte: gasto sem resultado (× teto)', hint: 'A variante que gastar isso sem resultado, ou com custo acima disso, é marcada para pausar.', step: '0.1' },
+  { key: 'min', label: 'Vitória: mínimo de resultados', hint: 'Custo no teto ou abaixo e pelo menos esse número de compras (ou leads, num teste de CPL).', step: '1' },
   { key: 'conf', label: 'Link A/B: chance mínima de vencer (%)', hint: 'Calculada por pessoa, pelo motor do Link A/B.', step: '1' },
   { key: 'minVisits', label: 'Link A/B: mínimo de visitantes por variante', hint: 'Sem esse piso, uma chance alta com pouca gente não vale como vitória.', step: '50' },
   { key: 'mde', label: 'Link A/B: menor melhora que importa (%)', hint: 'Define quantas pessoas cada lado precisa antes do veredito. Quanto menor, mais gente.', step: '1' },
@@ -40,6 +41,8 @@ const VERDICT: Record<Verdict, { text: string; tone: string }> = {
   no_data: { text: 'sem dados', tone: 'text-[var(--ct-text-3)]' },
 }
 const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const tetoText = (value: number | null, medida: TetoMedida | null) =>
+  value === null || !medida ? 'sem teto' : `${TETO_MEDIDA[medida].cost} ${medida === 'roas' ? `${value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}x` : brl(value)}`
 
 // The card pill takes the verdict's color: green for a win, red for a cut, amber when the days
 // ran out without one (only then is there a summary without a win or a cut).
@@ -89,12 +92,7 @@ export default async function BacklogPage({
     )
   }
 
-  const [loadedItems, canEdit, { data: costWatcher }, stageRows] = await Promise.all([
-    getBacklog(supabase, funnel.id),
-    canActAs(supabase, client.id, 'gestor'),
-    supabase.from('watchers').select('target').eq('sales_funnel_id', funnel.id).is('front_id', null).eq('metric', 'cpa_geral').maybeSingle(),
-    getFunnelStages(supabase, funnel.id),
-  ])
+  const [loadedItems, canEdit, stageRows] = await Promise.all([getBacklog(supabase, funnel.id), canActAs(supabase, client.id, 'gestor'), getFunnelStages(supabase, funnel.id)])
   // A new test starts in the first sale stage: most tests are judged by the CPA.
   const funnelStages = stageRows.filter((stage) => !stage.archivedAt)
   const funnelStageOptions = funnelStages.map((stage) => ({ value: stage.id, label: stage.name }))
@@ -110,11 +108,12 @@ export default async function BacklogPage({
   const items = loadedItems.map((item) =>
     tagged.has(item.code) ? { ...item, gates: item.gates.map((gate) => (isAutoTagGate(gate.label) && !gate.doneAt ? { ...gate, doneAt: 'auto' } : gate)) } : item
   )
-  const costTarget = costWatcher ? Number(costWatcher.target) : null
-  const rules = withPlanTeto(readRules(funnel.test_rules), costTarget, funnel.resultado)
-  const tetoFromPlan = rules.teto === costTarget && funnel.resultado === 'compra'
+  const rules = readRules(funnel.test_rules)
+  // What each open stage gives a new test today: the Critérios override, else its own meta.
+  const stageTetos = funnelStages.map((stage) => ({ stage, teto: effectiveTestTeto({ teto: null, funnelStageId: stage.id }, stageRows, readResult(funnel.resultado), rules.teto) }))
+  const canWrite = canEdit && !funnel.archived_at
   const [readouts, { data: abTests }] = await Promise.all([
-    loadReadouts(supabase, funnel.id, items, rules, funnel.resultado),
+    loadReadouts(supabase, funnel.id, items, rules),
     supabase.from('tests').select('id, name, slug, sales_funnel_id').eq('client_id', client.id).is('archived_at', null).order('name'),
   ])
   const tab = aba === 'regras' && canEdit ? 'regras' : 'backlog'
@@ -241,29 +240,34 @@ export default async function BacklogPage({
       {tab === 'regras' && (
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           <form action={saveRules.bind(null, context)} className="card-shadow flex flex-col gap-5 rounded-[18px] border border-[var(--ct-line)] px-6 py-6">
+            <fieldset className="flex flex-col gap-2 border-b border-[var(--ct-line)] pb-5 text-[13px]">
+              <legend className="mb-1.5 font-semibold">Teto dos testes de criativo</legend>
+              <label className="flex items-center gap-2 text-[12.5px]">
+                <input type="radio" name="teto_mode" value="segue" defaultChecked={rules.teto === null} />
+                Segue a meta da etapa de cada teste
+              </label>
+              <label className="flex flex-wrap items-center gap-2 text-[12.5px]">
+                <input type="radio" name="teto_mode" value="especifica" defaultChecked={rules.teto !== null} />
+                Um teto para todos os testes do funil:
+                <input name="teto" type="number" step="0.01" min="1" defaultValue={rules.teto ?? ''} aria-label="Teto para todos os testes" className={`${field} ${mono} max-w-[140px] font-normal`} />
+              </label>
+              <ul className="mt-1 flex flex-col gap-1 text-[12px] text-[var(--ct-text-3)]">
+                {stageTetos.map(({ stage, teto }) => (
+                  <li key={stage.id}>
+                    Teto em {stage.name}: <b className={`${mono} font-medium text-[var(--ct-text-2)]`}>{tetoText(teto.value, teto.medida)}</b> · {teto.source === 'criterios' ? 'este override' : teto.source === 'etapa' ? 'segue a meta da etapa' : 'a etapa ainda não tem meta'}
+                    {!decidesCreatives(teto.medida) && ' · esta etapa ainda não decide testes de criativo'}
+                  </li>
+                ))}
+              </ul>
+              <span className="text-[12px] text-[var(--ct-text-3)]">
+                O teto vale no custo da etapa do teste (CPL, CPA, CPM). Um teste que já roda segue com o teto com que começou; um teste pode ter o seu próprio, na gaveta dele.
+              </span>
+            </fieldset>
             {RULE_FIELDS.map((rule) => (
               <label key={rule.key} className="flex flex-col gap-1.5 border-b border-[var(--ct-line)] pb-5 text-[13px] font-semibold last:border-b-0 last:pb-0">
                 {rule.label}
-                <input
-                  name={rule.key}
-                  type="number"
-                  step={rule.step}
-                  defaultValue={rules[rule.key]}
-                  required
-                  readOnly={rule.key === 'teto' && tetoFromPlan}
-                  className={`${field} ${mono} max-w-[180px] font-normal read-only:opacity-70`}
-                />
-                {rule.key === 'teto' && tetoFromPlan ? (
-                  <span className="text-[12px] font-normal text-[var(--ct-text-3)]">
-                    Vem da meta de CPA em{' '}
-                    <Link className="text-[var(--ct-accent)]" href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/plano`}>
-                      Resultado e meta
-                    </Link>
-                    : mudou lá, muda aqui.
-                  </span>
-                ) : (
-                  <span className="text-[12px] font-normal text-[var(--ct-text-3)]">{rule.hint}</span>
-                )}
+                <input name={rule.key} type="number" step={rule.step} defaultValue={rules[rule.key]} required className={`${field} ${mono} max-w-[180px] font-normal`} />
+                <span className="text-[12px] font-normal text-[var(--ct-text-3)]">{rule.hint}</span>
               </label>
             ))}
             <button type="submit" className="self-start rounded-full bg-[var(--ct-accent)] px-4 py-2 text-[13px] font-semibold text-[var(--ct-on-accent)]">Salvar critérios</button>
@@ -271,8 +275,9 @@ export default async function BacklogPage({
           <div className="card-shadow flex flex-col gap-3 rounded-[18px] border border-[var(--ct-line)] px-6 py-6 text-[13px]">
             <b className="text-[15px]">Como os critérios leem um teste</b>
             {[
-              ['Corte', `variante com R$ ${(rules.teto * rules.mult).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} gastos sem venda ou com CPA acima disso`],
-              ['Vitória de criativo', `CPA de até R$ ${rules.teto.toLocaleString('pt-BR')} com ${rules.min}+ compras`],
+              ['Teto', rules.teto === null ? 'a meta da etapa de cada teste' : `${rules.teto.toLocaleString('pt-BR')} no custo da etapa de cada teste`],
+              ['Corte', `variante que gastou ${rules.mult.toLocaleString('pt-BR')} × o teto sem resultado, ou com custo acima disso`],
+              ['Vitória de criativo', `custo de até o teto com ${rules.min}+ resultados (ROAS: no mínimo a meta)`],
               ['Vitória de link A/B', `chance de ${rules.conf}%+, ${rules.min}+ conversões e a amostra para ver ${rules.mde}% de melhora (mín. ${rules.minVisits.toLocaleString('pt-BR')} pessoas)`],
               ['Saturação', `criativo rodando há mais de ${rules.sat} dias pede decisão`],
             ].map(([label, text]) => (
@@ -424,30 +429,89 @@ export default async function BacklogPage({
                 )}
               </div>
 
-              {selectedReadout?.meta && (
-                <div className="flex flex-col rounded-[14px] border border-[var(--ct-line)] px-4 py-3">
-                  <span className="text-[12.5px] font-semibold">Medição por tag · desde o início do teste</span>
-                  <div className={`${mono} mt-2 grid grid-cols-[28px_1fr_1fr_1fr_70px] gap-x-2 gap-y-1.5 text-[12px]`}>
-                    <span className="text-[var(--ct-text-3)]" />
-                    <span className="text-[var(--ct-text-3)]">gasto</span>
-                    <span className="text-[var(--ct-text-3)]">compras</span>
-                    <span className="text-[var(--ct-text-3)]">CPA</span>
-                    <span />
-                    {selectedReadout.meta.map((variant) => (
-                      <Fragment key={variant.key}>
-                        <span className="text-[var(--ct-text-3)]">{variant.key}</span>
-                        <span>{variant.ads > 0 ? brl(variant.spend) : '—'}</span>
-                        <span>{variant.ads > 0 ? variant.sales : '—'}</span>
-                        <span>{variant.cpa !== null ? brl(variant.cpa) : '—'}</span>
-                        <span className={VERDICT[variant.verdict].tone}>{VERDICT[variant.verdict].text}</span>
-                      </Fragment>
-                    ))}
+              {selected.method === 'meta' && selected.status !== 'decided' && (() => {
+                const running = selected.status === 'running'
+                const now = selected.tetoNow
+                const judged = running ? { value: selected.tetoInicial, medida: selected.tetoMedida } : now
+                const changed = running && tetoChanged({ value: selected.tetoInicial, medida: selected.tetoMedida }, now)
+                const nowStage = selected.funnelStageId ? stageName.get(selected.funnelStageId) : undefined
+                return (
+                  <div className="flex flex-col gap-2 rounded-[14px] border border-[var(--ct-line)] px-4 py-3 text-[12.5px]">
+                    <span className="font-semibold">Teto do teste</span>
+                    <span className="text-[var(--ct-text-2)]">
+                      <b className={`${mono} font-medium text-[var(--ct-text)]`}>{tetoText(judged.value, judged.medida)}</b>
+                      {' · '}
+                      {running ? 'o teto com que começou' : sourceLabel(now.source, nowStage)}
+                    </span>
+                    {!decidesCreatives(judged.medida) && <span className="text-[var(--ct-warn)]">Esta etapa ainda não decide testes de criativo: o teste só mede.</span>}
+                    {changed && (
+                      <div role="status" className="flex flex-col gap-2 rounded-[10px] bg-[var(--ct-warn-soft)] px-3 py-2.5 text-[var(--ct-text)]">
+                        <span>
+                          A meta da etapa mudou para {tetoText(now.value, now.medida)}. Este teste segue com {tetoText(selected.tetoInicial, selected.tetoMedida)}, o teto com que começou.
+                        </span>
+                        {canWrite && (
+                          <form action={applyCurrentTeto.bind(null, { ...context, item_id: selected.id, code: selected.code })}>
+                            <button type="submit" className="rounded-full bg-[var(--ct-accent)] px-3 py-1 text-[12px] font-semibold text-[var(--ct-on-accent)]">
+                              Usar a meta nova
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    )}
+                    {canWrite && (
+                      <details>
+                        <summary className="cursor-pointer text-[12px] font-medium text-[var(--ct-accent)]">Teto próprio deste teste</summary>
+                        <form action={setItemTeto.bind(null, { ...context, item_id: selected.id, code: selected.code })} className="mt-2 flex flex-col gap-2">
+                          <label className="flex items-center gap-2">
+                            <input type="radio" name="teto_mode" value="segue" defaultChecked={selected.teto === null} />
+                            Segue {rules.teto === null ? 'a meta da etapa' : 'os Critérios de decisão'}
+                          </label>
+                          <label className="flex flex-wrap items-center gap-2">
+                            <input type="radio" name="teto_mode" value="especifica" defaultChecked={selected.teto !== null} />
+                            Específico:
+                            <input name="teto" type="number" step="0.01" min="0.01" defaultValue={selected.teto ?? ''} aria-label="Teto próprio do teste" className={`${field} ${mono} w-28 py-1`} />
+                          </label>
+                          {running && <span className="text-[11.5px] text-[var(--ct-text-3)]">Vale na hora: um teto próprio muda o teto com que este teste é julgado.</span>}
+                          <button type="submit" className="self-start rounded-full border border-[var(--ct-line-2)] px-3 py-1 text-[12px]">Salvar teto</button>
+                        </form>
+                      </details>
+                    )}
                   </div>
-                  <p className="mt-2.5 text-[11.5px] text-[var(--ct-text-3)]">
-                    Gasto com imposto, compras de entrada. Corta com {brl(rules.teto * rules.mult)} sem venda; vence com CPA até {brl(rules.teto)} e {rules.min}+ compras. É sugestão: a decisão é sua.
-                  </p>
-                </div>
-              )}
+                )
+              })()}
+
+              {selectedReadout?.meta && (() => {
+                const medida = selectedReadout.teto?.medida ?? 'cpa'
+                const info = TETO_MEDIDA[medida]
+                return (
+                  <div className="flex flex-col rounded-[14px] border border-[var(--ct-line)] px-4 py-3">
+                    <span className="text-[12.5px] font-semibold">Medição por tag · desde o início do teste</span>
+                    <div className={`${mono} mt-2 grid grid-cols-[28px_1fr_1fr_1fr_70px] gap-x-2 gap-y-1.5 text-[12px]`}>
+                      <span className="text-[var(--ct-text-3)]" />
+                      <span className="text-[var(--ct-text-3)]">gasto</span>
+                      <span className="text-[var(--ct-text-3)]">{info.results}</span>
+                      <span className="text-[var(--ct-text-3)]">{info.cost}</span>
+                      <span />
+                      {selectedReadout.meta.map((variant) => (
+                        <Fragment key={variant.key}>
+                          <span className="text-[var(--ct-text-3)]">{variant.key}</span>
+                          <span>{variant.ads > 0 ? brl(variant.spend) : '—'}</span>
+                          <span>{variant.ads > 0 ? variant.results.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—'}</span>
+                          <span>{medida === 'roas' ? (variant.roas !== null ? `${variant.roas.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}x` : '—') : variant.cost !== null ? brl(variant.cost) : '—'}</span>
+                          <span className={VERDICT[variant.verdict].tone}>{VERDICT[variant.verdict].text}</span>
+                        </Fragment>
+                      ))}
+                    </div>
+                    <p className="mt-2.5 text-[11.5px] text-[var(--ct-text-3)]">
+                      {selectedReadout.teto
+                        ? medida === 'roas'
+                          ? `Gasto com imposto, receita líquida. Vence com ROAS de ${selectedReadout.teto.value.toLocaleString('pt-BR')}x ou mais e ${rules.min}+ compras; corta quem gastou ${rules.mult.toLocaleString('pt-BR')} × o CPA que bate a meta sem venda ou com ROAS bem abaixo. É sugestão: a decisão é sua.`
+                          : `Gasto com imposto. Corta com ${brl(selectedReadout.teto.value * rules.mult)} sem resultado ou com ${info.cost} acima disso; vence com ${info.cost} até ${brl(selectedReadout.teto.value)} e ${rules.min}+ ${info.results}. É sugestão: a decisão é sua.`
+                        : 'Sem teto que a etapa decida: o teste só mede. É sugestão: a decisão é sua.'}
+                    </p>
+                  </div>
+                )
+              })()}
 
               {selected.method === 'link' && selected.status !== 'decided' && (
                 <div className="flex flex-col gap-2 rounded-[14px] border border-[var(--ct-line)] px-4 py-3">

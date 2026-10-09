@@ -44,7 +44,7 @@ vi.mock('next/navigation', () => ({
   },
 }))
 
-import { savePlan } from './[funnelSlug]/plano/actions'
+import { saveBand, saveResult } from './[funnelSlug]/metas/actions'
 import { removeProduct, setProductRole } from './[funnelSlug]/produtos/actions'
 import { applySince } from './[funnelSlug]/apply-since-actions'
 import { editSalesFunnel } from './actions'
@@ -65,8 +65,9 @@ describe('writes to an archived project', () => {
     db.writes = []
   })
 
-  it('refuses the plan', async () => {
-    await expect(savePlan(context, form({ resultado: 'compra' }))).rejects.toThrow(/erro=Funil arquivado: restaure para editar/)
+  it('refuses the result, its meta and the faixa padrão', async () => {
+    await expect(saveResult(context, form({ resultado: 'compra' }))).rejects.toThrow(/erro=Funil arquivado: restaure para editar/)
+    await expect(saveBand(context, form({ warn_pct: '20', crit_pct: '40' }))).rejects.toThrow(/erro=Funil arquivado: restaure para editar/)
     expect(db.writes).toEqual([])
   })
 

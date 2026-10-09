@@ -17,10 +17,12 @@ import { saoPauloDay } from '@/lib/repo/today-repo'
 import { ApplySincePanel } from '../apply-since-panel'
 import { applySince, previewApplySince } from '../apply-since-actions'
 import { ArchivedProjectBanner } from '../../archived-project-banner'
-import type { ProjectResult } from '@/lib/domain/project-plan'
+import { readResult, type ProjectResult } from '@/lib/domain/project-plan'
 import { COLUMNS } from '@/lib/domain/backlog'
-import { METRICS, formatMetric, type WatcherMetric } from '@/lib/domain/watchers'
-import { campaignNameSuggestion, measureOfWatcherMetric, stageSetupItems } from '@/lib/domain/stage-canvas'
+import { METRICS, watcherSource, type WatcherMetric } from '@/lib/domain/watchers'
+import { resultStage, stageFollowers, watcherReader, type FrontMetas, type MetaReader, type TargetSource, type TetoMedida, type TetoSource } from '@/lib/domain/targets'
+import { measureOfMetric } from '@/lib/domain/funnel-stages'
+import { campaignNameSuggestion, stageSetupItems } from '@/lib/domain/stage-canvas'
 import { getCostCombos, getFunnelStages, getStagePresets } from '@/lib/repo/funnel-stages-repo'
 import { StagesCanvas } from './stages-canvas'
 import type { CanvasStage } from './canvas-types'
@@ -79,7 +81,7 @@ export default async function StagesAndFrontsPage({
   if (!(await canActAs(supabase, client.id, 'analista'))) notFound()
   const { data: funnel } = await supabase
     .from('sales_funnels')
-    .select('id, name, slug, archived_at, starts_on, ends_on')
+    .select('id, name, slug, archived_at, starts_on, ends_on, resultado')
     .eq('client_id', client.id)
     .eq('slug', funnelSlug)
     .maybeSingle()
@@ -110,8 +112,16 @@ export default async function StagesAndFrontsPage({
     getFunnelStages(supabase, funnel.id),
     getCostCombos(supabase, funnel.id),
     getStagePresets(supabase, client.id),
-    supabase.from('watchers').select('id, metric, target, front_id, plan_role').eq('sales_funnel_id', funnel.id).eq('is_active', true),
-    supabase.from('backlog_items').select('code, title, status, funnel_stage_id').eq('sales_funnel_id', funnel.id).not('funnel_stage_id', 'is', null).order('code'),
+    supabase
+      .from('watchers')
+      .select('id, metric, target, effective_target, target_source, target_stage_id, warn_pct, effective_warn_pct, effective_crit_pct, front_id, stage_id, plan_role')
+      .eq('sales_funnel_id', funnel.id)
+      .eq('is_active', true),
+    supabase
+      .from('backlog_items')
+      .select('id, code, title, status, method, funnel_stage_id, teto, teto_inicial, teto_medida, effective_teto, effective_teto_source, effective_teto_medida')
+      .eq('sales_funnel_id', funnel.id)
+      .order('code'),
   ])
 
   if (frontsError) throw frontsError
@@ -141,16 +151,73 @@ export default async function StagesAndFrontsPage({
     .reduce((sum, campaign) => sum + Number(campaign.spend), 0)
   const tags = bracketTags(campaigns)
 
-  // The stages with their open fronts, the watchers that read them and the tests the Quadro put in them.
-  const watchers = (watcherRows ?? []) as { id: string; metric: WatcherMetric; target: number; front_id: string | null; plan_role: string | null }[]
+  // The stages with their open fronts, the watchers that read them and the tests the Quadro put in
+  // them, each with the meta it follows or its own (0106).
+  const watchers = (watcherRows ?? []) as {
+    id: string
+    metric: WatcherMetric
+    target: number | null
+    effective_target: number | null
+    target_source: TargetSource | null
+    target_stage_id: string | null
+    warn_pct: number | null
+    effective_warn_pct: number
+    effective_crit_pct: number
+    front_id: string | null
+    stage_id: string | null
+    plan_role: 'principal' | 'secundaria' | null
+  }[]
+  const tests = (testRows ?? []) as {
+    id: string
+    code: string
+    title: string
+    status: string
+    method: string
+    funnel_stage_id: string | null
+    teto: number | null
+    teto_inicial: number | null
+    teto_medida: TetoMedida | null
+    effective_teto: number | null
+    effective_teto_source: TetoSource | null
+    effective_teto_medida: TetoMedida | null
+  }[]
+  const num = (value: number | null) => (value === null ? null : Number(value))
   const stageOfFront = new Map(stageRows.flatMap((stage) => stage.fronts.map((front) => [front.id, stage] as const)))
+  const frontMetas = new Map<string, FrontMetas>(
+    allFronts
+      .filter((front) => front.sales_funnel_id === funnel.id)
+      .flatMap((front) => {
+        const stage = stageOfFront.get(front.id)
+        return stage
+          ? [[front.id, { stageId: stage.id, metricaPrincipal: front.metrica_principal, alvoPrincipal: num(front.alvo_principal), metricaSecundaria: front.metrica_secundaria, alvoSecundaria: num(front.alvo_secundaria) }] as const]
+          : []
+      })
+  )
+  const resultStageId = resultStage(stageRows, measureOfMetric(readResult(funnel.resultado)))?.id ?? null
+  const testStage = (test: (typeof tests)[number]) => test.funnel_stage_id ?? resultStageId
+  // Each watcher shows on the stage whose meta it reads, or that it looks at.
+  const watcherStage = new Map(
+    watchers.map((watcher) => {
+      const reader = watcherReader({ metric: watcher.metric, target: num(watcher.target), frontId: watcher.front_id, stageId: watcher.stage_id }, stageRows, frontMetas)
+      return [watcher.id, watcher.front_id ? stageOfFront.get(watcher.front_id)?.id : (watcher.stage_id ?? reader?.stageId ?? null)] as const
+    })
+  )
+  const readers: MetaReader[] = [
+    ...fronts.map((front) => ({ stageId: stageOfFront.get(front.id)?.id ?? null, follows: !(front.metrica_principal && front.alvo_principal !== null) })),
+    ...watchers.flatMap((watcher) => {
+      const reader = watcherReader({ metric: watcher.metric, target: num(watcher.target), frontId: watcher.front_id, stageId: watcher.stage_id }, stageRows, frontMetas)
+      return reader ? [reader] : []
+    }),
+    ...tests.filter((test) => test.status !== 'decided').map((test) => ({ stageId: testStage(test), follows: test.effective_teto_source === 'etapa' })),
+  ]
+  const stageNameById = new Map(stageRows.map((stage) => [stage.id, stage.name]))
   const stages: CanvasStage[] = stageRows
     .filter((stage) => !stage.archivedAt)
     .map((stage) => {
       const open = stage.fronts.filter((front) => !front.archivedAt)
-      const openIds = new Set(open.map((front) => front.id))
       return {
         ...stage,
+        followers: stageFollowers(stage.id, readers),
         fronts: open.map((front) => {
           const row = frontById.get(front.id)
           const stats = summary.get(front.id)
@@ -171,15 +238,35 @@ export default async function StagesAndFrontsPage({
           }
         }),
         watchers: watchers
-          .filter((watcher) => (watcher.front_id ? openIds.has(watcher.front_id) : watcher.plan_role !== null && measureOfWatcherMetric(watcher.metric) === stage.measure))
+          .filter((watcher) => watcherStage.get(watcher.id) === stage.id && (!watcher.front_id || !frontById.get(watcher.front_id)?.archived_at))
           .map((watcher) => ({
             id: watcher.id,
-            label: `${METRICS[watcher.metric]?.label ?? watcher.metric} · meta ${formatMetric(watcher.metric, Number(watcher.target))}`,
-            scope: watcher.front_id ? `frente ${frontById.get(watcher.front_id)?.code ?? ''}` : 'do funil',
+            metric: watcher.metric,
+            label: METRICS[watcher.metric]?.label ?? watcher.metric,
+            scope: watcher.front_id ? `frente ${frontById.get(watcher.front_id)?.code ?? ''}` : watcher.stage_id ? 'da etapa' : 'do funil',
+            source: watcherSource({ planRole: watcher.plan_role, frontId: watcher.front_id }),
+            target: num(watcher.effective_target),
+            ownTarget: num(watcher.target),
+            targetSource: watcher.target_source,
+            targetStageName: watcher.target_stage_id ? (stageNameById.get(watcher.target_stage_id) ?? null) : null,
+            warnPct: Number(watcher.effective_warn_pct),
+            critPct: Number(watcher.effective_crit_pct),
+            ownBand: watcher.warn_pct !== null,
           })),
-        tests: ((testRows ?? []) as { code: string; title: string; status: string; funnel_stage_id: string }[])
-          .filter((test) => test.funnel_stage_id === stage.id)
-          .map((test) => ({ code: test.code, title: test.title, status: COLUMNS.find((column) => column.status === test.status)?.label ?? test.status })),
+        tests: tests
+          .filter((test) => testStage(test) === stage.id)
+          .map((test) => ({
+            id: test.id,
+            code: test.code,
+            title: test.title,
+            status: COLUMNS.find((column) => column.status === test.status)?.label ?? test.status,
+            running: test.status === 'running',
+            meta: test.method === 'meta',
+            teto: num(test.teto),
+            tetoInicial: num(test.teto_inicial),
+            tetoMedida: test.teto_medida,
+            tetoNow: { value: num(test.effective_teto), source: test.effective_teto_source, medida: test.effective_teto_medida },
+          })),
       }
     })
   const ordered = [...stages.filter((stage) => stage.parallel), ...stages.filter((stage) => !stage.parallel)]
@@ -319,7 +406,7 @@ export default async function StagesAndFrontsPage({
         canEdit={canEdit}
         context={pinContext}
         otherFunnels={(otherFunnels ?? []).filter((other) => !other.archived_at).map((other) => ({ id: other.id as string, name: other.name as string }))}
-        metasHref={`/dashboard/clients/${client.slug}/metas`}
+        metasHref={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/metas`}
         boardHref={`/dashboard/clients/${client.slug}/backlog?projeto=${funnel.slug}`}
         initialStageId={etapa ?? null}
         naming={naming}

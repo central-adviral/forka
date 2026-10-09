@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { canActAs } from '@/lib/view-as'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
+import { ensureResultWatchers } from '@/lib/repo/result-meta-repo'
 import { archivedProjectError } from '@/lib/repo/project-archive-repo'
 import { DEFAULT_STAGE_PRESETS, STAGE_MEASURES, type StageMeasure } from '@/lib/domain/funnel-stages'
 import { metaFromInput } from '@/lib/domain/stage-canvas'
@@ -122,10 +124,69 @@ export async function saveStage(context: StageContext, stageId: string, input: S
   if ('error' in access) return { error: access.error! }
   try {
     await updateStage(access.supabase, id.data, parsed.data)
+    // The result stage's meta is the funnel result's (0106): its watcher follows it.
+    await ensureResultWatchers(access.supabase, context.client_id, context.sales_funnel_id)
   } catch (err) {
     return { error: message(err) }
   }
   refresh(context)
+  return { error: null }
+}
+
+const watcherTargetsSchema = z
+  .object({
+    target: z.number().positive('a meta específica precisa ser maior que zero').nullable(),
+    band: z.object({ warnPct: z.number().min(0), critPct: z.number().min(0) }).nullable(),
+  })
+  .refine((value) => !value.band || value.band.critPct >= value.band.warnPct, 'o crítico precisa ser maior ou igual à atenção')
+
+export type WatcherTargetsInput = z.input<typeof watcherTargetsSchema>
+
+/**
+ * A watcher's target and band from the canvas drawer (0106): its own, or null to follow its front,
+ * its stage or the funnel result's stage, and the funnel's faixa padrão. A result or front watcher
+ * keeps its meta where it is set; only its band changes here. Judged again on the last closed day.
+ */
+export async function saveWatcherTargets(context: StageContext, watcherId: string, input: WatcherTargetsInput): Promise<StageActionResult> {
+  const id = z.uuid().safeParse(watcherId)
+  const parsed = watcherTargetsSchema.safeParse(input)
+  if (!id.success || !parsed.success) return { error: parsed.success ? 'Vigia inválido.' : issues(parsed.error) }
+  const access = await writer(context)
+  if ('error' in access) return { error: access.error! }
+  const { data: watcher } = await access.supabase.from('watchers').select('id, plan_role, front_id').eq('id', id.data).eq('sales_funnel_id', context.sales_funnel_id).maybeSingle()
+  if (!watcher) return { error: 'Vigia não encontrado neste funil.' }
+  const values: Record<string, unknown> = { warn_pct: parsed.data.band?.warnPct ?? null, crit_pct: parsed.data.band?.critPct ?? null, last_value: null, last_status: null }
+  if (!watcher.plan_role) values.target = parsed.data.target
+  const { data: saved, error } = await access.supabase.from('watchers').update(values).eq('id', watcher.id).select('effective_target')
+  if (error || !saved?.length) return { error: error?.message ?? 'Só gestor ou owner pode mudar vigias.' }
+  if (saved[0].effective_target === null) return { error: 'Salvo, mas não há meta acima para este vigia seguir: ele fica sem meta até a etapa ter uma.' }
+  await createServiceRoleClient().rpc('evaluate_watchers', { p_client_id: context.client_id })
+  refresh(context)
+  return { error: null }
+}
+
+/** A test's own teto, or null to follow the Critérios or its stage. While it runs, it is the teto it judges with. */
+export async function saveTestTeto(context: StageContext, itemId: string, teto: number | null): Promise<StageActionResult> {
+  const parsed = z.object({ itemId: z.uuid(), teto: z.number().positive('o teto é um número maior que zero').max(100000).nullable() }).safeParse({ itemId, teto })
+  if (!parsed.success) return { error: issues(parsed.error) }
+  const access = await writer(context)
+  if ('error' in access) return { error: access.error! }
+  const { data, error } = await access.supabase.from('backlog_items').update({ teto: parsed.data.teto }).eq('id', parsed.data.itemId).eq('sales_funnel_id', context.sales_funnel_id).select('id')
+  if (error || !data?.length) return { error: error?.message ?? 'Só gestor ou owner pode mudar o teto do teste.' }
+  refresh(context)
+  revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
+  return { error: null }
+}
+
+/** "Usar a meta nova": the running test takes the teto it would get today. */
+export async function applyNewTeto(context: StageContext, itemId: string): Promise<StageActionResult> {
+  if (!z.uuid().safeParse(itemId).success) return { error: 'Teste inválido.' }
+  const access = await writer(context)
+  if ('error' in access) return { error: access.error! }
+  const { data, error } = await access.supabase.rpc('use_current_teto', { p_item_id: itemId })
+  if (error || !data) return { error: error?.message ?? 'Só gestor ou owner pode trocar o teto de um teste que roda.' }
+  refresh(context)
+  revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
   return { error: null }
 }
 

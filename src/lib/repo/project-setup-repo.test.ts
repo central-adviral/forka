@@ -108,7 +108,7 @@ describe('getProjectSetupStatus', () => {
   it('5. Metas: needs a watcher besides the cost one', async () => {
     const result = await status({ watchers: [{ metric: 'cpa_geral', front_id: null, target: 60 }] })
     expect(pending(result)).toEqual(['metas'])
-    expect(result!.steps.find((step) => step.id === 'metas')!.text).toContain('Só o vigia de custo')
+    expect(result!.steps.find((step) => step.id === 'metas')!.text).toContain('Só o vigia do resultado')
   })
 
   it('returns null for a project the session cannot see', async () => {

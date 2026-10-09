@@ -9,14 +9,27 @@ export interface CreativeRow {
   ad_name: string
   spend: number
   sales_count: number
+  leads?: number
+  impressions?: number
+  revenue?: number
+}
+
+/** The teto a test started with and the cost it is in (backlog_items.teto_inicial, teto_medida). */
+export interface MetaTeto {
+  value: number
+  medida: 'cpa' | 'cpl' | 'roas' | 'cpm'
 }
 
 export interface MetaVariantRead {
   key: string
   ads: number
   spend: number
-  sales: number
-  cpa: number | null
+  /** Purchases (CPA, ROAS), paid leads (CPL) or thousands of impressions (CPM). */
+  results: number
+  /** Spend per result; null without a result. */
+  cost: number | null
+  /** Net revenue per real spent; null without spend. */
+  roas: number | null
   verdict: Verdict
 }
 
@@ -26,20 +39,44 @@ export function tagKey(adName: string, code: string): string | null {
   return match ? match[1].toUpperCase() : null
 }
 
-/** Spend and entry purchases per variant of a Meta creative test (the creative report already carries the tax), with the rules' verdict. */
-export function readMetaTest(code: string, keys: string[], creatives: CreativeRow[], rules: TestRules): MetaVariantRead[] {
+const resultsOf = (row: CreativeRow, medida: MetaTeto['medida']) =>
+  medida === 'cpl' ? Number(row.leads ?? 0) : medida === 'cpm' ? Number(row.impressions ?? 0) / 1000 : Number(row.sales_count ?? 0)
+
+/**
+ * Spend and results per variant of a Meta creative test (the creative report already carries the
+ * tax), with the rules' verdict against the teto the test started with. Without a teto in a cost
+ * the creative report has, it only measures.
+ *
+ * A cost (CPA, CPL, CPM): cut when the variant spent mult × teto with no result, or at a cost that is
+ * itself past mult × teto (one sale at R$ 300 against a R$ 55 ceiling is not a reason to keep paying);
+ * win at a cost within the teto with the rules' minimum results.
+ * ROAS, the mirror of the CPA rule: the CPA that hits the ROAS meta is the ticket ÷ meta (the ticket of
+ * every tagged and untagged creative in the window). Cut when the variant spent mult × that CPA with no
+ * sale or with ROAS at or below meta ÷ mult; win with ROAS at or above the meta and the minimum sales.
+ */
+export function readMetaTest(code: string, keys: string[], creatives: CreativeRow[], rules: TestRules, teto: MetaTeto | null): MetaVariantRead[] {
+  const medida = teto?.medida ?? 'cpa'
+  const sales = creatives.reduce((sum, row) => sum + Number(row.sales_count ?? 0), 0)
+  const ticket = sales > 0 ? creatives.reduce((sum, row) => sum + Number(row.revenue ?? 0), 0) / sales : null
   return keys.map((key) => {
     const tagged = creatives.filter((row) => tagKey(row.ad_name ?? '', code) === key)
     const spend = tagged.reduce((sum, row) => sum + Number(row.spend ?? 0), 0)
-    const sales = tagged.reduce((sum, row) => sum + Number(row.sales_count ?? 0), 0)
-    const cpa = sales > 0 ? spend / sales : null
+    const results = tagged.reduce((sum, row) => sum + resultsOf(row, medida), 0)
+    const revenue = tagged.reduce((sum, row) => sum + Number(row.revenue ?? 0), 0)
+    const cost = results > 0 ? spend / results : null
+    const roas = spend > 0 ? revenue / spend : null
     let verdict: Verdict = 'measuring'
     if (tagged.length === 0) verdict = 'no_data'
-    // Cut: the limit spent with no sale, or spent at a CPA that is itself past the limit (one sale
-    // at R$ 300 against a R$ 55 ceiling is not a reason to keep paying).
-    else if (spend >= rules.teto * rules.mult && (sales === 0 || (cpa !== null && cpa >= rules.teto * rules.mult))) verdict = 'cut'
-    else if (cpa !== null && cpa <= rules.teto && sales >= rules.min) verdict = 'win'
-    return { key, ads: tagged.length, spend, sales, cpa, verdict }
+    else if (teto && medida === 'roas') {
+      const limit = ticket !== null && ticket > 0 ? (ticket / teto.value) * rules.mult : null
+      if (limit !== null && spend >= limit && (results === 0 || (roas !== null && roas <= teto.value / rules.mult))) verdict = 'cut'
+      else if (roas !== null && roas >= teto.value && results >= rules.min) verdict = 'win'
+    } else if (teto) {
+      const limit = teto.value * rules.mult
+      if (spend >= limit && (results === 0 || (cost !== null && cost >= limit))) verdict = 'cut'
+      else if (cost !== null && cost <= teto.value && results >= rules.min) verdict = 'win'
+    }
+    return { key, ads: tagged.length, spend, results, cost, roas, verdict }
   })
 }
 

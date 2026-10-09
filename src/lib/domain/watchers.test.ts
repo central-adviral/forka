@@ -41,7 +41,7 @@ describe('alertActions', () => {
     expect(alertActions({ metric: 'cpa_anuncio', projectSlug: '1k', frontId: null }, base, true)).toEqual([
       { label: 'Ver criativos', href: '/dashboard/clients/voe/funis-venda/1k?periodo=7d&aba=criativos' },
       { label: 'Abrir funil', href: '/dashboard/clients/voe/funis-venda/1k?periodo=7d' },
-      { label: 'Ajustar meta', href: '/dashboard/clients/voe/metas' },
+      { label: 'Ajustar meta', href: '/dashboard/clients/voe/funis-venda/1k/metas' },
     ])
   })
 

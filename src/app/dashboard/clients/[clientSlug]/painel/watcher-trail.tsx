@@ -12,6 +12,7 @@ const DOT: Record<WatcherStatus, string> = {
   crit: 'var(--ct-crit)',
   sem_volume: 'var(--ct-text-3)',
   sem_dado: 'var(--ct-text-3)',
+  sem_meta: 'var(--ct-text-3)',
 }
 
 // The last closed days of a watcher against its band: target, atenção and crítico as dashed lines,
@@ -25,11 +26,12 @@ export function WatcherTrail({
 }: {
   points: TrailPoint[]
   metric: WatcherMetric
-  target: number
+  target: number | null
   warnPct: number
   critPct: number
 }) {
   const known = points.filter((point): point is TrailPoint & { value: number } => point.value !== null)
+  if (target === null) return <span className="text-[11px] text-[var(--ct-text-3)]">sem meta para comparar</span>
   if (known.length === 0) return <span className="text-[11px] text-[var(--ct-text-3)]">sem dado nos últimos {points.length} dias</span>
   const band = thresholds(metric, target, warnPct, critPct)
   const W = 280

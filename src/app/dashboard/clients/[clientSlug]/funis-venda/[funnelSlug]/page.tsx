@@ -95,7 +95,7 @@ export default async function SalesFunnelPage({
       ? supabase.rpc('get_project_front_sales', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until })
       : Promise.resolve({ data: null }),
     supabase.rpc('get_project_cross_sales', { p_sales_funnel_id: funnel.id, p_since: since, p_until: until }),
-    supabase.from('watchers').select('target, plan_role').eq('sales_funnel_id', funnel.id).is('front_id', null).not('plan_role', 'is', null),
+    supabase.from('watchers').select('target:effective_target, plan_role').eq('sales_funnel_id', funnel.id).is('front_id', null).not('plan_role', 'is', null),
   ])
   const frontList = (frontRows ?? []) as unknown as {
     id: string
@@ -218,8 +218,9 @@ export default async function SalesFunnelPage({
     impressions: totals.impressions,
   }
   const planTarget = (role: string) => {
-    const row = ((planRows ?? []) as { target: number; plan_role: string }[]).find((watcher) => watcher.plan_role === role)
-    return row ? Number(row.target) : null
+    // The effective target (0106): the watcher's own, or the meta of the stage it follows.
+    const row = ((planRows ?? []) as { target: number | null; plan_role: string }[]).find((watcher) => watcher.plan_role === role)
+    return row && row.target !== null ? Number(row.target) : null
   }
   const objectiveFronts: ObjectiveFront[] = frontList.map((front) => {
     const days = frontDayRows.filter((row) => row.front_id === front.id)
@@ -252,7 +253,7 @@ export default async function SalesFunnelPage({
   const projectBase = `/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}`
   const quality = ((qualityRows ?? []) as ProjectQualityRow[])[0]
   const seals = quality
-    ? qualitySeals(quality, { regras: `${projectBase}/regras`, produtos: `${projectBase}/produtos`, edit: `${projectBase}/edit`, metas: `/dashboard/clients/${client.slug}/metas` })
+    ? qualitySeals(quality, { regras: `${projectBase}/regras`, produtos: `${projectBase}/produtos`, edit: `${projectBase}/edit`, metas: `${projectBase}/metas` })
     : []
 
   return (
@@ -280,10 +281,10 @@ export default async function SalesFunnelPage({
                 {funnel.status === 'rodando' && <SyncFunnelButton salesFunnelId={funnel.id} clientSlug={client.slug} funnelSlug={funnel.slug} />}
                 <ProjectStatusActions salesFunnelId={funnel.id} status={funnel.status} canEdit={canEdit} />
                 <a
-                  href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/plano`}
+                  href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/metas`}
                   className="rounded-full border border-[var(--ct-accent)] bg-[var(--ct-accent-soft)] px-4 py-2 text-[13px] font-medium text-[var(--ct-accent)]"
                 >
-                  Resultado e meta
+                  Metas e vigias
                 </a>
                 <a href={`/dashboard/clients/${client.slug}/funis-venda/${funnel.slug}/produtos`} className={headerAction}>
                   Produtos

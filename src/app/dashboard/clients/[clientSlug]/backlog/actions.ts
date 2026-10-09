@@ -9,6 +9,7 @@ import { matchTestVariant } from '@/lib/domain/experiment-decision'
 import { equalWeights, experimentSlug, experimentVariantName } from '@/lib/domain/experiment-link'
 import { findTaggedCards } from '@/lib/repo/backlog-readout-repo'
 import { httpUrl } from '@/lib/domain/http-url-schema'
+import { archivedProjectError } from '@/lib/repo/project-archive-repo'
 
 // Writes go through the user's session: the 0068 policies only let a gestor or owner change the
 // backlog. A write RLS refuses touches no row without raising, so every write selects what it
@@ -409,8 +410,9 @@ export async function deleteItem(context: BacklogContext & { item_id: string; co
 }
 
 export async function saveRules(context: BacklogContext, formData: FormData) {
-  const rules = {} as TestRules
+  const rules: Partial<TestRules> = {}
   for (const key of Object.keys(RULE_LIMITS) as (keyof TestRules)[]) {
+    if (key === 'teto') continue
     const value = Number(String(formData.get(key) ?? '').replace(',', '.'))
     const [min, max, integer] = RULE_LIMITS[key]
     if (!Number.isFinite(value) || value < min || value > max || (integer && !Number.isInteger(value))) {
@@ -418,9 +420,45 @@ export async function saveRules(context: BacklogContext, formData: FormData) {
     }
     rules[key] = value
   }
+  // The teto override (0106): absent, every test follows the meta of its stage.
+  if (formData.get('teto_mode') === 'especifica') {
+    const teto = Number(String(formData.get('teto') ?? '').replace(',', '.'))
+    const [min, max] = RULE_LIMITS.teto
+    if (!Number.isFinite(teto) || teto < min || teto > max) back(context, 'erro', `Teto fora do intervalo: use de ${min} a ${max}, ou deixe seguir a meta da etapa.`, '&aba=regras')
+    rules.teto = teto
+  }
   const supabase = await createServerSupabaseClient()
+  const archived = await archivedProjectError(supabase, context.sales_funnel_id)
+  if (archived) back(context, 'erro', archived, '&aba=regras')
   const { data, error } = await supabase.from('sales_funnels').update({ test_rules: rules }).eq('id', context.sales_funnel_id).select('id')
   if (error || !data?.length) back(context, 'erro', 'Só gestor ou owner pode mudar os critérios de decisão.', '&aba=regras')
   revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
-  back(context, 'ok', 'Critérios de decisão salvos.', '&aba=regras')
+  back(context, 'ok', 'Critérios de decisão salvos. Testes que já rodam seguem com o teto com que começaram.', '&aba=regras')
+}
+
+/** A test's own teto, or back to following (0106). While it runs, the new teto is the one it judges with. */
+export async function setItemTeto(context: BacklogContext & { item_id: string; code: string }, formData: FormData) {
+  let teto: number | null = null
+  if (formData.get('teto_mode') === 'especifica') {
+    teto = Number(String(formData.get('teto') ?? '').replace(',', '.'))
+    if (!Number.isFinite(teto) || teto <= 0 || teto > RULE_LIMITS.teto[1]) back(context, 'erro', 'O teto do teste é um número maior que zero.', `&item=${context.code}`)
+  }
+  const supabase = await createServerSupabaseClient()
+  const archived = await archivedProjectError(supabase, context.sales_funnel_id)
+  if (archived) back(context, 'erro', archived, `&item=${context.code}`)
+  const { data, error } = await supabase.from('backlog_items').update({ teto }).eq('id', context.item_id).select('id')
+  if (error || !data?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode mudar o teto do teste.', `&item=${context.code}`)
+  revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
+  back(context, 'ok', teto === null ? `${context.code} segue o teto do funil.` : `${context.code} tem teto próprio.`, `&item=${context.code}`)
+}
+
+/** "Usar a meta nova": a running test takes the teto it would get today. Without this click nothing changes. */
+export async function applyCurrentTeto(context: BacklogContext & { item_id: string; code: string }) {
+  const supabase = await createServerSupabaseClient()
+  const archived = await archivedProjectError(supabase, context.sales_funnel_id)
+  if (archived) back(context, 'erro', archived, `&item=${context.code}`)
+  const { data, error } = await supabase.rpc('use_current_teto', { p_item_id: context.item_id })
+  if (error || !data) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode trocar o teto de um teste que roda.', `&item=${context.code}`)
+  revalidatePath(`/dashboard/clients/${context.client_slug}/backlog`)
+  back(context, 'ok', `${context.code} agora é julgado com a meta nova.`, `&item=${context.code}`)
 }

@@ -128,7 +128,10 @@ export default async function PainelPage({
           <div key={project} className="card-shadow rounded-[18px] border border-[var(--ct-line)]">
             <div className="flex items-center justify-between border-b border-[var(--ct-line)] px-6 py-3.5">
               <b className="text-[14.5px] font-semibold">{project}</b>
-              <Link href={`${base}/funis-venda/${list[0].projectSlug}`} className="text-[12.5px] text-[var(--ct-accent)]">Análises →</Link>
+              <span className="flex gap-4">
+                {canEdit && <Link href={`${base}/funis-venda/${list[0].projectSlug}/metas`} className="text-[12.5px] text-[var(--ct-accent)]">Metas e vigias →</Link>}
+                <Link href={`${base}/funis-venda/${list[0].projectSlug}`} className="text-[12.5px] text-[var(--ct-accent)]">Análises →</Link>
+              </span>
             </div>
             {list.map((watcher) => (
               <div key={watcher.id} className={`grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-5 border-b border-[var(--ct-line)] px-6 py-4 last:border-b-0 ${watcher.isActive ? '' : 'opacity-50'}`}>

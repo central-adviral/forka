@@ -200,5 +200,9 @@ async function fillProject(
     const { error } = await supabase.from('project_products').insert(products.map(([produto_nome, papel]) => ({ sales_funnel_id: funnelId, produto_nome, papel })))
     if (error) return error.message
   }
+
+  // The result watchers were written before the stages: a meta equal to its stage's now follows it (0106).
+  const { error: followError } = await supabase.rpc('normalize_funnel_targets', { p_sales_funnel_id: funnelId })
+  if (followError) return followError.message
   return null
 }

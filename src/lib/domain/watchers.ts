@@ -2,7 +2,7 @@
 // evaluation itself runs in SQL (evaluate_watchers, 0059); this file only names and formats.
 
 export type WatcherMetric = 'cpa_geral' | 'cpa_anuncio' | 'cpl' | 'cpm' | 'ctr' | 'connect_rate' | 'investimento' | 'frequencia' | 'roas' | 'custo_checkout' | 'custo_visita'
-export type WatcherStatus = 'ok' | 'warn' | 'crit' | 'sem_volume' | 'sem_dado'
+export type WatcherStatus = 'ok' | 'warn' | 'crit' | 'sem_volume' | 'sem_dado' | 'sem_meta'
 
 interface MetricInfo {
   label: string
@@ -35,6 +35,7 @@ export const STATUS_LABEL: Record<WatcherStatus, string> = {
   crit: 'crítico',
   sem_volume: 'gasto abaixo do mínimo',
   sem_dado: 'sem dado',
+  sem_meta: 'sem meta',
 }
 
 export function formatMetric(metric: WatcherMetric, value: number | null): string {
@@ -44,9 +45,10 @@ export function formatMetric(metric: WatcherMetric, value: number | null): strin
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
-/** What a watcher looks at, in words: one front, or every front of its project. */
-export function watcherScope(watcher: { frontName: string | null }): string {
-  return watcher.frontName ?? 'todas as frentes'
+/** What a watcher looks at, in words: one front, one stage, or every front of its funnel. */
+export function watcherScope(watcher: { frontName: string | null; stageName?: string | null }): string {
+  if (watcher.frontName) return watcher.frontName
+  return watcher.stageName ? `etapa ${watcher.stageName}` : 'todas as frentes'
 }
 
 /** The values where the band turns into atenção and into crítico, in the metric's bad direction. */
@@ -80,7 +82,7 @@ export function alertActions(
     { label: watcher.frontId ? 'Ver a frente' : costMetric ? 'Ver criativos' : 'Ver tráfego', href: `${project}?${query.toString()}` },
     { label: 'Abrir funil', href: `${project}?periodo=7d` },
   ]
-  if (canEdit) actions.push({ label: 'Ajustar meta', href: `${clientBase}/metas` })
+  if (canEdit) actions.push({ label: 'Ajustar meta', href: `${project}/metas` })
   return actions
 }
 

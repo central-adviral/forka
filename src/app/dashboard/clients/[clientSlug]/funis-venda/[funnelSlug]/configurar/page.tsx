@@ -48,8 +48,8 @@ export default async function ProjectSetupPage({ params }: { params: Promise<{ c
     produtos: `${base}/funis-venda/${funnel.slug}/produtos`,
     regras: `${base}/funis-venda/${funnel.slug}/regras`,
     paginas: `${base}/paginas`,
-    plano: `${base}/funis-venda/${funnel.slug}/plano`,
-    metas: `${base}/metas`,
+    plano: `${base}/funis-venda/${funnel.slug}/metas`,
+    metas: `${base}/funis-venda/${funnel.slug}/metas`,
     conferir: '#mapa',
   }
   const spendByFront = new Map<string, number>()
