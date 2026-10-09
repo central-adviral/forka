@@ -401,3 +401,8 @@ select private.sync_funnel_resultado(sf.id)
 from public.sales_funnels sf
 where sf.archived_at is null
   and private.derived_resultado(sf.resultado, private.result_stage_measure(sf.id)) <> sf.resultado;
+
+-- Records a production change made by hand on 2026-10-09: the Desempenho page runs about 15 report RPCs
+-- at once and, on the small instance, they were cancelled at 8 s (57014).
+alter role authenticated set statement_timeout = '20s';
+alter role authenticator set statement_timeout = '20s';
