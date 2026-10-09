@@ -124,7 +124,7 @@ export default async function SalesFunnelPage({
   }[]
   const stagesReport = await stagesData
   const stageByFront = new Map((stagesReport?.[0] ?? []).flatMap((stage, order) => stage.fronts.map((front) => [front.id, { name: stage.name, order: stage.parallel ? order - 1000 : order }] as const)))
-  const totalsByStage = stageTotals(stagesReport?.[1] ?? [])
+  const totalsByStage = stageTotals(stagesReport?.[1] ?? [], stagesReport?.[0] ?? [])
   const fronts: FrontInfo[] = frontList.map((front) => ({ id: front.id, code: front.code, name: front.name, sourceName: front.source?.name ?? null }))
   if (creativeResult.error) {
     console.error('[funnel-creative-report-failed]', { salesFunnelId: funnel.id }, creativeResult.error)

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { MEASURES, comboValue, stageCost, stageResult, stageRoas, sumTotals, type CostCombo, type Stage, type StageTotals } from '@/lib/domain/funnel-stages'
+import { MEASURES, comboValue, stageCost, stageResult, stageRoas, sumTotals, withMirroredLeads, type CostCombo, type Stage, type StageTotals } from '@/lib/domain/funnel-stages'
 import { MEASURE_COLOR, metaText, metaTone, passageRate, type Tone } from '@/lib/domain/stage-canvas'
 import type { StageDayRow, StageOrigin } from '@/lib/repo/funnel-stages-repo'
 
@@ -8,11 +8,17 @@ const TONE: Record<Tone, string> = { ok: 'text-[var(--ct-ok)]', warn: 'text-[var
 const pct = (value: number | null) => (value === null ? '—' : `${(value * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`)
 const roasText = (value: number | null) => (value === null ? '—' : `${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x`)
 
-/** Each stage's totals over the period, from get_funnel_stage_daily. */
-export function stageTotals(rows: StageDayRow[]): Map<string, StageTotals> {
+/** Each stage's totals over the period, from get_funnel_stage_daily; a mirror lead stage's leads are its buyers. */
+export function stageTotals(rows: StageDayRow[], stages: Pick<Stage, 'id' | 'measure' | 'mirror'>[]): Map<string, StageTotals> {
   const byStage = new Map<string, StageDayRow[]>()
   for (const row of rows) byStage.set(row.stageId, [...(byStage.get(row.stageId) ?? []), row])
-  return new Map([...byStage].map(([id, days]) => [id, sumTotals(days)]))
+  return new Map(
+    [...byStage].map(([id, days]) => {
+      const stage = stages.find((candidate) => candidate.id === id)
+      const totals = sumTotals(days)
+      return [id, stage ? withMirroredLeads(stage, totals) : totals]
+    })
+  )
 }
 
 /** "Etapas e frentes" on Desempenho: one card per stage, its own spend and its own cost against its meta. */
@@ -91,6 +97,12 @@ export function StagesPanel({
                   </div>
                 ))}
               </div>
+              {stage.mirror && (
+                <p className="mt-2 text-[11.5px] text-[var(--ct-text-3)]">
+                  <span className="mr-1.5 rounded-full border border-[var(--ct-line-2)] px-2 py-px text-[10.5px] font-medium text-[var(--ct-text-2)]">espelho</span>
+                  {own.vendasEspelho.toLocaleString('pt-BR')} {own.vendasEspelho === 1 ? 'venda' : 'vendas'} de {stage.mirror.funnelName}, sem somar no total do funil
+                </p>
+              )}
               {cameFrom.length > 0 && (
                 <p className="mt-2 text-[11.5px] text-[var(--ct-text-3)]">
                   Vendas vindas de: {cameFrom.map((origin) => `${name(origin.originStageId)} ${origin.vendas.toLocaleString('pt-BR')}`).join(' · ')}

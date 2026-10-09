@@ -100,6 +100,7 @@ export function StageDrawer({
   canEdit,
   context,
   otherFunnels,
+  mirror,
   metasHref,
   boardHref,
   pending,
@@ -124,6 +125,8 @@ export function StageDrawer({
   canEdit: boolean
   context: CanvasContext
   otherFunnels: { id: string; name: string }[]
+  /** "Espelhar vendas de outro funil" (MirrorSection), right before the fronts. */
+  mirror: ReactNode
   metasHref: string
   boardHref: string
   pending: boolean
@@ -263,6 +266,8 @@ export function StageDrawer({
           </p>
         </div>
       )}
+
+      {mirror}
 
       <DrawerSection title={`Frentes (${stage.fronts.length})`}>
         {stage.fronts.length === 0 && <p className="text-[12.5px] text-[var(--ct-text-3)]">Nenhuma frente: a etapa ainda não pega campanha nenhuma.</p>}

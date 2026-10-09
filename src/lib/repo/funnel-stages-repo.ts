@@ -1,11 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { DEFAULT_STAGE_PRESETS, type CostCombo, type Stage, type StageMeasure, type StagePreset } from '@/lib/domain/funnel-stages'
+import { DEFAULT_STAGE_PRESETS, type CostCombo, type Stage, type StageMeasure, type StageMirror, type StagePreset } from '@/lib/domain/funnel-stages'
+import type { ProductRole } from '@/lib/domain/product-roles'
 import type { RemovalFacts } from '@/lib/domain/stage-removal'
 
 // Etapas no funil (0105). Reads run on the user's session (RLS: cliente reads); writes go through the
 // same policies as fronts, so only a gestor or owner of the client (or staff admin) writes them.
 
-const STAGE_COLUMNS = 'id, sales_funnel_id, name, tag, measure, position, parallel, janela_inicio, janela_fim, meta, meta_roas, archived_at'
+const STAGE_COLUMNS = 'id, sales_funnel_id, name, tag, measure, position, parallel, janela_inicio, janela_fim, meta, meta_roas, archived_at, mirror_funnel_id, mirror_papeis, mirror_products'
+// Reads only: an embed in an insert's returning loses the order the rows were given in (createStages).
+const STAGE_READ_COLUMNS = `${STAGE_COLUMNS}, mirror_funnel:sales_funnels!funnel_stages_mirror_funnel_id_fkey(name)`
 
 interface StageRow {
   id: string
@@ -20,6 +23,10 @@ interface StageRow {
   meta: number | null
   meta_roas: number | null
   archived_at: string | null
+  mirror_funnel_id: string | null
+  mirror_papeis: ProductRole[] | null
+  mirror_products: string[] | null
+  mirror_funnel?: { name: string } | null
 }
 
 const toStage = (row: StageRow): Stage => ({
@@ -35,6 +42,9 @@ const toStage = (row: StageRow): Stage => ({
   meta: row.meta === null ? null : Number(row.meta),
   metaRoas: row.meta_roas === null ? null : Number(row.meta_roas),
   archivedAt: row.archived_at,
+  mirror: row.mirror_funnel_id
+    ? { funnelId: row.mirror_funnel_id, funnelName: row.mirror_funnel?.name ?? 'outro funil', papeis: row.mirror_papeis ?? ['entrada'], products: row.mirror_products }
+    : null,
 })
 
 export interface StageFront {
@@ -55,7 +65,7 @@ export interface StageWithFronts extends Stage {
 export async function getFunnelStages(db: SupabaseClient, salesFunnelId: string): Promise<StageWithFronts[]> {
   const { data, error } = await db
     .from('funnel_stages')
-    .select(`${STAGE_COLUMNS}, project_fronts(id, code, name, position, source_sales_funnel_id, archived_at, naming_rules(id, kind, value))`)
+    .select(`${STAGE_READ_COLUMNS}, project_fronts(id, code, name, position, source_sales_funnel_id, archived_at, naming_rules(id, kind, value))`)
     .eq('sales_funnel_id', salesFunnelId)
     .order('position')
     .order('created_at')
@@ -98,6 +108,8 @@ export interface StageDayRow {
   /** Net of this day's refunds, like get_funnel_daily. */
   receitaLiquida: number
   receitaReembolsadaLiquida: number
+  /** How many of the vendas are another funnel's, mirrored into the stage (0108). */
+  vendasEspelho: number
 }
 
 export async function getStageDaily(db: SupabaseClient, salesFunnelId: string, since: string, until: string): Promise<StageDayRow[]> {
@@ -119,6 +131,7 @@ export async function getStageDaily(db: SupabaseClient, salesFunnelId: string, s
     reembolsos: Number(row.reembolsos),
     receitaLiquida: Number(row.receita_liquida),
     receitaReembolsadaLiquida: Number(row.receita_reembolsada_liquida),
+    vendasEspelho: Number(row.vendas_espelho),
   }))
 }
 
@@ -190,6 +203,9 @@ export function stageWriteError(error: { code?: string; message: string }): stri
   if (error.message.includes('still has active fronts')) return 'A etapa ainda tem frentes ativas: mova ou arquive as frentes antes.'
   if (error.message.includes('is archived')) return 'Etapa arquivada: restaure a etapa antes de colocar frente nela.'
   if (error.message.includes('combo stages')) return 'O custo combinado só soma etapas deste funil.'
+  if (error.message.includes('mirror its own funnel')) return 'A etapa não pode espelhar o próprio funil.'
+  if (error.message.includes('mirror funnel must be of the same client')) return 'Só dá para espelhar um funil do mesmo cliente.'
+  if (error.message.includes('funnel_stages_mirror_measure')) return 'Só etapas de lead, compra ou ascensão espelham vendas.'
   if (error.code === '23503') return 'A etapa ainda é usada (frentes ou custo combinado).'
   return error.message
 }
@@ -223,7 +239,7 @@ const stageColumns = (input: Partial<StageInput>) => {
 export async function createStage(db: SupabaseClient, salesFunnelId: string, input: StageInput): Promise<Stage> {
   const { data, error } = await db.from('funnel_stages').insert({ sales_funnel_id: salesFunnelId, ...stageColumns(input) }).select(STAGE_COLUMNS).single()
   if (error) throw new Error(stageWriteError(error))
-  return toStage(data as StageRow)
+  return toStage(data as unknown as StageRow)
 }
 
 /**
@@ -234,12 +250,23 @@ export async function createStages(db: SupabaseClient, salesFunnelId: string, in
   if (inputs.length === 0) return []
   const { data, error } = await db.from('funnel_stages').insert(inputs.map((input) => ({ sales_funnel_id: salesFunnelId, ...stageColumns(input) }))).select(STAGE_COLUMNS)
   if (error) throw new Error(stageWriteError(error))
-  return (data as StageRow[]).map(toStage)
+  return (data as unknown as StageRow[]).map(toStage)
 }
 
 /** A tag change freezes the campaigns the names give today first (0105), like a rule change. */
 export async function updateStage(db: SupabaseClient, stageId: string, input: Partial<StageInput>): Promise<void> {
   const { data, error } = await db.from('funnel_stages').update(stageColumns(input)).eq('id', stageId).select('id')
+  if (error) throw new Error(stageWriteError(error))
+  if (!data?.length) throw new Error('Só gestor ou owner pode mudar a etapa.')
+}
+
+/** Sets or clears (null) the stage's sales mirror (0108); the database checks the source is of the same client. */
+export async function updateStageMirror(db: SupabaseClient, stageId: string, mirror: Omit<StageMirror, 'funnelName'> | null): Promise<void> {
+  const { data, error } = await db
+    .from('funnel_stages')
+    .update({ mirror_funnel_id: mirror?.funnelId ?? null, mirror_papeis: mirror?.papeis ?? null, mirror_products: mirror?.products ?? null })
+    .eq('id', stageId)
+    .select('id')
   if (error) throw new Error(stageWriteError(error))
   if (!data?.length) throw new Error('Só gestor ou owner pode mudar a etapa.')
 }

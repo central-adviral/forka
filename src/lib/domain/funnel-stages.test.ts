@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_STAGE_PRESETS, EMPTY_TOTALS, ascensionRate, comboValue, derivedResultado, funnelResultStage, stageOfProductRole, measureOfMetric, meetsMeta, stageCost, stageRoas, sumTotals, type StageMeasure, type StageTotals } from './funnel-stages'
+import { DEFAULT_STAGE_PRESETS, EMPTY_TOTALS, ascensionRate, comboValue, derivedResultado, funnelResultStage, stageOfProductRole, measureOfMetric, meetsMeta, stageCost, stageRoas, sumTotals, withMirroredLeads, type StageMeasure, type StageTotals } from './funnel-stages'
 
 const totals = (values: Partial<StageTotals>): StageTotals => ({ ...EMPTY_TOTALS, ...values })
 
@@ -31,6 +31,23 @@ describe('stageCost', () => {
     expect(stageCost('ascensao', totals({ vendas: 3 }), 30)).toBe(0.1)
     expect(stageCost('ascensao', totals({ vendas: 3 }))).toBeNull()
     expect(ascensionRate(1, 4)).toBe(0.25)
+  })
+})
+
+describe('withMirroredLeads', () => {
+  const mirror = { funnelId: 'f', funnelName: '1K', papeis: ['entrada' as const], products: null }
+
+  it('makes the mirrored buyers the leads of a mirror lead stage, so its CPL is spend over buyers', () => {
+    const paid = withMirroredLeads({ measure: 'lead', mirror }, totals({ spendComImposto: 300, leads: 7, vendas: 3, vendasEspelho: 3 }))
+    expect(paid.leads).toBe(3)
+    expect(stageCost('lead', paid)).toBe(100)
+  })
+
+  it('leaves own lead stages and the other measures alone', () => {
+    const own = totals({ leads: 7, vendas: 0 })
+    expect(withMirroredLeads({ measure: 'lead', mirror: null }, own)).toBe(own)
+    const asc = totals({ vendas: 2, vendasEspelho: 2 })
+    expect(withMirroredLeads({ measure: 'ascensao', mirror }, asc)).toBe(asc)
   })
 })
 

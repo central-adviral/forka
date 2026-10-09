@@ -8,6 +8,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import { ensureResultWatchers } from '@/lib/repo/result-meta-repo'
 import { archivedProjectError } from '@/lib/repo/project-archive-repo'
 import { DEFAULT_STAGE_PRESETS, STAGE_MEASURES, type StageMeasure } from '@/lib/domain/funnel-stages'
+import { PRODUCT_ROLES, type ProductRole } from '@/lib/domain/product-roles'
 import { metaFromInput } from '@/lib/domain/stage-canvas'
 import { frontInUse, isLastOpenStage, stageInUse } from '@/lib/domain/stage-removal'
 import {
@@ -24,6 +25,7 @@ import {
   setStageArchived,
   updateCostCombo,
   updateStage,
+  updateStageMirror,
 } from '@/lib/repo/funnel-stages-repo'
 
 // The canvas calls these directly and keeps its optimistic state, so they answer { error } instead of
@@ -130,6 +132,37 @@ export async function saveStage(context: StageContext, stageId: string, input: S
     await updateStage(access.supabase, id.data, parsed.data)
     // The result stage's meta is the funnel result's (0106): its watcher follows it.
     await ensureResultWatchers(access.supabase, context.client_id, context.sales_funnel_id)
+  } catch (err) {
+    return { error: message(err) }
+  }
+  refresh(context)
+  return { error: null }
+}
+
+const mirrorSchema = z
+  .object({
+    funnelId: z.uuid('escolha o funil'),
+    papeis: z.array(z.enum(PRODUCT_ROLES as unknown as [ProductRole, ...ProductRole[]])).min(1, 'marque ao menos um papel').max(4),
+    products: z.array(z.string().trim().min(1).max(200)).max(200),
+  })
+  .nullable()
+
+export type MirrorFields = z.input<typeof mirrorSchema>
+
+/** The stage's sales mirror (0108), or null to stop mirroring; no product listed takes every product of the roles. */
+export async function saveStageMirror(context: StageContext, stageId: string, input: MirrorFields): Promise<StageActionResult> {
+  const id = z.uuid().safeParse(stageId)
+  const parsed = mirrorSchema.safeParse(input)
+  if (!id.success || !parsed.success) return { error: parsed.success ? 'Etapa inválida.' : issues(parsed.error) }
+  if (parsed.data?.funnelId === context.sales_funnel_id) return { error: 'A etapa não pode espelhar o próprio funil.' }
+  const access = await writer(context)
+  if ('error' in access) return { error: access.error! }
+  try {
+    await updateStageMirror(
+      access.supabase,
+      id.data,
+      parsed.data && { funnelId: parsed.data.funnelId, papeis: [...new Set(parsed.data.papeis)], products: parsed.data.products.length ? [...new Set(parsed.data.products)] : null }
+    )
   } catch (err) {
     return { error: message(err) }
   }

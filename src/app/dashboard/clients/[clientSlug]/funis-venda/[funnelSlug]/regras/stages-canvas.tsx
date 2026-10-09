@@ -14,8 +14,9 @@ import {
   placeStage,
   sequenceEdges,
 } from '@/lib/domain/stage-canvas'
-import { addStage, applyNewTeto, archiveStage, moveFront, placeStageAction, removeCombo, removeFront, removePreset, removeStage, saveCombo, saveStage, savePreset, saveTestTeto, saveWatcherTargets, type StageActionResult } from './stage-actions'
+import { addStage, applyNewTeto, archiveStage, moveFront, placeStageAction, removeCombo, removeFront, removePreset, removeStage, saveCombo, saveStage, saveStageMirror, savePreset, saveTestTeto, saveWatcherTargets, type StageActionResult } from './stage-actions'
 import { ComboDrawer } from './combo-drawer'
+import { MirrorSection, type MirrorSource } from './mirror-section'
 import { StageDrawer, frontMetaText, mono } from './stage-drawer'
 import type { CanvasContext, CanvasPreset, CanvasStage } from './canvas-types'
 
@@ -53,7 +54,7 @@ export function StagesCanvas({
   ownPresets: boolean
   canEdit: boolean
   context: CanvasContext
-  otherFunnels: { id: string; name: string }[]
+  otherFunnels: MirrorSource[]
   metasHref: string
   boardHref: string
   initialStageId: string | null
@@ -122,6 +123,7 @@ export function StagesCanvas({
       meta: null,
       metaRoas: null,
       archivedAt: null,
+      mirror: null,
       fronts: [],
       watchers: [],
       tests: [],
@@ -256,6 +258,11 @@ export function StagesCanvas({
           </div>
         )}
         <div className="flex flex-wrap gap-1.5">
+          {stage.mirror && (
+            <span title="Vendas do outro funil que esta etapa mostra, sem somar no total do funil." className="max-w-full truncate rounded-full border border-[var(--ct-line-2)] px-2 py-0.5 text-[10.5px] text-[var(--ct-text-2)]">
+              espelho de {stage.mirror.funnelName}
+            </span>
+          )}
           <span className={`${mono} rounded-full bg-[var(--ct-surface-2)] px-2 py-0.5 text-[10.5px] text-[var(--ct-text-2)]`}>
             {stage.watchers.length} {stage.watchers.length === 1 ? 'vigia' : 'vigias'}
           </span>
@@ -509,6 +516,15 @@ export function StagesCanvas({
           canEdit={canEdit}
           context={context}
           otherFunnels={otherFunnels}
+          mirror={
+            <MirrorSection
+              stage={selectedStage}
+              sources={otherFunnels}
+              canEdit={canEdit}
+              pending={pending}
+              onSave={(fields) => run(null, () => saveStageMirror(context, selectedStage.id, fields), () => setToast(fields ? 'Espelho salvo.' : 'A etapa parou de espelhar.'))}
+            />
+          }
           metasHref={metasHref}
           boardHref={boardHref}
           pending={pending}
