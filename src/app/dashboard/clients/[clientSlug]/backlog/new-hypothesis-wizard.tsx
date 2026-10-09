@@ -74,6 +74,8 @@ export function NewHypothesisWizard({
   cancelHref,
   nextCode,
   stages,
+  funnelStages,
+  defaultFunnelStage,
   methods,
   serverError,
   defaultConversion,
@@ -84,6 +86,9 @@ export function NewHypothesisWizard({
   cancelHref: string
   nextCode: string
   stages: Option[]
+  /** The funnel's own stages (Captação, Vendas...): where the test's result is counted. */
+  funnelStages: Option[]
+  defaultFunnelStage: string
   methods: Option[]
   /** The error the server sent back on the last submit; its draft is restored when set. */
   serverError?: string
@@ -97,6 +102,7 @@ export function NewHypothesisWizard({
   const [title, setTitle] = useState('')
   const [hypothesis, setHypothesis] = useState('')
   const [stage, setStage] = useState('pagina')
+  const [funnelStage, setFunnelStage] = useState(defaultFunnelStage)
   const [method, setMethod] = useState('meta')
   const [scores, setScores] = useState({ impact: 5, confidence: 5, ease: 5 })
   const [metric, setMetric] = useState('')
@@ -122,6 +128,7 @@ export function NewHypothesisWizard({
       setTitle(draft.title ?? '')
       setHypothesis(draft.hypothesis ?? '')
       setStage(draft.stage ?? 'pagina')
+      setFunnelStage(draft.funnelStage ?? defaultFunnelStage)
       setMethod(draft.method ?? 'meta')
       setScores(draft.scores ?? { impact: 5, confidence: 5, ease: 5 })
       setMetric(draft.metric ?? '')
@@ -136,7 +143,7 @@ export function NewHypothesisWizard({
     } catch {
       // No storage (private window) or a broken draft: start clean.
     }
-  }, [draftKey, serverError, defaultConversion])
+  }, [draftKey, serverError, defaultConversion, defaultFunnelStage])
 
   const variantNames = variants.split('\n').map((name) => name.trim()).filter(Boolean).slice(0, 26)
   const linkNow = method === 'link' && createLink
@@ -165,7 +172,7 @@ export function NewHypothesisWizard({
           return
         }
         try {
-          sessionStorage.setItem(draftKey, JSON.stringify({ title, hypothesis, stage, method, scores, metric, owner, variants, createLink, testType, salesPageUrl, conversionMethod, urls }))
+          sessionStorage.setItem(draftKey, JSON.stringify({ title, hypothesis, stage, funnelStage, method, scores, metric, owner, variants, createLink, testType, salesPageUrl, conversionMethod, urls }))
         } catch {
           // Without storage the form still submits; only the restore on error is lost.
         }
@@ -213,12 +220,26 @@ export function NewHypothesisWizard({
 
         <section className="flex flex-col gap-4 border-b border-[var(--ct-line)] pb-6 last:border-b-0 last:pb-0">
           <h2 className="text-[20px] font-semibold">Onde e como testar?</h2>
-          <Why title="Por que escolher a etapa e o método">
-            A etapa diz em que ponto do funil a mudança acontece, e serve para filtrar e comparar testes depois. O método define como a Central mede: o
-            método errado mede a coisa errada (um teste de página não aparece no gasto por anúncio, por exemplo).
+          <Why title="Por que escolher onde testa e o método">
+            Onde testa diz em que ponto a mudança acontece (anúncio, página, checkout), e a etapa do funil diz de qual etapa é o resultado; os dois
+            servem para filtrar e comparar testes depois. O método define como a Central mede: o método errado mede a coisa errada (um teste de página
+            não aparece no gasto por anúncio, por exemplo).
           </Why>
+          {funnelStages.length > 0 && (
+            <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+              Etapa do funil
+              <select name="funnel_stage_id" value={funnelStage} onChange={(event) => setFunnelStage(event.target.value)} className={field}>
+                <option value="">nenhuma</option>
+                {funnelStages.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
-            Etapa do funil
+            Onde testa
             <select name="stage" value={stage} onChange={(event) => setStage(event.target.value)} className={field}>
               {stages.map((option) => (
                 <option key={option.value} value={option.value}>

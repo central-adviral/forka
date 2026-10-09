@@ -17,6 +17,7 @@ import { ConfirmDeleteButton } from '@/components/confirm-delete-button'
 import { createItem, decideItem, deleteItem, dropItem, editItem, linkAbTest, moveItem, saveRules, toggleGate, togglePublished } from './actions'
 import { PageHeader } from '@/components/page-header'
 import { headerPrimaryAction } from '@/components/header-actions'
+import { getFunnelStages } from '@/lib/repo/funnel-stages-repo'
 
 const mono = 'font-[family-name:var(--font-geist-mono)]'
 const field =
@@ -88,11 +89,17 @@ export default async function BacklogPage({
     )
   }
 
-  const [loadedItems, canEdit, { data: costWatcher }] = await Promise.all([
+  const [loadedItems, canEdit, { data: costWatcher }, stageRows] = await Promise.all([
     getBacklog(supabase, funnel.id),
     canActAs(supabase, client.id, 'gestor'),
     supabase.from('watchers').select('target').eq('sales_funnel_id', funnel.id).is('front_id', null).eq('metric', 'cpa_geral').maybeSingle(),
+    getFunnelStages(supabase, funnel.id),
   ])
+  // A new test starts in the first sale stage: most tests are judged by the CPA.
+  const funnelStages = stageRows.filter((stage) => !stage.archivedAt)
+  const funnelStageOptions = funnelStages.map((stage) => ({ value: stage.id, label: stage.name }))
+  const defaultFunnelStage = funnelStages.find((stage) => stage.measure === 'compra')?.id ?? ''
+  const stageName = new Map(stageRows.map((stage) => [stage.id, stage.name]))
   // The Meta tag gate the Central checks itself: an ad with the card's tag spent in the last days.
   // Shown done on the board and in the drawer; the move stores it (moveItem).
   const waitingMeta = loadedItems.filter((item) => item.method === 'meta' && (item.status === 'queue' || item.status === 'ready'))
@@ -209,6 +216,8 @@ export default async function BacklogPage({
               cancelHref={href('')}
               nextCode={nextCode(items.map((item) => item.code))}
               stages={Object.entries(STAGES).map(([value, label]) => ({ value, label }))}
+              funnelStages={funnelStageOptions}
+              defaultFunnelStage={defaultFunnelStage}
               methods={Object.entries(METHODS).map(([value, label]) => ({ value, label }))}
               serverError={erro}
               defaultConversion={funnel.resultado === 'lead' ? 'thank_you_page' : 'hubla_webhook'}
@@ -289,7 +298,8 @@ export default async function BacklogPage({
               <div>
                 <h2 className="text-[20px] font-semibold">{selected.title}</h2>
                 <p className="mt-1.5 text-[12.5px] text-[var(--ct-text-3)]">
-                  {STAGES[selected.stage]} · {METHODS[selected.method]} · ICE {selected.ice.toLocaleString('pt-BR')} (I{selected.impact} C{selected.confidence} F{selected.ease}){selected.owner ? ` · ${selected.owner}` : ''}
+                  {selected.funnelStageId && stageName.has(selected.funnelStageId) ? `Etapa ${stageName.get(selected.funnelStageId)} · ` : ''}
+                  Testa: {STAGES[selected.stage]} · {METHODS[selected.method]} · ICE {selected.ice.toLocaleString('pt-BR')} (I{selected.impact} C{selected.confidence} F{selected.ease}){selected.owner ? ` · ${selected.owner}` : ''}
                 </p>
               </div>
               {selected.hypothesis && <p className="text-[13.5px] leading-relaxed text-[var(--ct-text-2)]">{selected.hypothesis}</p>}
@@ -318,6 +328,19 @@ export default async function BacklogPage({
                       Responsável
                       <input name="owner" maxLength={60} defaultValue={selected.owner ?? ''} className={field} />
                     </label>
+                    {funnelStageOptions.length > 0 && (
+                      <label className="flex flex-col gap-1.5 text-xs text-[var(--ct-text-3)]">
+                        Etapa do funil
+                        <select name="funnel_stage_id" defaultValue={selected.funnelStageId ?? ''} className={field}>
+                          <option value="">nenhuma</option>
+                          {funnelStageOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                     {selected.abTestId ? (
                       <p className="text-[11.5px] text-[var(--ct-text-3)]">Os nomes das variantes ficam como estão: o link A/B vinculado os usa para achar a vencedora.</p>
                     ) : (

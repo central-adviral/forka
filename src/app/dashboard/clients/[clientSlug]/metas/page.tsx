@@ -96,7 +96,7 @@ export default async function MetasPage({
     <div className="flex max-w-[1240px] flex-col gap-9 px-4 md:px-14 pb-24 pt-12">
       <PageHeader
         title="Metas e vigias"
-        note="Cada vigia é uma métrica de um funil, com a meta que você aceita. As campanhas são as das Frentes e etiquetas, as mesmas das Análises; a frente é um recorte opcional. A cada sincronização ele olha o último dia fechado e abre um alerta em Alertas quando sai da faixa; o alerta fecha sozinho quando o número volta."
+        note="Cada vigia é uma métrica de um funil, com a meta que você aceita. As campanhas são as das Etapas e frentes, as mesmas das Análises; a frente é um recorte opcional. A cada sincronização ele olha o último dia fechado e abre um alerta em Alertas quando sai da faixa; o alerta fecha sozinho quando o número volta."
         actions={
           canEdit && (
             <form action={evaluateNow.bind(null, context)}>

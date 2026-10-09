@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import Link from 'next/link'
 
 export interface FrontDayRow {
@@ -33,8 +34,11 @@ export function FrontsPanel({
   rulesHref,
   currency,
   sales,
+  stageOf,
 }: {
   fronts: FrontInfo[]
+  /** Each front's stage name, the fronts already in stage order: the table gets a row per stage. */
+  stageOf?: Map<string, string>
   rows: FrontDayRow[]
   /** Entry sales and net revenue per own front (0095); null when the objective counts no sales. */
   sales: Map<string, { vendas: number; receita: number }> | null
@@ -46,7 +50,7 @@ export function FrontsPanel({
   if (fronts.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-[var(--ct-line-2)] p-6 text-sm text-[var(--ct-text-2)]">
-        Este funil ainda não tem frentes. Crie em <Link href={rulesHref} className="text-[var(--ct-accent)]">Frentes e etiquetas</Link>.
+        Este funil ainda não tem frentes. Crie em <Link href={rulesHref} className="text-[var(--ct-accent)]">Etapas e frentes</Link>.
       </p>
     )
   }
@@ -122,8 +126,16 @@ export function FrontsPanel({
             </tr>
           </thead>
           <tbody>
-            {totals.map((front) => (
-              <tr key={front.front.id} className="border-t border-[var(--ct-line)]">
+            {totals.map((front, index) => (
+              <Fragment key={front.front.id}>
+              {stageOf && stageOf.get(front.front.id) !== stageOf.get(totals[index - 1]?.front.id ?? '') && (
+                <tr className="border-t border-[var(--ct-line)] bg-[var(--ct-surface-2)]">
+                  <td colSpan={sales ? 14 : 11} className={`${mono} px-5 py-2 text-[10.5px] uppercase tracking-[0.06em] text-[var(--ct-text-3)]`}>
+                    Etapa {stageOf.get(front.front.id) ?? 'sem etapa'}
+                  </td>
+                </tr>
+              )}
+              <tr className="border-t border-[var(--ct-line)]">
                 <td className="whitespace-nowrap px-5 py-3">
                   <span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ background: front.color }} />
                   {front.front.name}
@@ -152,12 +164,13 @@ export function FrontsPanel({
                   <td key={i} className={`${mono} whitespace-nowrap px-5 py-3 text-right tabular-nums`}>{value}</td>
                 ))}
               </tr>
+              </Fragment>
             ))}
           </tbody>
         </table>
         <p className="border-t border-[var(--ct-line)] px-5 py-3 text-[11.5px] text-[var(--ct-text-3)]">
           Investimento com o imposto do cliente. Vendas de anúncio da frente: as que trazem na UTM o id de uma campanha dela (ou de um anúncio dela). Gasto sem dono fica fora das frentes, em Não classificado:{' '}
-          <Link href={rulesHref} className="text-[var(--ct-accent)]">ver em Frentes e etiquetas</Link>.
+          <Link href={rulesHref} className="text-[var(--ct-accent)]">ver em Etapas e frentes</Link>.
         </p>
       </div>
     </div>

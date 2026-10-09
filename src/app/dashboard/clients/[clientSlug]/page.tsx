@@ -282,7 +282,7 @@ export default async function TodayPage({
           {[
             { href: `${base}/funis-venda`, title: 'Análises', color: 'var(--ct-an)', stat: `${(funnels ?? []).filter((f) => f.is_active).length} funis ativos`, text: 'Frentes, caminho de conversão, origem das vendas e criativos de cada funil.' },
             { href: `${base}/tests`, title: 'Testes', color: 'var(--ct-ab)', stat: `${(activeTests ?? []).length} testes rodando`, text: 'Sorteio no clique, venda devolvida ao anúncio e veredito com probabilidade.' },
-            { href: firstProject ? `${base}/funis-venda/${firstProject.slug}/regras` : `${base}/funis-venda`, title: 'Frentes e etiquetas', color: 'var(--ct-painel)', stat: `${conflicts.length + orphans.length} campanhas sem dono`, text: 'Quem é dono de cada campanha, e o que fica em Não classificado.' },
+            { href: firstProject ? `${base}/funis-venda/${firstProject.slug}/regras` : `${base}/funis-venda`, title: 'Etapas e frentes', color: 'var(--ct-painel)', stat: `${conflicts.length + orphans.length} campanhas sem dono`, text: 'Quem é dono de cada campanha, e o que fica em Não classificado.' },
           ].map((door) => (
             <Link
               key={door.title}

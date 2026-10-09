@@ -104,7 +104,8 @@ export async function createProject(context: { client_id: string; client_slug: s
     return { error: failure }
   }
   revalidatePath('/dashboard', 'layout')
-  redirect(`/dashboard/clients/${context.client_slug}/funis-venda/${project.slug}/configurar`)
+  // The 0105 trigger already put each front in the stage of its metric: the next step is the journey.
+  redirect(`/dashboard/clients/${context.client_slug}/funis-venda/${project.slug}/regras`)
 }
 
 async function fillProject(

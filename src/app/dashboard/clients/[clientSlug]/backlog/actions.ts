@@ -42,6 +42,8 @@ const itemSchema = z.object({
   owner: z.string().trim().max(60),
   variants: z.string(),
 })
+// The funnel stage the test's result belongs to (0105); empty is none. The database checks it is of this funnel.
+const funnelStage = z.union([z.literal(''), z.uuid()]).transform((value) => value || null)
 
 export async function createItem(context: BacklogContext, formData: FormData) {
   const result = itemSchema.safeParse({
@@ -57,6 +59,8 @@ export async function createItem(context: BacklogContext, formData: FormData) {
     variants: formData.get('variants') ?? '',
   })
   if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '), '&nova=1')
+  const stage = funnelStage.safeParse(formData.get('funnel_stage_id') ?? '')
+  if (!stage.success) back(context, 'erro', 'Etapa do funil inválida.', '&nova=1')
   const names = result.data.variants.split('\n').map((name) => name.trim()).filter(Boolean).slice(0, 26)
   if (names.length < 2) back(context, 'erro', 'Liste pelo menos duas variantes, uma por linha (a primeira é o controle).', '&nova=1')
 
@@ -77,6 +81,7 @@ export async function createItem(context: BacklogContext, formData: FormData) {
       title: result.data.title,
       hypothesis: result.data.hypothesis,
       stage: result.data.stage,
+      funnel_stage_id: stage.data,
       method: result.data.method,
       impact: result.data.impact,
       confidence: result.data.confidence,
@@ -368,6 +373,9 @@ export async function editItem(context: BacklogContext & { item_id: string; code
     owner: formData.get('owner') ?? '',
   })
   if (!result.success) back(context, 'erro', result.error.issues.map((issue) => issue.message).join('; '), `&item=${context.code}`)
+  // Only the forms that show the stage select send it.
+  const stage = formData.has('funnel_stage_id') ? funnelStage.safeParse(formData.get('funnel_stage_id')) : null
+  if (stage && !stage.success) back(context, 'erro', 'Etapa do funil inválida.', `&item=${context.code}`)
   const variants: { id: string; name: string }[] = []
   for (const [field, value] of formData.entries()) {
     if (!field.startsWith('variant_')) continue
@@ -378,7 +386,7 @@ export async function editItem(context: BacklogContext & { item_id: string; code
   const supabase = await createServerSupabaseClient()
   const { data, error } = await supabase
     .from('backlog_items')
-    .update({ ...result.data, owner: result.data.owner || null })
+    .update({ ...result.data, owner: result.data.owner || null, ...(stage ? { funnel_stage_id: stage.data } : {}) })
     .eq('id', context.item_id)
     .select('id, ab_test_id')
   if (error || !data?.length) back(context, 'erro', error?.message ?? 'Só gestor ou owner pode editar testes.', `&item=${context.code}`)

@@ -20,6 +20,8 @@ export interface BacklogItem {
   title: string
   hypothesis: string
   stage: Stage
+  /** The funnel stage (0105) the test belongs to; backlog_items.stage is where it tests. */
+  funnelStageId: string | null
   method: Method
   status: BacklogStatus
   impact: number
@@ -44,7 +46,7 @@ export async function getBacklog(db: SupabaseClient, salesFunnelId: string): Pro
   const { data, error } = await db
     .from('backlog_items')
     .select(
-      'id, code, title, hypothesis, stage, method, status, impact, confidence, ease, ice, metric, owner, started_at, decided_at, result, winner_key, learning, published, ab_test_id, backlog_variants(id, key, name, status, position), backlog_gates(id, label, done_at, position)'
+      'id, code, title, hypothesis, stage, funnel_stage_id, method, status, impact, confidence, ease, ice, metric, owner, started_at, decided_at, result, winner_key, learning, published, ab_test_id, backlog_variants(id, key, name, status, position), backlog_gates(id, label, done_at, position)'
     )
     .eq('sales_funnel_id', salesFunnelId)
     .order('ice', { ascending: false })
@@ -55,6 +57,7 @@ export async function getBacklog(db: SupabaseClient, salesFunnelId: string): Pro
     title: string
     hypothesis: string
     stage: Stage
+    funnel_stage_id: string | null
     method: Method
     status: BacklogStatus
     impact: number
@@ -78,6 +81,7 @@ export async function getBacklog(db: SupabaseClient, salesFunnelId: string): Pro
     title: row.title,
     hypothesis: row.hypothesis,
     stage: row.stage,
+    funnelStageId: row.funnel_stage_id,
     method: row.method,
     status: row.status,
     impact: row.impact,

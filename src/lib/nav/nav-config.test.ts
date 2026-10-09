@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildNav, navHeading, projectSwitchHref, resolveActive, type BuildNavInput } from './nav-config'
+import { ANALYSIS_TABS } from '@/lib/domain/analysis-tabs'
 
 const slug = 'voe'
 const base = '/dashboard/clients/voe'
@@ -66,6 +67,13 @@ describe('buildNav: what each role sees', () => {
     expect(sectionIds(nav({ role: 'analista' }))).not.toContain('cliente')
     expect(subIds(nav({ role: 'analista' }), 'testes')).toEqual(['quadro', 'ab', 'aprendizados'])
     expect(subIds(nav({ role: 'gestor' }), 'testes')).toEqual(['quadro', 'ab', 'aprendizados', 'regras-jogo'])
+  })
+
+  it('names the stage screens the same in Configurar, Desempenho and the analysis tabs', () => {
+    const subs = nav().flatMap((group) => group.sections).flatMap((section) => section.subs)
+    expect(subs.find((sub) => sub.id === 'regras-campanha')).toMatchObject({ label: 'Etapas e frentes', desc: 'Monte a jornada, as etiquetas e as metas' })
+    expect(subs.find((sub) => sub.id === 'frentes')?.label).toBe('Etapas e frentes')
+    expect(ANALYSIS_TABS.find((tab) => tab.value === 'frentes')?.label).toBe('Etapas e frentes')
   })
 
   it('never shows the subsections that do not exist yet', () => {
