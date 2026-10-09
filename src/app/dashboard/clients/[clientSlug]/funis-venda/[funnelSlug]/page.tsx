@@ -28,6 +28,8 @@ import { ProjectStatusActions } from '../project-status'
 import { getCostCombos, getFunnelStages, getStageDaily, getStageOrigin } from '@/lib/repo/funnel-stages-repo'
 import { ComboCards, StagesPanel, stageTotals } from './stages-panel'
 
+const DEFAULT_PERIOD = '30d'
+
 export default async function SalesFunnelPage({
   params,
   searchParams,
@@ -36,11 +38,13 @@ export default async function SalesFunnelPage({
   searchParams: Promise<{ periodo?: string; desde?: string; ate?: string; aba?: string; frente?: string }>
 }) {
   const { clientSlug, funnelSlug } = await params
-  const { periodo, desde, ate, aba, frente } = await searchParams
+  const { periodo: periodoParam, desde, ate, aba, frente } = await searchParams
+  // Thirty days unless asked: "Tudo" reads every year at once and is chosen on purpose.
+  const periodo = periodoParam ?? DEFAULT_PERIOD
   const tab = readAnalysisTab(aba)
   // Links keep the period, the tab and the front together, whichever one the user changes.
   const withParams = (changes: Record<string, string | undefined>) => {
-    const merged = { periodo, desde, ate, aba: tab === 'visao' ? undefined : tab, frente, ...changes }
+    const merged = { periodo: periodoParam, desde, ate, aba: tab === 'visao' ? undefined : tab, frente, ...changes }
     const query = new URLSearchParams(Object.entries(merged).filter((entry): entry is [string, string] => Boolean(entry[1])))
     return query.size > 0 ? `?${query}` : '?'
   }
@@ -337,11 +341,11 @@ export default async function SalesFunnelPage({
 
       <div className="mb-6 flex flex-wrap gap-1.5">
         {REPORT_PERIODS.map((option) => {
-          const isActive = (periodo ?? 'all') === option.value
+          const isActive = periodo === option.value
           return (
             <a
               key={option.value}
-              href={withParams({ periodo: option.value === 'all' ? undefined : option.value, desde: undefined, ate: undefined })}
+              href={withParams({ periodo: option.value === DEFAULT_PERIOD ? undefined : option.value, desde: undefined, ate: undefined })}
               className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium ${
                 isActive
                   ? 'border-[var(--ct-accent)] bg-[var(--ct-accent)]/15 text-[var(--ct-accent)]'
