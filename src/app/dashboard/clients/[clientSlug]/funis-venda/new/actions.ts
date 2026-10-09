@@ -8,6 +8,8 @@ import { PROJECT_RESULTS } from '@/lib/domain/project-plan'
 import { PRODUCT_ROLES } from '@/lib/domain/product-roles'
 import { isSafeProbeUrl, pageKey } from '@/lib/domain/page-probe'
 import { PAGE_KINDS, PAGE_KIND_LABEL, blocksDraft, isBlocked, seals, type WizardProject } from '@/lib/domain/project-wizard'
+import { STAGE_NAME, measureOfMetric } from '@/lib/domain/funnel-stages'
+import { copyStages, createStage } from '@/lib/repo/funnel-stages-repo'
 
 // Writes run on the user's session: the policies of sales_funnels, project_fronts, naming_rules,
 // pages, watchers and project_products only let a gestor or owner of the client write them.
@@ -26,6 +28,7 @@ const projectSchema = z.object({
   startsOn: day,
   endsOn: day,
   duplicatedFrom: z.string().nullable(),
+  duplicatedFromId: z.uuid().nullable(),
   products: z.record(z.string().max(200), z.enum(PRODUCT_ROLES)),
   fronts: z
     .array(
@@ -121,6 +124,17 @@ async function fillProject(
     if (error) return error.message
   }
 
+  // A duplicate keeps the source's stages and combos, and each copied front its original's stage.
+  // Any other front lands in the stage of its metric's measure, made by the 0105 trigger.
+  let stageByCode = new Map<string, string>()
+  if (project.duplicatedFromId) {
+    try {
+      stageByCode = await copyStages(supabase, project.duplicatedFromId, funnelId)
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err)
+    }
+  }
+
   for (const [position, front] of project.fronts.entries()) {
     const mirror = front.kind === 'espelho'
     // The front's own metrics become its watchers through the 0102 trigger.
@@ -128,6 +142,7 @@ async function fillProject(
       .from('project_fronts')
       .insert({
         sales_funnel_id: funnelId,
+        stage_id: stageByCode.get(front.code.toUpperCase()) ?? null,
         code: front.code.toUpperCase(),
         name: front.name,
         position,
@@ -153,6 +168,29 @@ async function fillProject(
         pages.map((page) => ({ client_id: clientId, sales_funnel_id: funnelId, front_id: saved.id, url: page.url.trim(), label: `${PAGE_KIND_LABEL[page.kind]} · ${front.name}`, tipo: page.kind }))
       )
       if (pagesError) return pagesError.code === '23505' ? `Uma página da frente ${front.name} já está na sonda.` : pagesError.message
+    }
+  }
+
+  // A project with no front still has a stage where its result lives.
+  const { count: stages, error: stagesError } = await supabase.from('funnel_stages').select('id', { count: 'exact', head: true }).eq('sales_funnel_id', funnelId)
+  if (stagesError) return stagesError.message
+  if (!stages) {
+    const measure = measureOfMetric(project.primary)
+    const target = positive(project.primaryTarget)
+    try {
+      await createStage(supabase, funnelId, {
+        name: STAGE_NAME[measure],
+        tag: null,
+        measure,
+        position: 0,
+        parallel: false,
+        janelaInicio: null,
+        janelaFim: null,
+        meta: project.primary === measure ? target : null,
+        metaRoas: project.primary === 'roas' ? target : null,
+      })
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err)
     }
   }
 

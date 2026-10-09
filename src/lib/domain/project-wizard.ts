@@ -58,6 +58,8 @@ export interface WizardProject {
   fronts: WizardFront[]
   products: Record<string, ProductRole>
   duplicatedFrom: string | null
+  /** The project duplicated from: its stages and cost combos are copied too (0105). */
+  duplicatedFromId: string | null
 }
 
 interface FrontPreset {
@@ -152,7 +154,7 @@ export function newFront(projectName: string, preset: Partial<FrontPreset> & { n
 }
 
 export function emptyProject(): WizardProject {
-  return applyModel({ name: '', slug: '', slugEdited: false, model: null, primary: 'compra', primaryTarget: 0, secondary: 'lead', secondaryTarget: 0, startsOn: '', endsOn: '', fronts: [], products: {}, duplicatedFrom: null }, 'pago')
+  return applyModel({ name: '', slug: '', slugEdited: false, model: null, primary: 'compra', primaryTarget: 0, secondary: 'lead', secondaryTarget: 0, startsOn: '', endsOn: '', fronts: [], products: {}, duplicatedFrom: null, duplicatedFromId: null }, 'pago')
 }
 
 /** A model only pre-fills: metrics, targets and fronts with their pages. Name and dates stay. */
@@ -167,6 +169,7 @@ export function applyModel(project: WizardProject, model: ProjectModel): WizardP
     secondaryTarget: DEFAULT_TARGET[preset.secondary],
     fronts: preset.fronts.map((front) => newFront(project.name, front, preset)),
     duplicatedFrom: null,
+    duplicatedFromId: null,
   }
 }
 
@@ -405,5 +408,6 @@ export function duplicateProject(project: WizardProject, source: SourceProject):
     fronts,
     products: Object.fromEntries(source.products.map((product) => [product.produto_nome, product.papel])),
     duplicatedFrom: source.name,
+    duplicatedFromId: source.id,
   }
 }
