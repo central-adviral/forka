@@ -7,8 +7,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { canActAs } from '@/lib/view-as'
 import { readResult } from '@/lib/domain/project-plan'
-import { FUNNEL_MODELS, firstFrontCode, modelStages, resultadoOf, uniqueSlug, type FunnelModelKey } from '@/lib/domain/new-funnel'
-import { copyStages, createStages, getFunnelStages, getStagePresets } from '@/lib/repo/funnel-stages-repo'
+import { STAGE_MEASURES, type StageMeasure } from '@/lib/domain/funnel-stages'
+import { firstFrontCode, orderPlanned, plannedStagesIssues, resultadoOf, uniqueSlug, type PlannedStage } from '@/lib/domain/new-funnel'
+import { copyStages, createStages, getFunnelStages } from '@/lib/repo/funnel-stages-repo'
 
 // "Novo funil" in one screen (0107). Writes run on the user's session: the policies of sales_funnels,
 // funnel_stages, project_fronts, naming_rules, watchers and project_products only let a gestor or
@@ -18,21 +19,50 @@ export interface NewFunnelState {
   error: string | null
 }
 
-const newFunnelSchema = z.object({
-  name: z.string().trim().min(1, 'dê um nome para o funil').max(80, 'o nome tem até 80 letras'),
-  tag: z
+const tag = (max: number) =>
+  z
     .string()
-    .max(24, 'a etiqueta tem até 24 letras')
-    .transform((value) => value.toUpperCase().replace(/\s+/g, '') || null),
-  model: z.union([z.literal(''), z.enum(FUNNEL_MODELS.map((model) => model.key) as [FunnelModelKey, ...FunnelModelKey[]])]).transform((value) => value || null),
-  duplicate_from: z.union([z.literal(''), z.uuid()]).transform((value) => value || null),
-}).refine((value) => value.model || value.duplicate_from, 'escolha um modelo ou um funil para duplicar')
+    .max(max, `a etiqueta tem até ${max} letras`)
+    .transform((value) => value.toUpperCase().replace(/\s+/g, '') || null)
+
+const plannedStage = z.object({
+  name: z.string().trim().max(60, 'o nome da etapa tem até 60 letras'),
+  tag: tag(24),
+  measure: z.enum(STAGE_MEASURES as [StageMeasure, ...StageMeasure[]]),
+  parallel: z.boolean(),
+})
+
+// The stage list as the form edited it, in a hidden field: the stages to create, in the order shown.
+const stageList = z
+  .string()
+  .transform((value, ctx) => {
+    try {
+      return JSON.parse(value || '[]') as unknown
+    } catch {
+      ctx.addIssue({ code: 'custom', message: 'lista de etapas inválida' })
+      return z.NEVER
+    }
+  })
+  .pipe(z.array(plannedStage))
+
+const newFunnelSchema = z
+  .object({
+    name: z.string().trim().min(1, 'dê um nome para o funil').max(80, 'o nome tem até 80 letras'),
+    tag: tag(24),
+    stages: stageList,
+    duplicate_from: z.union([z.literal(''), z.uuid()]).transform((value) => value || null),
+  })
+  .superRefine((value, ctx) => {
+    // A duplicate copies the real stages of its source; the list is only read for a funnel built here.
+    if (value.duplicate_from) return
+    for (const message of plannedStagesIssues(value.stages)) ctx.addIssue({ code: 'custom', message })
+  })
 
 export async function createFunnel(context: { client_id: string; client_slug: string }, _previous: NewFunnelState, formData: FormData): Promise<NewFunnelState> {
   const parsed = newFunnelSchema.safeParse({
     name: formData.get('name') ?? '',
     tag: formData.get('tag') ?? '',
-    model: formData.get('model') ?? '',
+    stages: formData.get('stages') ?? '',
     duplicate_from: formData.get('duplicate_from') ?? '',
   })
   if (!parsed.success) return { error: parsed.error.issues.map((issue) => issue.message).join('; ') }
@@ -46,7 +76,7 @@ export async function createFunnel(context: { client_id: string; client_slug: st
 
   const source = input.duplicate_from ? await readSource(supabase, context.client_id, input.duplicate_from) : null
   if (input.duplicate_from && !source) return { error: 'Funil de origem não encontrado.' }
-  const planned = source ? null : modelStages(input.model ?? 'perpetuo', await getStagePresets(supabase, context.client_id))
+  const planned = source ? null : orderPlanned(input.stages)
 
   // Born with the resultado its stages give, so its history starts right (0104, 0107).
   const { data: funnel, error } = await supabase
@@ -101,8 +131,8 @@ async function readSource(supabase: SupabaseClient, clientId: string, sourceId: 
   }
 }
 
-/** The model's stages in one insert, each with one front of its own to receive the campaign tags. */
-async function fillFromModel(supabase: SupabaseClient, funnelId: string, planned: ReturnType<typeof modelStages>): Promise<string | null> {
+/** The edited stages in one insert, each with one front of its own to receive the campaign tags. */
+async function fillFromModel(supabase: SupabaseClient, funnelId: string, planned: PlannedStage[]): Promise<string | null> {
   const stages = await createStages(
     supabase,
     funnelId,

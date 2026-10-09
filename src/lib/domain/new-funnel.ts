@@ -10,7 +10,7 @@ export type PageKind = 'captura' | 'obrigado' | 'vendas' | 'checkout'
 export const PAGE_KINDS: PageKind[] = ['captura', 'obrigado', 'vendas', 'checkout']
 export const PAGE_KIND_LABEL: Record<PageKind, string> = { captura: 'Captura', obrigado: 'Obrigado', vendas: 'Vendas', checkout: 'Checkout' }
 
-export type FunnelModelKey = 'lancamento_completo' | 'lancamento' | 'perpetuo_ascensao' | 'perpetuo'
+export type FunnelModelKey = 'lancamento_completo' | 'lancamento' | 'perpetuo_ascensao' | 'perpetuo' | 'do_zero'
 
 export interface FunnelModel {
   key: FunnelModelKey
@@ -32,6 +32,7 @@ export const FUNNEL_MODELS: FunnelModel[] = [
   { key: 'lancamento', name: 'Lançamento', text: 'Captação, lembrete e vendas no mesmo funil.', stages: [stage('Captação'), stage('Lembrete do evento'), stage('Vendas')] },
   { key: 'perpetuo_ascensao', name: 'Perpétuo + ascensão', text: 'Venda direta e a ascensão para o produto maior.', stages: [stage('Vendas'), stage('Ascensão')] },
   { key: 'perpetuo', name: 'Perpétuo', text: 'Só venda direta.', stages: [stage('Vendas')] },
+  { key: 'do_zero', name: 'Do zero', text: 'Monte as etapas uma a uma.', stages: [] },
 ]
 
 export interface PlannedStage {
@@ -56,6 +57,35 @@ export function modelStages(key: FunnelModelKey, presets: Pick<StagePreset, 'nam
     return { name: preset.name, tag: preset.tag, measure: preset.measure, parallel: item.parallel }
   })
   return [...planned.filter((item) => item.parallel), ...planned.filter((item) => !item.parallel)].map((item, position) => ({ ...item, position }))
+}
+
+export const MAX_PLANNED_STAGES = 12
+
+export type StageDraft = Omit<PlannedStage, 'position'>
+
+/** What keeps the edited stage list from being created, in the screen's words; empty when it can be. */
+export function plannedStagesIssues(stages: Pick<StageDraft, 'name' | 'tag'>[]): string[] {
+  const issues: string[] = []
+  if (stages.length === 0) issues.push('monte ao menos uma etapa')
+  if (stages.length > MAX_PLANNED_STAGES) issues.push(`até ${MAX_PLANNED_STAGES} etapas por funil`)
+  if (stages.some((item) => !item.name.trim())) issues.push('dê um nome para cada etapa')
+  const tags = stages.flatMap((item) => (item.tag ? [item.tag.toUpperCase()] : []))
+  for (const tag of new Set(tags.filter((tag, index) => tags.indexOf(tag) !== index))) issues.push(`etiqueta ${tag} repetida`)
+  return issues
+}
+
+/** The edited list in the order the canvas saves: parallel stages first, then the sequence. */
+export function orderPlanned(stages: StageDraft[]): PlannedStage[] {
+  return [...stages.filter((item) => item.parallel), ...stages.filter((item) => !item.parallel)].map((item, position) => ({ ...item, position }))
+}
+
+/** The list with the item at index moved one step up (-1) or down (+1); unchanged at an edge. */
+export function moveItem<T>(list: T[], index: number, delta: -1 | 1): T[] {
+  const to = index + delta
+  if (index < 0 || index >= list.length || to < 0 || to >= list.length) return list
+  const next = [...list]
+  ;[next[index], next[to]] = [next[to], next[index]]
+  return next
 }
 
 /** What a new funnel's resultado is, so its versioned history starts right: its result stage's measure. */

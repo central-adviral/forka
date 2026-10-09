@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { DEFAULT_STAGE_PRESETS, type CostCombo, type Stage, type StageMeasure, type StagePreset } from '@/lib/domain/funnel-stages'
+import type { RemovalFacts } from '@/lib/domain/stage-removal'
 
 // Etapas no funil (0105). Reads run on the user's session (RLS: cliente reads); writes go through the
 // same policies as fronts, so only a gestor or owner of the client (or staff admin) writes them.
@@ -253,6 +254,45 @@ export async function setStageArchived(db: SupabaseClient, stageId: string, arch
   const { data, error } = await db.from('funnel_stages').update({ archived_at: archived ? new Date().toISOString() : null }).eq('id', stageId).select('id')
   if (error) throw new Error(stageWriteError(error))
   if (!data?.length) throw new Error('Só gestor ou owner pode arquivar a etapa.')
+}
+
+/** What the funnel's stages and fronts have taken so far, to tell what can be removed for good. */
+export async function getRemovalFacts(db: SupabaseClient, salesFunnelId: string): Promise<RemovalFacts> {
+  const [stages, combos] = await Promise.all([getFunnelStages(db, salesFunnelId), getCostCombos(db, salesFunnelId)])
+  const frontIds = stages.flatMap((stage) => stage.fronts.map((front) => front.id))
+  const none = { data: [], error: null }
+  const [campaigns, pages, watchers, tests] = await Promise.all([
+    frontIds.length ? db.from('campaign_fronts').select('front_id').in('front_id', frontIds) : none,
+    frontIds.length ? db.from('pages').select('front_id').in('front_id', frontIds) : none,
+    db.from('watchers').select('front_id, stage_id').eq('sales_funnel_id', salesFunnelId),
+    db.from('backlog_items').select('funnel_stage_id').eq('sales_funnel_id', salesFunnelId).not('funnel_stage_id', 'is', null),
+  ])
+  const failed = campaigns.error ?? pages.error ?? watchers.error ?? tests.error
+  if (failed) throw failed
+  return {
+    stages: stages.map((stage) => ({ id: stage.id, archivedAt: stage.archivedAt, fronts: stage.fronts.map((front) => ({ id: front.id, rules: front.rules.length })) })),
+    campaignFrontIds: ((campaigns.data ?? []) as { front_id: string }[]).map((row) => row.front_id),
+    pageFrontIds: ((pages.data ?? []) as { front_id: string }[]).map((row) => row.front_id),
+    watchers: ((watchers.data ?? []) as { front_id: string | null; stage_id: string | null }[]).map((row) => ({ frontId: row.front_id, stageId: row.stage_id })),
+    testStageIds: ((tests.data ?? []) as { funnel_stage_id: string }[]).map((row) => row.funnel_stage_id),
+    combos: combos.map((combo) => ({ stageIds: combo.stageIds, overStageId: combo.overStageId })),
+  }
+}
+
+/** Deletes an unused stage with its fronts; the caller checks it is unused (stageInUse) right before. */
+export async function deleteStage(db: SupabaseClient, salesFunnelId: string, stageId: string): Promise<void> {
+  const { error: frontsError } = await db.from('project_fronts').delete().eq('sales_funnel_id', salesFunnelId).eq('stage_id', stageId)
+  if (frontsError) throw new Error(stageWriteError(frontsError))
+  const { data, error } = await db.from('funnel_stages').delete().eq('sales_funnel_id', salesFunnelId).eq('id', stageId).select('id')
+  if (error) throw new Error(stageWriteError(error))
+  if (!data?.length) throw new Error('Só gestor ou owner pode remover a etapa.')
+}
+
+/** Deletes an unused front; the caller checks it is unused (frontInUse) right before. */
+export async function deleteFront(db: SupabaseClient, salesFunnelId: string, frontId: string): Promise<void> {
+  const { data, error } = await db.from('project_fronts').delete().eq('sales_funnel_id', salesFunnelId).eq('id', frontId).select('id')
+  if (error) throw new Error(stageWriteError(error))
+  if (!data?.length) throw new Error('Só gestor ou owner pode remover a frente.')
 }
 
 /** The stage must be of the front's own project and open; the owners freeze first if the tag changes. */

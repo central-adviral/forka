@@ -28,6 +28,8 @@ export interface CanvasFront {
   spend: number
   /** The pages linked to the front (pages.front_id), watched in Alertas › Páginas. */
   pages: { id: string; url: string; tipo: PageKind | null; isActive: boolean }[]
+  /** Why it cannot be removed for good, only archived; null when it never took data. */
+  inUse: string | null
 }
 
 export interface CanvasWatcher {
@@ -68,6 +70,10 @@ export interface CanvasStage extends Stage {
   tests: CanvasTest[]
   /** Who follows this stage's meta and who has a number of its own, for the line before a change. */
   followers: StageFollowers
+  /** Why it cannot be removed for good, only archived; null when it and its fronts never took data. */
+  inUse: string | null
+  /** The funnel's only open stage: neither removed nor archived. */
+  lastOpen: boolean
 }
 
 export interface CanvasPreset {

@@ -38,7 +38,8 @@ describe('resolveActive: the active section and subsection come from the URL onl
   it('keeps the section but no subsection on pages that are none of them, and nothing off the client', () => {
     expect(resolveActive(`${base}/tests/oferta`, '', '', slug)).toEqual({ section: 'testes', sub: null })
     expect(resolveActive(`${base}/funis-venda`, '', '', slug)).toEqual({ section: 'desempenho', sub: null })
-    expect(resolveActive(`${base}/funis-venda/new`, '', '', slug)).toEqual({ section: 'desempenho', sub: null })
+    expect(resolveActive(`${base}/funis-venda/new`, '', '', slug)).toEqual({ section: 'projeto', sub: null })
+    expect(navHeading(resolveActive(`${base}/funis-venda/new`, '', '', slug))).toMatchObject({ group: 'Configurar', section: 'Funil', sub: null })
     expect(resolveActive('/dashboard', '', '', slug)).toBeNull()
     expect(resolveActive('/dashboard/clients/outro', '', '', slug)).toBeNull()
   })

@@ -83,11 +83,11 @@ export function StagesPanel({
                 )}
                 {stage.measure === 'compra' && stage.metaRoas ? ` · ROAS ≥ ${stage.metaRoas.toLocaleString('pt-BR')}` : ''}
               </span>
-              <div className="mt-3 grid grid-cols-3 gap-x-3.5 gap-y-4 border-t border-[var(--ct-line)] pt-4">
+              <div className="mt-3 grid gap-x-5 gap-y-4 border-t border-[var(--ct-line)] pt-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,8.5rem),1fr))]">
                 {cells.map(([label, value, cellTone]) => (
-                  <div key={label}>
+                  <div key={label} className="min-w-0">
                     <small className="block text-[11px] text-[var(--ct-text-3)]">{label}</small>
-                    <b className={`${mono} text-[14px] font-medium ${cellTone ? TONE[cellTone] : ''}`}>{value}</b>
+                    <b className={`${mono} block text-[14px] font-medium tabular-nums [overflow-wrap:anywhere] ${cellTone ? TONE[cellTone] : ''}`}>{value}</b>
                   </div>
                 ))}
               </div>

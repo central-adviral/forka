@@ -107,6 +107,8 @@ export function StageDrawer({
   onSave,
   onPlace,
   onArchive,
+  onRemove,
+  onRemoveFront,
   onSavePreset,
   onMoveFront,
   onSaveWatcher,
@@ -129,6 +131,8 @@ export function StageDrawer({
   onSave: (fields: StageFields) => void
   onPlace: (parallel: boolean, index: number | null) => void
   onArchive: () => void
+  onRemove: () => void
+  onRemoveFront: (frontId: string) => void
   onSavePreset: () => void
   onMoveFront: (frontId: string, stageId: string) => void
   onSaveWatcher: (watcherId: string, input: WatcherTargetsInput) => void
@@ -244,7 +248,19 @@ export function StageDrawer({
           <button type="button" className={smallButton} disabled={pending} onClick={onSavePreset}>
             Salvar como etapa pronta
           </button>
-          <ConfirmButton label="Arquivar etapa" warning="Arquivar a etapa? Frentes ativas precisam sair antes." onConfirm={onArchive} disabled={pending} />
+          {!stage.lastOpen &&
+            (stage.inUse === null ? (
+              <ConfirmButton danger label="Remover etapa" warning="Remover a etapa e as frentes vazias dela? Não dá para desfazer." onConfirm={onRemove} disabled={pending} />
+            ) : (
+              <ConfirmButton label="Arquivar etapa" warning="Arquivar a etapa? Frentes ativas precisam sair antes." onConfirm={onArchive} disabled={pending} />
+            ))}
+          <p className="basis-full text-[12px] text-[var(--ct-text-3)]">
+            {stage.lastOpen
+              ? 'É a última etapa aberta do funil: não dá para remover nem arquivar.'
+              : stage.inUse === null
+                ? 'A etapa ainda não pegou dado nenhum: dá para remover de vez.'
+                : `${stage.inUse}: só dá para arquivar, o histórico fica.`}
+          </p>
         </div>
       )}
 
@@ -261,6 +277,8 @@ export function StageDrawer({
             editingRule={editingRule}
             onEditRule={setEditingRule}
             onMove={(stageId) => onMoveFront(front.id, stageId)}
+            onRemove={() => onRemoveFront(front.id)}
+            pending={pending}
           />
         ))}
         {canEdit && (
@@ -501,11 +519,16 @@ function draftOf(stage: CanvasStage): StageFields {
 }
 
 /** A two-step button for a client-side action, the same look as ConfirmDeleteButton. */
-export function ConfirmButton({ label: text, warning, onConfirm, disabled }: { label: string; warning: string; onConfirm: () => void; disabled?: boolean }) {
+export function ConfirmButton({ label: text, warning, onConfirm, disabled, danger }: { label: string; warning: string; onConfirm: () => void; disabled?: boolean; danger?: boolean }) {
   const [confirming, setConfirming] = useState(false)
   if (!confirming) {
     return (
-      <button type="button" disabled={disabled} onClick={() => setConfirming(true)} className={`${smallButton} hover:!border-[var(--ct-crit)] hover:!text-[var(--ct-crit)]`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setConfirming(true)}
+        className={`${smallButton} hover:!border-[var(--ct-crit)] hover:!text-[var(--ct-crit)] ${danger ? '!border-[color-mix(in_srgb,var(--ct-crit)_45%,transparent)] !text-[var(--ct-crit)]' : ''}`}
+      >
         {text}
       </button>
     )
@@ -539,6 +562,8 @@ function FrontItem({
   editingRule,
   onEditRule,
   onMove,
+  onRemove,
+  pending,
 }: {
   front: CanvasFront
   stage: CanvasStage
@@ -548,6 +573,8 @@ function FrontItem({
   editingRule: string | null
   onEditRule: (ruleId: string | null) => void
   onMove: (stageId: string) => void
+  onRemove: () => void
+  pending: boolean
 }) {
   const frontContext = { ...context, front_id: front.id }
   const includes = front.rules.filter((rule) => rule.kind === 'include')
@@ -737,12 +764,19 @@ function FrontItem({
               </div>
             </form>
           </details>
-          <span className="ml-auto">
-            <ConfirmDeleteButton
-              action={setFrontArchived.bind(null, { ...frontContext, code: front.code }, true)}
-              label="Arquivar"
-              warning="Arquivar? As campanhas dela ficam no histórico, novas não entram."
-            />
+          <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
+            {front.inUse === null ? (
+              <ConfirmButton danger label="Remover" warning="Remover a frente vazia? Não dá para desfazer." onConfirm={onRemove} disabled={pending} />
+            ) : (
+              <>
+                <span className="text-[11.5px] text-[var(--ct-text-3)]">{front.inUse}</span>
+                <ConfirmDeleteButton
+                  action={setFrontArchived.bind(null, { ...frontContext, code: front.code }, true)}
+                  label="Arquivar"
+                  warning="Arquivar? As campanhas dela ficam no histórico, novas não entram."
+                />
+              </>
+            )}
           </span>
         </div>
       )}
