@@ -60,14 +60,25 @@ export default async function SalesFunnelPage({
 
   const { since, until } = resolvePeriodDateRange(periodo, desde, ate)
   // The stage cards (Etapas e frentes) and the combo cards (Resumo) read the stages of the period.
+  // The stage reads are heavy and run beside a dozen other reports, so the Resumo only pays for
+  // them when a combo is on, and only the stage cards read the origins.
+  const loadStages = async () => {
+    const combos = await getCostCombos(supabase, funnel.id)
+    const none = { stages: [] as Awaited<ReturnType<typeof getFunnelStages>>, daily: [] as Awaited<ReturnType<typeof getStageDaily>>, origins: [] as Awaited<ReturnType<typeof getStageOrigin>> }
+    if (tab === 'visao' && !combos.some((combo) => combo.enabled)) return [none.stages, none.daily, none.origins, combos] as const
+    const [stages, daily, origins] = await Promise.all([
+      getFunnelStages(supabase, funnel.id),
+      getStageDaily(supabase, funnel.id, since, until),
+      tab === 'frentes' ? getStageOrigin(supabase, funnel.id, since, until) : Promise.resolve(none.origins),
+    ])
+    return [stages, daily, origins, combos] as const
+  }
   const stagesData =
     tab === 'frentes' || tab === 'visao'
-      ? Promise.all([getFunnelStages(supabase, funnel.id), getStageDaily(supabase, funnel.id, since, until), getStageOrigin(supabase, funnel.id, since, until), getCostCombos(supabase, funnel.id)]).catch(
-          (error) => {
-            console.error('[funnel-stages-report-failed]', { salesFunnelId: funnel.id }, error)
-            return null
-          }
-        )
+      ? loadStages().catch((error) => {
+          console.error('[funnel-stages-report-failed]', { salesFunnelId: funnel.id }, error)
+          return null
+        })
       : Promise.resolve(null)
   const [rows, health, paymentBreakdown, creativeResult, productResult, hourResult, salesByOrigin, { count: taxRates }, { data: frontRows }, { data: frontDays }, { data: qualityRows }, { data: frontSalesRows }, { data: crossRows }, { data: planRows }] = await Promise.all([
     getDailyFunnel(supabase, funnel.id, since, until),
